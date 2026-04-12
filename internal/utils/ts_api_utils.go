@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"math"
+	"strconv"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -55,13 +58,75 @@ func IsTypeParameter(t *checker.Type) bool {
 	return IsTypeFlagSet(t, checker.TypeFlagsTypeParameter)
 }
 func IsBooleanLiteralType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsBoolean)
+	return IsTypeFlagSet(t, checker.TypeFlagsBooleanLiteral)
 }
+
+// IsTrueLiteralType checks if the type is the boolean literal `true`.
+// Handles both TypeFlagsBooleanLiteral (literal `true`) and TypeFlagsBoolean
+// (widened boolean that is actually `true` from const narrowing).
 func IsTrueLiteralType(t *checker.Type) bool {
-	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "true"
+	flags := checker.Type_flags(t)
+	if flags&checker.TypeFlagsBooleanLiteral != 0 {
+		val := t.AsLiteralType().Value()
+		if b, ok := val.(bool); ok {
+			return b
+		}
+		return false
+	}
+	// For TypeFlagsBoolean used by const narrowing (e.g., `const x = true`)
+	if flags&checker.TypeFlagsBoolean != 0 && IsIntrinsicType(t) {
+		return t.AsIntrinsicType().IntrinsicName() == "true"
+	}
+	return false
 }
+
+// IsFalseLiteralType checks if the type is the boolean literal `false`.
 func IsFalseLiteralType(t *checker.Type) bool {
-	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "false"
+	flags := checker.Type_flags(t)
+	if flags&checker.TypeFlagsBooleanLiteral != 0 {
+		val := t.AsLiteralType().Value()
+		if b, ok := val.(bool); ok {
+			return !b
+		}
+		return false
+	}
+	if flags&checker.TypeFlagsBoolean != 0 && IsIntrinsicType(t) {
+		return t.AsIntrinsicType().IntrinsicName() == "false"
+	}
+	return false
+}
+
+// IsTypeFlagSetWithUnion checks type flags, iterating through union constituents.
+// This matches typescript-eslint's isTypeFlagSet which aggregates union constituent flags.
+func IsTypeFlagSetWithUnion(t *checker.Type, flags checker.TypeFlags) bool {
+	for _, part := range UnionTypeParts(t) {
+		if IsTypeFlagSet(part, flags) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsNullableType checks if the type includes null, undefined, void, any or unknown.
+// This matches typescript-eslint's isNullableType utility.
+func IsNullableType(t *checker.Type) bool {
+	return Some(UnionTypeParts(t), func(part *checker.Type) bool {
+		return IsTypeFlagSet(part, checker.TypeFlagsAny|checker.TypeFlagsUnknown|checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid)
+	})
+}
+
+// IsPossiblyFalsy checks if any union constituent of the type could be falsy.
+func IsPossiblyFalsy(t *checker.Type) bool {
+	return Some(UnionTypeParts(t), func(part *checker.Type) bool {
+		return isConstituentPossiblyFalsy(part)
+	})
+}
+
+// IsPossiblyTruthy checks if any union constituent of the type could be truthy.
+func IsPossiblyTruthy(t *checker.Type) bool {
+	return Some(UnionTypeParts(t), func(part *checker.Type) bool {
+		return isConstituentPossiblyTruthy(part)
+	})
 }
 
 func GetCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
@@ -356,4 +421,131 @@ func canHaveTrailingTrivia(token *ast.Node) bool {
 // @internal
 func isJsxElementOrFragment(node *ast.Node) bool {
 	return node.Kind == ast.KindJsxElement || node.Kind == ast.KindJsxFragment
+}
+
+// isNumberLiteralZeroOrNaN checks if a number literal type value is 0 or NaN.
+// tsgo stores number literal values as a named float64 type,
+// so we use ValueToString for reliable string conversion and then parse.
+func isNumberLiteralZeroOrNaN(val interface{}) bool {
+	s := checker.ValueToString(val)
+	if s == "0" || s == "-0" || s == "NaN" {
+		return true
+	}
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return false
+	}
+	return f == 0 || math.IsNaN(f)
+}
+
+func isConstituentPossiblyFalsy(t *checker.Type) bool {
+	flags := checker.Type_flags(t)
+	if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsTypeVariable != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsNever != 0 {
+		return false
+	}
+	if flags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid) != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsBooleanLike != 0 {
+		if IsTrueLiteralType(t) {
+			return false // `true` literal is never falsy
+		}
+		if IsFalseLiteralType(t) {
+			return true // `false` literal is always falsy
+		}
+		return true // general `boolean` is possibly falsy
+	}
+	if flags&checker.TypeFlagsStringLiteral != 0 {
+		if s, ok := t.AsLiteralType().Value().(string); ok {
+			return s == ""
+		}
+		return false
+	}
+	if flags&checker.TypeFlagsString != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsNumberLiteral != 0 {
+		return isNumberLiteralZeroOrNaN(t.AsLiteralType().Value())
+	}
+	if flags&checker.TypeFlagsNumber != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsBigIntLiteral != 0 {
+		return checker.ValueToString(t.AsLiteralType().Value()) == "0n"
+	}
+	if flags&checker.TypeFlagsBigInt != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsEnumLiteral != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsUnion != 0 {
+		return IsPossiblyFalsy(t)
+	}
+	if flags&checker.TypeFlagsIntersection != 0 {
+		return Some(t.Types(), isConstituentPossiblyFalsy)
+	}
+	return false
+}
+
+func isConstituentPossiblyTruthy(t *checker.Type) bool {
+	flags := checker.Type_flags(t)
+	if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsTypeVariable != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsNever != 0 {
+		return false
+	}
+	if flags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid) != 0 {
+		return false
+	}
+	if flags&checker.TypeFlagsBooleanLike != 0 {
+		if IsFalseLiteralType(t) {
+			return false // `false` literal is never truthy
+		}
+		if IsTrueLiteralType(t) {
+			return true // `true` literal is always truthy
+		}
+		return true // general `boolean` is possibly truthy
+	}
+	if flags&checker.TypeFlagsStringLiteral != 0 {
+		if s, ok := t.AsLiteralType().Value().(string); ok {
+			return s != ""
+		}
+		return true
+	}
+	if flags&checker.TypeFlagsString != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsNumberLiteral != 0 {
+		return !isNumberLiteralZeroOrNaN(t.AsLiteralType().Value())
+	}
+	if flags&checker.TypeFlagsNumber != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsBigIntLiteral != 0 {
+		return checker.ValueToString(t.AsLiteralType().Value()) != "0n"
+	}
+	if flags&checker.TypeFlagsBigInt != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsEnumLiteral != 0 {
+		return true
+	}
+	if flags&checker.TypeFlagsUnion != 0 {
+		return IsPossiblyTruthy(t)
+	}
+	if flags&checker.TypeFlagsIntersection != 0 {
+		return Every(t.Types(), isConstituentPossiblyTruthy)
+	}
+	return true
 }

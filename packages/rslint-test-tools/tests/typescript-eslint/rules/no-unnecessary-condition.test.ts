@@ -534,6 +534,23 @@ while (0) {}
       `,
       options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
     },
+    // only-allowed-literals applies to all loop types (for, do-while, while)
+    {
+      code: `for (; true; ) {}`,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `for (; 0; ) {}`,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `do {} while (0);`,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `do {} while (true);`,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
     `
 let variable = 'abc' as string | void;
 variable?.[0];
@@ -1135,6 +1152,33 @@ assertString('falafel');
       code: `
 declare function isString(x: unknown): x is string;
 isString('falafel');
+      `,
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // string | number | bigint is not a subtype of string | number
+      code: `
+declare function isStringOrNumber(x: unknown): x is string | number;
+declare const s: string | number | bigint;
+if (isStringOrNumber(s)) {
+}
+      `,
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // Narrower is not a subtype of Wider
+      code: `
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b: number;
+}
+declare function isNarrower(x: unknown): x is Narrower;
+declare const w: Wider;
+if (isNarrower(w)) {
+}
       `,
       options: [{ checkTypePredicates: true }],
     },
@@ -2082,27 +2126,8 @@ do {} while (test);
       errors: [{ column: 14, line: 4, messageId: 'alwaysTruthy' }],
       options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
     },
-    {
-      code: `
-for (; true; ) {}
-      `,
-      errors: [{ column: 8, line: 2, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `
-for (; 0; ) {}
-      `,
-      errors: [{ column: 8, line: 2, messageId: 'alwaysFalsy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `
-do {} while (0);
-      `,
-      errors: [{ column: 14, line: 2, messageId: 'alwaysFalsy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
+    // for/do-while with only-allowed-literals: true/false/0/1 are now valid
+    // (moved to valid section to match upstream behavior)
     {
       code: `
 let shouldRun = true;
@@ -3046,20 +3071,14 @@ if (x) {
 }
       `,
       errors: [
-        {
-          column: 1,
-          line: 0,
-          messageId: 'noStrictNullCheck',
-        },
-        {
-          column: 5,
-          line: 3,
-          messageId: 'alwaysTruthy',
-        },
+        { column: 1, line: 0, messageId: 'noStrictNullCheck' },
+        { column: 5, line: 3, messageId: 'alwaysTruthy' },
       ],
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
+          project: './tsconfig.unstrict.json',
+          projectService: false,
+          tsconfigRootDir: getFixturesRootDir(),
         },
       },
     },
@@ -3518,6 +3537,68 @@ isString('fa' + 'lafel');
       ],
       options: [{ checkTypePredicates: true }],
     },
+    {
+      // string is a strict subtype of string | number.
+      code: `
+declare function isStringOrNumber(x: unknown): x is string | number;
+declare const s: string;
+if (isStringOrNumber(s)) {
+}
+      `,
+      errors: [
+        {
+          line: 4,
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // Narrower (with optional) is a subtype of Wider
+      code: `
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b?: number;
+}
+declare function isWider(x: unknown): x is Wider;
+declare const n: Narrower;
+if (isWider(n)) {
+}
+      `,
+      errors: [
+        {
+          line: 11,
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // Wider is assignable to Narrower (with optional property)
+      code: `
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b?: number;
+}
+declare function isNarrower(x: unknown): x is Narrower;
+declare const w: Wider;
+if (isNarrower(w)) {
+}
+      `,
+      errors: [
+        {
+          line: 11,
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
 
     // "branded" types
     unnecessaryConditionTest('"" & {}', 'alwaysFalsy'),
@@ -3797,11 +3878,7 @@ arr2[42]?.x?.y.z;
         },
       ],
       languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noUncheckedIndexedAccess.json',
-          projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
-        },
+        parserOptions: optionsWithNoUncheckedIndexedAccess,
       },
     },
     {
@@ -3822,11 +3899,7 @@ if (arr[0]) {
         },
       ],
       languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noUncheckedIndexedAccess.json',
-          projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
-        },
+        parserOptions: optionsWithNoUncheckedIndexedAccess,
       },
     },
     {
@@ -3846,11 +3919,7 @@ if (arr[42] && arr[42]) {
         },
       ],
       languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noUncheckedIndexedAccess.json',
-          projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
-        },
+        parserOptions: optionsWithNoUncheckedIndexedAccess,
       },
     },
   ],

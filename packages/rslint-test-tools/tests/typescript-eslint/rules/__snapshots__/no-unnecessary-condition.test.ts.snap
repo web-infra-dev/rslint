@@ -1,0 +1,5241 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-condition > invalid 1`] = `
+{
+  "code": "
+const b1 = true;
+declare const b2: boolean;
+const t1 = b1 && b2;
+const t2 = b1 || b2;
+if (b1 && b2) {
+}
+if (b2 && b1) {
+}
+while (b1 && b2) {}
+while (b2 && b1) {}
+for (let i = 0; b1 && b2; i++) {
+  break;
+}
+const t1 = b1 && b2 ? 'yes' : 'no';
+const t1 = b2 && b1 ? 'yes' : 'no';
+switch (b1) {
+  case true:
+  default:
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 10,
+        },
+        "start": {
+          "column": 8,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 11,
+        },
+        "start": {
+          "column": 14,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 12,
+        },
+        "start": {
+          "column": 17,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 15,
+        },
+        "start": {
+          "column": 12,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 16,
+        },
+        "start": {
+          "column": 18,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`true === true\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 18,
+        },
+        "start": {
+          "column": 8,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 10,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 2`] = `
+{
+  "code": "
+declare const b1: object;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 3`] = `
+{
+  "code": "
+declare const b1: object | true;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 4`] = `
+{
+  "code": "
+declare const b1: "" | false;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 5`] = `
+{
+  "code": "
+declare const b1: "always truthy";
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 6`] = `
+{
+  "code": "
+declare const b1: undefined;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 7`] = `
+{
+  "code": "
+declare const b1: null;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 8`] = `
+{
+  "code": "
+declare const b1: void;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 9`] = `
+{
+  "code": "
+declare const b1: never;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is \`never\`.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 10`] = `
+{
+  "code": "
+declare const b1: string & number;
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is \`never\`.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 11`] = `
+{
+  "code": "
+declare const falseyBigInt: 0n;
+if (falseyBigInt) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 12`] = `
+{
+  "code": "
+declare const posbigInt: 1n;
+if (posbigInt) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 13`] = `
+{
+  "code": "
+declare const negBigInt: -2n;
+if (negBigInt) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 14`] = `
+{
+  "code": "
+declare const b1: boolean;
+declare const b2: boolean;
+if (true && b1 && b2) {
+}
+if (b1 && false && b2) {
+}
+if (b1 || b2 || true) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 8,
+        },
+        "start": {
+          "column": 17,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 15`] = `
+{
+  "code": "
+function test<T extends object>(t: T) {
+  return t ? 'yes' : 'no';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 16`] = `
+{
+  "code": "
+function test<T extends false>(t: T) {
+  return t ? 'yes' : 'no';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 17`] = `
+{
+  "code": "
+function test<T extends 'a' | 'b'>(t: T) {
+  return t ? 'yes' : 'no';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 18`] = `
+{
+  "code": "
+function test(a: 'a') {
+  return a === 'a';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`"a" === "a"\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 19`] = `
+{
+  "code": "
+declare const a: '34';
+declare const b: '56';
+a > b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`"34" > "56"\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 20`] = `
+{
+  "code": "
+const y = 1;
+if (y === 0) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`1 === 0\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 21`] = `
+{
+  "code": "
+// @ts-expect-error
+if (1 == '1') {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`1 == "1"\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 22`] = `
+{
+  "code": "
+2.3 > 2.3;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`2.3 > 2.3\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 23`] = `
+{
+  "code": "
+2.3 >= 2.3;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`2.3 >= 2.3\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 24`] = `
+{
+  "code": "
+2n < 2n;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`2n < 2n\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 25`] = `
+{
+  "code": "
+2n <= 2n;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`2n <= 2n\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 26`] = `
+{
+  "code": "
+-2n !== 2n;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`-2n !== 2n\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 27`] = `
+{
+  "code": "
+// @ts-expect-error
+if (1 == '2') {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`1 == "2"\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 28`] = `
+{
+  "code": "
+// @ts-expect-error
+if (1 != '2') {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`1 != "2"\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 29`] = `
+{
+  "code": "
+enum Foo {
+  a = 1,
+  b = 2,
+}
+
+const x = Foo.a;
+if (x === Foo.a) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`Foo.a === Foo.a\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 30`] = `
+{
+  "code": "
+enum Foo {
+  a = 1,
+  b = 2,
+}
+
+const x = Foo.a;
+if (x === 1) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`Foo.a === 1\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 31`] = `
+{
+  "code": "
+function takesMaybeValue(a: null | object) {
+  if (a) {
+  } else if (a == undefined) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`null == undefined\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 32`] = `
+{
+  "code": "
+function takesMaybeValue(a: null | object) {
+  if (a) {
+  } else if (a === undefined) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`null === undefined\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 33`] = `
+{
+  "code": "
+function takesMaybeValue(a: null | object) {
+  if (a) {
+  } else if (a != undefined) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`null != undefined\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 34`] = `
+{
+  "code": "
+function takesMaybeValue(a: null | object) {
+  if (a) {
+  } else if (a !== undefined) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`null !== undefined\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 35`] = `
+{
+  "code": "
+true === false;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`true === false\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 36`] = `
+{
+  "code": "
+true === true;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always true, since \`true === true\` is true.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 37`] = `
+{
+  "code": "
+true === undefined;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, comparison is always false, since \`true === undefined\` is false.",
+      "messageId": "comparisonBetweenLiteralTypes",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 38`] = `
+{
+  "code": "
+function test(a: string) {
+  const t1 = a === undefined;
+  const t2 = undefined === a;
+  const t3 = a !== undefined;
+  const t4 = undefined !== a;
+  const t5 = a === null;
+  const t6 = null === a;
+  const t7 = a !== null;
+  const t8 = null !== a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 9,
+        },
+        "start": {
+          "column": 14,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 10,
+        },
+        "start": {
+          "column": 14,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 39`] = `
+{
+  "code": "
+function test(a?: string) {
+  const t1 = a === undefined;
+  const t2 = undefined === a;
+  const t3 = a !== undefined;
+  const t4 = undefined !== a;
+  const t5 = a === null;
+  const t6 = null === a;
+  const t7 = a !== null;
+  const t8 = null !== a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 9,
+        },
+        "start": {
+          "column": 14,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 10,
+        },
+        "start": {
+          "column": 14,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 40`] = `
+{
+  "code": "
+function test(a: null | string) {
+  const t1 = a === undefined;
+  const t2 = undefined === a;
+  const t3 = a !== undefined;
+  const t4 = undefined !== a;
+  const t5 = a === null;
+  const t6 = null === a;
+  const t7 = a !== null;
+  const t8 = null !== a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 41`] = `
+{
+  "code": "
+function test<T extends object>(a: T) {
+  const t1 = a == null;
+  const t2 = null == a;
+  const t3 = a != null;
+  const t4 = null != a;
+  const t5 = a == undefined;
+  const t6 = undefined == a;
+  const t7 = a != undefined;
+  const t8 = undefined != a;
+  const t9 = a === null;
+  const t10 = null === a;
+  const t11 = a !== null;
+  const t12 = null !== a;
+  const t13 = a === undefined;
+  const t14 = undefined === a;
+  const t15 = a !== undefined;
+  const t16 = undefined !== a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 9,
+        },
+        "start": {
+          "column": 14,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 10,
+        },
+        "start": {
+          "column": 14,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 11,
+        },
+        "start": {
+          "column": 14,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 12,
+        },
+        "start": {
+          "column": 15,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 13,
+        },
+        "start": {
+          "column": 15,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 14,
+        },
+        "start": {
+          "column": 15,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 15,
+        },
+        "start": {
+          "column": 15,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 16,
+        },
+        "start": {
+          "column": 15,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 17,
+        },
+        "start": {
+          "column": 15,
+          "line": 17,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, the types have no overlap.",
+      "messageId": "noOverlapBooleanExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 18,
+        },
+        "start": {
+          "column": 15,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 16,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 42`] = `
+{
+  "code": "
+function test(a: string) {
+  return a ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 43`] = `
+{
+  "code": "
+function test(a: string | false) {
+  return a ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 44`] = `
+{
+  "code": "
+function test<T extends string>(a: T) {
+  return a ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 45`] = `
+{
+  "code": "
+function test(a: { foo: string }[]) {
+  return a[0].foo ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 46`] = `
+{
+  "code": "
+function test(a: null) {
+  return a ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, left-hand side of \`??\` operator is always \`null\` or \`undefined\`.",
+      "messageId": "alwaysNullish",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 47`] = `
+{
+  "code": "
+function test(a: null[]) {
+  return a[0] ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, left-hand side of \`??\` operator is always \`null\` or \`undefined\`.",
+      "messageId": "alwaysNullish",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 48`] = `
+{
+  "code": "
+function test<T extends null>(a: T) {
+  return a ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, left-hand side of \`??\` operator is always \`null\` or \`undefined\`.",
+      "messageId": "alwaysNullish",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 49`] = `
+{
+  "code": "
+function test(a: never) {
+  return a ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is \`never\`.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 50`] = `
+{
+  "code": "
+function test<T extends { foo: number }, K extends 'foo'>(num: T[K]) {
+  num ?? 'default';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 51`] = `
+{
+  "code": "
+[1, 3, 5].filter(() => true);
+[1, 2, 3].find(() => {
+  return false;
+});
+
+// with non-literal array
+function nothing(x: string[]) {
+  return x.filter(() => false);
+}
+// with readonly array
+function nothing2(x: readonly string[]) {
+  return x.filter(() => false);
+}
+// with tuple
+function nothing3(x: [string, string]) {
+  return x.filter(() => false);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 9,
+        },
+        "start": {
+          "column": 25,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 13,
+        },
+        "start": {
+          "column": 25,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 17,
+        },
+        "start": {
+          "column": 25,
+          "line": 17,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 52`] = `
+{
+  "code": "
+declare const test: <T extends true>() => T;
+
+[1, null].filter(test);
+      ",
+  "diagnostics": [
+    {
+      "message": "This callback should return a conditional, but return is always truthy.",
+      "messageId": "alwaysTruthyFunc",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 53`] = `
+{
+  "code": "
+declare const dict: Record<string, object>;
+if (dict['mightNotExist']) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 54`] = `
+{
+  "code": "
+const x = [{}] as [{ foo: string }];
+if (x[0]) {
+}
+if (x[0]?.foo) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 55`] = `
+{
+  "code": "
+declare const arr: object[];
+if (arr.filter) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 56`] = `
+{
+  "code": "
+function truthy() {
+  return [];
+}
+function falsy() {}
+[1, 3, 5].filter(truthy);
+[1, 2, 3].find(falsy);
+[1, 2, 3].findLastIndex(falsy);
+      ",
+  "diagnostics": [
+    {
+      "message": "This callback should return a conditional, but return is always truthy.",
+      "messageId": "alwaysTruthyFunc",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 18,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "This callback should return a conditional, but return is always falsy.",
+      "messageId": "alwaysFalsyFunc",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 16,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "This callback should return a conditional, but return is always falsy.",
+      "messageId": "alwaysFalsyFunc",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 8,
+        },
+        "start": {
+          "column": 25,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 57`] = `
+{
+  "code": "
+declare const test: true;
+
+while (test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 58`] = `
+{
+  "code": "
+declare const test: true;
+
+for (; test; ) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 59`] = `
+{
+  "code": "
+declare const test: true;
+
+do {} while (test);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 60`] = `
+{
+  "code": "
+declare const test: true;
+
+while (test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 61`] = `
+{
+  "code": "
+declare const test: true;
+
+for (; test; ) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 62`] = `
+{
+  "code": "
+declare const test: true;
+
+do {} while (test);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 63`] = `
+{
+  "code": "
+declare const test: true;
+
+while (test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 64`] = `
+{
+  "code": "
+declare const test: 1;
+
+while (test) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 65`] = `
+{
+  "code": "
+declare const test: true;
+
+for (; test; ) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 66`] = `
+{
+  "code": "
+declare const test: true;
+
+do {} while (test);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 67`] = `
+{
+  "code": "
+let shouldRun = true;
+
+while ((shouldRun = true)) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 68`] = `
+{
+  "code": "
+while (2) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 8,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 69`] = `
+{
+  "code": "
+while ('truthy') {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 8,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 70`] = `
+{
+  "code": "
+let foo = { bar: true };
+foo?.bar;
+foo ?. bar;
+foo ?.
+  bar;
+foo
+  ?. bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 71`] = `
+{
+  "code": "
+let foo = () => {};
+foo?.();
+foo ?. ();
+foo ?.
+  ();
+foo
+  ?. ();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 72`] = `
+{
+  "code": "
+let foo = () => {};
+foo?.(bar);
+foo ?. (bar);
+foo ?.
+  (bar);
+foo
+  ?. (bar);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 73`] = `
+{
+  "code": "const foo = [1, 2, 3]?.[0];",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 74`] = `
+{
+  "code": "
+declare const x: { a?: { b: string } };
+x?.a?.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 2,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 75`] = `
+{
+  "code": "
+declare const x: { a: { b?: { c: string } } };
+x.a?.b?.c;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 76`] = `
+{
+  "code": "
+let x: { a?: string };
+x?.a;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 2,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 77`] = `
+{
+  "code": "
+declare const foo: { bar: { baz: { c: string } } } | null;
+foo?.bar?.baz;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 78`] = `
+{
+  "code": "
+declare const foo: { bar?: { baz: { qux: string } } } | null;
+foo?.bar?.baz?.qux;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 79`] = `
+{
+  "code": "
+declare const foo: { bar: { baz: { qux?: () => {} } } } | null;
+foo?.bar?.baz?.qux?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 80`] = `
+{
+  "code": "
+declare const foo: { bar: { baz: { qux: () => {} } } } | null;
+foo?.bar?.baz?.qux?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 81`] = `
+{
+  "code": "
+type baz = () => { qux: () => {} };
+declare const foo: { bar: { baz: baz } } | null;
+foo?.bar?.baz?.().qux?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 82`] = `
+{
+  "code": "
+type baz = null | (() => { qux: () => {} });
+declare const foo: { bar: { baz: baz } } | null;
+foo?.bar?.baz?.().qux?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 83`] = `
+{
+  "code": "
+type baz = null | (() => { qux: () => {} } | null);
+declare const foo: { bar: { baz: baz } } | null;
+foo?.bar?.baz?.()?.qux?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 84`] = `
+{
+  "code": "
+type Foo = { baz: number };
+type Bar = { baz: null | string | { qux: string } };
+declare const foo: { fooOrBar: Foo | Bar } | null;
+foo?.fooOrBar?.baz?.qux;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 85`] = `
+{
+  "code": "
+declare const x: { a: { b: number } }[];
+x[0].a?.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 86`] = `
+{
+  "code": "
+type Foo = { [key: string]: string; foo: 'foo'; bar: 'bar' } | null;
+type Key = 'bar' | 'foo';
+declare const foo: Foo;
+declare const key: Key;
+
+foo?.[key]?.trim();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 87`] = `
+{
+  "code": "
+type Foo = { [key: string]: string; foo: 'foo'; bar: 'bar' } | null;
+declare const foo: Foo;
+const key = 'bar';
+foo?.[key]?.trim();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 88`] = `
+{
+  "code": "
+interface Outer {
+  inner?: {
+    [key: string]: string | undefined;
+    bar: 'bar';
+  };
+}
+
+export function test(outer: Outer): number | undefined {
+  const key = 'bar';
+  return outer.inner?.[key]?.charCodeAt(0);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 11,
+        },
+        "start": {
+          "column": 28,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 89`] = `
+{
+  "code": "
+interface Outer {
+  inner?: {
+    [key: string]: string | undefined;
+    bar: 'bar';
+  };
+}
+type Bar = 'bar';
+
+function Foo(outer: Outer, key: Bar): number | undefined {
+  return outer.inner?.[key]?.charCodeAt(0);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 11,
+        },
+        "start": {
+          "column": 28,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 90`] = `
+{
+  "code": "
+function test(testVal?: true) {
+  if (testVal ?? true) {
+    console.log('test');
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 91`] = `
+{
+  "code": "
+const a = null;
+if (!a) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 92`] = `
+{
+  "code": "
+const a = true;
+if (!a) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 93`] = `
+{
+  "code": "
+function sayHi(): void {
+  console.log('Hi!');
+}
+
+let speech: never = sayHi();
+if (!speech) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is \`never\`.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 94`] = `
+{
+  "code": "
+declare const x: string[] | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "messageId": "noStrictNullCheck",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 95`] = `
+{
+  "code": "
+interface Foo {
+  test: string;
+  [key: string]: [string] | undefined;
+}
+
+type OptionalFoo = Foo | undefined;
+declare const foo: OptionalFoo;
+foo?.test?.length;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 10,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 96`] = `
+{
+  "code": "
+function pick<Obj extends Record<string, 1 | 2 | 3>, Key extends keyof Obj>(
+  obj: Obj,
+  key: Key,
+): Obj[Key] {
+  const k = obj[key];
+  if (obj[key]) {
+    return obj[key];
+  }
+  throw new Error('Boom!');
+}
+
+pick({ foo: 1, bar: 2 }, 'bar');
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 7,
+        },
+        "start": {
+          "column": 7,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 97`] = `
+{
+  "code": "
+function getElem(dict: Record<string, { foo: string }>, key: string) {
+  if (dict[key]) {
+    return dict[key].foo;
+  } else {
+    return '';
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 98`] = `
+{
+  "code": "
+declare let foo: {};
+foo ??= 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 99`] = `
+{
+  "code": "
+declare let foo: number;
+foo ??= 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 100`] = `
+{
+  "code": "
+declare let foo: null;
+foo ??= null;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, left-hand side of \`??\` operator is always \`null\` or \`undefined\`.",
+      "messageId": "alwaysNullish",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 101`] = `
+{
+  "code": "
+declare let foo: {};
+foo ||= 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 102`] = `
+{
+  "code": "
+declare let foo: null;
+foo ||= null;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 103`] = `
+{
+  "code": "
+declare let foo: {};
+foo &&= 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 104`] = `
+{
+  "code": "
+declare let foo: null;
+foo &&= null;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 105`] = `
+{
+  "code": "
+declare const foo: { bar: number };
+foo.bar ??= 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 106`] = `
+{
+  "code": "
+type Foo = { bar: () => number } | null;
+declare const foo: Foo;
+foo?.bar()?.toExponential();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 107`] = `
+{
+  "code": "
+type Foo = { bar: null | { baz: () => { qux: number } } } | null;
+declare const foo: Foo;
+foo?.bar?.baz()?.qux?.toExponential();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 108`] = `
+{
+  "code": "
+type Foo = (() => number) | null;
+declare const foo: Foo;
+foo?.()?.toExponential();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 109`] = `
+{
+  "code": "
+type Foo = { [key: string]: () => number } | null;
+declare const foo: Foo;
+foo?.['bar']()?.toExponential();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 110`] = `
+{
+  "code": "
+type Foo = { [key: string]: () => number } | null;
+declare const foo: Foo;
+foo?.['bar']?.()?.toExponential();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 111`] = `
+{
+  "code": "
+        const a = true;
+        if (!!a) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 112`] = `
+{
+  "code": "
+declare function assert(x: unknown): asserts x;
+assert(true);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 113`] = `
+{
+  "code": "
+declare function assert(x: unknown): asserts x;
+assert(false);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 114`] = `
+{
+  "code": "
+declare function assert(x: unknown, y: unknown): asserts x;
+
+assert(true, Math.random() > 0.5);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 115`] = `
+{
+  "code": "
+declare function assert(x: unknown): asserts x;
+assert({});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 116`] = `
+{
+  "code": "
+declare function assertsString(x: unknown): asserts x is string;
+declare const a: string;
+assertsString(a);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the assertion function.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 117`] = `
+{
+  "code": "
+declare function isString(x: unknown): x is string;
+declare const a: string;
+isString(a);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the type guard.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 118`] = `
+{
+  "code": "
+declare function isString(x: unknown): x is string;
+declare const a: string;
+isString('fa' + 'lafel');
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the type guard.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 119`] = `
+{
+  "code": "
+declare function isStringOrNumber(x: unknown): x is string | number;
+declare const s: string;
+if (isStringOrNumber(s)) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the type guard.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 120`] = `
+{
+  "code": "
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b?: number;
+}
+declare function isWider(x: unknown): x is Wider;
+declare const n: Narrower;
+if (isWider(n)) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the type guard.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 11,
+        },
+        "start": {
+          "column": 13,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 121`] = `
+{
+  "code": "
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b?: number;
+}
+declare function isNarrower(x: unknown): x is Narrower;
+declare const w: Wider;
+if (isNarrower(w)) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the type guard.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 11,
+        },
+        "start": {
+          "column": 16,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 122`] = `
+{
+  "code": "
+declare const b1: "" & {};
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 123`] = `
+{
+  "code": "
+declare const b1: "" & { __brand: string };
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 124`] = `
+{
+  "code": "
+declare const b1: ("" | false) & { __brand: string };
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 125`] = `
+{
+  "code": "
+declare const b1: ((string & { __brandA: string }) | (number & { __brandB: string })) & "";
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 126`] = `
+{
+  "code": "
+declare const b1: ("foo" | "bar") & { __brand: string };
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 127`] = `
+{
+  "code": "
+declare const b1: (123 | true) & { __brand: string };
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 128`] = `
+{
+  "code": "
+declare const b1: (string | number) & ("foo" | 123) & { __brand: string };
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 129`] = `
+{
+  "code": "
+declare const b1: ((string & { __brandA: string }) | (number & { __brandB: string })) & "foo";
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 130`] = `
+{
+  "code": "
+declare const b1: ((string & { __brandA: string }) | (number & { __brandB: string })) & ("foo" | 123);
+declare const b2: boolean;
+const t1 = b1 && b2;
+",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 131`] = `
+{
+  "code": "
+type A = {
+  [name in Lowercase<string>]?: {
+    [name in Lowercase<string>]: {
+      a: 1;
+    };
+  };
+};
+
+declare const a: A;
+
+a.a?.a?.a;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 12,
+        },
+        "start": {
+          "column": 7,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 132`] = `
+{
+  "code": "
+interface T {
+  [name: Lowercase<string>]: {
+    [name: Lowercase<string>]: {
+      [name: Lowercase<string>]: {
+        value: 'value';
+      };
+    };
+  };
+  [name: Uppercase<string>]: null | {
+    [name: Uppercase<string>]: null | {
+      [name: Uppercase<string>]: null | {
+        VALUE: 'VALUE';
+      };
+    };
+  };
+}
+
+declare const t: T;
+
+t.a?.a?.a?.value;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 21,
+        },
+        "start": {
+          "column": 4,
+          "line": 21,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 21,
+        },
+        "start": {
+          "column": 7,
+          "line": 21,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 21,
+        },
+        "start": {
+          "column": 10,
+          "line": 21,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 133`] = `
+{
+  "code": "
+declare const test: Array<{ a?: string }>;
+
+if (test[0]?.a) {
+  test[0]?.a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 10,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 134`] = `
+{
+  "code": "
+declare const arr2: Array<{ x: { y: { z: object } } }>;
+arr2[42]?.x?.y?.z;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+    {
+      "message": "Unnecessary optional chain on a non-nullish value.",
+      "messageId": "neverOptionalChain",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 135`] = `
+{
+  "code": "
+declare const arr: string[];
+
+if (arr[0]) {
+  arr[0] ?? 'foo';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expected left-hand side of \`??\` operator to be possibly null or undefined.",
+      "messageId": "neverNullish",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 136`] = `
+{
+  "code": "
+declare const arr: object[];
+
+if (arr[42] && arr[42]) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
