@@ -106,6 +106,9 @@ func processScope(ctx rule.RuleContext, statements []*ast.Node, opts ruleOptions
 		}
 
 		resolvedPath := resolveImportPath(importDecl.ModuleSpecifier, ctx, opts, sourceText)
+		if resolvedPath == "" {
+			continue
+		}
 
 		importMap := getImportMap(importDecl, opts, imported, nsImported, defaultTypesImported, namedTypesImported)
 		importMap[resolvedPath] = append(importMap[resolvedPath], stmt)
