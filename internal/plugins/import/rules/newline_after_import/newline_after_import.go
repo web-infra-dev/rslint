@@ -95,20 +95,20 @@ func checkImportDeclarations(ctx rule.RuleContext, statements []*ast.Node, lineS
 		if !isImportStatement(stmt) {
 			continue
 		}
-		if i+1 >= len(statements) {
-			continue
-		}
 
-		nextStmt := statements[i+1]
-
-		// When considerComments is enabled, a comment close to the import
-		// (within count+1 lines) is checked instead of the next statement.
-		// For imports the window anchor is the statement itself (import node = statement).
+		// ESLint's checkImport checks considerComments before checking if nextNode
+		// exists, so a trailing comment after the last import can still trigger a report.
 		if opts.considerComments {
 			if checkCommentGap(ctx, stmt, stmt.End(), lineStarts, text, opts, "import") {
 				continue
 			}
 		}
+
+		if i+1 >= len(statements) {
+			continue
+		}
+
+		nextStmt := statements[i+1]
 
 		if isImportStatement(nextStmt) {
 			continue

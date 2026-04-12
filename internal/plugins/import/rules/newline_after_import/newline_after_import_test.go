@@ -199,6 +199,14 @@ func TestNewlineAfterImportRule(t *testing.T) {
 			{Code: "import foo from 'foo';\n\n@SomeDecorator(foo)\nclass Foo {}"},
 			// Export default decorated class with sufficient gap
 			{Code: "import foo from 'foo';\n\n@SomeDecorator(foo)\nexport default class Test {}"},
+
+			// ===== Last import + trailing comment (considerComments) =====
+
+			// Last import with enough gap before trailing comment
+			{
+				Code:    "import foo from 'foo';\n\n// trailing comment",
+				Options: map[string]interface{}{"considerComments": true},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ===== Basic import errors =====
@@ -494,6 +502,18 @@ func TestNewlineAfterImportRule(t *testing.T) {
 			{
 				Code:   "import foo from 'foo';\n@SomeDecorator(foo)\nclass Foo {}",
 				Output: []string{"import foo from 'foo';\n\n@SomeDecorator(foo)\nclass Foo {}"},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "newlineAfterImport", Line: 1, Column: 1,
+				}},
+			},
+
+			// ===== Last import + trailing comment too close (considerComments) =====
+
+			// Last import in file, comment immediately after, no more statements
+			{
+				Code:    "import foo from 'foo';\n// trailing comment",
+				Output:  []string{"import foo from 'foo';\n\n// trailing comment"},
+				Options: map[string]interface{}{"considerComments": true},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "newlineAfterImport", Line: 1, Column: 1,
 				}},
