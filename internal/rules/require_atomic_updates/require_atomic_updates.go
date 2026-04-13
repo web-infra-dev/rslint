@@ -695,8 +695,9 @@ func (a *analyzer) report(assignmentNode *ast.Node, left *ast.Node, targetName s
 }
 
 // stmtAlwaysTerminates returns true if a statement always exits via
-// return/throw (so the state from this branch should NOT merge into
-// the continuation).
+// return/throw/break/continue (so the state from this branch should NOT merge
+// into the continuation). Checks all statements in a block — an early
+// return/throw in the middle means the block terminates even if dead code follows.
 func stmtAlwaysTerminates(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -705,11 +706,12 @@ func stmtAlwaysTerminates(node *ast.Node) bool {
 	case ast.KindReturnStatement, ast.KindThrowStatement:
 		return true
 	case ast.KindBlock:
-		statements := node.AsBlock().Statements.Nodes
-		if len(statements) == 0 {
-			return false
+		for _, stmt := range node.AsBlock().Statements.Nodes {
+			if stmtAlwaysTerminates(stmt) {
+				return true
+			}
 		}
-		return stmtAlwaysTerminates(statements[len(statements)-1])
+		return false
 	case ast.KindIfStatement:
 		ifStmt := node.AsIfStatement()
 		if ifStmt.ElseStatement == nil {
@@ -737,7 +739,6 @@ func (a *analyzer) walkIfStatement(node *ast.Node, state *analysisState) {
 		switch {
 		case thenExits && elseExits:
 			// Both branches exit — code after if is unreachable.
-			// Use either state (doesn't matter).
 			*state = *thenState
 		case thenExits:
 			// Only then exits — continuation only from else path.
@@ -753,9 +754,10 @@ func (a *analyzer) walkIfStatement(node *ast.Node, state *analysisState) {
 	} else {
 		if thenExits {
 			// Then-branch always exits — continuation only from the non-taken path.
-			// state already represents the pre-if state (condition was walked).
+			// state already holds the pre-if state (condition was walked).
 		} else {
-			*state = *thenState
+			// Then-branch may or may not execute — merge both possibilities.
+			state.merge(thenState)
 		}
 	}
 }
@@ -775,6 +777,21 @@ func (a *analyzer) walkConditionalExpression(node *ast.Node, state *analysisStat
 	*state = *consequentState
 }
 
+// clauseTerminates checks whether a case/default clause's statements end with
+// break/return/throw (i.e., no fallthrough to the next case).
+func clauseTerminates(statements []*ast.Node) bool {
+	for _, stmt := range statements {
+		if stmtAlwaysTerminates(stmt) {
+			return true
+		}
+		// break/continue also terminate a case clause
+		if stmt.Kind == ast.KindBreakStatement || stmt.Kind == ast.KindContinueStatement {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *analyzer) walkSwitchStatement(node *ast.Node, state *analysisState) {
 	switchStmt := node.AsSwitchStatement()
 
@@ -785,20 +802,40 @@ func (a *analyzer) walkSwitchStatement(node *ast.Node, state *analysisState) {
 		return
 	}
 
+	// fallthroughState accumulates across cases that don't break/return/throw.
+	// When a case terminates, its state merges into mergedState and fallthroughState resets.
 	mergedState := state.clone()
+	var fallthroughState *analysisState
+
 	for _, clause := range caseBlock.Clauses.Nodes {
-		clauseState := state.clone()
 		caseOrDefault := clause.AsCaseOrDefaultClause()
 		if caseOrDefault == nil {
 			continue
 		}
+
+		// Start from pre-switch state (direct jump to this case).
+		clauseState := state.clone()
+		// If the previous case fell through, merge its accumulated state.
+		if fallthroughState != nil {
+			clauseState.merge(fallthroughState)
+		}
+
 		if clause.Kind == ast.KindCaseClause && caseOrDefault.Expression != nil {
 			a.walkNode(caseOrDefault.Expression, clauseState)
 		}
+		var clauseStatements []*ast.Node
 		if caseOrDefault.Statements != nil {
-			a.walkStatements(caseOrDefault.Statements.Nodes, clauseState)
+			clauseStatements = caseOrDefault.Statements.Nodes
+			a.walkStatements(clauseStatements, clauseState)
 		}
+
 		mergedState.merge(clauseState)
+
+		if clauseTerminates(clauseStatements) {
+			fallthroughState = nil
+		} else {
+			fallthroughState = clauseState
+		}
 	}
 	*state = *mergedState
 }

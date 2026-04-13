@@ -168,6 +168,16 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			// ---- this.foo: `this` is not a tracked variable ----
 			{Code: `async function x() { this.foo += await bar; }`},
 
+			// ---- Switch: break prevents fallthrough, read in case 1 doesn't affect case 2 ----
+			{Code: `
+				let foo;
+				async function x() {
+					switch (n) {
+						case 1: foo; break;
+						case 2: await bar; foo = 1; break;
+					}
+				}`},
+
 			// ---- Property shorthand: await before shorthand ----
 			{Code: `let foo; async function x() { foo = {bar: await baz, foo}; }`},
 
@@ -216,6 +226,19 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 						await bar;
 						if (inner) return;
 						else throw new Error();
+					}
+					foo = 1;
+				}`},
+
+			// ---- Block with early return (dead code after) still terminates ----
+			{Code: `
+				let foo;
+				async function x() {
+					if (cond) {
+						foo;
+						await bar;
+						return;
+						console.log("dead code");
 					}
 					foo = 1;
 				}`},
@@ -1145,6 +1168,74 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicObjectUpdate"},
 					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+
+			// ---- Fix #1: if without else — re-read in then shouldn't clear outdated for the non-taken path ----
+			{
+				Code: `
+					let foo;
+					async function x() {
+						foo;
+						await bar;
+						if (cond) { foo; }
+						foo = 1;
+					}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Fix #6: block with return in middle (dead code after) still terminates ----
+			// Then-branch terminates despite dead code after return → no report for code after if.
+			// Instead we test: block without early terminator in then-branch DOES report.
+			{
+				Code: `
+					let foo;
+					async function x() {
+						if (cond) {
+							foo;
+							await bar;
+							doStuff();
+						}
+						foo = 1;
+					}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Fix #7: switch fallthrough — read in case 1 carries to case 2 ----
+			{
+				Code: `
+					let foo;
+					async function x() {
+						switch (n) {
+							case 1:
+								foo;
+							case 2:
+								await bar;
+								foo = 1;
+						}
+					}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Switch: fallthrough across 3 cases ----
+			{
+				Code: `
+					let foo;
+					async function x() {
+						switch (n) {
+							case 1: foo;
+							case 2: await bar;
+							case 3: foo = 1;
+						}
+					}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
 				},
 			},
 		},
