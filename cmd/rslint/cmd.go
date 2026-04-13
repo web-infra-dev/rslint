@@ -666,8 +666,15 @@ func runCMD() int {
 			// ReadGitignoreAsGlobs walks UP (ancestor inheritance) and DOWN
 			// (nested .gitignore) from each configDir. Sibling configs are
 			// fully isolated — they never share gitignore patterns.
+			//
+			// Config ignores are passed so that directories which are
+			// directory-level blocked (e.g. **/tests/**) are pruned during
+			// the .gitignore scan. This is safe because isDirPathBlocked is
+			// the same function used by the linter — blocked dirs' files
+			// are never linted, so their .gitignore patterns are irrelevant.
 			for configDir, entries := range configMap {
-				gitGlobs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs)
+				configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+				gitGlobs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores)
 				if len(gitGlobs) > 0 {
 					configMap[configDir] = append(
 						rslintconfig.RslintConfig{{Ignores: gitGlobs}},
@@ -694,7 +701,8 @@ func runCMD() int {
 			currentDirectory = payload.SingleConfigDir
 
 			// Inject .gitignore patterns as global ignores.
-			gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs)
+			configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
+			gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs, configIgnores)
 			if len(gitGlobs) > 0 {
 				rslintConfig = append(
 					rslintconfig.RslintConfig{{Ignores: gitGlobs}},
@@ -713,7 +721,8 @@ func runCMD() int {
 		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
 		// Inject .gitignore patterns as global ignores.
-		gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs)
+		configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
+		gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs, configIgnores)
 		if len(gitGlobs) > 0 {
 			rslintConfig = append(
 				rslintconfig.RslintConfig{{Ignores: gitGlobs}},

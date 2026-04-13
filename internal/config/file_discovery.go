@@ -48,15 +48,11 @@ func DiscoverGapFiles(
 	allowDirs []string,
 ) []string {
 	// 1. Collect global ignore patterns and files patterns from config entries.
-	var globalIgnores []string
+	globalIgnores := ExtractConfigIgnores(config)
+
 	var allFilesPatterns []string
 	hasFilesField := false
-
 	for _, entry := range config {
-		if isGlobalIgnoreEntry(entry) {
-			globalIgnores = append(globalIgnores, entry.Ignores...)
-			continue
-		}
 		if len(entry.Files) > 0 {
 			hasFilesField = true
 			allFilesPatterns = append(allFilesPatterns, entry.Files...)

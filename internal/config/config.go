@@ -732,12 +732,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 	// 1. Collect all global ignore patterns and evaluate once.
 	// This allows `!` negation patterns in separate entries to work correctly,
 	// aligned with ESLint v10 which merges all global ignores before evaluating.
-	var globalIgnorePatterns []string
-	for _, entry := range config {
-		if isGlobalIgnoreEntry(entry) {
-			globalIgnorePatterns = append(globalIgnorePatterns, entry.Ignores...)
-		}
-	}
+	globalIgnorePatterns := ExtractConfigIgnores(config)
 	if len(globalIgnorePatterns) > 0 {
 		// Phase 1: directory-level check. Patterns like `dir/**` block the
 		// directory entirely — `!` negation cannot undo this. Aligned with

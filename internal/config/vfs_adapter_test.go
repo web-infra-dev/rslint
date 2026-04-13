@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"gotest.tools/v3/assert"
 )
@@ -52,30 +53,24 @@ func TestVfsAdapter_OpenDirectory(t *testing.T) {
 	assert.Assert(t, info.IsDir())
 }
 
-func TestVfsAdapter_OpenFile(t *testing.T) {
+// Open() always returns vfsDirFile (the adapter is only used by fs.WalkDir
+// which only opens directories). Verify this contract.
+func TestVfsAdapter_OpenAlwaysReturnsDir(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "file.json"))
 
 	adapter := &vfsAdapter{vfs: osvfs.FS(), root: tmpDir}
+
+	// Open a file path — still returns vfsDirFile (no DirectoryExists check).
 	f, err := adapter.Open("file.json")
 	assert.NilError(t, err)
 	defer f.Close()
 
 	info, err := f.Stat()
 	assert.NilError(t, err)
-	assert.Assert(t, !info.IsDir())
-}
-
-func TestVfsAdapter_OpenNotExist(t *testing.T) {
-	tmpDir := t.TempDir()
-
-	adapter := &vfsAdapter{vfs: osvfs.FS(), root: tmpDir}
-	_, err := adapter.Open("nonexistent")
-	assert.Assert(t, err != nil)
-
-	var pathErr *fs.PathError
-	assert.Assert(t, errors.As(err, &pathErr))
-	assert.Assert(t, errors.Is(pathErr.Err, fs.ErrNotExist))
+	// This returns isDir=true because Open always returns vfsDirFile.
+	// This is correct for the fs.WalkDir use case where Open is never called for files.
+	assert.Assert(t, info.IsDir(), "Open always returns vfsDirFile for fs.WalkDir usage")
 }
 
 func TestVfsDirFile_ReadDirAll(t *testing.T) {
@@ -177,10 +172,6 @@ func TestVfsAdapter_SymlinkCycleFiltered(t *testing.T) {
 	assert.NilError(t, err)
 
 	// Inside a/loop (=tmpDir), there's "a" directory.
-	// Inside "a", the symlink "loop" points to tmpDir again.
-	// When ReadDir on a/loop lists "a", it's a regular dir (not a symlink) → included.
-	// But when we later ReadDir on a/loop/a, "loop" symlink target (tmpDir) is
-	// already in visitedSymTargets → filtered out, breaking the cycle.
 	hasA := false
 	for _, e := range entries2 {
 		if e.Name() == "a" {
@@ -219,4 +210,34 @@ func TestVfsDirEntry_TypeAndInfo(t *testing.T) {
 	fileEntry := &vfsDirEntry{name: "file.txt", isDir: false}
 	assert.Assert(t, !fileEntry.IsDir())
 	assert.Equal(t, fileEntry.Type(), fs.FileMode(0))
+}
+
+// spyVFS wraps a real VFS and counts DirectoryExists calls.
+type spyVFS struct {
+	vfs.FS
+	directoryExistsCalls int
+}
+
+func (s *spyVFS) DirectoryExists(path string) bool {
+	s.directoryExistsCalls++
+	return s.FS.DirectoryExists(path)
+}
+
+// Open() no longer calls DirectoryExists (always returns vfsDirFile).
+// Verify with a spy VFS that DirectoryExists is never called.
+func TestVfsAdapter_OpenNeverCallsDirectoryExists(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "sub/file.txt"))
+
+	spy := &spyVFS{FS: osvfs.FS()}
+	adapter := &vfsAdapter{vfs: spy, root: tmpDir}
+
+	// Open root
+	_, err := adapter.Open(".")
+	assert.NilError(t, err)
+	// Open subdirectory
+	_, err = adapter.Open("sub")
+	assert.NilError(t, err)
+
+	assert.Equal(t, spy.directoryExistsCalls, 0, "Open should never call DirectoryExists")
 }
