@@ -159,6 +159,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
@@ -541,6 +542,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
+	GlobalRuleRegistry.Register("no-undef-init", no_undef_init.NoUndefInitRule)
 	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
 	GlobalRuleRegistry.Register("no-this-before-super", no_this_before_super.NoThisBeforeSuperRule)
 	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
