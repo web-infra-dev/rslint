@@ -14,7 +14,7 @@ var NoDeleteVarRule = rule.Rule{
 				// SkipParentheses to match ESTree semantics: ESTree strips ParenthesizedExpression,
 				// so ESLint sees `delete (x)` as deleting an Identifier directly.
 				expr := ast.SkipParentheses(node.AsDeleteExpression().Expression)
-				if expr.Kind == ast.KindIdentifier {
+				if expr != nil && expr.Kind == ast.KindIdentifier {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "unexpected",
 						Description: "Variables should not be deleted.",
