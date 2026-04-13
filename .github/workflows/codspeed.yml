@@ -38,4 +38,4 @@ jobs:
         uses: CodSpeedHQ/action@db35df748deb45fdef0960669f57d627c1956c30 # v4.13.1
         with:
           mode: walltime
-          run: go test -bench=. -benchtime=5s -timeout 300s ./internal/linter/
+          run: go test -bench=. -benchtime=5s ./internal/linter/
