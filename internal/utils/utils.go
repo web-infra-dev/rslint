@@ -265,6 +265,29 @@ func GetOptionsString(opts any) string {
 	return ""
 }
 
+// ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
+// extracting only the string elements. Returns nil if the input is nil, not an array,
+// or contains no strings. Useful for parsing rule options from JSON config.
+func ToStringSlice(val interface{}) []string {
+	if val == nil {
+		return nil
+	}
+	arr, ok := val.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
 // NaturalCompare compares two strings using natural sort order,
 // where embedded numeric segments are compared by their numeric value
 // (e.g., "a2" < "a10" instead of "a10" < "a2").
