@@ -212,6 +212,12 @@ var ClassLiteralPropertyStyleRule = rule.CreateRule(rule.Rule{
 		// Only add the getter check when style is "fields"
 		if style == "fields" {
 			listeners[ast.KindGetAccessor] = func(node *ast.Node) {
+				// Only check getters inside class bodies — object literal getters use the
+				// same KindGetAccessor but are not class members and must be skipped.
+				if node.Parent == nil || !ast.IsClassLike(node.Parent) {
+					return
+				}
+
 				getter := node.AsGetAccessorDeclaration()
 
 				// Skip if getter has override modifier
