@@ -11,9 +11,12 @@ import (
 )
 
 // vfsAdapter adapts a vfs.FS to a standard fs.FS rooted at a given directory,
-// specifically for use with fs.WalkDir in DiscoverGapFiles. It is NOT a
-// general-purpose fs.FS implementation — Open() always returns a directory
-// handle (vfsDirFile) because fs.WalkDir only opens directories.
+// used by fs.WalkDir in DiscoverGapFiles and doublestar.GlobWalk in
+// expandProjectGlob. It is NOT a general-purpose fs.FS implementation —
+// Open() always returns a directory handle (vfsDirFile) because both
+// callers only open directories (WalkDir by design, GlobWalk because
+// expandProjectGlob is only called when the pattern contains glob
+// meta characters).
 //
 // It tracks visited symlink targets to prevent infinite recursion caused by
 // symlink cycles, since the underlying VFS follows symlinks transparently
@@ -26,11 +29,11 @@ type vfsAdapter struct {
 
 var _ fs.FS = (*vfsAdapter)(nil)
 
-// Open implements fs.FS. This adapter is ONLY used by fs.WalkDir in
-// DiscoverGapFiles, where Open() is only called on directories (via the
-// internal readDir function). Therefore we always return a vfsDirFile
-// without calling DirectoryExists — the parent's ReadDir already confirmed
-// the entry is a directory, so the stat would be redundant.
+// Open implements fs.FS. Both callers (fs.WalkDir in DiscoverGapFiles and
+// doublestar.GlobWalk in expandProjectGlob) only call Open() on directories.
+// Therefore we always return a vfsDirFile without calling DirectoryExists —
+// the parent's ReadDir already confirmed the entry is a directory, so the
+// stat would be redundant.
 func (a *vfsAdapter) Open(name string) (fs.File, error) {
 	fullPath := a.fullPath(name)
 

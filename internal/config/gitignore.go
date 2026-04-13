@@ -133,20 +133,24 @@ func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]
 			childRel = relDir + "/" + dir
 		}
 
-		// Prune directories already matched by collected gitignore patterns.
-		// This is critical for performance: without it, scanning a repo like
-		// rspack enters target/ (6,277 Rust build dirs, 0 .ts files).
-		if isDirIgnoredByGlobs(*result, childRel) {
-			continue
-		}
-
 		// Prune directories that are directory-level blocked by config ignores.
 		// isDirPathBlocked is the same function the linter uses in
 		// GetConfigForFile → isDirBlockedByIgnores. If it returns true here,
 		// the linter will also return nil for any file in this directory,
 		// meaning files here are never linted. Therefore their .gitignore
 		// patterns are irrelevant and we can safely skip collecting them.
+		// Checked first because configIgnores is typically a short list (a few
+		// user-defined patterns), whereas *result grows as we collect more
+		// .gitignore patterns — checking configIgnores first avoids a linear
+		// scan of the longer list for directories blocked by config.
 		if len(configIgnores) > 0 && isDirPathBlocked(childRel, configIgnores) {
+			continue
+		}
+
+		// Prune directories already matched by collected gitignore patterns.
+		// This is critical for performance: without it, scanning a repo like
+		// rspack enters target/ (6,277 Rust build dirs, 0 .ts files).
+		if isDirIgnoredByGlobs(*result, childRel) {
 			continue
 		}
 
