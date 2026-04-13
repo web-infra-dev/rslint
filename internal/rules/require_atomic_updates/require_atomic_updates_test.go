@@ -168,13 +168,34 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			// ---- this.foo: `this` is not a tracked variable ----
 			{Code: `async function x() { this.foo += await bar; }`},
 
-			// ---- Switch: break prevents fallthrough, read in case 1 doesn't affect case 2 ----
+			// ---- Switch: break prevents fallthrough ----
 			{Code: `
 				let foo;
 				async function x() {
 					switch (n) {
 						case 1: foo; break;
 						case 2: await bar; foo = 1; break;
+					}
+				}`},
+
+			// ---- Switch: return prevents fallthrough ----
+			{Code: `
+				let foo;
+				async function x() {
+					switch (n) {
+						case 1: foo; return;
+						case 2: await bar; foo = 1;
+					}
+				}`},
+
+			// ---- Switch: break in middle stops fallthrough to later cases ----
+			{Code: `
+				let foo;
+				async function x() {
+					switch (n) {
+						case 1: foo; break;
+						case 2: await bar;
+						case 3: foo = 1;
 					}
 				}`},
 
@@ -1232,6 +1253,21 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 							case 1: foo;
 							case 2: await bar;
 							case 3: foo = 1;
+						}
+					}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Switch: default case with fallthrough ----
+			{
+				Code: `
+					let foo;
+					async function x() {
+						switch (n) {
+							default: foo;
+							case 1: await bar; foo = 1;
 						}
 					}`,
 				Errors: []rule_tester.InvalidTestCaseError{
