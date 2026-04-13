@@ -2,6 +2,7 @@ package utils
 
 import (
 	"math"
+	"math/big"
 	"slices"
 	"strconv"
 	"strings"
@@ -817,10 +818,12 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 // e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
 func NormalizeNumericLiteral(text string) string {
 	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
-	// Parse them as integers first, then convert to float.
+	// Use big.Int to handle arbitrary precision, then convert to float64
+	// to match JavaScript's String(Number(...)) behavior.
 	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
-		if i, err := strconv.ParseInt(text, 0, 64); err == nil {
-			return strconv.FormatInt(i, 10)
+		if n, ok := new(big.Int).SetString(text, 0); ok {
+			f, _ := new(big.Float).SetInt(n).Float64()
+			return strconv.FormatFloat(f, 'f', -1, 64)
 		}
 		return text
 	}
