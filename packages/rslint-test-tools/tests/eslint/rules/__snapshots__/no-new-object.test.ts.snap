@@ -1,0 +1,718 @@
+// Rstest Snapshot v1
+
+exports[`no-new-object > invalid 1`] = `
+{
+  "code": "var foo = new Object()",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 2`] = `
+{
+  "code": "new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 3`] = `
+{
+  "code": "new Object",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 4`] = `
+{
+  "code": "var foo = new Object("foo")",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 5`] = `
+{
+  "code": "new (Object)()",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 6`] = `
+{
+  "code": "new (Object as any)()",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 7`] = `
+{
+  "code": "new Object<any>()",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 8`] = `
+{
+  "code": "new Object(); new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 9`] = `
+{
+  "code": "function bar() { return function Object() {}; } var baz = new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 59,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 10`] = `
+{
+  "code": "{ let Object = 1; } new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 11`] = `
+{
+  "code": "function foo() { var Object = 1; } new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 12`] = `
+{
+  "code": "(function(Object) {})(1); new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 13`] = `
+{
+  "code": "try {} catch(Object) {} new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 14`] = `
+{
+  "code": "function f() { new Object(); }",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 15`] = `
+{
+  "code": "const f = () => new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 16`] = `
+{
+  "code": "class C { m() { new Object(); } }",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 17`] = `
+{
+  "code": "function a() { function b() { function c() { new Object(); } } }",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 18`] = `
+{
+  "code": "({ m() { new Object() } })",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 19`] = `
+{
+  "code": "function f(x = new Object()) {}",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 20`] = `
+{
+  "code": "foo(new Object())",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 21`] = `
+{
+  "code": "function f() { return new Object(); }",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 22`] = `
+{
+  "code": "class C { x = new Object() }",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 23`] = `
+{
+  "code": "class C { static x = new Object() }",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 24`] = `
+{
+  "code": "type Object = string; new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 25`] = `
+{
+  "code": "interface Object { x: number } new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 26`] = `
+{
+  "code": "function f(Object) { new Object(); } new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-object > invalid 27`] = `
+{
+  "code": "{ let Object = 1; new Object(); } new Object();",
+  "diagnostics": [
+    {
+      "message": "The object literal notation {} is preferable.",
+      "messageId": "preferLiteral",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-object",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

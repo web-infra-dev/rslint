@@ -146,6 +146,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
+	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
@@ -552,6 +553,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-setter-return", no_setter_return.NoSetterReturnRule)
 	GlobalRuleRegistry.Register("no-unsafe-negation", no_unsafe_negation.NoUnsafeNegationRule)
 	GlobalRuleRegistry.Register("no-obj-calls", no_obj_calls.NoObjCallsRule)
+	GlobalRuleRegistry.Register("no-new-object", no_new_object.NoNewObjectRule)
 	GlobalRuleRegistry.Register("no-new-symbol", no_new_symbol.NoNewSymbolRule)
 	GlobalRuleRegistry.Register("use-isnan", use_isnan.UseIsNaNRule)
 	GlobalRuleRegistry.Register("eqeqeq", eqeqeq.EqeqeqRule)
