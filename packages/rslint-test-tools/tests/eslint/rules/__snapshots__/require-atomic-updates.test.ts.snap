@@ -1,0 +1,755 @@
+// Rstest Snapshot v1
+
+exports[`require-atomic-updates > invalid 1`] = `
+{
+  "code": "let foo; async function x() { foo += await amount; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 2`] = `
+{
+  "code": "if (1); let foo; async function x() { foo += await amount; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 3`] = `
+{
+  "code": "let foo; async function x() { while (condition) { foo += await amount; } }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 4`] = `
+{
+  "code": "let foo; async function x() { foo = foo + await amount; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 5`] = `
+{
+  "code": "let foo; async function x() { foo = foo + (bar ? baz : await amount); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 6`] = `
+{
+  "code": "let foo; async function x() { foo = foo + (bar ? await amount : baz); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 7`] = `
+{
+  "code": "let foo; async function x() { foo = condition ? foo + await amount : somethingElse; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 83,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 8`] = `
+{
+  "code": "let foo; async function x() { foo = (condition ? foo : await bar) + await bar; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 9`] = `
+{
+  "code": "let foo; async function x() { foo += bar + await amount; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 10`] = `
+{
+  "code": "async function x() { let foo; bar(() => foo); foo += await amount; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 11`] = `
+{
+  "code": "let foo; function* x() { foo += yield baz }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 12`] = `
+{
+  "code": "let foo; async function x() { foo = bar(foo, await something) }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 13`] = `
+{
+  "code": "const foo = {}; async function x() { foo.bar += await baz }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo.bar\` might be assigned based on an outdated state of \`foo\`.",
+      "messageId": "nonAtomicObjectUpdate",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 14`] = `
+{
+  "code": "const foo = []; async function x() { foo[bar].baz += await result;  }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo[bar].baz\` might be assigned based on an outdated state of \`foo\`.",
+      "messageId": "nonAtomicObjectUpdate",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 15`] = `
+{
+  "code": "const foo = {}; class C { #bar; async wrap() { foo.#bar += await baz } }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo.#bar\` might be assigned based on an outdated state of \`foo\`.",
+      "messageId": "nonAtomicObjectUpdate",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 16`] = `
+{
+  "code": "let foo; async function* x() { foo = (yield foo) + await bar; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 17`] = `
+{
+  "code": "let foo; async function x() { foo = foo + await result(foo); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 18`] = `
+{
+  "code": "let foo; async function x() { foo = await result(foo, await somethingElse); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 19`] = `
+{
+  "code": "function* x() { let foo; yield async function y() { foo += await bar; } }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 20`] = `
+{
+  "code": "let foo; async function* x() { foo = await foo + (yield bar); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 21`] = `
+{
+  "code": "let foo; async function x() { foo = bar + await foo; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 22`] = `
+{
+  "code": "let foo = ''; async function x() { foo += await bar; }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 23`] = `
+{
+  "code": "let foo = 0; async function x() { foo = (a ? b : foo) + await bar; if (baz); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 24`] = `
+{
+  "code": "let foo = 0; async function x() { foo = (a ? b ? c ? d ? foo : e : f : g : h) + await bar; if (baz); }",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 90,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 25`] = `
+{
+  "code": "
+        async function a(foo) {
+          if (foo.bar) {
+            foo.bar = await something;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo.bar\` might be assigned based on an outdated state of \`foo\`.",
+      "messageId": "nonAtomicObjectUpdate",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 26`] = `
+{
+  "code": "
+        function* g(foo) {
+          baz = foo.bar;
+          yield something;
+          foo.bar = 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo.bar\` might be assigned based on an outdated state of \`foo\`.",
+      "messageId": "nonAtomicObjectUpdate",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 27`] = `
+{
+  "code": "
+        let foo;
+        async function a() {
+          if (foo) {
+            foo = await something;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-atomic-updates > invalid 28`] = `
+{
+  "code": "
+        let foo;
+        function* g() {
+          baz = foo;
+          yield something;
+          foo = 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Possible race condition: \`foo\` might be reassigned based on an outdated value of \`foo\`.",
+      "messageId": "nonAtomicUpdate",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "require-atomic-updates",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

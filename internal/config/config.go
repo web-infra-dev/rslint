@@ -150,6 +150,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
+	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
@@ -571,6 +572,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-unsafe-finally", no_unsafe_finally.NoUnsafeFinallyRule)
 	GlobalRuleRegistry.Register("no-unmodified-loop-condition", no_unmodified_loop_condition.NoUnmodifiedLoopConditionRule)
 	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
+	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
