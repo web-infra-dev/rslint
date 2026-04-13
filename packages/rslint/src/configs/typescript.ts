@@ -44,7 +44,7 @@ const recommended: RslintConfigEntry = {
 
     // Remaining eslint:recommended rules (not turned off by TS)
     // 'no-control-regex': 'error', // not implemented
-    // 'no-delete-var': 'error', // not implemented
+    'no-delete-var': 'error',
     // 'no-dupe-else-if': 'error', // not implemented
     'no-empty-character-class': 'error',
     // 'no-empty-static-block': 'error', // not implemented
