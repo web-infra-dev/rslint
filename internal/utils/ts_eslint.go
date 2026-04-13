@@ -2,6 +2,7 @@ package utils
 
 import (
 	"math"
+	"math/big"
 	"slices"
 	"strconv"
 	"strings"
@@ -803,6 +804,8 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 			return NormalizeBigIntLiteral(expr.AsBigIntLiteral().Text), true
 		case ast.KindNoSubstitutionTemplateLiteral:
 			return expr.AsNoSubstitutionTemplateLiteral().Text, true
+		case ast.KindNullKeyword:
+			return "null", true
 		}
 		return "", false
 	default:
@@ -814,6 +817,16 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 // normalized string representation, matching ESLint's String(node.value) behavior.
 // e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
 func NormalizeNumericLiteral(text string) string {
+	// ParseFloat doesn't handle JS octal (0o) or binary (0b) prefixes.
+	// Use big.Int to handle arbitrary precision, then convert to float64
+	// to match JavaScript's String(Number(...)) behavior.
+	if len(text) > 2 && text[0] == '0' && (text[1] == 'o' || text[1] == 'O' || text[1] == 'b' || text[1] == 'B') {
+		if n, ok := new(big.Int).SetString(text, 0); ok {
+			f, _ := new(big.Float).SetInt(n).Float64()
+			return strconv.FormatFloat(f, 'f', -1, 64)
+		}
+		return text
+	}
 	f, err := strconv.ParseFloat(text, 64)
 	if err != nil {
 		// ParseFloat returns +/-Inf with ErrRange for overflow (e.g. 1e309).
