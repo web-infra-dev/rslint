@@ -1,0 +1,327 @@
+// Rstest Snapshot v1
+
+exports[`no-dupe-class-members > invalid 1`] = `
+{
+  "code": "
+class A {
+  foo() {}
+  foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 2`] = `
+{
+  "code": "
+!class A {
+  foo() {}
+  foo() {}
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 3`] = `
+{
+  "code": "
+class A {
+  'foo'() {}
+  'foo'() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 4`] = `
+{
+  "code": "
+class A {
+  10() {}
+  1e1() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '10'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 5`] = `
+{
+  "code": "
+class A {
+  foo() {}
+  foo() {}
+  foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 6`] = `
+{
+  "code": "
+class A {
+  static foo() {}
+  static foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 7`] = `
+{
+  "code": "
+class A {
+  foo() {}
+  get foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 8`] = `
+{
+  "code": "
+class A {
+  set foo(value) {}
+  foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 9`] = `
+{
+  "code": "
+class A {
+  foo;
+  foo = 42;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 10`] = `
+{
+  "code": "
+class A {
+  foo;
+  foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
