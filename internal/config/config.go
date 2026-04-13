@@ -126,6 +126,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
+	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
@@ -517,6 +518,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)
 	GlobalRuleRegistry.Register("no-constructor-return", no_constructor_return.NoConstructorReturnRule)
 	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
+	GlobalRuleRegistry.Register("no-delete-var", no_delete_var.NoDeleteVarRule)
 	GlobalRuleRegistry.Register("no-dupe-args", no_dupe_args.NoDupeArgsRule)
 	GlobalRuleRegistry.Register("no-dupe-keys", no_dupe_keys.NoDupeKeysRule)
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)

@@ -7,7 +7,7 @@ const recommended: RslintConfigEntry = {
   rules: {
     'constructor-super': 'error',
     // 'no-control-regex': 'error', // not implemented
-    // 'no-delete-var': 'error', // not implemented
+    'no-delete-var': 'error',
     // 'no-dupe-class-members': 'error', // not implemented
     // 'no-dupe-else-if': 'error', // not implemented
     'no-empty-character-class': 'error',
