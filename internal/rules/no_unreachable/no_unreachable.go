@@ -10,10 +10,23 @@ import (
 // https://eslint.org/docs/latest/rules/no-unreachable
 
 // isUnreachable checks if a statement is unreachable using the binder's flow analysis.
-// The binder sets FlowNode on each reachable statement; unreachable statements have nil FlowNode.
+// The binder assigns FlowNode only to nodes in [KindFirstStatement, KindLastStatement].
+// Declaration nodes like EnumDeclaration, ClassDeclaration, and ModuleDeclaration fall
+// outside that range and never receive a FlowNode, so a nil FlowNode alone does not imply
+// the node is unreachable. For those nodes we fall back to the NodeFlagsUnreachable flag that the
+// binder sets on all potentially-executable unreachable nodes.
 func isUnreachable(node *ast.Node) bool {
 	flowData := node.FlowNodeData()
-	return flowData == nil || flowData.FlowNode == nil
+	if flowData != nil && flowData.FlowNode != nil {
+		return false
+	}
+	// For nodes in the statement range, the binder always assigns FlowNode;
+	// a nil value reliably means unreachable.
+	if node.Kind >= ast.KindFirstStatement && node.Kind <= ast.KindLastStatement {
+		return true
+	}
+	// For nodes outside the range, use the explicit flag.
+	return node.Flags&ast.NodeFlagsUnreachable != 0
 }
 
 // isHoistedOrEmpty returns true if the statement is safe to appear
