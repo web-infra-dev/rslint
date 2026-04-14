@@ -107,6 +107,13 @@ func TestNoUnreachableRule(t *testing.T) {
 
 			// --- Generator try/yield: catch IS reachable (yield can throw) ---
 			{Code: `function* foo() { try { yield 1; return; } catch (err) { return err; } }`},
+
+			// --- TypeScript: enum/class/namespace declarations that are reachable ---
+			{Code: `export enum Foo { A, B }`},
+			{Code: `const x = 1; export enum Foo { A, B }`},
+			{Code: `const x = 1; enum Foo { A, B }`},
+			{Code: `const x = 1; class Bar {}`},
+			{Code: `const x = 1; namespace NS { export const a = 1; }`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -324,6 +331,15 @@ func TestNoUnreachableRule(t *testing.T) {
 			// --- TypeScript: enum after return (has runtime effect) ---
 			{
 				Code:   `function foo() { return; enum Color { Red } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unreachableCode"}},
+			},
+			// --- TypeScript: export enum / export class after throw at module level ---
+			{
+				Code:   `export const x = 1; throw new Error(); export enum Bar { A, B }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unreachableCode"}},
+			},
+			{
+				Code:   `export const x = 1; throw new Error(); export class Foo {}`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unreachableCode"}},
 			},
 
