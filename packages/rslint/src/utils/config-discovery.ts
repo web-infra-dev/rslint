@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import picomatch from 'picomatch';
+import { type RslintConfigEntry } from '../define-config.ts';
 
 export const JS_CONFIG_FILES = [
   'rslint.config.js',
@@ -44,9 +45,9 @@ export function findJSConfigsInDir(startDir: string): string[] {
   const resolved = path.resolve(startDir);
 
   // Node 22+ native globSync (C++ implementation, faster)
-  if (typeof (fs as any).globSync === 'function') {
+  if (typeof fs.globSync === 'function') {
     const pattern = '**/rslint.config.{js,mjs,ts,mts}';
-    return (fs as any)
+    return fs
       .globSync(pattern, {
         cwd: resolved,
         exclude: (f: string) => SCAN_EXCLUDE_DIRS.has(path.basename(f)),
@@ -152,7 +153,9 @@ export function discoverConfigs(
  * `ignores` and no other meaningful fields. Aligns with ESLint flat config
  * semantics where such entries prevent directory traversal.
  */
-function isGlobalIgnoreEntry(entry: Record<string, unknown>): boolean {
+function isGlobalIgnoreEntry(
+  entry: RslintConfigEntry,
+): entry is Required<Pick<RslintConfigEntry, 'ignores'>> {
   const ignores = entry.ignores;
   if (!Array.isArray(ignores) || ignores.length === 0) return false;
 
@@ -168,11 +171,11 @@ function isGlobalIgnoreEntry(entry: Record<string, unknown>): boolean {
 /**
  * Extract global ignore patterns from a config's entries.
  */
-function getGlobalIgnores(entries: Record<string, unknown>[]): string[] {
+function getGlobalIgnores(entries: RslintConfigEntry[]): string[] {
   const patterns: string[] = [];
   for (const entry of entries) {
     if (isGlobalIgnoreEntry(entry)) {
-      for (const pattern of entry.ignores as string[]) {
+      for (const pattern of entry.ignores) {
         patterns.push(pattern);
       }
     }
@@ -245,9 +248,9 @@ function isDirIgnoredByPatterns(
   return false;
 }
 
-interface ConfigEntry {
+export interface ConfigEntry {
   configDirectory: string;
-  entries: unknown[];
+  entries: RslintConfigEntry[];
 }
 
 /**
@@ -298,9 +301,7 @@ export function filterConfigsByParentIgnores(
         continue;
       }
 
-      const globalIgnores = getGlobalIgnores(
-        parent.entries as Record<string, unknown>[],
-      );
+      const globalIgnores = getGlobalIgnores(parent.entries);
       if (globalIgnores.length === 0) continue;
 
       if (isDirIgnoredByPatterns(configDir, globalIgnores, parentDir)) {

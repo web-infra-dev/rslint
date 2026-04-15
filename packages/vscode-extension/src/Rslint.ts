@@ -27,8 +27,8 @@ export class Rslint implements Disposable {
   private readonly logger: Logger;
   private readonly extension: Extension;
   private readonly workspaceFolder: WorkspaceFolder;
-  private lspOutputChannel: OutputChannel | undefined;
-  private outputChannel: OutputChannel | undefined;
+  private readonly lspOutputChannel: OutputChannel | undefined;
+  private readonly outputChannel: OutputChannel | undefined;
   private configWatcher: FileSystemWatcher | undefined;
   private configReloadTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -307,7 +307,7 @@ export class Rslint implements Disposable {
         `Using Rslint binary from node_modules: ${platformPackageBinPath}`,
       );
       return platformPackageBinPath;
-    } catch (err) {
+    } catch {
       this.logger.debug('No binary found in node_modules');
     }
 
@@ -326,8 +326,9 @@ export class Rslint implements Disposable {
 
       try {
         this.logger.debug('Looking for Rslint binary in PnP mode');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-        const yarnPnpApi = require(yarnPnpFile.fsPath);
+        const yarnPnpApi: {
+          resolveRequest: (request: string, issuer: string) => string | null;
+        } = require(yarnPnpFile.fsPath); // rslint-disable-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
 
         const rslintCorePackage = yarnPnpApi.resolveRequest(
           '@rslint/core/package.json',
@@ -338,12 +339,16 @@ export class Rslint implements Disposable {
           continue;
         }
 
-        const rslintPlatformPkg = Uri.file(
-          yarnPnpApi.resolveRequest(
-            PLATFORM_BIN_REQUEST,
-            rslintCorePackage,
-          ) as string,
+        const rslintPlatformPkgPath = yarnPnpApi.resolveRequest(
+          PLATFORM_BIN_REQUEST,
+          rslintCorePackage,
         );
+
+        if (!rslintPlatformPkgPath) {
+          continue;
+        }
+
+        const rslintPlatformPkg = Uri.file(rslintPlatformPkgPath);
 
         if (await fileExists(rslintPlatformPkg)) {
           this.logger.debug(
@@ -351,7 +356,7 @@ export class Rslint implements Disposable {
           );
           return rslintPlatformPkg.fsPath;
         }
-      } catch (err) {
+      } catch {
         this.logger.debug('No binary found in PnP mode');
       }
     }
@@ -376,13 +381,13 @@ export class Rslint implements Disposable {
   private async getBinaryPath(): Promise<string> {
     const binPathConfig = workspace
       .getConfiguration()
-      .get<RslintBinPath>('rslint.binPath')!;
+      .get<RslintBinPath>('rslint.binPath');
 
     let finalBinPath: string | null = null;
     if (binPathConfig === 'local') {
       // 1. Check if the binary exists in node_modules or PnP
       // 2. Fallback to built-in binary if not found
-      let localBinPath =
+      const localBinPath =
         this.findBinaryFromNodeModules() ?? (await this.findBinaryFromPnp());
 
       if (localBinPath === null) {

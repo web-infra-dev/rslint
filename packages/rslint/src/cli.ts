@@ -6,6 +6,7 @@ import { parseArgs, classifyArgs, isJSConfigFile } from './utils/args.js';
 import {
   discoverConfigs,
   filterConfigsByParentIgnores,
+  type ConfigEntry,
 } from './utils/config-discovery.js';
 
 /**
@@ -44,7 +45,7 @@ async function runWithJSConfigs(
   goArgs: string[],
   cwd: string,
 ): Promise<number> {
-  const configEntries: { configDirectory: string; entries: unknown[] }[] = [];
+  const configEntries: ConfigEntry[] = [];
   const isSingleConfig = configs.size === 1;
 
   for (const [configPath, configDir] of configs) {
@@ -63,7 +64,7 @@ async function runWithJSConfigs(
       continue;
     }
 
-    let entries: unknown[];
+    let entries: ConfigEntry['entries'];
     try {
       entries = normalizeConfig(rawConfig);
     } catch (err: unknown) {

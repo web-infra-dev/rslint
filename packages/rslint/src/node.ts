@@ -2,10 +2,6 @@ import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import type {
   RslintServiceInterface,
-  LintOptions,
-  LintResponse,
-  ApplyFixesRequest,
-  ApplyFixesResponse,
   RSlintOptions,
   PendingMessage,
   IpcMessage,
@@ -16,9 +12,9 @@ import type {
  */
 export class NodeRslintService implements RslintServiceInterface {
   private nextMessageId: number;
-  private pendingMessages: Map<number, PendingMessage>;
-  private rslintPath: string;
-  private process: ChildProcess;
+  private readonly pendingMessages: Map<number, PendingMessage>;
+  private readonly rslintPath: string;
+  private readonly process: ChildProcess;
   private chunks: Buffer[];
   private chunkSize: number;
   private expectedSize: number | null;

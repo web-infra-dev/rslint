@@ -1,5 +1,3 @@
-<!-- cspell:ignore strnig undefned nunber fucntion -->
-
 # valid-typeof
 
 ## Rule Details

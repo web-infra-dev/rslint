@@ -18,6 +18,8 @@ module.exports = {
     'cmd/tsgo',
     './agents',
     'internal/linter/*_test.go',
+    'internal/rules/valid_typeof/valid_typeof.md',
+    'website/docs/en/rules/*/',
   ],
   dictionaries: ['dictionary'],
   dictionaryDefinitions: [
