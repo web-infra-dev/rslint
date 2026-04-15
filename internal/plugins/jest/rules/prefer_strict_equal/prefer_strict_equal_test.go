@@ -68,6 +68,22 @@ func TestPreferStrictEqualRule(t *testing.T) {
 					},
 				},
 			},
+			{
+				Code: "expect(something)[`toEqual`](somethingElse);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "useToStrictEqual",
+						Line:      1,
+						Column:    19,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestReplaceWithStrictEqual",
+								Output:    "expect(something)[`toStrictEqual`](somethingElse);",
+							},
+						},
+					},
+				},
+			},
 		},
 	)
 }

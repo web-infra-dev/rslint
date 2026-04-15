@@ -40,7 +40,7 @@ var PreferStrictEqualRule = rule.Rule{
 
 				for _, memberEntry := range MemberEntries {
 					kind := memberEntry.Node.Kind
-					if kind != ast.KindIdentifier && kind != ast.KindStringLiteral {
+					if kind != ast.KindIdentifier && kind != ast.KindStringLiteral && kind != ast.KindNoSubstitutionTemplateLiteral {
 						continue
 					}
 
@@ -57,8 +57,11 @@ var PreferStrictEqualRule = rule.Rule{
 								{
 									Range: core.NewTextRange(memberEntry.Node.Pos(), memberEntry.Node.End()),
 									Text: func() string {
-										if memberEntry.Node.Kind != ast.KindIdentifier {
+										if memberEntry.Node.Kind == ast.KindStringLiteral {
 											return "'toStrictEqual'"
+										}
+										if memberEntry.Node.Kind == ast.KindNoSubstitutionTemplateLiteral {
+											return "`toStrictEqual`"
 										}
 										return "toStrictEqual"
 									}(),
