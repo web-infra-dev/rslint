@@ -889,7 +889,7 @@ func TestTypeCheck_MultiplePrograms(t *testing.T) {
 
 	var mu sync.Mutex
 	var diagnostics []rule.RuleDiagnostic
-	count, err := RunLinter(
+	result, err := RunLinter(
 		[]*compiler.Program{program1, program2},
 		true,
 		nil, nil, utils.ExcludePaths,
@@ -906,8 +906,8 @@ func TestTypeCheck_MultiplePrograms(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
 	}
-	if count < 2 {
-		t.Errorf("Expected lintedFileCount >= 2, got %d", count)
+	if result.LintedFileCount < 2 {
+		t.Errorf("Expected lintedFileCount >= 2, got %d", result.LintedFileCount)
 	}
 
 	tsCount := 0

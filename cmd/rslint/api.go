@@ -205,7 +205,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Run linter
-	lintedFilesCount, err := linter.RunLinter(
+	lintResult, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for IPC
 		allowedFiles,
@@ -262,7 +262,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	response := &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
-		FileCount:   int(lintedFilesCount),
+		FileCount:   int(lintResult.LintedFileCount),
 		RuleCount:   len(rulesWithOptions),
 	}
 	// Only include encoded source files if requested
