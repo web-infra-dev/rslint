@@ -13,8 +13,8 @@ interface IpcMessage {
 
 // Global state for the worker
 let rslintProcess: any = null;
-let nextMessageId = 1;
-let pendingMessages = new Map<
+// const nextMessageId = 1;
+const pendingMessages = new Map<
   number,
   { resolve: (data: any) => void; reject: (error: Error) => void }
 >();
@@ -32,6 +32,7 @@ async function initializeRslint(): Promise<void> {
     // const rslintWasm = await import('./rslint.wasm');
     // rslintProcess = await rslintWasm.default();
 
+    // rslint-disable-next-line no-console
     console.log('Rslint worker initialized');
   } catch (error) {
     console.error('Failed to initialize rslint:', error);
@@ -85,8 +86,8 @@ async function sendToRslint(kind: string, data: any): Promise<any> {
 /**
  * Handle messages from the main thread
  */
-async function handleMessage(event: MessageEvent): Promise<void> {
-  const { id, kind, data } = event.data as IpcMessage;
+async function handleMessage(event: MessageEvent<IpcMessage>): Promise<void> {
+  const { id, kind, data } = event.data;
 
   try {
     // Ensure rslint is initialized
@@ -122,7 +123,7 @@ function handleError(error: ErrorEvent): void {
   console.error('Worker error:', error);
 
   // Send error to main thread for all pending messages
-  for (const [id, pending] of pendingMessages) {
+  for (const [id] of pendingMessages) {
     self.postMessage({
       id,
       kind: 'error',
@@ -139,4 +140,5 @@ self.addEventListener('message', handleMessage);
 self.addEventListener('error', handleError);
 
 // Initialize the worker
+// rslint-disable-next-line no-console
 console.log('Rslint worker started');

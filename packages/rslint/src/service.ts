@@ -12,7 +12,7 @@ import type {
  * Main RslintService class that automatically uses the appropriate implementation
  */
 export class RSLintService {
-  private service: RslintServiceBackend;
+  private readonly service: RslintServiceBackend;
 
   constructor(service: RslintServiceBackend) {
     this.service = service;

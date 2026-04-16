@@ -2,10 +2,6 @@
 
 import type {
   RslintServiceInterface,
-  LintOptions,
-  LintResponse,
-  ApplyFixesRequest,
-  ApplyFixesResponse,
   RSlintOptions,
   PendingMessage,
   IpcMessage,
@@ -16,9 +12,9 @@ import type {
  */
 export class BrowserRslintService implements RslintServiceInterface {
   private nextMessageId: number;
-  private pendingMessages: Map<number, PendingMessage>;
+  private readonly pendingMessages: Map<number, PendingMessage>;
   private worker!: Worker | null;
-  private workerUrl: string;
+  private readonly workerUrl: string;
   private chunks: Uint8Array[];
   private chunkSize: number;
   private expectedSize: number | null;
@@ -50,7 +46,7 @@ export class BrowserRslintService implements RslintServiceInterface {
       this.worker.onerror = (error) => {
         console.error('Worker error:', error);
         // Reject all pending messages
-        for (const [id, pending] of this.pendingMessages) {
+        for (const [, pending] of this.pendingMessages) {
           pending.reject(new Error(`Worker error: ${error.message}`));
         }
         this.pendingMessages.clear();
@@ -175,7 +171,7 @@ export class BrowserRslintService implements RslintServiceInterface {
   terminate(): void {
     if (this.worker) {
       // Reject all pending messages
-      for (const [id, pending] of this.pendingMessages) {
+      for (const [, pending] of this.pendingMessages) {
         pending.reject(new Error('Service terminated'));
       }
       this.pendingMessages.clear();

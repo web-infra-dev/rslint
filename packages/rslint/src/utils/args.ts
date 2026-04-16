@@ -68,7 +68,9 @@ export function parseArgs(argv: string[]) {
     : [...flags, ...positionalsBefore];
 
   return {
+    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     config: (values.config as string) ?? null,
+    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     init: (values.init as boolean) ?? false,
     rest,
     positionals,

@@ -14,9 +14,9 @@ import { setupStatusBar } from './statusBar';
 import { RegisterCommands } from './commands';
 
 export class Extension implements Disposable {
-  private rslintInstances = new Map<string, Rslint>();
+  private readonly rslintInstances = new Map<string, Rslint>();
   private disposables: Disposable[] = [];
-  private logger: Logger;
+  private readonly logger: Logger;
   public context: ExtensionContext;
 
   constructor(context: ExtensionContext) {
@@ -56,7 +56,7 @@ export class Extension implements Disposable {
     this.logger.info('Rslint extension deactivating...');
 
     const stopPromises = Array.from(this.rslintInstances.values()).map(
-      (instance) => instance.stop(),
+      async (instance) => instance.stop(),
     );
 
     try {
