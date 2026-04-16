@@ -108,7 +108,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/member-ordering/member-ordering-natural-case-insensitive-order.test.ts',
     './tests/typescript-eslint/rules/member-ordering/member-ordering-natural-order.test.ts',
     './tests/typescript-eslint/rules/member-ordering/member-ordering-optionalMembers.test.ts',
-    // './tests/typescript-eslint/rules/method-signature-style.test.ts',
+    './tests/typescript-eslint/rules/method-signature-style.test.ts',
     // './tests/typescript-eslint/rules/naming-convention/cases/accessor.test.ts',
     // './tests/typescript-eslint/rules/naming-convention/cases/autoAccessor.test.ts',
     // './tests/typescript-eslint/rules/naming-convention/cases/class.test.ts',

@@ -1,0 +1,1498 @@
+// Rstest Snapshot v1
+
+exports[`method-signature-style > invalid 1`] = `
+{
+  "code": "
+        interface Test {
+          f(a: string): number;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          f: (a: string) => number;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 2`] = `
+{
+  "code": "
+        interface Test {
+          ['f'](a: boolean): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          ['f']: (a: boolean) => void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 3`] = `
+{
+  "code": "
+        interface Test {
+          f<T>(a: T): T;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          f: <T>(a: T) => T;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 4`] = `
+{
+  "code": "
+        interface Test {
+          ['f']<T extends {}>(a: T, b: T): T;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          ['f']: <T extends {}>(a: T, b: T) => T;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 5`] = `
+{
+  "code": "
+        interface Test {
+          'f!'</* a */>(/* b */ x: any /* c */): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          'f!': </* a */>(/* b */ x: any /* c */) => void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 6`] = `
+{
+  "code": "
+        type Test = { f(a: string): number };
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { f: (a: string) => number };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 7`] = `
+{
+  "code": "
+        type Test = { ['f']?(a: boolean): void };
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { ['f']?: (a: boolean) => void };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 8`] = `
+{
+  "code": "
+        type Test = { f?<T>(a?: T): T };
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { f?: <T>(a?: T) => T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 9`] = `
+{
+  "code": "
+        type Test = { ['f']?<T>(a: T, b: T): T };
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { ['f']?: <T>(a: T, b: T) => T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 10`] = `
+{
+  "code": "
+        interface Test {
+          f: (a: string) => number;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          f(a: string): number;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 11`] = `
+{
+  "code": "
+        interface Test {
+          ['f']: (a: boolean) => void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          ['f'](a: boolean): void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 12`] = `
+{
+  "code": "
+        interface Test {
+          f: <T>(a: T) => T;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          f<T>(a: T): T;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 13`] = `
+{
+  "code": "
+        interface Test {
+          ['f']: <T extends {}>(a: T, b: T) => T;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          ['f']<T extends {}>(a: T, b: T): T;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 14`] = `
+{
+  "code": "
+        interface Test {
+          'f!': </* a */>(/* b */ x: any /* c */) => void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface Test {
+          'f!'</* a */>(/* b */ x: any /* c */): void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 15`] = `
+{
+  "code": "
+        type Test = { f: (a: string) => number };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { f(a: string): number };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 16`] = `
+{
+  "code": "
+        type Test = { ['f']?: (a: boolean) => void };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { ['f']?(a: boolean): void };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 17`] = `
+{
+  "code": "
+        type Test = { f?: <T>(a?: T) => T };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { f?<T>(a?: T): T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 18`] = `
+{
+  "code": "
+        type Test = { ['f']?: <T>(a: T, b: T) => T };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Test = { ['f']?<T>(a: T, b: T): T };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 19`] = `
+{
+  "code": "
+interface Foo {
+  semi(arg: string): void;
+  comma(arg: string): void,
+  none(arg: string): void
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  semi: (arg: string) => void;
+  comma: (arg: string) => void,
+  none: (arg: string) => void
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 20`] = `
+{
+  "code": "
+interface Foo {
+  semi: (arg: string) => void;
+  comma: (arg: string) => void,
+  none: (arg: string) => void
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Function property signature is forbidden. Use a method shorthand instead.",
+      "messageId": "errorProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  semi(arg: string): void;
+  comma(arg: string): void,
+  none(arg: string): void
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 21`] = `
+{
+  "code": "
+interface Foo {
+  x(
+    args: Pick<
+      Bar,
+      'one' | 'two' | 'three'
+    >,
+  ): Baz;
+  y(
+    foo: string,
+    bar: number,
+  ): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  x: (
+    args: Pick<
+      Bar,
+      'one' | 'two' | 'three'
+    >,
+  ) => Baz;
+  y: (
+    foo: string,
+    bar: number,
+  ) => void;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 22`] = `
+{
+  "code": "
+interface Foo {
+  foo(): one;
+  foo(): two;
+  foo(): three;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  foo: (() => one) & (() => two) & (() => three);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 23`] = `
+{
+  "code": "
+interface Foo {
+  foo(bar: string): one;
+  foo(bar: number, baz: string): two;
+  foo(): three;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  foo: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 24`] = `
+{
+  "code": "
+interface Foo {
+  [foo](bar: string): one;
+  [foo](bar: number, baz: string): two;
+  [foo](): three;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 25`] = `
+{
+  "code": "
+interface Foo {
+  [foo](bar: string): one;
+  [foo](bar: number, baz: string): two;
+  [foo](): three;
+  bar(arg: string): void;
+  bar(baz: number): Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);
+  bar: ((arg: string) => void) & ((baz: number) => Foo);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 26`] = `
+{
+  "code": "
+        declare global {
+          namespace jest {
+            interface Matchers<R, T> {
+              // Add overloads specific to the DOM
+              toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;
+              toHaveProps(props: Partial<DomPropsOf<T>>): R;
+            }
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 95,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 7,
+        },
+        "start": {
+          "column": 15,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 27`] = `
+{
+  "code": "
+type Foo = {
+  foo(): one;
+  foo(): two;
+  foo(): three;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+type Foo = {
+  foo: (() => one) & (() => two) & (() => three);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 28`] = `
+{
+  "code": "
+declare const Foo: {
+  foo(): one;
+  foo(): two;
+  foo(): three;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+declare const Foo: {
+  foo: (() => one) & (() => two) & (() => three);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 29`] = `
+{
+  "code": "
+interface MyInterface {
+  methodReturningImplicitAny();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface MyInterface {
+  methodReturningImplicitAny: () => any;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 30`] = `
+{
+  "code": "
+interface Test {
+  f(value: number): this;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 31`] = `
+{
+  "code": "
+interface Test {
+  foo(): this;
+  foo(): Promise<this>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 32`] = `
+{
+  "code": "
+interface Test {
+  f(value: number): this | undefined;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 33`] = `
+{
+  "code": "
+interface Test {
+  f(value: number): Promise<this>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`method-signature-style > invalid 34`] = `
+{
+  "code": "
+interface Test {
+  f(value: number): Promise<this | undefined>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Shorthand method signature is forbidden. Use a function property instead.",
+      "messageId": "errorMethod",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/method-signature-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
