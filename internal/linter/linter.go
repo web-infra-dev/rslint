@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -397,6 +398,12 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 type RuleHandler = func(sourceFile *ast.SourceFile) []ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
+// LintResult holds the outcome of a RunLinter invocation.
+type LintResult struct {
+	LintedFileCount int32
+	ExecutedRules   map[string]struct{}
+}
+
 // RunLinter runs all configured rules across the given programs in parallel.
 //   - allowFiles: if non-nil, only lint files in this list; nil = all files
 //   - allowDirs: if non-nil, also lint files under these dirs (OR with allowFiles)
@@ -404,7 +411,20 @@ type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 //   - fileFilters: optional per-program ownership filters (parallel to programs).
 //     In multi-config mode, each filter ensures a program only lints files owned by
 //     its nearest config. nil or missing entries = no filter (process all).
-func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler, typeInfoFiles map[string]struct{}, fileFilters []func(string) bool) (int32, error) {
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler, typeInfoFiles map[string]struct{}, fileFilters []func(string) bool) (*LintResult, error) {
+
+	executedRules := make(map[string]struct{})
+	var rulesMu sync.Mutex
+
+	trackedGetRules := func(sourceFile *ast.SourceFile) []ConfiguredRule {
+		rules := getRulesForFile(sourceFile)
+		rulesMu.Lock()
+		for _, r := range rules {
+			executedRules[r.Name] = struct{}{}
+		}
+		rulesMu.Unlock()
+		return rules
+	}
 
 	wg := core.NewWorkGroup(singleThreaded)
 
@@ -432,12 +452,15 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 		}
 
 		wg.Queue(func() {
-			fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, typeCheck, onDiagnostic, typeInfoFiles, filter)
+			fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, trackedGetRules, typeCheck, onDiagnostic, typeInfoFiles, filter)
 			lintedFileCount.Add(fileCount)
 		})
 	}
 	wg.RunAndWait()
-	return lintedFileCount.Load(), nil
+	return &LintResult{
+		LintedFileCount: lintedFileCount.Load(),
+		ExecutedRules:   executedRules,
+	}, nil
 }
 
 // buildOwnedFileSet returns a set of file names that this program directly owns

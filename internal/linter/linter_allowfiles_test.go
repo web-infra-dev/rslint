@@ -181,7 +181,7 @@ func TestRunLinter_AllowFilesIntegration(t *testing.T) {
 	})
 
 	lintedFileNames := []string{}
-	lintedCount, err := RunLinter([]*compiler.Program{program}, true, []string{paths["b.ts"]}, nil, utils.ExcludePaths,
+	result, err := RunLinter([]*compiler.Program{program}, true, []string{paths["b.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
@@ -193,8 +193,8 @@ func TestRunLinter_AllowFilesIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
 	}
-	if lintedCount != 1 {
-		t.Errorf("Expected 1 file, got %d", lintedCount)
+	if result.LintedFileCount != 1 {
+		t.Errorf("Expected 1 file, got %d", result.LintedFileCount)
 	}
 }
 
@@ -204,7 +204,7 @@ func TestRunLinter_AllowFilesNilPassthrough(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	lintedCount, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -213,7 +213,7 @@ func TestRunLinter_AllowFilesNilPassthrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
 	}
-	if lintedCount < 2 {
-		t.Errorf("Expected at least 2 files, got %d", lintedCount)
+	if result.LintedFileCount < 2 {
+		t.Errorf("Expected at least 2 files, got %d", result.LintedFileCount)
 	}
 }

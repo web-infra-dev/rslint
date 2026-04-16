@@ -920,7 +920,7 @@ func runCMD() int {
 		}
 	}
 
-	lintedfileCount, err := linter.RunLinter(
+	lintResult, err := linter.RunLinter(
 		programs,
 		singleThreaded,
 		allowFiles,
@@ -940,6 +940,8 @@ func runCMD() int {
 		fmt.Fprintf(os.Stderr, "error running linter: %v\n", err)
 		return 1
 	}
+
+	lintedfileCount := lintResult.LintedFileCount
 
 	wg.Wait()
 
@@ -1035,7 +1037,7 @@ func runCMD() int {
 				}
 			}
 			var passDiags []rule.RuleDiagnostic
-			linter.RunLinter(
+			passResult, _ := linter.RunLinter(
 				newPrograms,
 				singleThreaded,
 				allowFiles,
@@ -1051,6 +1053,11 @@ func runCMD() int {
 				typeInfoFiles,
 				fixFileFilters,
 			)
+			if passResult != nil {
+				for name := range passResult.ExecutedRules {
+					lintResult.ExecutedRules[name] = struct{}{}
+				}
+			}
 
 			// Replace allDiags with latest post-fix diagnostics.
 			allDiags = passDiags
@@ -1115,6 +1122,8 @@ func runCMD() int {
 
 	warningsText := pluralize(warningsCount, "warning", "warnings")
 	filesText := pluralize(int(lintedfileCount), "file", "files")
+	rulesCount := len(lintResult.ExecutedRules)
+	rulesText := pluralize(rulesCount, "rule", "rules")
 	threadsCount := 1
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
@@ -1141,13 +1150,15 @@ func runCMD() int {
 			fixText := pluralize(fixedCount, "issue", "issues")
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
+				"Found %s and %s %s %s(linted %s %s with %s %s in %s using %s threads, fixed %s %s)%s\n",
 				errorsSummary,
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
 				colors.BoldText("%d", lintedfileCount),
 				filesText,
+				colors.BoldText("%d", rulesCount),
+				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
 				colors.SuccessText("%d", fixedCount),
@@ -1157,13 +1168,15 @@ func runCMD() int {
 		} else {
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s and %s %s %s(linted %s %s in %s using %s threads)%s\n",
+				"Found %s and %s %s %s(linted %s %s with %s %s in %s using %s threads)%s\n",
 				errorsSummary,
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
 				colors.BoldText("%d", lintedfileCount),
 				filesText,
+				colors.BoldText("%d", rulesCount),
+				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
 				color.New().SprintFunc()(""), // Reset

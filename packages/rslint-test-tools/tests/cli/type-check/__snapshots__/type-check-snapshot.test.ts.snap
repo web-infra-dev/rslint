@@ -9,7 +9,7 @@ exports[`--type-check output snapshots (default format) > --quiet suppresses war
   │ 3 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 1 warning (linted 1 file in <TIME> using <N> threads)
+Found 0 lint errors, 1 type error and 1 warning (linted 1 file with 1 rule in <TIME> using <N> threads)
 "
 `;
 
@@ -28,7 +28,7 @@ exports[`--type-check output snapshots (default format) > both lint error and ty
   │ 3 │  
   ╰────────────────────────────────
 
-Found 1 lint error, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 1 lint error, 1 type error and 0 warnings (linted 1 file with 1 rule in <TIME> using <N> threads)
 "
 `;
 
@@ -40,7 +40,7 @@ exports[`--type-check output snapshots (default format) > lint error only with -
   │ 2 │  console.log(a);
   ╰────────────────────────────────
 
-Found 1 lint error, 0 type errors and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 1 lint error, 0 type errors and 0 warnings (linted 1 file with 1 rule in <TIME> using <N> threads)
 "
 `;
 
@@ -52,7 +52,7 @@ exports[`--type-check output snapshots (default format) > lint error without --t
   │ 2 │  console.log(a);
   ╰────────────────────────────────
 
-Found 1 error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 1 error and 0 warnings (linted 1 file with 1 rule in <TIME> using <N> threads)
 "
 `;
 
@@ -66,7 +66,7 @@ exports[`--type-check output snapshots (default format) > multi-line lint error 
   │ 6 │  console.log(fn);
   ╰────────────────────────────────
 
-Found 1 error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 1 error and 0 warnings (linted 1 file with 1 rule in <TIME> using <N> threads)
 "
 `;
 
@@ -87,7 +87,7 @@ exports[`--type-check output snapshots (default format) > multi-line lint error 
   │ 7 │  
   ╰────────────────────────────────
 
-Found 1 lint error, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 1 lint error, 1 type error and 0 warnings (linted 1 file with 1 rule in <TIME> using <N> threads)
 "
 `;
 
@@ -100,7 +100,7 @@ exports[`--type-check output snapshots (default format) > multi-line: MessageCha
   │ 2 │  console.log(foo);
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 0 lint errors, 1 type error and 0 warnings (linted 1 file with 0 rules in <TIME> using <N> threads)
 "
 `;
 
@@ -114,7 +114,7 @@ exports[`--type-check output snapshots (default format) > multi-line: RelatedInf
   │ 3 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 0 lint errors, 1 type error and 0 warnings (linted 1 file with 0 rules in <TIME> using <N> threads)
 "
 `;
 
@@ -128,7 +128,7 @@ exports[`--type-check output snapshots (default format) > multi-line: RelatedInf
   │ 3 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 0 lint errors, 1 type error and 0 warnings (linted 1 file with 0 rules in <TIME> using <N> threads)
 "
 `;
 
@@ -143,12 +143,12 @@ exports[`--type-check output snapshots (default format) > multi-line: deep Messa
   │ 4 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 0 lint errors, 1 type error and 0 warnings (linted 1 file with 0 rules in <TIME> using <N> threads)
 "
 `;
 
 exports[`--type-check output snapshots (default format) > no errors with --type-check 1`] = `
-"Found 0 lint errors, 0 type errors and 0 warnings (linted 1 file in <TIME> using <N> threads)
+"Found 0 lint errors, 0 type errors and 0 warnings (linted 1 file with 0 rules in <TIME> using <N> threads)
 "
 `;
 
@@ -160,7 +160,7 @@ exports[`--type-check output snapshots (default format) > type error only (TS232
   │ 2 │  
   ╰────────────────────────────────
 
-Found 0 lint errors, 1 type error and 0 warnings (linted 1 file in <TIME> using <N> threads)
+Found 0 lint errors, 1 type error and 0 warnings (linted 1 file with 0 rules in <TIME> using <N> threads)
 "
 `;
 

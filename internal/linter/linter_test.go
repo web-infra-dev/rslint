@@ -77,3 +77,87 @@ func tmpDirPath(t *testing.T, normalizedPaths map[string]string, fileName string
 	return tspath.GetDirectoryPath(normalizedPaths[fileName])
 }
 
+func TestRunLinter_ExecutedRules(t *testing.T) {
+	program, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+		"b.ts": "const b = 2;",
+	})
+
+	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+		func(sf *ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{
+				{Name: "rule-a", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
+				{Name: "rule-b", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
+			}
+		},
+		false, func(d rule.RuleDiagnostic) {}, nil, nil,
+	)
+
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if _, ok := result.ExecutedRules["rule-a"]; !ok {
+		t.Error("Expected rule-a in ExecutedRules")
+	}
+	if _, ok := result.ExecutedRules["rule-b"]; !ok {
+		t.Error("Expected rule-b in ExecutedRules")
+	}
+	if len(result.ExecutedRules) != 2 {
+		t.Errorf("Expected 2 executed rules, got %d", len(result.ExecutedRules))
+	}
+}
+
+func TestRunLinter_ExecutedRulesPerFile(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+		"b.ts": "const b = 2;",
+	})
+
+	// Different files get different rules — ExecutedRules should be the union.
+	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+		func(sf *ast.SourceFile) []ConfiguredRule {
+			if sf.FileName() == paths["a.ts"] {
+				return []ConfiguredRule{
+					{Name: "only-a", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
+				}
+			}
+			return []ConfiguredRule{
+				{Name: "only-b", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
+			}
+		},
+		false, func(d rule.RuleDiagnostic) {}, nil, nil,
+	)
+
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if len(result.ExecutedRules) != 2 {
+		t.Errorf("Expected 2 executed rules (union), got %d", len(result.ExecutedRules))
+	}
+	if _, ok := result.ExecutedRules["only-a"]; !ok {
+		t.Error("Expected only-a in ExecutedRules")
+	}
+	if _, ok := result.ExecutedRules["only-b"]; !ok {
+		t.Error("Expected only-b in ExecutedRules")
+	}
+}
+
+func TestRunLinter_ExecutedRulesEmpty(t *testing.T) {
+	program, _ := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+
+	// No rules returned → ExecutedRules should be empty.
+	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
+		false, func(d rule.RuleDiagnostic) {}, nil, nil,
+	)
+
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if len(result.ExecutedRules) != 0 {
+		t.Errorf("Expected 0 executed rules, got %d", len(result.ExecutedRules))
+	}
+}
+

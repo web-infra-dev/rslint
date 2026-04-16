@@ -372,7 +372,7 @@ func TestRunLinter_AllowDirsIntegration(t *testing.T) {
 	})
 
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
-	lintedCount, err := RunLinter([]*compiler.Program{program}, true, nil, []string{srcDir}, utils.ExcludePaths,
+	result, err := RunLinter([]*compiler.Program{program}, true, nil, []string{srcDir}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -381,8 +381,8 @@ func TestRunLinter_AllowDirsIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
 	}
-	if lintedCount != 1 {
-		t.Errorf("Expected 1 file under src/, got %d", lintedCount)
+	if result.LintedFileCount != 1 {
+		t.Errorf("Expected 1 file under src/, got %d", result.LintedFileCount)
 	}
 }
 
@@ -396,7 +396,7 @@ func TestRunLinter_MultiplePrograms(t *testing.T) {
 	})
 
 	lintedFileNames := []string{}
-	lintedCount, err := RunLinter(
+	result, err := RunLinter(
 		[]*compiler.Program{programA, programB},
 		true,
 		[]string{pathsA["a.ts"], pathsB["b.ts"]},
@@ -413,8 +413,8 @@ func TestRunLinter_MultiplePrograms(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunLinter error: %v", err)
 	}
-	if lintedCount != 2 {
-		t.Errorf("Expected 2 files across 2 programs, got %d", lintedCount)
+	if result.LintedFileCount != 2 {
+		t.Errorf("Expected 2 files across 2 programs, got %d", result.LintedFileCount)
 	}
 }
 
@@ -431,7 +431,7 @@ func TestRunLinter_MultipleProgramsWithAllowDirs(t *testing.T) {
 	srcDirA := tmpDirPath(t, pathsA, "src/a.ts")
 	srcDirB := tmpDirPath(t, pathsB, "src/b.ts")
 
-	lintedCount, err := RunLinter(
+	result, err := RunLinter(
 		[]*compiler.Program{programA, programB},
 		true,
 		nil,
@@ -446,8 +446,8 @@ func TestRunLinter_MultipleProgramsWithAllowDirs(t *testing.T) {
 		t.Fatalf("RunLinter error: %v", err)
 	}
 	// Only src/ files from each program
-	if lintedCount != 2 {
-		t.Errorf("Expected 2 files (src from each program), got %d", lintedCount)
+	if result.LintedFileCount != 2 {
+		t.Errorf("Expected 2 files (src from each program), got %d", result.LintedFileCount)
 	}
 }
 
