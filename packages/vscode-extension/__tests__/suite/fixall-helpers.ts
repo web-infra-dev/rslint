@@ -18,7 +18,10 @@ export async function openFixture(
 export async function waitForDiagnostics(
   doc: vscode.TextDocument,
 ): Promise<vscode.Diagnostic[]> {
-  for (let i = 0; i < 10; i++) {
+  // On CI (especially Windows), the LSP server may take longer to start up,
+  // load config, type-check, and push initial diagnostics. Use generous
+  // iteration count (15) and per-iteration timeout (2s) to avoid flaky failures.
+  for (let i = 0; i < 15; i++) {
     const diagnostics = vscode.languages.getDiagnostics(doc.uri);
     if (diagnostics.length > 0) {
       return diagnostics;
@@ -36,7 +39,7 @@ export async function waitForDiagnostics(
       setTimeout(() => {
         disposable.dispose();
         resolve(void 0);
-      }, 1000);
+      }, 2000);
     });
   }
   return vscode.languages.getDiagnostics(doc.uri);
@@ -45,7 +48,7 @@ export async function waitForDiagnostics(
 export async function waitForDiagnosticsToChange(
   doc: vscode.TextDocument,
   previousCount: number,
-  timeoutMs = 15000,
+  timeoutMs = 30000,
 ): Promise<vscode.Diagnostic[]> {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {
@@ -75,7 +78,7 @@ export async function waitForDiagnosticsToChange(
 export async function waitForDiagnosticsCount(
   doc: vscode.TextDocument,
   expectedCount: number,
-  timeoutMs = 15000,
+  timeoutMs = 30000,
 ): Promise<vscode.Diagnostic[]> {
   const startTime = Date.now();
   while (Date.now() - startTime < timeoutMs) {

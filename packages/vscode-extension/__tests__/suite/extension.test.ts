@@ -3,23 +3,23 @@ import * as vscode from 'vscode';
 import path from 'node:path';
 
 suite('rslint extension', function () {
-  this.timeout(50000);
+  this.timeout(90000);
 
-  // Helper function to wait for diagnostics
+  // Helper function to wait for diagnostics.
+  // On CI (especially Windows), the LSP server may take longer to start up,
+  // load config, type-check, and push initial diagnostics. Use generous
+  // iteration count (15) and per-iteration timeout (2s) to avoid flaky failures.
   async function waitForDiagnostics(
     doc: vscode.TextDocument,
   ): Promise<vscode.Diagnostic[]> {
-    // Try multiple times to get diagnostics
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 15; i++) {
       const diagnostics = vscode.languages.getDiagnostics(doc.uri);
       if (diagnostics.length > 0) {
         return diagnostics;
       }
 
-      // Wait for diagnostics change event or timeout
       await new Promise((resolve) => {
         const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          // Check if this event is for our document
           for (const uri of e.uris) {
             if (uri.toString() === doc.uri.toString()) {
               disposable.dispose();
@@ -28,22 +28,20 @@ suite('rslint extension', function () {
             }
           }
         });
-        // Wait 1 second then check again
         setTimeout(() => {
           disposable.dispose();
           resolve(void 0);
-        }, 1000);
+        }, 2000);
       });
     }
 
     return vscode.languages.getDiagnostics(doc.uri);
   }
 
-  // Helper function to wait for diagnostics to change from a previous state
   async function waitForDiagnosticsToChange(
     doc: vscode.TextDocument,
     previousCount: number,
-    timeoutMs = 15000,
+    timeoutMs = 30000,
   ): Promise<vscode.Diagnostic[]> {
     const startTime = Date.now();
 
@@ -74,11 +72,10 @@ suite('rslint extension', function () {
     return vscode.languages.getDiagnostics(doc.uri);
   }
 
-  // Helper function to wait for diagnostics to reach a specific count
   async function waitForDiagnosticsCount(
     doc: vscode.TextDocument,
     expectedCount: number,
-    timeoutMs = 15000,
+    timeoutMs = 30000,
   ): Promise<vscode.Diagnostic[]> {
     const startTime = Date.now();
 
@@ -108,11 +105,10 @@ suite('rslint extension', function () {
     return vscode.languages.getDiagnostics(doc.uri);
   }
 
-  // Helper function to wait for diagnostics containing a specific message
   async function waitForDiagnosticsWithMessage(
     doc: vscode.TextDocument,
     messageSubstring: string,
-    timeoutMs = 15000,
+    timeoutMs = 30000,
   ): Promise<vscode.Diagnostic[]> {
     const startTime = Date.now();
 
