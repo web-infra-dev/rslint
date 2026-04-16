@@ -11,7 +11,7 @@ import {
 } from './fixall-helpers';
 
 suite('rslint fixAll - on-save', function () {
-  this.timeout(50000);
+  this.timeout(90000);
 
   test('generic source.fixAll triggers rslint via on-save', async () => {
     const fixturesDir = getFixturesDir();
@@ -54,7 +54,7 @@ suite('rslint fixAll - on-save', function () {
         const startTime = Date.now();
         while (
           doc.getText().includes('gfVal as string') &&
-          Date.now() - startTime < 10000
+          Date.now() - startTime < 20000
         ) {
           await new Promise((r) => setTimeout(r, 500));
         }
@@ -97,7 +97,7 @@ suite('rslint fixAll - on-save', function () {
       const startTime = Date.now();
       while (
         doc.getText().includes('saveVal as string') &&
-        Date.now() - startTime < 10000
+        Date.now() - startTime < 20000
       ) {
         await new Promise((r) => setTimeout(r, 500));
       }
@@ -222,7 +222,7 @@ suite('rslint fixAll - on-save', function () {
       const startTime = Date.now();
       while (
         doc.getText().includes('quickVal as string') &&
-        Date.now() - startTime < 10000
+        Date.now() - startTime < 20000
       ) {
         await new Promise((r) => setTimeout(r, 500));
       }

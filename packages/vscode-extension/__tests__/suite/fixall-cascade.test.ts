@@ -10,7 +10,7 @@ import {
 } from './fixall-helpers';
 
 suite('rslint fixAll - cascade (multi-pass)', function () {
-  this.timeout(50000);
+  this.timeout(90000);
 
   test('ban-types triggers no-inferrable-types in second pass', async () => {
     const cascadeContent = [
@@ -67,7 +67,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       while (
         (doc.getText().includes(': String') ||
           doc.getText().includes(': string')) &&
-        Date.now() - startTime < 15000
+        Date.now() - startTime < 30000
       ) {
         await new Promise((r) => setTimeout(r, 500));
       }

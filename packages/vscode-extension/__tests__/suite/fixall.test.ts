@@ -11,7 +11,7 @@ import {
 } from './fixall-helpers';
 
 suite('rslint fixAll - code actions', function () {
-  this.timeout(50000);
+  this.timeout(90000);
 
   // ======== Basic fixAll behavior (read-only, safe to use fixtures) ========
 

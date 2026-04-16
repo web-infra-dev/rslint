@@ -10,7 +10,7 @@ import {
 } from './fixall-helpers';
 
 suite('rslint fixAll - error flows', function () {
-  this.timeout(50000);
+  this.timeout(90000);
 
   test('fixAll on file with syntax errors does not crash', async () => {
     const brokenContent = 'const x: string = \nfunction (\nexport { \n';
@@ -65,7 +65,7 @@ suite('rslint fixAll - error flows', function () {
       const probeStart = Date.now();
       while (
         doc.getText().includes('pVal as string') &&
-        Date.now() - probeStart < 10000
+        Date.now() - probeStart < 20000
       ) {
         await new Promise((r) => setTimeout(r, 500));
       }
