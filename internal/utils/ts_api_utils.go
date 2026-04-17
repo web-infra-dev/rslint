@@ -423,10 +423,10 @@ func isJsxElementOrFragment(node *ast.Node) bool {
 	return node.Kind == ast.KindJsxElement || node.Kind == ast.KindJsxFragment
 }
 
-// isNumberLiteralZeroOrNaN checks if a number literal type value is 0 or NaN.
+// IsNumberLiteralZeroOrNaN checks if a number literal type value is 0 or NaN.
 // tsgo stores number literal values as a named float64 type,
 // so we use ValueToString for reliable string conversion and then parse.
-func isNumberLiteralZeroOrNaN(val interface{}) bool {
+func IsNumberLiteralZeroOrNaN(val interface{}) bool {
 	s := checker.ValueToString(val)
 	if s == "0" || s == "-0" || s == "NaN" {
 		return true
@@ -471,7 +471,7 @@ func isConstituentPossiblyFalsy(t *checker.Type) bool {
 		return true
 	}
 	if flags&checker.TypeFlagsNumberLiteral != 0 {
-		return isNumberLiteralZeroOrNaN(t.AsLiteralType().Value())
+		return IsNumberLiteralZeroOrNaN(t.AsLiteralType().Value())
 	}
 	if flags&checker.TypeFlagsNumber != 0 {
 		return true
@@ -527,7 +527,7 @@ func isConstituentPossiblyTruthy(t *checker.Type) bool {
 		return true
 	}
 	if flags&checker.TypeFlagsNumberLiteral != 0 {
-		return !isNumberLiteralZeroOrNaN(t.AsLiteralType().Value())
+		return !IsNumberLiteralZeroOrNaN(t.AsLiteralType().Value())
 	}
 	if flags&checker.TypeFlagsNumber != 0 {
 		return true
