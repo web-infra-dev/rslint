@@ -114,8 +114,10 @@ func flattenMessageChain(b *strings.Builder, chain *ast.Diagnostic, level int) {
 
 // RunLinterInProgram lints files in a single Program. Files are filtered through
 // skipFiles, allowFiles/allowDirs, and the optional fileFilter before rule execution.
-// fileFilter is used in multi-config mode for ownership-based deduplication: only files
-// owned by this program's config pass the filter. Pass nil to lint all files.
+// fileFilter is a caller-supplied predicate covering any reason to skip a file —
+// used for multi-config ownership-based deduplication and for config `ignores`
+// patterns. Files it rejects are excluded from rule diagnostics, type-check
+// diagnostics, and the returned linted-file count. Pass nil to lint all files.
 func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDirs []string, skipFiles []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler, typeInfoFiles map[string]struct{}, fileFilter func(string) bool) int32 {
 	// Pre-compute FileInfo for allowFiles once to avoid N×M stat calls in the loop.
 	var allowFileInfos []os.FileInfo
@@ -408,9 +410,10 @@ type LintResult struct {
 //   - allowFiles: if non-nil, only lint files in this list; nil = all files
 //   - allowDirs: if non-nil, also lint files under these dirs (OR with allowFiles)
 //   - typeInfoFiles: files with type info; gap files not in this set skip type-aware rules
-//   - fileFilters: optional per-program ownership filters (parallel to programs).
-//     In multi-config mode, each filter ensures a program only lints files owned by
-//     its nearest config. nil or missing entries = no filter (process all).
+//   - fileFilters: optional per-program skip predicates (parallel to programs).
+//     Each filter covers any caller-specific reason to skip a file — multi-config
+//     ownership deduplication and config `ignores` exclusion are both composed
+//     in here by the caller. nil or missing entries = no filter (process all).
 func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler, typeInfoFiles map[string]struct{}, fileFilters []func(string) bool) (*LintResult, error) {
 
 	executedRules := make(map[string]struct{})

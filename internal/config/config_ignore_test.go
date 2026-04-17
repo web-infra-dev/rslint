@@ -424,3 +424,59 @@ func TestGetConfigForFile_NegationSequentialOverride(t *testing.T) {
 		t.Error("Expected dist/generated/a.js to be ignored")
 	}
 }
+
+// IsFileIgnored reports only on global ignores, distinct from GetConfigForFile
+// which ALSO returns nil when no entry matched the file. This distinction
+// matters for --type-check: ignored files must be silenced, but files outside
+// rslint's `files` scope should still receive type diagnostics.
+func TestIsFileIgnored_OnlyReflectsIgnores(t *testing.T) {
+	config := RslintConfig{
+		{Ignores: []string{"**/fixtures/**", "**/*.gen.ts"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	}
+
+	tests := []struct {
+		name    string
+		path    string
+		ignored bool
+	}{
+		{"directory pattern hits", "packages/x/fixtures/a.ts", true},
+		{"file pattern hits", "src/schema.gen.ts", true},
+		{"in-scope file not ignored", "src/index.ts", false},
+		// Critical: a file that no entry matches (e.g. .js when only **/*.ts
+		// has rules) is NOT ignored — it's just out of rslint's scope.
+		// GetConfigForFile returns nil for both cases, but IsFileIgnored
+		// distinguishes them so --type-check can still report on out-of-scope files.
+		{"out-of-scope file not ignored", "src/index.js", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := config.IsFileIgnored(tt.path, ""); got != tt.ignored {
+				t.Errorf("IsFileIgnored(%q) = %v, want %v", tt.path, got, tt.ignored)
+			}
+		})
+	}
+}
+
+// Empty patterns short-circuit — no config with ignores should never flag a file.
+func TestIsFileIgnored_NoPatterns(t *testing.T) {
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	}
+	if config.IsFileIgnored("any/file.ts", "") {
+		t.Error("IsFileIgnored should return false when config has no ignore patterns")
+	}
+}
+
+// Directory-level blocking cannot be undone by `!` negation, matching
+// ESLint v10's isDirectoryIgnored. IsFileIgnored must reflect this so
+// --type-check honors the same blocking rule.
+func TestIsFileIgnored_DirectoryBlockingBeatsNegation(t *testing.T) {
+	config := RslintConfig{
+		{Ignores: []string{"blocked/**", "!blocked/keep.ts"}},
+	}
+	if !config.IsFileIgnored("blocked/keep.ts", "") {
+		t.Error("directory-level block should ignore blocked/keep.ts even with negation")
+	}
+}

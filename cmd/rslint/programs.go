@@ -125,3 +125,59 @@ func buildFileOwnerMap(programs []*compiler.Program, configMap map[string]rslint
 	}
 	return fileOwner
 }
+
+// buildFileFilters returns per-program file filters combining two concerns:
+//   - multi-config ownership: a file is linted by the program belonging to its
+//     nearest config (only active when len(configMap) > 1)
+//   - config `ignores`: files matching the user's ignore patterns are excluded
+//     from ALL diagnostics (lint rules, type-check, and the linted-file count)
+//
+// The returned slice is always len(programs). Entries are never nil — ignores
+// must apply to every program, including the gap-file fallback program.
+//
+// singleConfig / singleConfigDir are used when configMap is nil (single-config
+// mode). When configMap is non-nil, the per-file nearest config is looked up.
+func buildFileFilters(
+	programs []*compiler.Program,
+	configMap map[string]rslintconfig.RslintConfig,
+	programConfigDirs []string,
+	singleConfig rslintconfig.RslintConfig,
+	singleConfigDir string,
+) []func(string) bool {
+	var fileOwner map[string]string
+	if len(configMap) > 1 {
+		fileOwner = buildFileOwnerMap(programs, configMap)
+	}
+
+	filters := make([]func(string) bool, len(programs))
+	for i := range programs {
+		var ownerDir string
+		if fileOwner != nil && i < len(programConfigDirs) {
+			ownerDir = programConfigDirs[i]
+		}
+		filters[i] = func(fileName string) bool {
+			// Ownership check: only when we have multiple configs AND this
+			// program is anchored to a configDir (gap fallback has "").
+			if fileOwner != nil && ownerDir != "" {
+				if owner, ok := fileOwner[fileName]; ok && owner != ownerDir {
+					return false
+				}
+			}
+			// Ignore check: resolve the config that governs this file and
+			// consult its global `ignores` patterns.
+			var cfg rslintconfig.RslintConfig
+			var cwd string
+			if configMap != nil {
+				cwd, cfg = rslintconfig.FindNearestConfig(fileName, configMap)
+			} else {
+				cfg = singleConfig
+				cwd = singleConfigDir
+			}
+			if cfg != nil && cfg.IsFileIgnored(fileName, cwd) {
+				return false
+			}
+			return true
+		}
+	}
+	return filters
+}

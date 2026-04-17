@@ -24,6 +24,7 @@ export default defineConfig({
     './tests/cli/entry-point.test.ts',
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',
+    './tests/cli/type-check/ignores-suppression.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
