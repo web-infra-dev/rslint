@@ -39,6 +39,25 @@ describe('lint api', async (t) => {
     });
     expect(diags).toMatchSnapshot();
   });
+
+  test('explicit files filter limits lint scope', async () => {
+    const config = path.resolve(import.meta.dirname, '../fixtures/rslint.json');
+    const targetFile = path.resolve(cwd, 'src/index.ts');
+    const diags = await lint({
+      config,
+      files: [targetFile],
+      ruleOptions: {
+        '@typescript-eslint/no-unsafe-member-access': 'error',
+      },
+      workingDirectory: cwd,
+    });
+
+    expect(diags.fileCount).toBe(1);
+    expect(diags.diagnostics.length).toBeGreaterThan(0);
+    expect(new Set(diags.diagnostics.map((diag) => diag.filePath))).toEqual(
+      new Set(['src/index.ts']),
+    );
+  });
 });
 
 describe('applyFixes api', async (t) => {
