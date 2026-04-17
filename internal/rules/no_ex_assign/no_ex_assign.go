@@ -202,30 +202,12 @@ func isWriteReference(node *ast.Node) bool {
 	return false
 }
 
-func getReferenceSymbol(node *ast.Node, ctx rule.RuleContext) *ast.Symbol {
-	if node == nil || ctx.TypeChecker == nil {
-		return nil
-	}
-
-	parent := node.Parent
-	if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-		shorthand := parent.AsShorthandPropertyAssignment()
-		if shorthand != nil && shorthand.Name() == node {
-			if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
-				return symbol
-			}
-		}
-	}
-
-	return ctx.TypeChecker.GetSymbolAtLocation(node)
-}
-
 func isNameShadowed(node *ast.Node, symbols []*ast.Symbol, ctx rule.RuleContext) bool {
 	if node == nil || ctx.TypeChecker == nil || len(symbols) == 0 {
 		return false
 	}
 
-	symbol := getReferenceSymbol(node, ctx)
+	symbol := utils.GetReferenceSymbol(node, ctx.TypeChecker)
 	if symbol == nil {
 		return false
 	}

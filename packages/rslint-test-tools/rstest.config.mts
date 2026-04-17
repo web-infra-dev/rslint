@@ -51,6 +51,7 @@ export default defineConfig({
     './tests/eslint/rules/no-new-func.test.ts',
     './tests/eslint/rules/no-new-object.test.ts',
     './tests/eslint/rules/no-new-wrappers.test.ts',
+    './tests/eslint/rules/no-param-reassign.test.ts',
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
     './tests/eslint/rules/no-undef-init.test.ts',

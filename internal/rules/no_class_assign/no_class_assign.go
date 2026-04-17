@@ -247,41 +247,9 @@ func isNameShadowed(node *ast.Node, className string, classNode *ast.Node, ctx *
 		return symbol != classSymbol
 	}
 
-	// Fallback: check if the identifier is within a scope that shadows the class name
-	return isInShadowingScope(node, className, classNode)
-}
-
-// isInShadowingScope checks if a node is within a scope that shadows the class name.
-// Unlike utils.IsShadowed, this walks only up to classNode (not to SourceFile).
-func isInShadowingScope(node *ast.Node, className string, classNode *ast.Node) bool {
-	current := node.Parent
-	for current != nil && current != classNode {
-		if ast.IsFunctionLikeDeclaration(current) {
-			if utils.HasShadowingParameter(current, className) {
-				return true
-			}
-		}
-
-		if current.Kind == ast.KindBlock {
-			if utils.HasShadowingDeclaration(current, className) {
-				return true
-			}
-		}
-
-		if current.Kind == ast.KindCatchClause {
-			catchClause := current.AsCatchClause()
-			if catchClause != nil && catchClause.VariableDeclaration != nil {
-				varDecl := catchClause.VariableDeclaration.AsVariableDeclaration()
-				if varDecl != nil && varDecl.Name() != nil {
-					if utils.HasNameInBindingPattern(varDecl.Name(), className) {
-						return true
-					}
-				}
-			}
-		}
-		current = current.Parent
-	}
-	return false
+	// Fallback: check if the identifier is within a scope that shadows the
+	// class name. Walks only up to classNode (not to SourceFile).
+	return utils.IsNameShadowedBetween(node, classNode, className)
 }
 
 // checkClassReassignments finds all reassignments to the class name

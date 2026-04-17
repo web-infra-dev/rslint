@@ -53,36 +53,14 @@ func isNameShadowed(node *ast.Node, name string, declNode *ast.Node, ctx *rule.R
 }
 
 // isInShadowingScope walks from `node` up to (but not including) `declNode`,
-// returning true if any intermediate scope introduces a binding with the given name.
+// returning true if any intermediate scope introduces a binding with the given
+// name. Also treats `declNode`'s own parameters as shadowing
+// (e.g. `function foo(foo) { foo = bar; }`).
 func isInShadowingScope(node *ast.Node, name string, declNode *ast.Node) bool {
-	for current := node.Parent; current != nil && current != declNode; current = current.Parent {
-		if ast.IsFunctionLikeDeclaration(current) {
-			if utils.HasShadowingParameter(current, name) {
-				return true
-			}
-		}
-
-		if current.Kind == ast.KindBlock {
-			if utils.HasShadowingDeclaration(current, name) {
-				return true
-			}
-		}
-
-		if current.Kind == ast.KindCatchClause {
-			cc := current.AsCatchClause()
-			if cc != nil && cc.VariableDeclaration != nil {
-				vd := cc.VariableDeclaration.AsVariableDeclaration()
-				if vd != nil && vd.Name() != nil && vd.Name().Kind == ast.KindIdentifier && vd.Name().Text() == name {
-					return true
-				}
-			}
-		}
-	}
-	// Also check declNode's own parameters (e.g. function foo(foo) { foo = bar; }).
-	if declNode != nil && utils.HasShadowingParameter(declNode, name) {
+	if utils.IsNameShadowedBetween(node, declNode, name) {
 		return true
 	}
-	return false
+	return declNode != nil && utils.HasShadowingParameter(declNode, name)
 }
 
 // checkReassignments walks `searchRoot` and reports every write-reference to `name`
