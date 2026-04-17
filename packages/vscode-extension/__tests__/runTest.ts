@@ -109,6 +109,28 @@ async function main() {
     failed = true;
   }
 
+  // --- projectService type-aware scope tests ---
+  const projectServiceScopeWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-project-service-scope',
+  );
+  const projectServiceScopeTestsPath = path.resolve(
+    __dirname,
+    './suite-project-service-scope',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: projectServiceScopeTestsPath,
+      launchArgs: ['--disable-extensions', projectServiceScopeWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('projectService scope tests failed:', err);
+    failed = true;
+  }
+
   if (failed) {
     console.error('Some test suites failed');
     process.exit(1);
