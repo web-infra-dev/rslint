@@ -727,6 +727,20 @@ type MergedConfig struct {
 	Plugins         map[string]struct{}
 }
 
+// IsFileIgnored reports whether filePath is excluded by the config's global
+// `ignores` patterns. It is distinct from GetConfigForFile returning nil,
+// which also covers "no entry matched this file" — callers that need ESLint's
+// "ignores hides the file from the linter entirely" semantics (including
+// type-check diagnostics and file counts) should use this method.
+func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
+	patterns := ExtractConfigIgnores(config)
+	if len(patterns) == 0 {
+		return false
+	}
+	return isDirBlockedByIgnores(filePath, patterns, cwd) ||
+		isFileIgnored(filePath, patterns, cwd)
+}
+
 // GetConfigForFile computes the merged configuration for a file following ESLint flat config semantics.
 // Returns nil if the file is globally ignored or no entry matches (should not be linted).
 //

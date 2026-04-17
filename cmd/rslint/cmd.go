@@ -898,27 +898,10 @@ func runCMD() int {
 		return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, filePath, currentDirectory, enforcePlugins, typeInfoFiles)
 	}
 
-	// Build per-program file ownership filters for multi-config deduplication.
-	// Each file is owned by its nearest config (ESLint v10 aligned).
-	// Programs only lint files belonging to their own config directory.
-	var fileFilters []func(string) bool
-	if len(configMap) > 1 {
-		fileOwner := buildFileOwnerMap(programs, configMap)
-		fileFilters = make([]func(string) bool, len(programs))
-		for i := range programs {
-			if i < len(programConfigDirs) && programConfigDirs[i] != "" {
-				ownerDir := programConfigDirs[i]
-				fileFilters[i] = func(fileName string) bool {
-					owner, ok := fileOwner[fileName]
-					if !ok {
-						return true
-					}
-					return owner == ownerDir
-				}
-			}
-			// nil filter for gap file fallback program (no configDir) → process all
-		}
-	}
+	// Build per-program file filters combining:
+	//   - multi-config ownership deduplication (ESLint v10 aligned)
+	//   - config `ignores` exclusion (applies to rules, type-check, and counts)
+	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
 
 	lintResult, err := linter.RunLinter(
 		programs,
@@ -1018,24 +1001,8 @@ func runCMD() int {
 			}
 
 			// Re-lint: collect remaining diagnostics.
-			// Rebuild file filters for the new programs.
-			var fixFileFilters []func(string) bool
-			if len(configMap) > 1 {
-				fixOwner := buildFileOwnerMap(newPrograms, configMap)
-				fixFileFilters = make([]func(string) bool, len(newPrograms))
-				for i := range newPrograms {
-					if i < len(programConfigDirs) && programConfigDirs[i] != "" {
-						ownerDir := programConfigDirs[i]
-						fixFileFilters[i] = func(fileName string) bool {
-							owner, ok := fixOwner[fileName]
-							if !ok {
-								return true
-							}
-							return owner == ownerDir
-						}
-					}
-				}
-			}
+			// Rebuild file filters for the new programs (ownership + ignores).
+			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
 			var passDiags []rule.RuleDiagnostic
 			passResult, _ := linter.RunLinter(
 				newPrograms,

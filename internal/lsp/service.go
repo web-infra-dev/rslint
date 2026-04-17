@@ -678,6 +678,12 @@ type LintResponse struct {
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
 	filename := uriToPath(uri)
 
+	// Files excluded by the config's `ignores` patterns produce no diagnostics,
+	// matching CLI behavior. Return early before spinning up the language service.
+	if rslintConfig.IsFileIgnored(filename, cwd) {
+		return []rule.RuleDiagnostic{}, nil
+	}
+
 	// GetLanguageService flushes any pending changes (from DidChangeFile) and
 	// returns a language service whose program reflects the latest overlay content.
 	languageService, err := session.GetLanguageService(ctx, uri)

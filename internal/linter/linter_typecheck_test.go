@@ -1256,3 +1256,83 @@ func TestTypeCheck_MessageIdEmpty(t *testing.T) {
 		}
 	}
 }
+
+// fileFilter rejecting a file must suppress BOTH rule and type-check
+// diagnostics for it, and exclude it from the returned LintedFileCount.
+// This is what wires config `ignores` into the linter at the CLI/LSP layer.
+func TestTypeCheck_FileFilterSuppressesDiagnostics(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
+		"kept.ts":    "const x: number = 'hello';",
+		"ignored.ts": "const y: number = 'world';",
+	})
+
+	ignoredPath := paths["ignored.ts"]
+	keptPath := paths["kept.ts"]
+
+	var diagnostics []rule.RuleDiagnostic
+	count := RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
+		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
+		true,
+		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
+		// Reject ignored.ts — stands in for config `ignores` hitting the file.
+		func(fileName string) bool { return fileName != ignoredPath },
+	)
+
+	// Count should exclude the filtered file.
+	if count != 1 {
+		t.Errorf("LintedFileCount = %d, want 1 (ignored file should not count)", count)
+	}
+
+	// Kept file should still produce its TS error; filtered file must be silent.
+	var keptDiags, ignoredDiags int
+	for _, d := range diagnostics {
+		switch d.SourceFile.FileName() {
+		case keptPath:
+			keptDiags++
+		case ignoredPath:
+			ignoredDiags++
+		}
+	}
+	if keptDiags == 0 {
+		t.Error("expected kept.ts to produce TS diagnostics, got none")
+	}
+	if ignoredDiags != 0 {
+		t.Errorf("expected ignored.ts to produce no diagnostics, got %d", ignoredDiags)
+	}
+}
+
+// Parallel scenario: multiple programs each with their own filter.
+func TestTypeCheck_FileFilterSuppressesAcrossPrograms(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const x: number = 'hello';",
+		"b.ts": "const y: number = 'world';",
+	})
+
+	// Filter that rejects everything — simulates all files being ignored.
+	rejectAll := func(string) bool { return false }
+
+	var diagCount int
+	var mu sync.Mutex
+	result, err := RunLinter(
+		[]*compiler.Program{program},
+		true, // singleThreaded
+		nil, nil, utils.ExcludePaths,
+		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
+		true,
+		func(d rule.RuleDiagnostic) { mu.Lock(); diagCount++; mu.Unlock() },
+		nil,
+		[]func(string) bool{rejectAll},
+	)
+	if err != nil {
+		t.Fatalf("RunLinter: %v", err)
+	}
+	if result.LintedFileCount != 0 {
+		t.Errorf("LintedFileCount = %d, want 0", result.LintedFileCount)
+	}
+	if diagCount != 0 {
+		t.Errorf("diagnostic count = %d, want 0", diagCount)
+	}
+	// Reference paths so the test fails obviously if the helper changes shape.
+	_ = paths["a.ts"]
+	_ = paths["b.ts"]
+}
