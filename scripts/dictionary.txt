@@ -116,6 +116,7 @@ preact
 Prettier
 propertyassignment
 Ptrs
+quxx
 qwer
 rankdir
 ranksep

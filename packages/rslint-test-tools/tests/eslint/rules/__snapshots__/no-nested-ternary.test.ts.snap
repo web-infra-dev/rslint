@@ -1,0 +1,512 @@
+// Rstest Snapshot v1
+
+exports[`no-nested-ternary > invalid 1`] = `
+{
+  "code": "foo ? bar : baz === qux ? quxx : foobar;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 2`] = `
+{
+  "code": "foo ? baz === qux ? quxx : foobar : bar;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 3`] = `
+{
+  "code": "var a = foo ? (bar ? baz : qux) : quux;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 4`] = `
+{
+  "code": "var a = foo ? bar : (baz ? qux : quux);",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 5`] = `
+{
+  "code": "var a = foo ? ((bar ? baz : qux)) : quux;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 6`] = `
+{
+  "code": "var a = a ? b ? c : d : e ? f : g;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 7`] = `
+{
+  "code": "var a = a ? b : c ? d : e ? f : g;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 8`] = `
+{
+  "code": "var a = foo ? /* x */ (bar ? baz : qux) /* y */ : quux;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 9`] = `
+{
+  "code": "foo(a ? b ? c : d : e);",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 10`] = `
+{
+  "code": "var s = \`\${a ? b : c ? d : e}\`;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 11`] = `
+{
+  "code": "function f() { return a ? b : c ? d : e; }",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 12`] = `
+{
+  "code": "const f = () => a ? b : c ? d : e;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 13`] = `
+{
+  "code": "var a = foo
+  ? bar
+  : baz ? qux : quux;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 14`] = `
+{
+  "code": "!(a ? b : c ? d : e);",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 15`] = `
+{
+  "code": "if (a ? b : c ? d : e) {}",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 16`] = `
+{
+  "code": "var o = { [a ? b : c ? d : e]: 1 };",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 17`] = `
+{
+  "code": "throw a ? b : c ? d : e;",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 18`] = `
+{
+  "code": "foo(...(a ? b : c ? d : e));",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-nested-ternary > invalid 19`] = `
+{
+  "code": "obj[a ? b : c ? d : e];",
+  "diagnostics": [
+    {
+      "message": "Do not nest ternary expressions.",
+      "messageId": "noNestedTernary",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-nested-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
