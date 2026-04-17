@@ -1438,3 +1438,62 @@ func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
 		t.Errorf("expected tsConfigPaths nil when no config, got %v", s.tsConfigPaths)
 	}
 }
+
+// ======== runLintWithSession: ignored-file short-circuit ========
+
+// runLintWithSession must early-return for files matching the config's
+// `ignores` patterns, WITHOUT touching the session. This test proves the
+// guard semantically (not just by coincidence of a no-op session):
+//
+//  1. Positive: call with session=nil AND an ignored path. The call must
+//     return empty diagnostics with no error. Passing a nil session is the
+//     key trick — if the guard is removed, the very next line dereferences
+//     session and panics, making the test fail loudly rather than silently.
+//  2. Control: call with session=nil AND a non-ignored path. The call MUST
+//     panic (runtime nil-pointer dereference). This proves the only thing
+//     keeping the positive case alive is the ignore early-return, not some
+//     accidental nil-session tolerance downstream.
+func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
+	ctx := context.Background()
+	cwd := "/project"
+	cfg := config.RslintConfig{
+		// Global ignores entry: hides everything under lib/.
+		{Ignores: []string{"lib/**"}},
+	}
+
+	ignoredURI := lsproto.DocumentUri("file:///project/lib/util.ts")
+	normalURI := lsproto.DocumentUri("file:///project/src/main.ts")
+
+	t.Run("ignored file returns empty without touching session", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("runLintWithSession panicked on ignored file (early-return missing?): %v", r)
+			}
+		}()
+
+		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if diags == nil {
+			t.Fatal("expected non-nil empty slice (LSP protocol expects [], not null)")
+		}
+		if len(diags) != 0 {
+			t.Errorf("expected 0 diagnostics for ignored file, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("non-ignored file falls through to session (nil-session → panic)", func(t *testing.T) {
+		// This control test asserts the inverse: without a matching ignore,
+		// the function proceeds to `session.GetLanguageService(...)` which
+		// must nil-dereference. If this test stops panicking, it means some
+		// other short-circuit has crept in and the positive test above may
+		// be passing for the wrong reason.
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
+			}
+		}()
+		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+	})
+}
