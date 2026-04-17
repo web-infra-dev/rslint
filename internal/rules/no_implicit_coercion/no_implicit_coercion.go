@@ -327,6 +327,8 @@ func getNonNumericOperand(bin *ast.BinaryExpression) *ast.Node {
 // isNumeric reports whether node statically evaluates to a number: a numeric
 // literal or a call to `Number`, `parseInt`, or `parseFloat`. Shadowing of
 // these globals is ignored — matches ESLint, which also uses a syntactic check.
+// Parens on the callee (e.g. `(Number)(x)`) are peeled off to match ESLint's
+// paren-transparent AST.
 func isNumeric(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -335,7 +337,7 @@ func isNumeric(node *ast.Node) bool {
 		return true
 	}
 	if node.Kind == ast.KindCallExpression {
-		callee := node.AsCallExpression().Expression
+		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 		if callee != nil && callee.Kind == ast.KindIdentifier {
 			switch callee.AsIdentifier().Text {
 			case "Number", "parseInt", "parseFloat":
@@ -347,7 +349,8 @@ func isNumeric(node *ast.Node) bool {
 }
 
 // isStringType reports whether node statically evaluates to a string: any
-// string/template literal, or a call to `String`.
+// string/template literal, or a call to `String`. Parens on the callee
+// (e.g. `(String)(x)`) are peeled off to match ESLint's paren-transparent AST.
 func isStringType(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -356,7 +359,7 @@ func isStringType(node *ast.Node) bool {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
 		return true
 	case ast.KindCallExpression:
-		callee := node.AsCallExpression().Expression
+		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 		if callee != nil && callee.Kind == ast.KindIdentifier && callee.AsIdentifier().Text == "String" {
 			return true
 		}

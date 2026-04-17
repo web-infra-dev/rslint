@@ -126,6 +126,20 @@ func TestNoImplicitCoercion(t *testing.T) {
 			{Code: `console.log(Math.PI * 1/4)`},
 			{Code: `a * 1 / 2`},
 			{Code: `a * 1 / b`},
+
+			// Parenthesised callee — ESLint treats `(Number)(x)` as numeric and
+			// `(String)(x)` as string, since parens are transparent.
+			{Code: `+(Number)(foo)`},
+			{Code: `- -(Number)(foo)`},
+			{Code: `(Number)(foo) * 1`},
+			{Code: `(Number)(foo) - 0`},
+			{Code: `'' + (String)(foo)`},
+			{Code: `(String)(foo) + ''`},
+			{Code: "`` + (String)(foo)"},
+			{Code: "(String)(foo) + ``"},
+			{Code: "`${(String)(foo)}`", Options: map[string]interface{}{"disallowTemplateShorthand": true}},
+			// Doubly-parenthesised callee.
+			{Code: `+((Number))(foo)`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// !!foo — fix applied when Boolean not shadowed. Autofix cases have

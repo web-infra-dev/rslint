@@ -133,6 +133,22 @@ ruleTester.run('no-implicit-coercion', {
     'console.log(Math.PI * 1/4)',
     'a * 1 / 2',
     'a * 1 / b',
+
+    // Parenthesised callee on Number/String — parens are transparent in ESLint,
+    // so these are treated as already-coerced and NOT flagged.
+    '+(Number)(foo)',
+    '- -(Number)(foo)',
+    '(Number)(foo) * 1',
+    '(Number)(foo) - 0',
+    "'' + (String)(foo)",
+    "(String)(foo) + ''",
+    '`` + (String)(foo)',
+    '(String)(foo) + ``',
+    {
+      code: '`${(String)(foo)}`',
+      options: { disallowTemplateShorthand: true },
+    },
+    '+((Number))(foo)',
   ],
   invalid: [
     {
