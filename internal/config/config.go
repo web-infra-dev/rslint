@@ -120,6 +120,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
+	"github.com/web-infra-dev/rslint/internal/rules/no_bitwise"
 	"github.com/web-infra-dev/rslint/internal/rules/no_caller"
 	"github.com/web-infra-dev/rslint/internal/rules/no_case_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_class_assign"
@@ -523,6 +524,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-alert", no_alert.NoAlertRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
 	GlobalRuleRegistry.Register("no-await-in-loop", no_await_in_loop.NoAwaitInLoopRule)
+	GlobalRuleRegistry.Register("no-bitwise", no_bitwise.NoBitwiseRule)
 	GlobalRuleRegistry.Register("no-caller", no_caller.NoCallerRule)
 	GlobalRuleRegistry.Register("no-case-declarations", no_case_declarations.NoCaseDeclarationsRule)
 	GlobalRuleRegistry.Register("no-class-assign", no_class_assign.NoClassAssignRule)
