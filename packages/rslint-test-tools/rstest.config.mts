@@ -59,6 +59,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',
+    './tests/eslint/rules/prefer-template.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
