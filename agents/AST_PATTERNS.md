@@ -85,27 +85,98 @@ rule.RuleListeners{
 
 ---
 
-## Common Pitfalls
+## AST Shape Essentials
+
+The tsgo AST differs from ESTree (ESLint's AST) in a few systematic ways. Most porting bugs trace back to one of these shape differences. Work through each section before and after implementing a rule.
 
 ### ParenthesizedExpression
 
-TypeScript's AST preserves `ParenthesizedExpression` nodes (e.g., `(expr)`), while ESTree (used by ESLint) removes them during parsing. This means almost every rule that walks parent/child chains needs to unwrap parentheses explicitly.
+tsgo keeps parentheses as an explicit `KindParenthesizedExpression` node; ESTree drops them during parsing. Any time a rule reads a child expression, parentheses may be sitting in between.
+
+**Primary helpers** (from `shim/ast`, prefer these over hand-rolled loops):
+
+- `ast.SkipParentheses(node)` — returns the innermost non-paren expression.
+- `ast.WalkUpParenthesizedExpressions(node)` — returns the first non-paren ancestor.
 
 ```go
-// Walking UP the parent chain: skip ParenthesizedExpression
-current := node.Parent
-for current != nil && current.Kind == ast.KindParenthesizedExpression {
-    current = current.Parent
-}
-
-// Walking DOWN into an expression: unwrap ParenthesizedExpression
-expr := someNode
-for expr != nil && expr.Kind == ast.KindParenthesizedExpression {
-    expr = expr.AsParenthesizedExpression().Expression
-}
+inner := ast.SkipParentheses(node.AsCallExpression().Expression)
+// `inner` is the callee without any `( … )` wrapping
 ```
 
-**When to unwrap**: Any time you check `node.Parent.Kind` or `expr.Kind` and expect a specific node type, consider whether parentheses could appear in between.
+**Trap sites** — any expression-typed child can be parenthesised. The table below lists high-frequency offenders. The principle is universal: if you are about to read an expression-typed child and do anything with its kind/text/structure, unwrap it first.
+
+| Kind                                                                                                                                                                 | Children to unwrap                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `BinaryExpression`                                                                                                                                                   | `Left`, `Right`                           |
+| `PrefixUnaryExpression` / `PostfixUnaryExpression`                                                                                                                   | `Operand`                                 |
+| `CallExpression` / `NewExpression`                                                                                                                                   | `Expression` (callee)                     |
+| `ElementAccessExpression`                                                                                                                                            | `Expression`, `ArgumentExpression`        |
+| `PropertyAccessExpression`                                                                                                                                           | `Expression` (object)                     |
+| `TemplateSpan`                                                                                                                                                       | `Expression`                              |
+| `SpreadElement` / `AwaitExpression` / `YieldExpression` / `TypeOfExpression` / `VoidExpression` / `DeleteExpression`                                                 | `Expression`                              |
+| `ConditionalExpression`                                                                                                                                              | `Condition`, `WhenTrue`, `WhenFalse`      |
+| `VariableDeclaration` / `PropertyAssignment` / `BindingElement`                                                                                                      | `Initializer`                             |
+| `IfStatement` / `WhileStatement` / `DoStatement` / `SwitchStatement` / `CaseClause` / `WithStatement` / `ReturnStatement` / `ThrowStatement` / `ExpressionStatement` | `Expression`                              |
+| `ForStatement`                                                                                                                                                       | `Initializer`, `Condition`, `Incrementor` |
+| `ForInStatement` / `ForOfStatement`                                                                                                                                  | `Initializer`, `Expression`               |
+
+A helper that embeds the check (e.g. `isNumeric`, `isStringType`) should call `ast.SkipParentheses` at the top rather than require every call site to unwrap — otherwise one forgotten caller is a silent divergence.
+
+### Optional Chain
+
+tsgo does not have a `ChainExpression` wrapper. Instead, every link in an optional chain (`PropertyAccess` / `ElementAccess` / `Call` / `NonNullExpression`) carries `NodeFlagsOptionalChain`. Parentheses break the chain — `(foo?.bar)(x)` parses as an ordinary call whose callee happens to be a paren-wrapped optional chain.
+
+- `ast.IsOptionalChain(node)` — true iff node is a link in an optional chain.
+- `ast.IsOptionalChainRoot(node)` — true iff node introduces the chain (holds the leading `?.`).
+- `ast.IsOutermostOptionalChain(node)` — true iff node is the top of its chain.
+
+When porting a rule that switches on "is the argument a `ChainExpression`?", translate to `ast.IsOptionalChain(arg)` on the tsgo-side argument after `ast.SkipParentheses`.
+
+### Literal Kinds
+
+ESTree uses one `Literal` node carrying a typed `value`. tsgo splits the literal family across kinds, and booleans / null are keyword tokens rather than literal nodes:
+
+| Value                   | tsgo kind                              | Text accessor                                                        |
+| ----------------------- | -------------------------------------- | -------------------------------------------------------------------- |
+| Number                  | `KindNumericLiteral`                   | `node.AsNumericLiteral().Text` (raw source — may be `0x1` / `1_000`) |
+| String                  | `KindStringLiteral`                    | `node.AsStringLiteral().Text` (cooked)                               |
+| BigInt                  | `KindBigIntLiteral`                    | `node.AsBigIntLiteral().Text` (includes `n` suffix in source text)   |
+| Regex                   | `KindRegularExpressionLiteral`         | `node.Text()`                                                        |
+| `true` / `false`        | `KindTrueKeyword` / `KindFalseKeyword` | —                                                                    |
+| `null`                  | `KindNullKeyword`                      | —                                                                    |
+| `` `…` `` without `${}` | `KindNoSubstitutionTemplateLiteral`    | `node.AsNoSubstitutionTemplateLiteral().Text` (cooked)               |
+| `` `…${x}…` ``          | `KindTemplateExpression`               | `Head.Text()` + each `TemplateSpan.Literal.Text()` (all cooked)      |
+
+Common translations:
+
+- ESTree `node.type === "Literal" && typeof node.value === "number"` → `node.Kind == ast.KindNumericLiteral`.
+- ESTree's `isStringLiteral` helper (StringLiteral + TemplateLiteral) → `ast.IsStringLiteralLike(node)` covers `StringLiteral` + `NoSubstitutionTemplateLiteral`. For TemplateExpression add it explicitly.
+- Comparing numeric literal value (e.g. "is this `1`"): `utils.NormalizeNumericLiteral(text) == "1"` — handles `1`, `1.0`, `0x1`, `1e0`, `1_000`, etc. with one comparison.
+
+### Binary Operator Kinds
+
+tsgo uses `BinaryExpression` for the entire family of binary operators, including assignment and comma:
+
+- `a + b`, `a * b`, `a && b`, `a ?? b`, … — plain arithmetic / logical
+- `a, b` — sequence (ESTree `SequenceExpression`) via `OperatorToken.Kind == ast.KindCommaToken`
+- `a = b`, `a += b`, `a **= b`, … — assignment (ESTree `AssignmentExpression`) via `ast.KindEqualsToken`, `ast.KindPlusEqualsToken`, etc.
+
+For a rule that registers separate ESTree listeners for `AssignmentExpression` / `SequenceExpression`, collapse into one `BinaryExpression` listener and switch on `OperatorToken.Kind`. Do not rely on `IsBinaryExpression` alone to exclude assignments.
+
+### Node Text and Positions
+
+Raw `node.Pos()` and `node.End()` include leading trivia (whitespace, comments, line breaks). This is almost never what a rule wants — reading source text across `node.Pos()..node.End()` yields leading blanks, and reporting at `node.Pos()` positions the diagnostic on the trivia.
+
+Prefer:
+
+- `utils.TrimNodeTextRange(sourceFile, node)` — range with leading trivia skipped.
+- `utils.TrimmedNodeText(sourceFile, node)` — source text over that trimmed range.
+- `ctx.ReportNode(node, msg)` — diagnostic range already uses the trimmed span; no manual adjustment needed.
+
+For fixes:
+
+- `rule.RuleFixReplace(sf, node, text)` — replaces the trimmed span.
+- `rule.RuleFixReplaceRange(range, text)` — replaces a specific range (useful for precision edits across multiple nodes).
 
 ---
 
