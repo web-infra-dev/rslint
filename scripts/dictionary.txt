@@ -1,5 +1,6 @@
 # Custom Dictionary Words
 aavascript
+apos
 accum
 afoob
 anee
@@ -49,6 +50,7 @@ foos
 foox
 fooz
 forinstatement
+fullwidth
 forofstatement
 fround
 fsys
@@ -80,7 +82,9 @@ jsonc
 jsonline
 keygen
 ldflags
+ldquo
 libsyncrpc
+lsquo
 lifecycles
 lintedfile
 llms
@@ -121,6 +125,7 @@ quxx
 qwer
 rankdir
 ranksep
+rdquo
 reactutil
 readonlyness
 Readonlys
@@ -137,6 +142,7 @@ rivo
 rsbuild
 rsdoctor
 rslib
+rsquo
 rslint
 rslintconfig
 rslog
