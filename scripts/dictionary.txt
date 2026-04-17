@@ -1,6 +1,7 @@
 # Custom Dictionary Words
 aavascript
 accum
+afoob
 anee
 arraybindingpattern
 arrayish

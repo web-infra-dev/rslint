@@ -161,6 +161,27 @@ func Flatten[T any](array [][]T) []T {
 	return result
 }
 
+// IsConstructorName reports whether `name` follows the ESLint constructor
+// naming convention: the first character that is not `_`, `$`, or a digit is
+// uppercase. Names consisting only of `_`, `$` and digits (e.g. `_`, `$$`,
+// `_8`) are not treated as constructors.
+//
+// Matches the `isConstructor` helper used by ESLint's `new-cap` and
+// `object-shorthand` rules.
+func IsConstructorName(name string) bool {
+	for i := range len(name) {
+		c := name[i]
+		if c == '_' || c == '$' || (c >= '0' && c <= '9') {
+			continue
+		}
+		// First non-prefix character: constructor iff uppercase.
+		upper := strings.ToUpper(string(c))
+		lower := strings.ToLower(string(c))
+		return upper != lower && string(c) == upper
+	}
+	return false
+}
+
 func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
 	modifiers := node.Modifiers()
 	if modifiers == nil {
