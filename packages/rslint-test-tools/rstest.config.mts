@@ -81,6 +81,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-filename-extension.test.ts',
     './tests/eslint-plugin-react/rules/jsx-first-prop-new-line.test.ts',
     './tests/eslint-plugin-react/rules/jsx-max-props-per-line.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-bind.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
