@@ -19,12 +19,12 @@ var PreferTemplateRule = rule.Rule{
 		reported := map[int]bool{}
 
 		checkForStringConcat := func(node *ast.Node) {
-			if !isStringLike(node) {
+			if !utils.IsStringLiteralOrTemplate(node) {
 				return
 			}
 			// Walk past the paren wrapper (if any) to find the logical parent.
 			parent := ast.WalkUpParenthesizedExpressions(node.Parent)
-			if !isConcatenation(parent) {
+			if !utils.IsPlusBinaryExpression(parent) {
 				return
 			}
 			top := getTopConcatBinaryExpression(parent)
@@ -61,30 +61,13 @@ var PreferTemplateRule = rule.Rule{
 	},
 }
 
-// isStringLike reports whether the node behaves as a string literal for this
-// rule (matches ESLint's `astUtils.isStringLiteral || TemplateLiteral`).
-// The shim's `ast.IsStringLiteralLike` covers StringLiteral and
-// NoSubstitutionTemplateLiteral but not templates with substitutions.
-func isStringLike(node *ast.Node) bool {
-	return node != nil && (ast.IsStringLiteralLike(node) || node.Kind == ast.KindTemplateExpression)
-}
-
-// isConcatenation reports whether node is a `+` binary expression.
-func isConcatenation(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindBinaryExpression {
-		return false
-	}
-	bin := node.AsBinaryExpression()
-	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindPlusToken
-}
-
 // getTopConcatBinaryExpression walks up through concatenations (transparently
 // crossing `ParenthesizedExpression` wrappers) and returns the outermost
 // concatenation.
 func getTopConcatBinaryExpression(node *ast.Node) *ast.Node {
 	for {
 		p := ast.WalkUpParenthesizedExpressions(node.Parent)
-		if !isConcatenation(p) {
+		if !utils.IsPlusBinaryExpression(p) {
 			return node
 		}
 		node = p
@@ -95,11 +78,11 @@ func getTopConcatBinaryExpression(node *ast.Node) *ast.Node {
 // any string literal.
 func hasStringLiteral(node *ast.Node) bool {
 	node = ast.SkipParentheses(node)
-	if isConcatenation(node) {
+	if utils.IsPlusBinaryExpression(node) {
 		bin := node.AsBinaryExpression()
 		return hasStringLiteral(bin.Right) || hasStringLiteral(bin.Left)
 	}
-	return isStringLike(node)
+	return utils.IsStringLiteralOrTemplate(node)
 }
 
 // hasNonStringLiteral reports whether the concat subtree rooted at node
@@ -107,11 +90,11 @@ func hasStringLiteral(node *ast.Node) bool {
 // actually benefits from template-literal conversion).
 func hasNonStringLiteral(node *ast.Node) bool {
 	node = ast.SkipParentheses(node)
-	if isConcatenation(node) {
+	if utils.IsPlusBinaryExpression(node) {
 		bin := node.AsBinaryExpression()
 		return hasNonStringLiteral(bin.Right) || hasNonStringLiteral(bin.Left)
 	}
-	return !isStringLike(node)
+	return !utils.IsStringLiteralOrTemplate(node)
 }
 
 // startsWithTemplateCurly reports whether converting node to a template
@@ -161,7 +144,7 @@ var octalEscapePattern = regexp.MustCompile(`(?s)^(?:[^\\]|\\.)*?\\(?:[1-9]|0[0-
 // cannot be represented in a template literal, so autofix must be skipped.
 func hasOctalOrNonOctalDecimalEscape(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	node = ast.SkipParentheses(node)
-	if isConcatenation(node) {
+	if utils.IsPlusBinaryExpression(node) {
 		bin := node.AsBinaryExpression()
 		return hasOctalOrNonOctalDecimalEscape(sourceFile, bin.Left) ||
 			hasOctalOrNonOctalDecimalEscape(sourceFile, bin.Right)
@@ -213,7 +196,7 @@ func toTemplateLiteral(sourceFile *ast.SourceFile, currentNode *ast.Node, textBe
 		return utils.TrimmedNodeText(sourceFile, node)
 	}
 
-	if isConcatenation(node) && hasStringLiteral(node) {
+	if utils.IsPlusBinaryExpression(node) && hasStringLiteral(node) {
 		bin := node.AsBinaryExpression()
 		src := sourceFile.Text()
 

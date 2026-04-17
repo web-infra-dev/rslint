@@ -183,6 +183,27 @@ func IsConstructorName(name string) bool {
 	return false
 }
 
+// IsStringLiteralOrTemplate reports whether node is a string literal or a
+// template literal (with or without substitutions). Matches the semantics of
+// ESLint's `astUtils.isStringLiteral`, which treats `Literal{string}` and
+// `TemplateLiteral` as equivalent. The shim's `ast.IsStringLiteralLike` only
+// covers `StringLiteral` and `NoSubstitutionTemplateLiteral`, so we also
+// include `TemplateExpression` (templates with `${}`).
+func IsStringLiteralOrTemplate(node *ast.Node) bool {
+	return node != nil && (ast.IsStringLiteralLike(node) || node.Kind == ast.KindTemplateExpression)
+}
+
+// IsPlusBinaryExpression reports whether node is a `+` binary expression.
+// Covers both string concatenation and numeric addition — callers that only
+// care about concatenation must additionally inspect the operands.
+func IsPlusBinaryExpression(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	bin := node.AsBinaryExpression()
+	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindPlusToken
+}
+
 func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
 	modifiers := node.Modifiers()
 	if modifiers == nil {
