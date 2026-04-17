@@ -5,13 +5,22 @@ import path from 'node:path';
 // Type-aware rule scope when parserOptions uses `projectService: true`
 // (the shape `ts.configs.recommended` exports) without an explicit
 // `project`. The LSP and CLI must agree: only files covered by the
-// fallback tsconfig's `include` get type-aware rules.
+// fallback tsconfig's `include` get type-aware rules, AND a nested
+// config that has no tsconfig must not leak allow-all onto sibling
+// configs' files.
 //
 // Fixture: fixtures-project-service-scope
-//   - rslint.config.js  — parserOptions.projectService: true (no explicit project)
-//   - tsconfig.json     — include: ["src"]
-//   - src/covered.ts    — IN tsconfig: no-unused-vars SHOULD fire
-//   - test/skills.test.ts — NOT IN tsconfig: no-unused-vars should NOT fire
+//   - rslint.config.js            — parserOptions.projectService: true (no explicit project)
+//   - tsconfig.json               — include: ["src"]
+//   - src/covered.ts              — IN tsconfig: no-unused-vars SHOULD fire
+//   - test/skills.test.ts         — NOT IN tsconfig: no-unused-vars should NOT fire
+//   - template-nested/rslint.config.js — nested config, also projectService: true,
+//                                    but the dir has NO tsconfig.json.
+//   - template-nested/orphan.ts   — under the nested config. Both CLI and LSP
+//                                    treat this as "has type info" (CLI via the
+//                                    scan-directory fallback Program, LSP via
+//                                    allow-all for the nested config's scope),
+//                                    so no-unused-vars SHOULD fire.
 suite('rslint projectService type-aware scope', function () {
   this.timeout(60000);
 
@@ -87,6 +96,34 @@ suite('rslint projectService type-aware scope', function () {
     assert.ok(
       !rslintDiags.some((d) => d.message.includes('no-unused-vars')),
       `no-unused-vars should NOT fire on a file outside tsconfig.include. Got: ${rslintDiags.map((d) => d.message).join(' | ')}`,
+    );
+  });
+
+  test('template-nested/orphan.ts (nested config without tsconfig) — no-unused-vars SHOULD fire, matching CLI', async () => {
+    // Alignment check with CLI: when the nearest rslint config has no
+    // resolvable tsconfig, the CLI builds a scan-directory AllowJs Program
+    // and runs type-aware rules; the LSP falls through to allow-all scoped
+    // to that config. Both engines must produce the same no-unused-vars
+    // diagnostics on this file.
+    const doc = await vscode.workspace.openTextDocument(
+      path.join(workspaceRoot(), 'template-nested/orphan.ts'),
+    );
+    await vscode.window.showTextDocument(doc);
+
+    const diagnostics = await waitForDiagnostics(doc, (diags) =>
+      rslintDiagnostics(diags).some((d) =>
+        d.message.includes('no-unused-vars'),
+      ),
+    );
+
+    const rslintDiags = rslintDiagnostics(diagnostics);
+    const unusedVarDiags = rslintDiags.filter((d) =>
+      d.message.includes('no-unused-vars'),
+    );
+    assert.strictEqual(
+      unusedVarDiags.length,
+      3,
+      `Expected 3 no-unused-vars diagnostics (command/args/options) to match CLI output. Got ${unusedVarDiags.length}: ${unusedVarDiags.map((d) => d.message).join(' | ')}`,
     );
   });
 });
