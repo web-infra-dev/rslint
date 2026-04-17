@@ -174,13 +174,13 @@ func isCallbackWithThisArg(call *ast.CallExpression, callback *ast.Node) bool {
 	args := call.Arguments.Nodes
 
 	// Reflect.apply(callback, thisArg, args)
-	if isSpecificMemberAccess(call.Expression, "Reflect", "apply") {
+	if IsSpecificMemberAccess(call.Expression, "Reflect", "apply") {
 		return len(args) >= 3 && args[0] == callback && !IsNullOrUndefined(args[1])
 	}
 
 	// Array.from(iterable, callback, thisArg) / Array.fromAsync(...)
-	if isSpecificMemberAccess(call.Expression, "Array", "from") ||
-		isSpecificMemberAccess(call.Expression, "Array", "fromAsync") {
+	if IsSpecificMemberAccess(call.Expression, "Array", "from") ||
+		IsSpecificMemberAccess(call.Expression, "Array", "fromAsync") {
 		return len(args) >= 3 && args[1] == callback && !IsNullOrUndefined(args[2])
 	}
 
@@ -197,16 +197,3 @@ func isCallbackWithThisArg(call *ast.CallExpression, callback *ast.Node) bool {
 	return false
 }
 
-// isSpecificMemberAccess checks if node is Object.method pattern.
-func isSpecificMemberAccess(node *ast.Node, objectName, methodName string) bool {
-	if node == nil || !ast.IsPropertyAccessExpression(node) {
-		return false
-	}
-	prop := node.AsPropertyAccessExpression()
-	name := prop.Name()
-	if name == nil || name.Text() != methodName {
-		return false
-	}
-	obj := ast.SkipParentheses(prop.Expression)
-	return obj != nil && ast.IsIdentifier(obj) && obj.AsIdentifier().Text == objectName
-}

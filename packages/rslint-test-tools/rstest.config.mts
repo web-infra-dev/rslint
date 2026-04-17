@@ -27,6 +27,7 @@ export default defineConfig({
     './tests/cli/type-check/ignores-suppression.test.ts',
 
     // eslint
+    './tests/eslint/rules/accessor-pairs.test.ts',
     './tests/eslint/rules/default-case.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',

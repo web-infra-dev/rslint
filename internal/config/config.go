@@ -109,6 +109,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/unified_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/use_unknown_in_catch_callback_variable"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
@@ -517,6 +518,7 @@ func registerAllEslintImportPluginRules() {
 
 // registerAllCoreEslintRules registers core ESLint rules
 func registerAllCoreEslintRules() {
+	GlobalRuleRegistry.Register("accessor-pairs", accessor_pairs.AccessorPairsRule)
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
 	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)

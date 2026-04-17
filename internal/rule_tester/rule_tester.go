@@ -31,7 +31,10 @@ type ValidTestCase struct {
 }
 
 type InvalidTestCaseError struct {
-	MessageId   string                      `json:"messageId"`
+	MessageId string `json:"messageId"`
+	// Message, if non-empty, must match the diagnostic's formatted message
+	// exactly. Leave empty to skip the text assertion.
+	Message     string                      `json:"message,omitempty"`
 	Line        int                         `json:"line"`
 	Column      int                         `json:"column"`
 	EndLine     int                         `json:"endLine"`
@@ -244,6 +247,10 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 				if expected.MessageId != diagnostic.Message.Id {
 					t.Errorf("Invalid message id %v. Expected %v", diagnostic.Message.Id, expected.MessageId)
+				}
+
+				if expected.Message != "" && expected.Message != diagnostic.Message.Description {
+					t.Errorf("Invalid message text %q. Expected %q", diagnostic.Message.Description, expected.Message)
 				}
 
 				lineIndex, columnIndex := scanner.GetECMALineAndUTF16CharacterOfPosition(diagnostic.SourceFile, diagnostic.Range.Pos())
