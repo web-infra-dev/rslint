@@ -1236,6 +1236,20 @@ func TestNoImplicitCoercion(t *testing.T) {
 					{MessageId: "implicitCoercion", Line: 1, Column: 1},
 				},
 			},
+			// Computed property key wrapped in parens — ESLint treats parens
+			// transparently in the `isSpecificMemberAccess` check.
+			{
+				Code: `~foo[('indexOf')](1)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "implicitCoercion", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: "~foo[(`lastIndexOf`)](1)",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "implicitCoercion", Line: 1, Column: 1},
+				},
+			},
 			// `Boolean` shadowed by a class name at the top level — suggestion only.
 			{
 				Code: `class Boolean {} !!foo;`,

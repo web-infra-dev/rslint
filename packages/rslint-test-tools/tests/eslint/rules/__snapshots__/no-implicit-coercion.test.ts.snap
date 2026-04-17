@@ -886,6 +886,58 @@ exports[`no-implicit-coercion > invalid 34`] = `
 
 exports[`no-implicit-coercion > invalid 35`] = `
 {
+  "code": "~foo[('indexOf')](1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo[('indexOf')](1) !== -1\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 36`] = `
+{
+  "code": "~foo[(\`lastIndexOf\`)](1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo[(\`lastIndexOf\`)](1) !== -1\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 37`] = `
+{
   "code": "1 * a / 2",
   "diagnostics": [
     {
@@ -910,7 +962,7 @@ exports[`no-implicit-coercion > invalid 35`] = `
 }
 `;
 
-exports[`no-implicit-coercion > invalid 36`] = `
+exports[`no-implicit-coercion > invalid 38`] = `
 {
   "code": "(a * 1) / 2",
   "diagnostics": [
@@ -936,7 +988,7 @@ exports[`no-implicit-coercion > invalid 36`] = `
 }
 `;
 
-exports[`no-implicit-coercion > invalid 37`] = `
+exports[`no-implicit-coercion > invalid 39`] = `
 {
   "code": "a * 1 / (b * 1)",
   "diagnostics": [
@@ -962,7 +1014,7 @@ exports[`no-implicit-coercion > invalid 37`] = `
 }
 `;
 
-exports[`no-implicit-coercion > invalid 38`] = `
+exports[`no-implicit-coercion > invalid 40`] = `
 {
   "code": "a * 1 + 2",
   "diagnostics": [

@@ -295,6 +295,14 @@ ruleTester.run('no-implicit-coercion', {
       errors: [{ messageId: 'implicitCoercion' }],
     },
     {
+      code: "~foo[('indexOf')](1)",
+      errors: [{ messageId: 'implicitCoercion' }],
+    },
+    {
+      code: '~foo[(`lastIndexOf`)](1)',
+      errors: [{ messageId: 'implicitCoercion' }],
+    },
+    {
       code: '1 * a / 2',
       errors: [{ messageId: 'implicitCoercion' }],
     },

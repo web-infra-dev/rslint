@@ -255,7 +255,9 @@ func isBinaryNegatingOfIndexOf(pue *ast.PrefixUnaryExpression) bool {
 		name := callee.AsPropertyAccessExpression().Name()
 		return name != nil && isIndexOfName(name.Text())
 	case ast.KindElementAccessExpression:
-		arg := callee.AsElementAccessExpression().ArgumentExpression
+		// Strip parens on the computed key so `foo[('indexOf')](x)` matches —
+		// ESLint treats parens transparently in `isSpecificMemberAccess`.
+		arg := ast.SkipParentheses(callee.AsElementAccessExpression().ArgumentExpression)
 		if arg == nil {
 			return false
 		}
