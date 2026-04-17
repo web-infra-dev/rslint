@@ -176,6 +176,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
@@ -560,6 +561,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-script-url", no_script_url.NoScriptUrlRule)
 	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
+	GlobalRuleRegistry.Register("no-useless-concat", no_useless_concat.NoUselessConcatRule)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
 	GlobalRuleRegistry.Register("no-undef-init", no_undef_init.NoUndefInitRule)
