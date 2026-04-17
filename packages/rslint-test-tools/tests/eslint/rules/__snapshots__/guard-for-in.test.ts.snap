@@ -1,0 +1,685 @@
+// Rstest Snapshot v1
+
+exports[`guard-for-in > invalid 1`] = `
+{
+  "code": "for (var x in o) { if (x) { f(); continue; } g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 2`] = `
+{
+  "code": "for (var x in o) { if (x) { continue; f(); } g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 3`] = `
+{
+  "code": "for (var x in o) { if (x) { f(); } g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 4`] = `
+{
+  "code": "for (var x in o) { if (x) f(); g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 5`] = `
+{
+  "code": "for (var x in o) { foo() }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 6`] = `
+{
+  "code": "for (var x in o) foo();",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 7`] = `
+{
+  "code": "for (var x in o) throw x;",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 8`] = `
+{
+  "code": "for (var x in o) for (var y in o2) g();",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 9`] = `
+{
+  "code": "for (var x in o) lbl: continue;",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 10`] = `
+{
+  "code": "for (var x in o) { f(); if (x) continue; g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 11`] = `
+{
+  "code": "for (var x in o) { ; if (x) continue; f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 12`] = `
+{
+  "code": "for (var x in o) { { if (x) continue; } f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 13`] = `
+{
+  "code": "for (var x in o) { if (x); f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 14`] = `
+{
+  "code": "for (var x in o) { if (x) f(); else continue; g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 15`] = `
+{
+  "code": "for (var x in o) { if (x) { continue; continue; } f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 16`] = `
+{
+  "code": "for (var x in o) { if (x) continue; for (var y in o2) g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 17`] = `
+{
+  "code": "for (var x in o) { for (var y in o2) if (y) g(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 18`] = `
+{
+  "code": "for (var x in o) { for (var y in o2) { g(); } }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 19`] = `
+{
+  "code": "function run() {
+  for (var x in o) {
+    bar();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 20`] = `
+{
+  "code": "for (var x in o) { var y = 1; if (x) continue; f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 21`] = `
+{
+  "code": "for (var x in o) { lbl: if (x) continue; }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 22`] = `
+{
+  "code": "for (var x in o) { if (x) {} else { continue; } f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 23`] = `
+{
+  "code": "for (var x in o) switch (x) { case 1: f(); }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 24`] = `
+{
+  "code": "for (var x in o) do f(); while (false);",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`guard-for-in > invalid 25`] = `
+{
+  "code": "for (var a in x) { if (a) continue; for (var b in y) { if (b) continue; for (var c in z) { g(); } } }",
+  "diagnostics": [
+    {
+      "message": "The body of a for-in should be wrapped in an if statement to filter unwanted properties from the prototype.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 98,
+          "line": 1,
+        },
+        "start": {
+          "column": 73,
+          "line": 1,
+        },
+      },
+      "ruleName": "guard-for-in",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
