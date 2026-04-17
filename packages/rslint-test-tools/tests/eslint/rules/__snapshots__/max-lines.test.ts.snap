@@ -1,0 +1,1217 @@
+// Rstest Snapshot v1
+
+exports[`max-lines > invalid 1`] = `
+{
+  "code": "var xyz;
+var xyz;
+var xyz;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 2`] = `
+{
+  "code": "/* a multiline comment
+ that goes to many lines*/
+var xy;
+var xy;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 3`] = `
+{
+  "code": "//a single line comment
+var xy;
+var xy;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 4`] = `
+{
+  "code": "var x;
+
+
+
+var y;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 5`] = `
+{
+  "code": "//a single line comment
+var xy;
+ 
+var xy;
+ 
+ /* a multiline
+ really really
+ long comment*/",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 6`] = `
+{
+  "code": "var x; // inline comment
+var y;
+var z;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 7`] = `
+{
+  "code": "var x; /* inline comment
+ spanning multiple lines */
+var y;
+var z;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 8`] = `
+{
+  "code": "//a single line comment
+var xy;
+ 
+var xy;
+ 
+ /* a multiline
+ really really
+ long comment*/",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (6). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 9`] = `
+{
+  "code": "AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA
+AAAAAAAA",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (301). Maximum allowed is 300.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 301,
+        },
+        "start": {
+          "column": 1,
+          "line": 301,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 10`] = `
+{
+  "code": "",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 11`] = `
+{
+  "code": " ",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 12`] = `
+{
+  "code": "
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 13`] = `
+{
+  "code": "A",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 14`] = `
+{
+  "code": "A
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 15`] = `
+{
+  "code": "A
+ ",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (2). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 16`] = `
+{
+  "code": "A
+ ",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 17`] = `
+{
+  "code": "A
+
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 18`] = `
+{
+  "code": "var a = 'a'; 
+var x
+var c;
+console.log",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 19`] = `
+{
+  "code": "var a = 'a',
+c,
+x;
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 20`] = `
+{
+  "code": "var a = 'a',
+c,
+x;
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 21`] = `
+{
+  "code": "
+
+var a = 'a',
+c,
+x;
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 22`] = `
+{
+  "code": "var a = 'a'; 
+var x
+var c;
+console.log
+// some block 
+// comments",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 23`] = `
+{
+  "code": "var a = 'a'; 
+var x
+var c;
+console.log
+/* block comments */",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 24`] = `
+{
+  "code": "var a = 'a'; 
+var x
+var c;
+console.log
+/* block comments */
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 25`] = `
+{
+  "code": "var a = 'a'; 
+var x
+var c;
+console.log
+/** block 
+
+ comments */",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 26`] = `
+{
+  "code": "var a = 'a'; 
+
+
+// comment",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 27`] = `
+{
+  "code": "var a = 'a'; 
+var x
+
+
+var c;
+console.log
+
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 28`] = `
+{
+  "code": "var a = 'a'; 
+
+
+var x
+var c;
+console.log
+
+",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 29`] = `
+{
+  "code": "var a = 'a'; 
+//
+var x
+var c;
+console.log
+//",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 30`] = `
+{
+  "code": "// hello world
+/*hello
+ world 2 */
+var a,
+b
+// hh
+c,
+e,
+f;",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 9,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines > invalid 31`] = `
+{
+  "code": "
+var x = '';
+
+// comment
+
+var b = '',
+c,
+d,
+e
+
+// comment",
+  "diagnostics": [
+    {
+      "message": "File has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 11,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "max-lines",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

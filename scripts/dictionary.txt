@@ -186,6 +186,8 @@ unrooted
 unstrict
 unstub
 untest
+subtests
+FEFF
 Unwatch
 unwinded
 USERPROFILE

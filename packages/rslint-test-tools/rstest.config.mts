@@ -266,6 +266,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
     './tests/eslint/rules/no-alert.test.ts',
     './tests/eslint/rules/no-bitwise.test.ts',
+    './tests/eslint/rules/max-lines.test.ts',
     './tests/eslint/rules/no-labels.test.ts',
     './tests/eslint/rules/no-multi-str.test.ts',
     './tests/eslint/rules/no-nested-ternary.test.ts',
