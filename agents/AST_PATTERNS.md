@@ -105,18 +105,20 @@ inner := ast.SkipParentheses(node.AsCallExpression().Expression)
 
 **Trap sites** — any expression-typed child can be parenthesised. The table below lists high-frequency offenders. The principle is universal: if you are about to read an expression-typed child and do anything with its kind/text/structure, unwrap it first.
 
-| Kind                                                                                                                                                                                              | Children to unwrap                   |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `BinaryExpression`                                                                                                                                                                                | `Left`, `Right`                      |
-| `PrefixUnaryExpression` / `PostfixUnaryExpression`                                                                                                                                                | `Operand`                            |
-| `CallExpression` / `NewExpression`                                                                                                                                                                | `Expression` (callee)                |
-| `ElementAccessExpression`                                                                                                                                                                         | `Expression`, `ArgumentExpression`   |
-| `PropertyAccessExpression`                                                                                                                                                                        | `Expression` (object)                |
-| `TemplateSpan`                                                                                                                                                                                    | `Expression`                         |
-| `SpreadElement` / `AwaitExpression` / `YieldExpression` / `TypeOfExpression` / `VoidExpression` / `DeleteExpression`                                                                              | `Expression`                         |
-| `ConditionalExpression`                                                                                                                                                                           | `Condition`, `WhenTrue`, `WhenFalse` |
-| `VariableDeclaration` / `PropertyAssignment` / `BindingElement`                                                                                                                                   | `Initializer`                        |
-| `IfStatement` / `WhileStatement` / `DoStatement` / `ForStatement` (condition) / `SwitchStatement` / `CaseClause` / `WithStatement` / `ReturnStatement` / `ThrowStatement` / `ExpressionStatement` | `Expression`                         |
+| Kind                                                                                                                                                                 | Children to unwrap                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `BinaryExpression`                                                                                                                                                   | `Left`, `Right`                           |
+| `PrefixUnaryExpression` / `PostfixUnaryExpression`                                                                                                                   | `Operand`                                 |
+| `CallExpression` / `NewExpression`                                                                                                                                   | `Expression` (callee)                     |
+| `ElementAccessExpression`                                                                                                                                            | `Expression`, `ArgumentExpression`        |
+| `PropertyAccessExpression`                                                                                                                                           | `Expression` (object)                     |
+| `TemplateSpan`                                                                                                                                                       | `Expression`                              |
+| `SpreadElement` / `AwaitExpression` / `YieldExpression` / `TypeOfExpression` / `VoidExpression` / `DeleteExpression`                                                 | `Expression`                              |
+| `ConditionalExpression`                                                                                                                                              | `Condition`, `WhenTrue`, `WhenFalse`      |
+| `VariableDeclaration` / `PropertyAssignment` / `BindingElement`                                                                                                      | `Initializer`                             |
+| `IfStatement` / `WhileStatement` / `DoStatement` / `SwitchStatement` / `CaseClause` / `WithStatement` / `ReturnStatement` / `ThrowStatement` / `ExpressionStatement` | `Expression`                              |
+| `ForStatement`                                                                                                                                                       | `Initializer`, `Condition`, `Incrementor` |
+| `ForInStatement` / `ForOfStatement`                                                                                                                                  | `Initializer`, `Expression`               |
 
 A helper that embeds the check (e.g. `isNumeric`, `isStringType`) should call `ast.SkipParentheses` at the top rather than require every call site to unwrap — otherwise one forgotten caller is a silent divergence.
 
