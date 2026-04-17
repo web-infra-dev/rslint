@@ -23,28 +23,27 @@ func messageNonAtomicObjectUpdate(value, object string) rule.RuleMessage {
 	}
 }
 
-// analysisState tracks which variables have been read before/after an await/yield.
+// analysisState tracks which symbols have been read before/after an await/yield.
 //
-// Algorithm (mirrors ESLint's code-path segment approach):
-//   - When a variable is read, it is added to freshReads.
-//   - When an await/yield is encountered, all freshReads move to outdatedReads.
-//   - When an assignment targets an outdated variable, the rule reports.
-//   - Re-reading a variable removes it from outdated (the new read is current).
+// Mirrors ESLint's per-segment freshReadVariables / outdatedReadVariables sets,
+// keyed by *ast.Symbol (not name) so shadowing, imports, namespace aliasing,
+// catch bindings, block-scoped let/const, and TS type wrappers are handled
+// naturally — distinct symbols never collide in state regardless of their name.
 type analysisState struct {
-	freshReads    map[string]bool
-	outdatedReads map[string]bool
+	freshReads    map[*ast.Symbol]bool
+	outdatedReads map[*ast.Symbol]bool
 }
 
 func newAnalysisState() *analysisState {
 	return &analysisState{
-		freshReads:    make(map[string]bool),
-		outdatedReads: make(map[string]bool),
+		freshReads:    make(map[*ast.Symbol]bool),
+		outdatedReads: make(map[*ast.Symbol]bool),
 	}
 }
 
 func (s *analysisState) clone() *analysisState {
-	fresh := make(map[string]bool, len(s.freshReads))
-	outdated := make(map[string]bool, len(s.outdatedReads))
+	fresh := make(map[*ast.Symbol]bool, len(s.freshReads))
+	outdated := make(map[*ast.Symbol]bool, len(s.outdatedReads))
 	for k := range s.freshReads {
 		fresh[k] = true
 	}
@@ -54,7 +53,7 @@ func (s *analysisState) clone() *analysisState {
 	return &analysisState{freshReads: fresh, outdatedReads: outdated}
 }
 
-// merge unions another branch's state into this one (used after if/else, ternary, etc.).
+// merge unions another branch's state into this one (used after if/else, etc.).
 func (s *analysisState) merge(other *analysisState) {
 	for k := range other.freshReads {
 		s.freshReads[k] = true
@@ -64,10 +63,13 @@ func (s *analysisState) merge(other *analysisState) {
 	}
 }
 
-func (s *analysisState) markRead(varName string) {
-	s.freshReads[varName] = true
-	// A re-read after await captures the current value, so the variable is no longer outdated.
-	delete(s.outdatedReads, varName)
+func (s *analysisState) markRead(sym *ast.Symbol) {
+	if sym == nil {
+		return
+	}
+	s.freshReads[sym] = true
+	// A re-read after await captures the current value, clearing outdated.
+	delete(s.outdatedReads, sym)
 }
 
 // makeOutdated moves all fresh reads to outdated (called on await/yield).
@@ -75,317 +77,260 @@ func (s *analysisState) makeOutdated() {
 	for k := range s.freshReads {
 		s.outdatedReads[k] = true
 	}
-	s.freshReads = make(map[string]bool)
+	s.freshReads = make(map[*ast.Symbol]bool)
 }
 
-func (s *analysisState) isOutdated(varName string) bool {
-	return s.outdatedReads[varName]
+func (s *analysisState) isOutdated(sym *ast.Symbol) bool {
+	return sym != nil && s.outdatedReads[sym]
 }
 
-// getIdentifierName returns the name if the node (after stripping parentheses) is an Identifier.
-func getIdentifierName(node *ast.Node) string {
-	n := ast.SkipParentheses(node)
-	if n.Kind == ast.KindIdentifier {
-		return n.AsIdentifier().Text
-	}
-	return ""
-}
-
-// getBaseIdentifierNode walks down a member expression chain (foo.bar[baz].qux)
-// and returns the base identifier node and its name. Unlike ast.GetFirstIdentifier,
-// this handles ElementAccessExpression and returns nil instead of panicking.
-func getBaseIdentifierNode(node *ast.Node) (*ast.Node, string) {
-	n := ast.SkipParentheses(node)
-	for n != nil {
-		switch n.Kind {
-		case ast.KindIdentifier:
-			return n, n.AsIdentifier().Text
-		case ast.KindPropertyAccessExpression:
-			n = ast.SkipParentheses(n.AsPropertyAccessExpression().Expression)
-		case ast.KindElementAccessExpression:
-			n = ast.SkipParentheses(n.AsElementAccessExpression().Expression)
-		default:
-			return nil, ""
-		}
-	}
-	return nil, ""
-}
-
-// normalizedNodeText returns the source text of a node with internal whitespace collapsed.
-// For example, "foo . bar" → "foo.bar". Used in diagnostic messages.
-func normalizedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
-	return strings.Join(strings.Fields(utils.TrimmedNodeText(sourceFile, node)), "")
+// breakTarget captures state snapshots produced by `break` statements that
+// target this loop or switch (with optional label).
+type breakTarget struct {
+	label  string
+	states []*analysisState
 }
 
 // analyzer performs the require-atomic-updates analysis within one resumable
-// (async or generator) function. It walks the function body in evaluation order,
-// tracking variable reads relative to await/yield, and reports assignments that
-// may use stale values.
+// (async or generator) function.
 type analyzer struct {
 	ctx             rule.RuleContext
 	funcNode        *ast.Node
 	allowProperties bool
 
-	// localVarsSafe: true = declared in this function and never referenced in a closure.
-	localVarsSafe map[string]bool
-	paramNames    map[string]bool
-	// declaredOuterVars: variables declared in outer scopes. Together with
-	// localVarsSafe, this is used to distinguish declared variables from
-	// undeclared globals (which are not tracked per ESLint semantics).
-	declaredOuterVars map[string]bool
+	// Pre-computed once per function:
+	//   declaredInFunc : symbols whose declaration site is inside funcNode's
+	//                    subtree (including params, locals, nested block decls).
+	//   parameterSymbols  : subset that are parameters of funcNode itself
+	//                    (for the isMember+param escape quirk).
+	//   escapedSymbols : subset referenced inside a nested function/arrow/
+	//                    class-static-block — they can be observed by a
+	//                    concurrent context, so writes to them are race-prone.
+	declaredInFunc map[*ast.Symbol]bool
+	parameterSymbols  map[*ast.Symbol]bool
+	escapedSymbols map[*ast.Symbol]bool
+
+	// breakTargets is the stack of currently-enclosing loops/switches that
+	// can receive a `break` (optionally labeled). Innermost at the end.
+	breakTargets []*breakTarget
 }
 
 func newAnalyzer(ctx rule.RuleContext, funcNode *ast.Node, allowProperties bool) *analyzer {
 	a := &analyzer{
-		ctx:               ctx,
-		funcNode:          funcNode,
-		allowProperties:   allowProperties,
-		localVarsSafe:     make(map[string]bool),
-		paramNames:        make(map[string]bool),
-		declaredOuterVars: make(map[string]bool),
+		ctx:             ctx,
+		funcNode:        funcNode,
+		allowProperties: allowProperties,
+		declaredInFunc:  make(map[*ast.Symbol]bool),
+		parameterSymbols:   make(map[*ast.Symbol]bool),
+		escapedSymbols:  make(map[*ast.Symbol]bool),
 	}
-	a.collectLocalDeclarations()
-	a.collectOuterDeclarations()
+	a.collectDeclarations()
+	a.collectEscapes()
 	return a
 }
 
-// collectLocalDeclarations gathers all declarations local to this function
-// and determines which ones escape to closures.
-func (a *analyzer) collectLocalDeclarations() {
-	allLocals := make(map[string]bool)
-	escapedLocals := make(map[string]bool)
-
-	if params := a.funcNode.Parameters(); params != nil {
-		for _, param := range params {
-			utils.CollectBindingNames(param.Name(), func(_ *ast.Node, name string) {
-				allLocals[name] = true
-				a.paramNames[name] = true
-			})
-		}
+// symbolOf returns the *ast.Symbol that `node` resolves to (or nil). The rule
+// is type-aware (RequiresTypeInfo is set), so TypeChecker is guaranteed non-nil
+// at runtime. Shorthand property identifiers resolve to their VALUE symbol
+// (the outer binding of the same name), and symbols augmented into the global
+// scope via `declare global { … }` are treated as unresolved — ESLint's
+// scope analyzer leaves those references unresolved too.
+func (a *analyzer) symbolOf(node *ast.Node) *ast.Symbol {
+	if node == nil || a.ctx.TypeChecker == nil {
+		return nil
 	}
-
-	body := a.funcNode.Body()
-	if body == nil {
-		return
+	var sym *ast.Symbol
+	if node.Kind == ast.KindIdentifier && node.Parent != nil &&
+		node.Parent.Kind == ast.KindShorthandPropertyAssignment &&
+		node.Parent.AsShorthandPropertyAssignment().Name() == node {
+		sym = a.ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
 	}
-	a.collectDeclsInBlock(body, allLocals)
-	a.findEscapedVars(body, allLocals, escapedLocals, false, nil)
-
-	for name := range allLocals {
-		a.localVarsSafe[name] = !escapedLocals[name]
+	if sym == nil {
+		sym = a.ctx.TypeChecker.GetSymbolAtLocation(node)
 	}
+	if sym == nil {
+		return nil
+	}
+	if symbolIsDeclareGlobal(sym) {
+		return nil
+	}
+	return sym
 }
 
-// collectOuterDeclarations walks up from the function to the source file,
-// collecting variable declarations in outer scopes. Undeclared globals are
-// not tracked (ESLint skips unresolved references).
-func (a *analyzer) collectOuterDeclarations() {
-	current := a.funcNode.Parent
-	for current != nil {
-		switch current.Kind {
-		case ast.KindSourceFile:
-			for _, stmt := range current.AsSourceFile().Statements.Nodes {
-				a.collectOuterDeclsFromStmt(stmt)
-			}
-		case ast.KindBlock:
-			for _, stmt := range current.AsBlock().Statements.Nodes {
-				a.collectOuterDeclsFromStmt(stmt)
-			}
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			ast.KindArrowFunction, ast.KindMethodDeclaration:
-			if params := current.Parameters(); params != nil {
-				for _, param := range params {
-					utils.CollectBindingNames(param.Name(), func(_ *ast.Node, name string) {
-						a.declaredOuterVars[name] = true
-					})
-				}
-			}
-		case ast.KindCatchClause:
-			cc := current.AsCatchClause()
-			if cc.VariableDeclaration != nil {
-				utils.CollectBindingNames(cc.VariableDeclaration.Name(), func(_ *ast.Node, name string) {
-					a.declaredOuterVars[name] = true
-				})
-			}
-		case ast.KindForStatement:
-			forStmt := current.AsForStatement()
-			if forStmt.Initializer != nil && forStmt.Initializer.Kind == ast.KindVariableDeclarationList {
-				a.collectDeclsFromVarList(forStmt.Initializer, a.declaredOuterVars)
-			}
-		case ast.KindForInStatement, ast.KindForOfStatement:
-			stmt := current.AsForInOrOfStatement()
-			if stmt.Initializer != nil && stmt.Initializer.Kind == ast.KindVariableDeclarationList {
-				a.collectDeclsFromVarList(stmt.Initializer, a.declaredOuterVars)
-			}
-		}
-		current = current.Parent
-	}
-}
-
-func (a *analyzer) collectOuterDeclsFromStmt(stmt *ast.Node) {
-	switch stmt.Kind {
-	case ast.KindVariableStatement:
-		stmt.ForEachChild(func(declList *ast.Node) bool {
-			if declList.Kind == ast.KindVariableDeclarationList {
-				a.collectDeclsFromVarList(declList, a.declaredOuterVars)
-			}
-			return false
-		})
-	case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
-		if stmt.Name() != nil && stmt.Name().Kind == ast.KindIdentifier {
-			a.declaredOuterVars[stmt.Name().AsIdentifier().Text] = true
-		}
-	}
-}
-
-// collectDeclsFromVarList extracts variable names from a VariableDeclarationList.
-func (a *analyzer) collectDeclsFromVarList(declList *ast.Node, target map[string]bool) {
-	declList.ForEachChild(func(decl *ast.Node) bool {
-		if decl.Kind == ast.KindVariableDeclaration {
-			utils.CollectBindingNames(decl.Name(), func(_ *ast.Node, name string) {
-				target[name] = true
-			})
-		}
+// symbolIsDeclareGlobal reports whether every declaration of `sym` is nested
+// inside a `declare global { … }` block. Such globals augment the ambient
+// scope and are not visible to ESLint's scope analyzer, so the rule must
+// treat references to them like unresolved identifiers.
+func symbolIsDeclareGlobal(sym *ast.Symbol) bool {
+	if sym == nil || len(sym.Declarations) == 0 {
 		return false
-	})
-}
-
-// collectDeclsInBlock collects variable declarations from a block without
-// recursing into nested functions. The topLevel flag controls scoping:
-//   - topLevel=true  (function body): collect let/const/var/function/class
-//   - topLevel=false (nested block):  collect only var (it hoists to function scope)
-func (a *analyzer) collectDeclsInBlock(node *ast.Node, locals map[string]bool) {
-	a.collectDeclsInBlockImpl(node, locals, true)
-}
-
-func (a *analyzer) collectDeclsInBlockImpl(node *ast.Node, locals map[string]bool, topLevel bool) {
-	if node == nil {
-		return
 	}
-
-	node.ForEachChild(func(child *ast.Node) bool {
-		switch child.Kind {
-		case ast.KindVariableStatement:
-			child.ForEachChild(func(declList *ast.Node) bool {
-				if declList.Kind == ast.KindVariableDeclarationList {
-					// In nested blocks, only collect var (hoisted); skip let/const (block-scoped).
-					if topLevel || utils.IsVarKeyword(declList) {
-						a.collectDeclsFromVarList(declList, locals)
-					}
-				}
-				return false
-			})
-		case ast.KindFunctionDeclaration:
-			if child.Name() != nil && child.Name().Kind == ast.KindIdentifier {
-				locals[child.Name().AsIdentifier().Text] = true
-			}
-			// Don't recurse into the function body
-		case ast.KindClassDeclaration:
-			if child.Name() != nil && child.Name().Kind == ast.KindIdentifier {
-				locals[child.Name().AsIdentifier().Text] = true
-			}
-		default:
-			if !ast.IsFunctionLikeDeclaration(child) {
-				a.collectDeclsInBlockImpl(child, locals, false)
-			}
-		}
-		return false
-	})
-}
-
-// findEscapedVars finds local variables referenced inside nested functions.
-// shadowed tracks variables redeclared in inner scopes to avoid false positives
-// (e.g., inner `let foo` should not cause outer `foo` to be marked escaped).
-func (a *analyzer) findEscapedVars(node *ast.Node, locals map[string]bool, escaped map[string]bool, inNestedFunc bool, shadowed map[string]bool) {
-	if node == nil {
-		return
-	}
-
-	node.ForEachChild(func(child *ast.Node) bool {
-		if ast.IsFunctionLikeDeclaration(child) {
-			// Collect declarations in the nested function to detect shadowing
-			innerLocals := make(map[string]bool)
-			a.collectNestedFuncDecls(child, innerLocals)
-
-			innerShadowed := make(map[string]bool, len(shadowed)+len(innerLocals))
-			for k := range shadowed {
-				innerShadowed[k] = true
-			}
-			for k := range innerLocals {
-				innerShadowed[k] = true
-			}
-
-			a.findEscapedVars(child, locals, escaped, true, innerShadowed)
+	for _, decl := range sym.Declarations {
+		if !isInsideDeclareGlobal(decl) {
 			return false
 		}
+	}
+	return true
+}
 
-		if child.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(child) {
-			name := child.AsIdentifier().Text
-			if inNestedFunc && locals[name] && !shadowed[name] {
-				escaped[name] = true
+func isInsideDeclareGlobal(node *ast.Node) bool {
+	for cur := node; cur != nil; cur = cur.Parent {
+		if cur.Kind == ast.KindModuleDeclaration {
+			name := cur.Name()
+			if name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "global" {
+				return true
 			}
 		}
-
-		a.findEscapedVars(child, locals, escaped, inNestedFunc, shadowed)
-		return false
-	})
-}
-
-func (a *analyzer) collectNestedFuncDecls(funcNode *ast.Node, decls map[string]bool) {
-	if params := funcNode.Parameters(); params != nil {
-		for _, param := range params {
-			utils.CollectBindingNames(param.Name(), func(_ *ast.Node, name string) {
-				decls[name] = true
-			})
-		}
-	}
-	if body := funcNode.Body(); body != nil {
-		a.collectDeclsInBlock(body, decls)
-	}
-}
-
-// isDeclaredVariable returns true if the variable is declared in any scope
-// (local or outer). Falls back to TypeChecker to resolve globals from type
-// definitions (e.g., `process` from @types/node). Truly undeclared names return false.
-func (a *analyzer) isDeclaredVariable(name string, identNode *ast.Node) bool {
-	_, isLocal := a.localVarsSafe[name]
-	if isLocal || a.declaredOuterVars[name] {
-		return true
-	}
-	// TypeChecker can resolve globals from lib/types (e.g., process, console).
-	if a.ctx.TypeChecker != nil && identNode != nil {
-		sym := a.ctx.TypeChecker.GetSymbolAtLocation(identNode)
-		if sym == nil {
-			return false
-		}
-		// If the symbol is declared inside the current function, it's local (safe).
-		// This covers block-scoped variables (for-loop let, catch var) that our
-		// AST-based collection may have missed.
-		if sym.ValueDeclaration != nil && a.isNodeInsideFunc(sym.ValueDeclaration) {
-			a.localVarsSafe[name] = true
-			return true
-		}
-		return true
 	}
 	return false
 }
 
-// isNodeInsideFunc checks if a node is a descendant of the current function.
-func (a *analyzer) isNodeInsideFunc(node *ast.Node) bool {
-	return ast.FindAncestor(node, func(n *ast.Node) bool {
-		return n == a.funcNode
-	}) != nil
+// collectDeclarations walks funcNode (not descending into nested functions)
+// and records the symbol of every declaration name it finds.
+func (a *analyzer) collectDeclarations() {
+	if params := a.funcNode.Parameters(); params != nil {
+		for _, param := range params {
+			a.collectBindingSymbols(param.Name(), true)
+		}
+	}
+	if body := a.funcNode.Body(); body != nil {
+		a.collectDeclsIn(body)
+	}
 }
 
-// isLocalVariableWithoutEscape returns true if the variable is local and
-// never referenced in a closure (i.e., no other concurrent code can observe it).
-// For member access on parameters, returns false because the object comes from outside.
-func (a *analyzer) isLocalVariableWithoutEscape(name string, isMemberAccess bool) bool {
-	if isMemberAccess && a.paramNames[name] {
+// collectBindingSymbols walks a binding target (Identifier or
+// ObjectBindingPattern/ArrayBindingPattern) and registers each contained name's
+// symbol. isParam=true only when collecting parameters of funcNode itself.
+func (a *analyzer) collectBindingSymbols(nameNode *ast.Node, isParam bool) {
+	if nameNode == nil {
+		return
+	}
+	utils.CollectBindingNames(nameNode, func(ident *ast.Node, _ string) {
+		if sym := a.symbolOf(ident); sym != nil {
+			a.declaredInFunc[sym] = true
+			if isParam {
+				a.parameterSymbols[sym] = true
+			}
+		}
+	})
+}
+
+// collectDeclsIn descends into funcNode's body skipping nested functions and
+// registers every declaration's symbol. Shadowing is handled naturally by
+// distinct symbols, so there is no need to track which declarations belong
+// to which block.
+func (a *analyzer) collectDeclsIn(node *ast.Node) {
+	if node == nil {
+		return
+	}
+	node.ForEachChild(func(child *ast.Node) bool {
+		if ast.IsFunctionLikeDeclaration(child) {
+			return false
+		}
+		switch child.Kind {
+		case ast.KindVariableDeclaration:
+			vd := child.AsVariableDeclaration()
+			if vd.Name() != nil {
+				a.collectBindingSymbols(vd.Name(), false)
+			}
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration,
+			ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+			if n := child.Name(); n != nil && n.Kind == ast.KindIdentifier {
+				if sym := a.symbolOf(n); sym != nil {
+					a.declaredInFunc[sym] = true
+				}
+			}
+		case ast.KindCatchClause:
+			cc := child.AsCatchClause()
+			if cc.VariableDeclaration != nil {
+				if vd := cc.VariableDeclaration.AsVariableDeclaration(); vd != nil && vd.Name() != nil {
+					a.collectBindingSymbols(vd.Name(), false)
+				}
+			}
+		}
+		a.collectDeclsIn(child)
+		return false
+	})
+}
+
+// collectEscapes walks funcNode's body and marks any symbol in declaredInFunc
+// that is referenced inside a nested function as "escaped" — writes to such a
+// symbol can be observed by the nested function's body, so race analysis must
+// treat it like a non-local variable.
+func (a *analyzer) collectEscapes() {
+	a.walkForEscape(a.funcNode.Body(), false)
+}
+
+func (a *analyzer) walkForEscape(node *ast.Node, inNested bool) {
+	if node == nil {
+		return
+	}
+
+	// Check this node if it's a value-reference identifier inside a nested
+	// function (arrow expression body, method body, static block, …).
+	if inNested && node.Kind == ast.KindIdentifier && !utils.IsNonReferenceIdentifier(node) {
+		if sym := a.symbolOf(node); sym != nil && a.declaredInFunc[sym] {
+			a.escapedSymbols[sym] = true
+		}
+	}
+
+	node.ForEachChild(func(child *ast.Node) bool {
+		if ast.IsFunctionLikeDeclaration(child) {
+			// Walk the full function-like subtree with inNested=true so
+			// every identifier inside (body expression, block, parameter
+			// defaults, etc.) is scanned.
+			a.walkForEscape(child, true)
+			return false
+		}
+		a.walkForEscape(child, inNested)
+		return false
+	})
+}
+
+// isLocalWithoutEscape reports whether writes to `sym` can only be observed by
+// code inside funcNode — i.e. the symbol is declared in funcNode and never
+// referenced from a nested function scope. For member-access writes on a
+// parameter, the underlying object comes from outside, so we treat the param
+// as not-local (matches ESLint's isLocalVariableWithoutEscape param shortcut).
+func (a *analyzer) isLocalWithoutEscape(sym *ast.Symbol, isMember bool) bool {
+	if sym == nil {
 		return false
 	}
-	safe, exists := a.localVarsSafe[name]
-	return exists && safe
+	if !a.declaredInFunc[sym] {
+		return false
+	}
+	if a.escapedSymbols[sym] {
+		return false
+	}
+	if isMember && a.parameterSymbols[sym] {
+		return false
+	}
+	return true
+}
+
+// getBaseIdentifierNode walks down a member expression chain (foo.bar[baz].qux)
+// and returns the base identifier node. Only parentheses are transparent —
+// type assertions break the chain, matching ESLint's getWriteExpr.
+func getBaseIdentifierNode(node *ast.Node) *ast.Node {
+	n := ast.SkipParentheses(node)
+	for n != nil {
+		switch n.Kind {
+		case ast.KindIdentifier:
+			return n
+		case ast.KindPropertyAccessExpression:
+			n = ast.SkipParentheses(n.AsPropertyAccessExpression().Expression)
+		case ast.KindElementAccessExpression:
+			n = ast.SkipParentheses(n.AsElementAccessExpression().Expression)
+		default:
+			return nil
+		}
+	}
+	return nil
+}
+
+// normalizedNodeText returns the source text of a node with internal whitespace collapsed.
+func normalizedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	return strings.Join(strings.Fields(utils.TrimmedNodeText(sourceFile, node)), "")
 }
 
 // run performs the analysis on parameter defaults and the function body.
@@ -395,7 +340,6 @@ func (a *analyzer) run() {
 		return
 	}
 	state := newAnalysisState()
-	// Parameter default values are evaluated at call time and may contain await.
 	if params := a.funcNode.Parameters(); params != nil {
 		for _, param := range params {
 			p := param.AsParameterDeclaration()
@@ -421,15 +365,20 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 		ast.KindConstructor,
 		ast.KindGetAccessor,
 		ast.KindSetAccessor:
-		// Function boundaries: don't recurse (inner functions are separate scopes)
 		return
 
 	case ast.KindClassDeclaration, ast.KindClassExpression:
-		// Class bodies contain methods which are separate function scopes
 		return
 
 	case ast.KindBlock:
+		// Shadowing is handled naturally by distinct symbols; no mask needed.
 		a.walkStatements(node.AsBlock().Statements.Nodes, state)
+
+	case ast.KindCatchClause:
+		cc := node.AsCatchClause()
+		if cc.Block != nil {
+			a.walkNode(cc.Block, state)
+		}
 
 	case ast.KindIfStatement:
 		a.walkIfStatement(node, state)
@@ -440,17 +389,34 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 	case ast.KindSwitchStatement:
 		a.walkSwitchStatement(node, state)
 
+	case ast.KindLabeledStatement:
+		a.walkLabeledStatement(node, state)
+
+	case ast.KindBreakStatement:
+		bs := node.AsBreakStatement()
+		label := ""
+		if bs.Label != nil && bs.Label.Kind == ast.KindIdentifier {
+			label = bs.Label.AsIdentifier().Text
+		}
+		a.recordBreak(label, state)
+
 	case ast.KindTryStatement:
 		a.walkTryStatement(node, state)
 
 	case ast.KindWhileStatement:
 		whileStmt := node.AsWhileStatement()
 		a.walkNode(whileStmt.Expression, state)
-		a.walkNode(whileStmt.Statement, state)
+		bodyState := state.clone()
+		tgt := a.pushBreakTarget("")
+		a.walkNode(whileStmt.Statement, bodyState)
+		a.popBreakTargetInto(tgt, state)
 
 	case ast.KindDoStatement:
 		doStmt := node.AsDoStatement()
-		a.walkNode(doStmt.Statement, state)
+		bodyState := state.clone()
+		tgt := a.pushBreakTarget("")
+		a.walkNode(doStmt.Statement, bodyState)
+		a.popBreakTargetInto(tgt, state)
 		a.walkNode(doStmt.Expression, state)
 
 	case ast.KindForStatement:
@@ -459,24 +425,31 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 	case ast.KindForInStatement, ast.KindForOfStatement:
 		stmt := node.AsForInOrOfStatement()
 		a.walkNode(stmt.Expression, state)
-		// for-await-of implicitly awaits on each iteration
+		// ESLint quirk: for-of / for-in / for-await-of bodies get a FRESH
+		// entry state (pre-loop reads are NOT inherited), but the body's
+		// END state IS union-merged back into post-loop — post-loop is
+		// reachable from the body's tail via the iterator-done edge, so
+		// reads that became outdated inside the body propagate.
+		bodyState := newAnalysisState()
 		if stmt.AwaitModifier != nil {
-			state.makeOutdated()
+			bodyState.makeOutdated()
 		}
-		a.walkNode(stmt.Statement, state)
+		a.walkForInOfInitializer(stmt.Initializer, bodyState)
+		tgt := a.pushBreakTarget("")
+		a.walkNode(stmt.Statement, bodyState)
+		state.merge(bodyState)
+		a.popBreakTargetInto(tgt, state)
 
 	case ast.KindBinaryExpression:
 		a.walkBinaryExpression(node, state)
 
 	case ast.KindAwaitExpression:
-		// The operand is evaluated BEFORE the await pauses
 		if node.Expression() != nil {
 			a.walkNode(node.Expression(), state)
 		}
 		state.makeOutdated()
 
 	case ast.KindYieldExpression:
-		// The operand is evaluated BEFORE the yield pauses
 		if node.Expression() != nil {
 			a.walkNode(node.Expression(), state)
 		}
@@ -484,15 +457,13 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 
 	case ast.KindIdentifier:
 		if !utils.IsNonReferenceIdentifier(node) {
-			if name := node.AsIdentifier().Text; name != "" {
-				state.markRead(name)
+			if sym := a.symbolOf(node); sym != nil {
+				state.markRead(sym)
 			}
 		}
 
 	case ast.KindVariableDeclaration:
 		vd := node.AsVariableDeclaration()
-		// Walk binding pattern defaults (e.g., `const {a = await bar} = obj`)
-		// Declaration identifiers are skipped by IsNonReferenceIdentifier.
 		a.walkBindingDefaults(vd.Name(), state)
 		if vd.Initializer != nil {
 			a.walkNode(vd.Initializer, state)
@@ -533,8 +504,6 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 		a.walkNode(node.AsParenthesizedExpression().Expression, state)
 
 	// TypeScript type wrappers: walk the runtime expression, skip the type annotation.
-	// Without this, type reference identifiers (e.g., MyType in `x as MyType`) would
-	// be incorrectly marked as variable reads.
 	case ast.KindAsExpression:
 		a.walkNode(node.AsAsExpression().Expression, state)
 	case ast.KindTypeAssertionExpression:
@@ -545,7 +514,6 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 		a.walkNode(node.AsNonNullExpression().Expression, state)
 
 	case ast.KindPropertyAccessExpression:
-		// Walk only the object expression, not the property name
 		a.walkNode(node.AsPropertyAccessExpression().Expression, state)
 
 	case ast.KindElementAccessExpression:
@@ -572,8 +540,10 @@ func (a *analyzer) walkNode(node *ast.Node, state *analysisState) {
 }
 
 // walkBindingDefaults walks only the default-value initializers inside a
-// destructuring binding pattern (e.g., `{a = await bar}` or `[x = await y]`).
-// This is needed because default values are evaluated at runtime and may contain await.
+// destructuring BINDING pattern (var/let/const declarations). Each default is
+// conditional (runs only if the key is undefined), so it's walked in a
+// cloned state and union-merged back — an await in one default outdates the
+// outer state, but a re-read in a later default doesn't clear it.
 func (a *analyzer) walkBindingDefaults(nameNode *ast.Node, state *analysisState) {
 	if nameNode == nil {
 		return
@@ -584,9 +554,10 @@ func (a *analyzer) walkBindingDefaults(nameNode *ast.Node, state *analysisState)
 			if child.Kind == ast.KindBindingElement {
 				be := child.AsBindingElement()
 				if be.Initializer != nil {
-					a.walkNode(be.Initializer, state)
+					branch := state.clone()
+					a.walkNode(be.Initializer, branch)
+					state.merge(branch)
 				}
-				// Recurse into nested patterns (e.g., `{a: {b = await c}} = obj`)
 				if be.Name() != nil {
 					a.walkBindingDefaults(be.Name(), state)
 				}
@@ -626,78 +597,325 @@ func (a *analyzer) walkBinaryExpression(node *ast.Node, state *analysisState) {
 	}
 
 	// --- Assignment expression ---
-	// Skip parentheses and TS type assertions (as T, <T>, !, satisfies T) on LHS.
 	left := ast.SkipOuterExpressions(binary.Left, ast.OEKParentheses|ast.OEKAssertions)
 	isCompound := ast.IsCompoundAssignment(opKind)
 	isMember := ast.IsAccessExpression(left)
 
-	// Determine the target variable name and its identifier node
-	var targetName string
+	var targetSym *ast.Symbol
 	var targetIdentNode *ast.Node
 	if isMember {
-		targetIdentNode, targetName = getBaseIdentifierNode(left)
-	} else {
-		targetName = getIdentifierName(left)
-		if left.Kind == ast.KindIdentifier {
-			targetIdentNode = left
-		}
+		targetIdentNode = getBaseIdentifierNode(left)
+	} else if left.Kind == ast.KindIdentifier {
+		targetIdentNode = left
+	}
+	if targetIdentNode != nil {
+		targetSym = a.symbolOf(targetIdentNode)
 	}
 
-	if targetName == "" {
+	if targetIdentNode == nil {
+		// Destructuring assignment: `({a, b} = src)` / `[a, b] = src`.
+		if !isCompound && isDestructuringAssignmentTarget(left) {
+			a.walkDestructuringAssignment(node, left, binary.Right, state)
+			return
+		}
 		a.walkNode(binary.Left, state)
 		a.walkNode(binary.Right, state)
 		return
 	}
 
-	// Skip undeclared globals (ESLint skips unresolved references)
-	if !a.isDeclaredVariable(targetName, targetIdentNode) {
-		if isCompound {
-			a.walkNode(binary.Left, state)
-		}
-		a.walkNode(binary.Right, state)
-		return
-	}
-
-	// Local variables that don't escape can't have race conditions
-	if a.isLocalVariableWithoutEscape(targetName, isMember) {
-		if isCompound {
-			a.walkNode(binary.Left, state)
-		}
-		a.walkNode(binary.Right, state)
-		return
-	}
-
-	// For compound assignments (+=, -=, etc.), the LHS is read first.
-	// For simple assignment (=), the LHS is NOT marked as a fresh read
-	// (matches ESLint behavior: only the write target is registered).
+	// Walk the LHS (side-reads always register; the write-target chain itself
+	// is skipped for simple assignments to match ESLint's getWriteExpr chain).
 	if isCompound {
 		a.walkNode(binary.Left, state)
+	} else {
+		a.walkSimpleAssignLHS(binary.Left, state)
 	}
 
 	a.walkNode(binary.Right, state)
 
-	// Check if the target variable was outdated when assigned
-	if state.isOutdated(targetName) {
-		a.report(node, left, targetName, isMember)
+	// Undeclared globals (sym == nil) and local-without-escape vars: no race.
+	if targetSym == nil {
+		return
+	}
+	if a.isLocalWithoutEscape(targetSym, isMember) {
+		return
+	}
+
+	// ESLint quirk: RHS that is a function/arrow expression silently skips
+	// the check (the :expression:exit fires inside the inner function's
+	// CodePath whose referenceMap is null).
+	if isFunctionLikeRHS(binary.Right) {
+		return
+	}
+
+	if state.isOutdated(targetSym) {
+		// TS type-wrapped simple target (e.g. `(foo as any) = 1`): ESLint
+		// reports nonAtomicObjectUpdate with the wrapper's source text as the
+		// value, and allowProperties: true suppresses it. Detect by comparing
+		// the raw LHS to its assertion-stripped form.
+		wrapped := !isMember && binary.Left != left
+		if wrapped {
+			a.report(node, binary.Left, targetSym, true)
+		} else {
+			a.report(node, left, targetSym, isMember)
+		}
 	}
 }
 
-func (a *analyzer) report(assignmentNode *ast.Node, left *ast.Node, targetName string, isMemberAccess bool) {
+func (a *analyzer) report(assignmentNode, left *ast.Node, sym *ast.Symbol, isMemberAccess bool) {
 	if isMemberAccess {
 		if a.allowProperties {
 			return
 		}
 		leftText := normalizedNodeText(a.ctx.SourceFile, left)
-		a.ctx.ReportNode(assignmentNode, messageNonAtomicObjectUpdate(leftText, targetName))
+		a.ctx.ReportNode(assignmentNode, messageNonAtomicObjectUpdate(leftText, sym.Name))
 	} else {
-		a.ctx.ReportNode(assignmentNode, messageNonAtomicUpdate(targetName))
+		a.ctx.ReportNode(assignmentNode, messageNonAtomicUpdate(sym.Name))
+	}
+}
+
+// isFunctionLikeRHS reports whether an assignment's RHS is a function-like
+// expression. ESLint's :expression:exit handler skips outdated checks when
+// the RHS starts a new CodePath with a non-async/non-generator scope.
+func isFunctionLikeRHS(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	n := ast.SkipParentheses(node)
+	switch n.Kind {
+	case ast.KindFunctionExpression, ast.KindArrowFunction:
+		return true
+	}
+	return false
+}
+
+// isDestructuringAssignmentTarget returns true if `node` is an ObjectLiteral
+// or ArrayLiteral being reinterpreted as a destructuring pattern.
+func isDestructuringAssignmentTarget(node *ast.Node) bool {
+	n := ast.SkipParentheses(node)
+	return n.Kind == ast.KindObjectLiteralExpression || n.Kind == ast.KindArrayLiteralExpression
+}
+
+// destructuringTarget records a single variable-write target collected from
+// a destructuring pattern.
+type destructuringTarget struct {
+	symbol *ast.Symbol
+	name   string
+}
+
+// walkDestructuringAssignment handles `({a, b = def} = src)` / `[a, b] = src`.
+func (a *analyzer) walkDestructuringAssignment(assignNode, pattern, rhs *ast.Node, state *analysisState) {
+	if rhs != nil {
+		a.walkNode(rhs, state)
+	}
+	var targets []destructuringTarget
+	a.collectDestructuringTargets(pattern, state, &targets)
+
+	if isFunctionLikeRHS(rhs) {
+		return
+	}
+	leftText := normalizedNodeText(a.ctx.SourceFile, pattern)
+	for _, t := range targets {
+		if t.symbol == nil {
+			continue
+		}
+		if a.isLocalWithoutEscape(t.symbol, false) {
+			continue
+		}
+		if state.isOutdated(t.symbol) {
+			a.ctx.ReportNode(assignNode, messageNonAtomicObjectUpdate(leftText, t.name))
+		}
+	}
+}
+
+// collectDestructuringTargets walks a destructuring pattern. Default
+// expressions are walked (in cloned branches) so awaits in defaults outdate
+// without letting re-reads clear the outer state. Each variable-target leaf is
+// appended to `targets`.
+func (a *analyzer) collectDestructuringTargets(node *ast.Node, state *analysisState, targets *[]destructuringTarget) {
+	if node == nil {
+		return
+	}
+	n := ast.SkipParentheses(node)
+	switch n.Kind {
+	case ast.KindObjectLiteralExpression:
+		for _, prop := range n.AsObjectLiteralExpression().Properties.Nodes {
+			a.collectDestructuringProperty(prop, state, targets)
+		}
+	case ast.KindArrayLiteralExpression:
+		for _, elem := range n.AsArrayLiteralExpression().Elements.Nodes {
+			a.collectDestructuringElement(elem, state, targets)
+		}
+	case ast.KindIdentifier:
+		if sym := a.symbolOf(n); sym != nil {
+			*targets = append(*targets, destructuringTarget{symbol: sym, name: sym.Name})
+		}
+	default:
+		// Member target or other — walk as a normal expression so any side
+		// reads register, but don't record as a tracked target.
+		a.walkNode(n, state)
+	}
+}
+
+func (a *analyzer) collectDestructuringProperty(prop *ast.Node, state *analysisState, targets *[]destructuringTarget) {
+	switch prop.Kind {
+	case ast.KindShorthandPropertyAssignment:
+		sp := prop.AsShorthandPropertyAssignment()
+		if sp.ObjectAssignmentInitializer != nil {
+			branch := state.clone()
+			a.walkNode(sp.ObjectAssignmentInitializer, branch)
+			state.merge(branch)
+		}
+		name := sp.Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			if sym := a.symbolOf(name); sym != nil {
+				*targets = append(*targets, destructuringTarget{symbol: sym, name: sym.Name})
+			}
+		}
+	case ast.KindPropertyAssignment:
+		pa := prop.AsPropertyAssignment()
+		if pa.Name() != nil && pa.Name().Kind == ast.KindComputedPropertyName {
+			a.walkNode(pa.Name(), state)
+		}
+		a.collectDestructuringValue(pa.Initializer, state, targets)
+	case ast.KindSpreadAssignment:
+		a.collectDestructuringValue(prop.AsSpreadAssignment().Expression, state, targets)
+	default:
+		a.walkNode(prop, state)
+	}
+}
+
+func (a *analyzer) collectDestructuringElement(elem *ast.Node, state *analysisState, targets *[]destructuringTarget) {
+	if elem == nil || elem.Kind == ast.KindOmittedExpression {
+		return
+	}
+	if elem.Kind == ast.KindSpreadElement {
+		a.collectDestructuringValue(elem.Expression(), state, targets)
+		return
+	}
+	a.collectDestructuringValue(elem, state, targets)
+}
+
+func (a *analyzer) collectDestructuringValue(node *ast.Node, state *analysisState, targets *[]destructuringTarget) {
+	if node == nil {
+		return
+	}
+	n := ast.SkipParentheses(node)
+	if n.Kind == ast.KindBinaryExpression {
+		bin := n.AsBinaryExpression()
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+			branch := state.clone()
+			a.walkNode(bin.Right, branch)
+			state.merge(branch)
+			a.collectDestructuringValue(bin.Left, state, targets)
+			return
+		}
+	}
+	a.collectDestructuringTargets(n, state, targets)
+}
+
+// walkLabeledStatement handles `label: stmt`. Loops/switches inside a labeled
+// statement become reachable via `break <label>` from nested constructs.
+func (a *analyzer) walkLabeledStatement(node *ast.Node, state *analysisState) {
+	ls := node.AsLabeledStatement()
+	label := ""
+	if ls.Label != nil && ls.Label.Kind == ast.KindIdentifier {
+		label = ls.Label.AsIdentifier().Text
+	}
+	body := ls.Statement
+	switch body.Kind {
+	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement,
+		ast.KindForInStatement, ast.KindForOfStatement, ast.KindSwitchStatement,
+		ast.KindBlock:
+		t := a.pushBreakTarget(label)
+		a.walkNode(body, state)
+		a.popBreakTargetInto(t, state)
+	default:
+		a.walkNode(body, state)
+	}
+}
+
+func (a *analyzer) pushBreakTarget(label string) *breakTarget {
+	t := &breakTarget{label: label}
+	a.breakTargets = append(a.breakTargets, t)
+	return t
+}
+
+func (a *analyzer) popBreakTargetInto(t *breakTarget, post *analysisState) {
+	if n := len(a.breakTargets); n > 0 && a.breakTargets[n-1] == t {
+		a.breakTargets = a.breakTargets[:n-1]
+	}
+	for _, s := range t.states {
+		post.merge(s)
+	}
+}
+
+func (a *analyzer) recordBreak(label string, state *analysisState) {
+	for i := len(a.breakTargets) - 1; i >= 0; i-- {
+		t := a.breakTargets[i]
+		if label == "" || t.label == label {
+			t.states = append(t.states, state.clone())
+			return
+		}
+	}
+}
+
+// walkForInOfInitializer walks a for-in / for-of statement's Initializer in
+// bodyState so awaits inside destructuring defaults correctly outdate per
+// iteration.
+func (a *analyzer) walkForInOfInitializer(init *ast.Node, state *analysisState) {
+	if init == nil {
+		return
+	}
+	if init.Kind == ast.KindVariableDeclarationList {
+		a.walkNode(init, state)
+		return
+	}
+	n := ast.SkipParentheses(init)
+	switch n.Kind {
+	case ast.KindIdentifier:
+		// `for (foo of gen)` — foo is a pure write target; no read.
+	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
+		var discard []destructuringTarget
+		a.collectDestructuringTargets(n, state, &discard)
+	default:
+		a.walkNode(n, state)
+	}
+}
+
+// walkSimpleAssignLHS walks the LHS of a simple `=` assignment. The
+// write-target chain (the base identifier reached via PropertyAccess.Expression
+// / ElementAccess.Expression / TS wrappers) is NOT marked as a read. Side
+// expressions (computed indices, etc.) are walked normally.
+func (a *analyzer) walkSimpleAssignLHS(node *ast.Node, state *analysisState) {
+	if node == nil {
+		return
+	}
+	node = ast.SkipParentheses(node)
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		a.walkSimpleAssignLHS(node.AsPropertyAccessExpression().Expression, state)
+	case ast.KindElementAccessExpression:
+		elem := node.AsElementAccessExpression()
+		a.walkSimpleAssignLHS(elem.Expression, state)
+		a.walkNode(elem.ArgumentExpression, state)
+	case ast.KindAsExpression:
+		a.walkSimpleAssignLHS(node.AsAsExpression().Expression, state)
+	case ast.KindTypeAssertionExpression:
+		a.walkSimpleAssignLHS(node.AsTypeAssertion().Expression, state)
+	case ast.KindSatisfiesExpression:
+		a.walkSimpleAssignLHS(node.AsSatisfiesExpression().Expression, state)
+	case ast.KindNonNullExpression:
+		a.walkSimpleAssignLHS(node.AsNonNullExpression().Expression, state)
+	case ast.KindIdentifier:
+		// Base of the write-target chain: do not mark as a read.
+	default:
+		a.walkNode(node, state)
 	}
 }
 
 // stmtAlwaysTerminates returns true if a statement always exits via
-// return/throw/break/continue (so the state from this branch should NOT merge
-// into the continuation). Checks all statements in a block — an early
-// return/throw in the middle means the block terminates even if dead code follows.
+// return/throw.
 func stmtAlwaysTerminates(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -738,25 +956,17 @@ func (a *analyzer) walkIfStatement(node *ast.Node, state *analysisState) {
 
 		switch {
 		case thenExits && elseExits:
-			// Both branches exit — code after if is unreachable.
 			*state = *thenState
 		case thenExits:
-			// Only then exits — continuation only from else path.
 			*state = *elseState
 		case elseExits:
-			// Only else exits — continuation only from then path.
 			*state = *thenState
 		default:
-			// Neither exits — merge both paths.
 			thenState.merge(elseState)
 			*state = *thenState
 		}
 	} else {
-		if thenExits {
-			// Then-branch always exits — continuation only from the non-taken path.
-			// state already holds the pre-if state (condition was walked).
-		} else {
-			// Then-branch may or may not execute — merge both possibilities.
+		if !thenExits {
 			state.merge(thenState)
 		}
 	}
@@ -777,19 +987,28 @@ func (a *analyzer) walkConditionalExpression(node *ast.Node, state *analysisStat
 	*state = *consequentState
 }
 
-// clauseTerminates checks whether a case/default clause's statements end with
-// break/return/throw (i.e., no fallthrough to the next case).
-func clauseTerminates(statements []*ast.Node) bool {
+// clauseEndKind classifies how a switch clause's statements end.
+type clauseEndKind int
+
+const (
+	clauseEndFallthrough clauseEndKind = iota
+	clauseEndBreak
+	clauseEndExit
+)
+
+func classifyClauseEnd(statements []*ast.Node) clauseEndKind {
 	for _, stmt := range statements {
 		if stmtAlwaysTerminates(stmt) {
-			return true
+			return clauseEndExit
 		}
-		// break/continue also terminate a case clause
-		if stmt.Kind == ast.KindBreakStatement || stmt.Kind == ast.KindContinueStatement {
-			return true
+		if stmt.Kind == ast.KindBreakStatement {
+			return clauseEndBreak
+		}
+		if stmt.Kind == ast.KindContinueStatement {
+			return clauseEndExit
 		}
 	}
-	return false
+	return clauseEndFallthrough
 }
 
 func (a *analyzer) walkSwitchStatement(node *ast.Node, state *analysisState) {
@@ -802,20 +1021,19 @@ func (a *analyzer) walkSwitchStatement(node *ast.Node, state *analysisState) {
 		return
 	}
 
-	// fallthroughState accumulates across cases that don't break/return/throw.
-	// When a case terminates, its state merges into mergedState and fallthroughState resets.
+	swTgt := a.pushBreakTarget("")
+
 	mergedState := state.clone()
 	var fallthroughState *analysisState
+	clauses := caseBlock.Clauses.Nodes
 
-	for _, clause := range caseBlock.Clauses.Nodes {
+	for i, clause := range clauses {
 		caseOrDefault := clause.AsCaseOrDefaultClause()
 		if caseOrDefault == nil {
 			continue
 		}
 
-		// Start from pre-switch state (direct jump to this case).
 		clauseState := state.clone()
-		// If the previous case fell through, merge its accumulated state.
 		if fallthroughState != nil {
 			clauseState.merge(fallthroughState)
 		}
@@ -829,35 +1047,64 @@ func (a *analyzer) walkSwitchStatement(node *ast.Node, state *analysisState) {
 			a.walkStatements(clauseStatements, clauseState)
 		}
 
-		mergedState.merge(clauseState)
-
-		if clauseTerminates(clauseStatements) {
+		switch classifyClauseEnd(clauseStatements) {
+		case clauseEndBreak, clauseEndExit:
 			fallthroughState = nil
-		} else {
+		case clauseEndFallthrough:
+			if i == len(clauses)-1 {
+				mergedState.merge(clauseState)
+			}
 			fallthroughState = clauseState
 		}
 	}
+
+	a.popBreakTargetInto(swTgt, mergedState)
 	*state = *mergedState
 }
 
 func (a *analyzer) walkTryStatement(node *ast.Node, state *analysisState) {
 	tryStmt := node.AsTryStatement()
 
-	tryState := state.clone()
+	tryEnd := state.clone()
 	if tryStmt.TryBlock != nil {
-		a.walkNode(tryStmt.TryBlock, tryState)
+		a.walkNode(tryStmt.TryBlock, tryEnd)
 	}
 
-	// The catch block may be entered at any point during try execution
-	// (an exception can occur after an await). Use the post-try state so
-	// the catch block sees all reads/outdating from the try block.
-	catchState := tryState.clone()
+	tryTerminates := tryStmt.TryBlock != nil && stmtAlwaysTerminates(tryStmt.TryBlock)
+
+	var catchEnd *analysisState
 	if tryStmt.CatchClause != nil {
-		a.walkNode(tryStmt.CatchClause, catchState)
+		if tryTerminates {
+			catchEnd = state.clone()
+		} else {
+			catchEnd = tryEnd.clone()
+		}
+		a.walkNode(tryStmt.CatchClause, catchEnd)
 	}
 
-	tryState.merge(catchState)
-	*state = *tryState
+	var catchTerminates bool
+	if tryStmt.CatchClause != nil {
+		cc := tryStmt.CatchClause.AsCatchClause()
+		if cc.Block != nil {
+			catchTerminates = stmtAlwaysTerminates(cc.Block)
+		}
+	}
+
+	post := newAnalysisState()
+	contributions := 0
+	if !tryTerminates {
+		post.merge(tryEnd)
+		contributions++
+	}
+	if tryStmt.CatchClause != nil && !catchTerminates {
+		post.merge(catchEnd)
+		contributions++
+	}
+	if contributions == 0 {
+		*state = *state.clone()
+	} else {
+		*state = *post
+	}
 
 	if tryStmt.FinallyBlock != nil {
 		a.walkNode(tryStmt.FinallyBlock, state)
@@ -872,16 +1119,21 @@ func (a *analyzer) walkForStatement(node *ast.Node, state *analysisState) {
 	if forStmt.Condition != nil {
 		a.walkNode(forStmt.Condition, state)
 	}
-	a.walkNode(forStmt.Statement, state)
+	bodyState := state.clone()
+	tgt := a.pushBreakTarget("")
+	a.walkNode(forStmt.Statement, bodyState)
+	a.popBreakTargetInto(tgt, state)
+	// Incrementor runs in its own segment whose entry state is fresh.
 	if forStmt.Incrementor != nil {
-		a.walkNode(forStmt.Incrementor, state)
+		a.walkNode(forStmt.Incrementor, newAnalysisState())
 	}
 }
 
 // RequireAtomicUpdatesRule disallows assignments that can lead to race conditions
 // due to usage of `await` or `yield`.
 var RequireAtomicUpdatesRule = rule.Rule{
-	Name: "require-atomic-updates",
+	Name:             "require-atomic-updates",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		allowProperties := false
 		optsMap := utils.GetOptionsMap(options)
