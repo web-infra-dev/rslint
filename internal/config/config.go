@@ -149,6 +149,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
+	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
@@ -545,6 +546,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
 	GlobalRuleRegistry.Register("no-restricted-imports", no_restricted_imports.NoRestrictedImportsRule)
 	GlobalRuleRegistry.Register("no-multi-str", no_multi_str.NoMultiStrRule)
+	GlobalRuleRegistry.Register("no-nested-ternary", no_nested_ternary.NoNestedTernaryRule)
 	GlobalRuleRegistry.Register("no-octal-escape", no_octal_escape.NoOctalEscapeRule)
 	GlobalRuleRegistry.Register("no-proto", no_proto.NoProtoRule)
 	GlobalRuleRegistry.Register("no-script-url", no_script_url.NoScriptUrlRule)
