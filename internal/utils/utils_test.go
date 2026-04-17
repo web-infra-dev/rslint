@@ -92,3 +92,61 @@ func TestNaturalCompare(t *testing.T) {
 		}
 	}
 }
+
+func TestIsConstructorName(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		// ── ASCII constructor forms ──
+		{"Foo", true},
+		{"FooBar", true},
+		{"_Foo", true},
+		{"$Foo", true},
+		{"__Foo", true},
+		{"_0Foo", true},
+		{"$_Foo", true},
+		{"____Foo", true},
+
+		// ── ASCII non-constructor forms ──
+		{"foo", false},
+		{"fooBar", false},
+		{"_foo", false},
+		{"$foo", false},
+		{"_0foo", false},
+
+		// ── All-prefix → not a constructor ──
+		{"", false},
+		{"_", false},
+		{"$", false},
+		{"$$", false},
+		{"_8", false},
+		{"_0$_", false},
+
+		// ── Unicode uppercase identifiers → constructor ──
+		// Greek capital Pi; verifies rune-aware iteration.
+		{"Πfoo", true},
+		{"_Πfoo", true},
+		// Cyrillic capital "Д".
+		{"Дelta", true},
+		// Latin Extended capital "Ǆ".
+		{"ǄName", true},
+
+		// ── Unicode lowercase identifiers → not constructor ──
+		{"πfoo", false},
+		{"_πfoo", false},
+		{"дelta", false},
+
+		// ── Non-ASCII digits are NOT stripped as prefix (matches ESLint's
+		// `[0-9]` which only accepts ASCII 0–9). An Arabic-Indic digit at
+		// the start is the first non-prefix rune and `unicode.IsUpper`
+		// returns false for it → not a constructor.
+		{"٠Foo", false},
+	}
+	for _, tt := range tests {
+		got := IsConstructorName(tt.name)
+		if got != tt.want {
+			t.Errorf("IsConstructorName(%q) = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}

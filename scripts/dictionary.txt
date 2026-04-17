@@ -198,3 +198,7 @@ xdescribe
 xitiViewMap
 xjavascript
 xtest
+Πfoo
+πfoo
+Дelta
+дelta

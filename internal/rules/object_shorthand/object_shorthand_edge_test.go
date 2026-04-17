@@ -537,6 +537,45 @@ func TestObjectShorthandAutofixShapes(t *testing.T) {
 	)
 }
 
+// TestObjectShorthandIgnoreConstructorsUnicode verifies that the
+// `ignoreConstructors` option treats Unicode uppercase identifiers (e.g. Greek
+// capital Pi `Π`, Cyrillic `Д`) the same way ESLint does — they count as
+// constructor names and are skipped.
+func TestObjectShorthandIgnoreConstructorsUnicode(t *testing.T) {
+	ignoreCtorOpts := []any{"always", map[string]any{"ignoreConstructors": true}}
+
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&ObjectShorthandRule,
+		[]rule_tester.ValidTestCase{
+			// Greek capital Π as first rune → constructor → skipped.
+			{Code: `var x = {Πfoo: function(){}, a: b}`, Options: ignoreCtorOpts},
+			// `_` prefix + Greek capital → still constructor.
+			{Code: `var x = {_Πfoo: function(){}, a: b}`, Options: ignoreCtorOpts},
+			// Cyrillic capital Д.
+			{Code: `var x = {Дelta: function(){}, a: b}`, Options: ignoreCtorOpts},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Greek lowercase π → NOT a constructor → method shorthand enforced.
+			{
+				Code:    `var x = {πfoo: function(){}, a: b}`,
+				Output:  []string{`var x = {πfoo(){}, a: b}`},
+				Options: ignoreCtorOpts,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expectedMethodShorthand"}},
+			},
+			// `_` prefix + Greek lowercase → still not a constructor.
+			{
+				Code:    `var x = {_πfoo: function(){}, a: b}`,
+				Output:  []string{`var x = {_πfoo(){}, a: b}`},
+				Options: ignoreCtorOpts,
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "expectedMethodShorthand"}},
+			},
+		},
+	)
+}
+
 // TestObjectShorthandJSDocDetection covers the JSDoc `@type` detection for
 // both the Identifier-key and StringLiteral-key branches. ESLint uses two
 // subtly different predicates:
