@@ -72,6 +72,20 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-go-windows
+
+      - name: Relocate Go build cache & temp to runner work disk
+        shell: pwsh
+        run: |
+          $base = 'C:\Users\ContainerAdministrator\runner\_work'
+          $goCache = Join-Path $base 'go\cache'
+          $temp    = Join-Path $base 'temp'
+          New-Item -ItemType Directory -Force -Path $goCache, $temp | Out-Null
+
+          "GOCACHE=$goCache" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "TEMP=$temp"       | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "TMP=$temp"        | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          "GOTMPDIR=$temp"   | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+
       - name: Unit Test
         shell: pwsh
         run: |
