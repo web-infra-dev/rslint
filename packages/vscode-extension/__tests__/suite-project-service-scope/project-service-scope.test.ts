@@ -10,10 +10,14 @@ import path from 'node:path';
 // configs' files.
 //
 // Fixture: fixtures-project-service-scope
-//   - rslint.config.js            — parserOptions.projectService: true (no explicit project)
+//   - rslint.config.js            — parserOptions.projectService: true (no explicit project).
+//                                    Also enables `no-console` as a non-type-aware marker
+//                                    rule so the negative test case can wait for rslint to
+//                                    finish linting a file without a fixed-duration sleep.
 //   - tsconfig.json               — include: ["src"]
 //   - src/covered.ts              — IN tsconfig: no-unused-vars SHOULD fire
-//   - test/skills.test.ts         — NOT IN tsconfig: no-unused-vars should NOT fire
+//   - test/skills.test.ts         — NOT IN tsconfig: no-unused-vars should NOT fire.
+//                                    Contains a `console.log` so the marker rule triggers.
 //   - template-nested/rslint.config.js — nested config, also projectService: true,
 //                                    but the dir has NO tsconfig.json.
 //   - template-nested/orphan.ts   — under the nested config. Both CLI and LSP
@@ -85,14 +89,19 @@ suite('rslint projectService type-aware scope', function () {
     );
     await vscode.window.showTextDocument(doc);
 
-    // Give the server time to publish diagnostics. Waiting for a specific
-    // predicate is unreliable here because the correct outcome is "no rslint
-    // diagnostics" — we instead wait a bounded amount of time.
-    await new Promise((r) => setTimeout(r, 5000));
-    const rslintDiags = rslintDiagnostics(
-      vscode.languages.getDiagnostics(doc.uri),
+    // Wait for `no-console` (non-type-aware, must fire on the fixture's
+    // console.log) — its presence proves rslint has finalized this file's
+    // diagnostics, so the negative assertion below can run synchronously
+    // instead of waiting on a fixed-duration sleep.
+    const diagnostics = await waitForDiagnostics(doc, (diags) =>
+      rslintDiagnostics(diags).some((d) => d.message.includes('no-console')),
     );
 
+    const rslintDiags = rslintDiagnostics(diagnostics);
+    assert.ok(
+      rslintDiags.some((d) => d.message.includes('no-console')),
+      `Expected no-console marker to appear on test/skills.test.ts. Got: ${rslintDiags.map((d) => d.message).join(' | ')}`,
+    );
     assert.ok(
       !rslintDiags.some((d) => d.message.includes('no-unused-vars')),
       `no-unused-vars should NOT fire on a file outside tsconfig.include. Got: ${rslintDiags.map((d) => d.message).join(' | ')}`,

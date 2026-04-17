@@ -13,6 +13,10 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-unused-vars': 'error',
+      // Non-type-aware marker rule. The suite relies on its diagnostic as a
+      // "rslint has finished linting this file" signal, so the negative
+      // assertion does not need a fixed-duration sleep.
+      'no-console': 'error',
     },
   },
 ];
