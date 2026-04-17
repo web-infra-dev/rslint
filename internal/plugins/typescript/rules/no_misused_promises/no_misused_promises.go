@@ -1,6 +1,7 @@
 package no_misused_promises
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -66,18 +67,56 @@ func buildVoidReturnVariableMessage() rule.RuleMessage {
 }
 
 type NoMisusedPromisesChecksVoidReturnOptions struct {
-	Arguments        *bool
-	Attributes       *bool
-	InheritedMethods *bool
-	Properties       *bool
-	Returns          *bool
-	Variables        *bool
+	Arguments        *bool `json:"arguments,omitempty"`
+	Attributes       *bool `json:"attributes,omitempty"`
+	InheritedMethods *bool `json:"inheritedMethods,omitempty"`
+	Properties       *bool `json:"properties,omitempty"`
+	Returns          *bool `json:"returns,omitempty"`
+	Variables        *bool `json:"variables,omitempty"`
 }
 type NoMisusedPromisesOptions struct {
-	ChecksConditionals   *bool
-	ChecksSpreads        *bool
-	ChecksVoidReturn     *bool
-	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions
+	ChecksConditionals   *bool                                     `json:"checksConditionals,omitempty"`
+	ChecksSpreads        *bool                                     `json:"checksSpreads,omitempty"`
+	ChecksVoidReturn     *bool                                     `json:"-"`
+	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions `json:"-"`
+}
+
+// rawNoMisusedPromisesOptions mirrors the JSON shape (where checksVoidReturn
+// can be `boolean | object`) so we can unmarshal it without needing a custom
+// schema in TypeScript.
+type rawNoMisusedPromisesOptions struct {
+	ChecksConditionals *bool           `json:"checksConditionals,omitempty"`
+	ChecksSpreads      *bool           `json:"checksSpreads,omitempty"`
+	ChecksVoidReturn   json.RawMessage `json:"checksVoidReturn,omitempty"`
+}
+
+func (o *NoMisusedPromisesOptions) UnmarshalJSON(data []byte) error {
+	var raw rawNoMisusedPromisesOptions
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	o.ChecksConditionals = raw.ChecksConditionals
+	o.ChecksSpreads = raw.ChecksSpreads
+
+	if len(raw.ChecksVoidReturn) == 0 {
+		return nil
+	}
+
+	// `checksVoidReturn` may be either a boolean (enable/disable all sub-checks)
+	// or an object overriding individual sub-checks.
+	var asBool bool
+	if err := json.Unmarshal(raw.ChecksVoidReturn, &asBool); err == nil {
+		o.ChecksVoidReturn = utils.Ref(asBool)
+		return nil
+	}
+
+	var sub NoMisusedPromisesChecksVoidReturnOptions
+	if err := json.Unmarshal(raw.ChecksVoidReturn, &sub); err != nil {
+		return err
+	}
+	o.ChecksVoidReturn = utils.Ref(true)
+	o.ChecksVoidReturnOpts = &sub
+	return nil
 }
 
 var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
@@ -87,6 +126,16 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 		opts, ok := options.(NoMisusedPromisesOptions)
 		if !ok {
 			opts = NoMisusedPromisesOptions{}
+			// Options coming from JS configs / the test runner arrive as
+			// `[]interface{}` whose first element is the actual option object.
+			// Round-trip through JSON to populate the typed struct (matches the
+			// pattern used by other ported rules; malformed input falls back to
+			// defaults — global config-shape validation is a project-level concern).
+			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+				if optsJSON, err := json.Marshal(optsMap); err == nil {
+					_ = json.Unmarshal(optsJSON, &opts)
+				}
+			}
 		}
 		if opts.ChecksConditionals == nil {
 			opts.ChecksConditionals = utils.Ref(true)
@@ -143,6 +192,14 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			}
 
 			expr := parent.AsCallExpression()
+			// Original selector matches `CallExpression > MemberExpression.callee`,
+			// so only fire when the access expression IS the callee. Without this
+			// guard, the listener also fires for member-access arguments and would
+			// double-report on the callback.
+			if expr.Expression != node {
+				return
+			}
+
 			arguments := expr.Arguments.Nodes
 			if len(arguments) == 0 {
 				return
@@ -259,14 +316,14 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			t *checker.Type,
 			memberName string,
 		) *ast.Symbol {
-			// TODO(port)
-			// const escapedMemberName = ts.escapeLeadingUnderscores(memberName);
+			// tsgo's SymbolTable uses raw member names (internal symbols are
+			// distinguished by an invalid-UTF8 prefix), so unlike upstream
+			// typescript-eslint we don't need an escapeLeadingUnderscores step.
 			symbol := checker.Type_symbol(t)
 			if symbol != nil {
-				symbol = symbol.Members[memberName]
-			}
-			if symbol != nil {
-				return symbol
+				if member, ok := symbol.Members[memberName]; ok {
+					return member
+				}
 			}
 
 			return checker.Checker_getPropertyOfType(ctx.TypeChecker, t, memberName)
@@ -469,9 +526,32 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 			return voidReturnIndices
 		}
 
+		// isPromiseFinallyMethod mirrors typescript-eslint's `parseFinallyCall`
+		// gate: skip `<Promise>.finally(callback)` call sites because returning
+		// a Promise from a `finally` handler is a legitimate pattern.
+		isPromiseFinallyMethod := func(node *ast.Node) bool {
+			if !ast.IsCallExpression(node) {
+				return false
+			}
+			callee := node.AsCallExpression().Expression
+			if !ast.IsAccessExpression(callee) {
+				return false
+			}
+			methodName, ok := checker.Checker_getAccessedPropertyName(ctx.TypeChecker, callee)
+			if !ok || methodName != "finally" {
+				return false
+			}
+			objectType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, callee.Expression())
+			return utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, objectType)
+		}
+
 		checkArguments := func(
 			node *ast.Expression,
 		) {
+			if isPromiseFinallyMethod(node) {
+				return
+			}
+
 			voidArgs := voidFunctionArguments(node)
 			if len(voidArgs) == 0 {
 				return
@@ -543,9 +623,8 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 						if returnType != nil {
 							ctx.ReportNode(returnType, buildVoidReturnPropertyMessage())
 						} else {
-							ctx.ReportNode(
-								// TODO(port): getFunctionHeadLoc(functionNode, context.sourceCode)
-								property.Initializer,
+							ctx.ReportRange(
+								utils.GetFunctionHeadLoc(ctx.SourceFile, property.Initializer),
 								buildVoidReturnPropertyMessage(),
 							)
 						}
@@ -583,7 +662,19 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				if objType == nil {
 					return
 				}
-				propertySymbol := checker.Checker_getPropertyOfType(ctx.TypeChecker, objType, node.Name().Text())
+				// Mirror upstream's `unionConstituents(objType).map(...).find(p => p)`:
+				// for object literals assigned to `T | undefined` (or any union),
+				// the member must be looked up on each constituent individually
+				// because TS's getPropertyOfType on the union returns nothing when
+				// the property is missing from any branch.
+				memberName := node.Name().Text()
+				var propertySymbol *ast.Symbol
+				for _, part := range utils.UnionTypeParts(objType) {
+					if sym := checker.Checker_getPropertyOfType(ctx.TypeChecker, part, memberName); sym != nil {
+						propertySymbol = sym
+						break
+					}
+				}
 				if propertySymbol == nil {
 					return
 				}
@@ -594,17 +685,11 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				)
 
 				if isVoidReturningFunctionType(node.Name(), contextualType) {
-					//nolint:staticcheck // FIXME: todo
-					if ast.IsMethodDeclaration(node) {
-
-					}
-
 					if node.Type() != nil {
 						ctx.ReportNode(node.Type(), buildVoidReturnPropertyMessage())
 					} else {
-						ctx.ReportNode(
-							// TODO(port): getFunctionHeadLoc(functionNode, context.sourceCode)
-							node,
+						ctx.ReportRange(
+							utils.GetFunctionHeadLoc(ctx.SourceFile, node),
 							buildVoidReturnPropertyMessage(),
 						)
 					}
@@ -685,11 +770,12 @@ var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 				for current != nil && !ast.IsFunctionLike(current) {
 					current = current.Parent
 				}
-				if current == nil {
-					panic("missing parent function")
-				}
 				return current
 			})()
+
+			if functionNode == nil {
+				return
+			}
 
 			if functionNode.Type() != nil && !isPossiblyFunctionType(functionNode.Type()) {
 				return
