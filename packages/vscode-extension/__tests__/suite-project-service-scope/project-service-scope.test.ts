@@ -27,16 +27,15 @@ suite('rslint projectService type-aware scope', function () {
       const current = vscode.languages.getDiagnostics(doc.uri);
       if (predicate(current)) return current;
       await new Promise((resolve) => {
+        let timer: ReturnType<typeof setTimeout>;
         const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
+          if (e.uris.some((uri) => uri.toString() === doc.uri.toString())) {
+            clearTimeout(timer);
+            disposable.dispose();
+            resolve(void 0);
           }
         });
-        setTimeout(() => {
+        timer = setTimeout(() => {
           disposable.dispose();
           resolve(void 0);
         }, 1500);
