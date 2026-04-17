@@ -268,33 +268,28 @@ func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) []str
 // rebuildTsConfigPaths resolves parserOptions.project from the current config.
 // Called when a tsconfig or rslint config changes so that type-aware rule
 // filtering stays in sync.
+//
+// For JS/TS configs we resolve per-config directory into tsConfigPathsByConfig.
+// A config whose parserOptions.project is empty and has no auto-detected
+// tsconfig resolves to nil — this disables type-aware-rule filtering only for
+// files governed by that config, not globally across the workspace. A nested
+// template / fixture config without a tsconfig must not relax filtering for
+// other configs' files.
 func (s *Server) rebuildTsConfigPaths() {
 	if len(s.jsConfigs) > 0 {
-		var merged []string
-		seen := make(map[string]struct{})
+		byConfig := make(map[string][]string, len(s.jsConfigs))
 		for dir, entries := range s.jsConfigs {
 			configDir := uriToPath(lsproto.DocumentUri(dir))
-			paths := s.resolveTsConfigPaths(entries, configDir)
-			if paths == nil {
-				// At least one config has no parserOptions.project and no
-				// auto-detected tsconfig. Cannot determine which files should
-				// have type-aware rules without per-file config resolution.
-				// Disable filtering entirely (conservative: allow all).
-				s.tsConfigPaths = nil
-				return
-			}
-			for _, p := range paths {
-				if _, ok := seen[p]; !ok {
-					seen[p] = struct{}{}
-					merged = append(merged, p)
-				}
-			}
+			byConfig[dir] = s.resolveTsConfigPaths(entries, configDir)
 		}
-		s.tsConfigPaths = merged
+		s.tsConfigPathsByConfig = byConfig
+		s.tsConfigPaths = nil
 	} else if s.rslintConfigPath != "" {
 		s.tsConfigPaths = s.resolveTsConfigPaths(s.jsonConfig, s.cwd)
+		s.tsConfigPathsByConfig = nil
 	} else {
 		s.tsConfigPaths = nil
+		s.tsConfigPathsByConfig = nil
 	}
 }
 
@@ -524,6 +519,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	}
 
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	tsConfigPaths := s.tsConfigPathsForURI(uri)
 	originalContent := s.documents[uri]
 	currentContent := originalContent
 
@@ -536,7 +532,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 			})
 		}
 
-		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, s.tsConfigPaths, s.fs)
+		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
 		if err != nil {
 			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
 			break
@@ -926,6 +922,31 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 	return s.jsonConfig, s.cwd, false
 }
 
+// tsConfigPathsForURI returns the resolved parserOptions.project tsconfig
+// paths for the rslint config that governs the given URI. It walks parents
+// the same way getConfigForURI does so a nested config with no tsconfig
+// does not leak its "allow-all" fallback into sibling configs.
+//
+// A nil return means the governing config has no resolved tsconfig; callers
+// should treat this as "disable type-aware filtering for this file only".
+func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
+	if len(s.jsConfigs) > 0 {
+		dir := uriDirname(string(uri))
+		for {
+			if _, ok := s.jsConfigs[dir]; ok {
+				return s.tsConfigPathsByConfig[dir]
+			}
+			parent := uriDirname(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+		return nil
+	}
+	return s.tsConfigPaths
+}
+
 // uriDirname returns the parent directory of a URI string.
 // e.g. "file:///project/src/index.ts" → "file:///project/src"
 func uriDirname(uri string) string {
@@ -956,7 +977,8 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	}
 
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
-	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, s.tsConfigPaths, s.fs)
+	tsConfigPaths := s.tsConfigPathsForURI(uri)
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		return

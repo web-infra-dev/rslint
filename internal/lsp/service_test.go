@@ -1301,11 +1301,12 @@ func TestHandleConfigUpdate_RebuildsTsConfigPaths(t *testing.T) {
 	s.fs = &mockFS{files: map[string]bool{}}
 	ctx := context.Background()
 
-	// Set stale tsConfigPaths
-	s.tsConfigPaths = []string{"/old/tsconfig.json"}
+	// Set stale state
+	s.tsConfigPathsByConfig = map[string][]string{"file:///old": {"/old/tsconfig.json"}}
 
 	// Config update with no parserOptions.project and no tsconfig.json (mockFS has no files)
-	// → ResolveTsConfigPaths returns nil → rebuildTsConfigPaths clears tsConfigPaths
+	// → ResolveTsConfigPaths returns nil → per-config entry should be nil, and
+	// stale entries should be dropped.
 	err := s.handleConfigUpdate(ctx, map[string]any{
 		"configs": []any{
 			map[string]any{
@@ -1322,9 +1323,15 @@ func TestHandleConfigUpdate_RebuildsTsConfigPaths(t *testing.T) {
 		t.Fatalf("handleConfigUpdate failed: %v", err)
 	}
 
-	// tsConfigPaths should be nil (mockFS has no tsconfig.json to auto-detect)
-	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths nil after config update with no project, got %v", s.tsConfigPaths)
+	if _, stale := s.tsConfigPathsByConfig["file:///old"]; stale {
+		t.Errorf("expected stale config entry to be dropped, still present in %v", s.tsConfigPathsByConfig)
+	}
+	entry, ok := s.tsConfigPathsByConfig["file:///project"]
+	if !ok {
+		t.Fatalf("expected per-config entry for file:///project, got %v", s.tsConfigPathsByConfig)
+	}
+	if entry != nil {
+		t.Errorf("expected nil tsconfig paths for config with no project/auto-detect, got %v", entry)
 	}
 }
 
@@ -1333,7 +1340,7 @@ func TestHandleConfigUpdate_EmptyConfigs_ClearsTsConfigPaths(t *testing.T) {
 	s.fs = &mockFS{files: map[string]bool{}}
 	ctx := context.Background()
 
-	s.tsConfigPaths = []string{"/project/tsconfig.json"}
+	s.tsConfigPathsByConfig = map[string][]string{"file:///project": {"/project/tsconfig.json"}}
 
 	err := s.handleConfigUpdate(ctx, map[string]any{
 		"configs": []any{},
@@ -1342,6 +1349,9 @@ func TestHandleConfigUpdate_EmptyConfigs_ClearsTsConfigPaths(t *testing.T) {
 		t.Fatalf("handleConfigUpdate failed: %v", err)
 	}
 
+	if len(s.tsConfigPathsByConfig) != 0 {
+		t.Errorf("expected tsConfigPathsByConfig empty after clearing configs, got %v", s.tsConfigPathsByConfig)
+	}
 	if s.tsConfigPaths != nil {
 		t.Errorf("expected tsConfigPaths nil after empty config update, got %v", s.tsConfigPaths)
 	}
@@ -1349,10 +1359,11 @@ func TestHandleConfigUpdate_EmptyConfigs_ClearsTsConfigPaths(t *testing.T) {
 
 func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 	s := newTestServer()
-	s.fs = &mockFS{files: map[string]bool{}}
+	s.fs = &mockFS{files: map[string]bool{"/project-a/tsconfig.json": true}}
 
-	// Config A has project, Config B doesn't (and no tsconfig.json to auto-detect)
-	// → ResolveTsConfigPaths returns nil for B → rebuildTsConfigPaths should set nil (allow all)
+	// Config A has a project that resolves; Config B has neither a project
+	// nor an auto-detectable tsconfig. The two must be tracked independently
+	// so B's missing tsconfig does not disable filtering for A's files.
 	s.jsConfigs = map[string]config.RslintConfig{
 		"file:///project-a": {
 			{
@@ -1372,9 +1383,15 @@ func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
 
 	s.rebuildTsConfigPaths()
 
-	// Should be nil because config B has no project and no auto-detected tsconfig
+	entryA := s.tsConfigPathsByConfig["file:///project-a"]
+	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
+		t.Errorf("expected project-a to resolve to its tsconfig, got %v", entryA)
+	}
+	if entry, ok := s.tsConfigPathsByConfig["file:///project-b"]; !ok || entry != nil {
+		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
+	}
 	if s.tsConfigPaths != nil {
-		t.Errorf("expected tsConfigPaths nil for mixed configs (some without project), got %v", s.tsConfigPaths)
+		t.Errorf("expected legacy tsConfigPaths nil in JS-config mode, got %v", s.tsConfigPaths)
 	}
 }
 
@@ -1408,22 +1425,57 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 
 	s.rebuildTsConfigPaths()
 
-	if s.tsConfigPaths == nil {
-		t.Fatal("expected tsConfigPaths non-nil when all configs have project")
+	entryA := s.tsConfigPathsByConfig["file:///project-a"]
+	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
+		t.Errorf("expected project-a → /project-a/tsconfig.json, got %v", entryA)
 	}
-	if len(s.tsConfigPaths) != 2 {
-		t.Fatalf("expected 2 tsconfig paths, got %d: %v", len(s.tsConfigPaths), s.tsConfigPaths)
+	entryB := s.tsConfigPathsByConfig["file:///project-b"]
+	if len(entryB) != 1 || entryB[0] != "/project-b/tsconfig.json" {
+		t.Errorf("expected project-b → /project-b/tsconfig.json, got %v", entryB)
 	}
-	// Verify actual paths contain the expected tsconfig locations
-	pathSet := make(map[string]bool)
-	for _, p := range s.tsConfigPaths {
-		pathSet[p] = true
+}
+
+// Regression test: a nested config without any resolvable tsconfig must not
+// cascade its "allow-all" fallback onto files under OTHER configs.
+// See https://github.com/web-infra-dev/rslint/issues/671 — the create-rstack
+// workspace ships a `template-rslint/` starter directory with its own
+// rslint.config.ts but no tsconfig.json, which used to flip the whole
+// workspace into allow-all and incorrectly run type-aware rules on files
+// under the root config.
+func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
+
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///project": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+		"file:///project/template-rslint": {
+			{
+				Rules: config.Rules{"no-console": "error"},
+			},
+		},
 	}
-	if !pathSet["/project-a/tsconfig.json"] {
-		t.Errorf("expected /project-a/tsconfig.json in paths, got %v", s.tsConfigPaths)
+
+	s.rebuildTsConfigPaths()
+
+	// File under root config → root's resolved tsconfig.
+	rootPaths := s.tsConfigPathsForURI("file:///project/test/skills.test.ts")
+	if len(rootPaths) != 1 || rootPaths[0] != "/project/tsconfig.json" {
+		t.Errorf("expected root-config file to see [/project/tsconfig.json], got %v", rootPaths)
 	}
-	if !pathSet["/project-b/tsconfig.json"] {
-		t.Errorf("expected /project-b/tsconfig.json in paths, got %v", s.tsConfigPaths)
+
+	// File under nested template config → nil (allow-all) but scoped to this
+	// config only; the root config's list above must remain unaffected.
+	nestedPaths := s.tsConfigPathsForURI("file:///project/template-rslint/foo.ts")
+	if nestedPaths != nil {
+		t.Errorf("expected nested-config file to see nil tsconfig paths (allow-all), got %v", nestedPaths)
 	}
 }
 
