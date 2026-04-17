@@ -52,28 +52,51 @@ x += y;
 
 ## Options
 
-This rule supports the following options:
+This rule accepts a single object option with the following properties:
 
-- `allow` (`string[]`): Allows a list of bitwise operators to be used as exceptions.
-- `int32Hint` (`boolean`): Allows the use of bitwise OR in `|0` pattern for type casting.
+### `allow`
 
-### allow
+- Type: `string[]` (subset of `"|"`, `"&"`, `"^"`, `"<<"`, `">>"`, `">>>"`, `"|="`, `"&="`, `"^="`, `"<<="`, `">>="`, `">>>="`, `"~"`)
+- Default: `[]`
 
-Examples of **correct** code for this rule with the `{ "allow": ["~"] }` option:
+Whitelists the listed bitwise operators as exceptions. Only operators exactly matching a string in this list are allowed; all others still report.
+
+Example configuration:
+
+```json
+{
+  "rules": {
+    "no-bitwise": ["error", { "allow": ["~"] }]
+  }
+}
+```
+
+Examples of **correct** code with the above configuration:
 
 ```javascript
-/*eslint no-bitwise: ["error", { "allow": ["~"] }] */
-
 ~[1, 2, 3].indexOf(1) === -1;
 ```
 
-### int32Hint
+### `int32Hint`
 
-Examples of **correct** code for this rule with the `{ "int32Hint": true }` option:
+- Type: `boolean`
+- Default: `false`
+
+When `true`, permits the `x | 0` idiom commonly used to coerce a number to a 32-bit integer. Only `|` with a literal `0` on the right-hand side is allowed — `0 | x`, `x & 0`, `x | 1`, `x | -0`, and `x | 0n` still report.
+
+Example configuration:
+
+```json
+{
+  "rules": {
+    "no-bitwise": ["error", { "int32Hint": true }]
+  }
+}
+```
+
+Examples of **correct** code with the above configuration:
 
 ```javascript
-/*eslint no-bitwise: ["error", { "int32Hint": true }] */
-
 var b = a | 0;
 ```
 
