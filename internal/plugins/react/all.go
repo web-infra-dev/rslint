@@ -12,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
@@ -32,6 +33,7 @@ func GetAllRules() []rule.Rule {
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
+		no_unescaped_entities.NoUnescapedEntitiesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		self_closing_comp.SelfClosingCompRule,
 		style_prop_object.StylePropObjectRule,
