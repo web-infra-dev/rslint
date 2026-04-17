@@ -806,6 +806,12 @@ func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
 			return expr.AsNoSubstitutionTemplateLiteral().Text, true
 		case ast.KindNullKeyword:
 			return "null", true
+		case ast.KindTrueKeyword:
+			return "true", true
+		case ast.KindFalseKeyword:
+			return "false", true
+		case ast.KindRegularExpressionLiteral:
+			return expr.AsRegularExpressionLiteral().Text, true
 		}
 		return "", false
 	default:
@@ -1236,4 +1242,143 @@ func VisitDestructuringIdentifiers(node *ast.Node, fn func(*ast.Node)) {
 		}
 		return false
 	})
+}
+
+// IsSpecificMemberAccess reports whether `node` is a member access of the
+// form `<objectName>.<methodName>`. Both dot (`Object.defineProperty`) and
+// bracket-with-static-string (`Object['defineProperty']`) forms are matched,
+// each transparently unwrapping parentheses (e.g. `(Object).defineProperty`)
+// and optional chaining (`Object?.defineProperty`, `Object?.['defineProperty']`).
+// Mirrors ESLint's `astUtils.isSpecificMemberAccess`.
+func IsSpecificMemberAccess(node *ast.Node, objectName, methodName string) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	var obj *ast.Node
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		pae := node.AsPropertyAccessExpression()
+		name := pae.Name()
+		if name == nil || !ast.IsIdentifier(name) || name.AsIdentifier().Text != methodName {
+			return false
+		}
+		obj = pae.Expression
+	case ast.KindElementAccessExpression:
+		eae := node.AsElementAccessExpression()
+		argText, ok := GetStaticExpressionValue(ast.SkipParentheses(eae.ArgumentExpression))
+		if !ok || argText != methodName {
+			return false
+		}
+		obj = eae.Expression
+	default:
+		return false
+	}
+	obj = ast.SkipParentheses(obj)
+	return obj != nil && ast.IsIdentifier(obj) && obj.AsIdentifier().Text == objectName
+}
+
+// AreNodesStructurallyEqual reports whether two AST subtrees have identical
+// syntactic shape and leaf values, transparently unwrapping
+// ParenthesizedExpression on both sides at every level. Useful for rules that
+// compare computed keys, duplicate case expressions, or any pattern that must
+// be evaluated at the source-syntax level rather than by semantic reference
+// identity (for which see [IsSameReference]).
+//
+// Leaf comparison:
+//   - Identifier / PrivateIdentifier: `.Text` equality.
+//   - StringLiteral / NoSubstitutionTemplateLiteral / TemplateHead / Middle /
+//     Tail / RegularExpressionLiteral: textual equality.
+//   - NumericLiteral: normalized numeric value equality (e.g. `0x10` == `16`).
+//   - BigIntLiteral: normalized bigint value equality (e.g. `0x1n` == `1n`).
+//   - All other kinds (keyword tokens, punctuation tokens, composite nodes):
+//     Kind must match, and the non-nil children visited by [ast.Node.ForEachChild]
+//     must be pairwise structurally equal in order.
+//
+// Comments and whitespace are not part of the AST and are therefore ignored
+// (so `a+b` and `a + b` compare equal). Optional chaining IS preserved
+// (`a.b` != `a?.b`). Type-only syntax (`as T`, `<T>x`, `x!`, `x satisfies T`)
+// is compared as-is — callers that want to see through it should strip it
+// first via [ast.SkipOuterExpressions] before calling this helper.
+func AreNodesStructurallyEqual(a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	a = ast.SkipParentheses(a)
+	b = ast.SkipParentheses(b)
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Kind != b.Kind {
+		return false
+	}
+	switch a.Kind {
+	case ast.KindIdentifier:
+		return a.AsIdentifier().Text == b.AsIdentifier().Text
+	case ast.KindPrivateIdentifier:
+		return a.AsPrivateIdentifier().Text == b.AsPrivateIdentifier().Text
+	case ast.KindStringLiteral:
+		return a.AsStringLiteral().Text == b.AsStringLiteral().Text
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return a.AsNoSubstitutionTemplateLiteral().Text == b.AsNoSubstitutionTemplateLiteral().Text
+	case ast.KindNumericLiteral:
+		// Note: tsgo already normalizes numeric literals at parse time
+		// (`0x1` / `1e2` / `1.0` are all stored as their decimal form).
+		// Normalize again to be explicit about the intent; two literals
+		// that differ only in source form (e.g. `0x1` vs `1`) are treated
+		// as equal here. This is slightly more forgiving than ESLint's
+		// token-level comparison, which would see them as distinct — but
+		// the raw source form is not recoverable from the tsgo AST
+		// without a *SourceFile, which we deliberately don't take.
+		return NormalizeNumericLiteral(a.AsNumericLiteral().Text) ==
+			NormalizeNumericLiteral(b.AsNumericLiteral().Text)
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(a.AsBigIntLiteral().Text) ==
+			NormalizeBigIntLiteral(b.AsBigIntLiteral().Text)
+	case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail,
+		ast.KindRegularExpressionLiteral:
+		return a.Text() == b.Text()
+	}
+	// Composite / pure-token kinds: compare children pairwise. Token kinds
+	// without children (operators, keywords) fall through the empty loop and
+	// return true, which is correct — Kind already uniquely identifies them.
+	var aKids, bKids []*ast.Node
+	a.ForEachChild(func(c *ast.Node) bool {
+		aKids = append(aKids, c)
+		return false
+	})
+	b.ForEachChild(func(c *ast.Node) bool {
+		bKids = append(bKids, c)
+		return false
+	})
+	if len(aKids) != len(bKids) {
+		return false
+	}
+	for i := range aKids {
+		if !AreNodesStructurallyEqual(aKids[i], bKids[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// IsArgumentOfSpecificCall reports whether `node` sits at argument position
+// `index` of a call to `<objectName>.<methodName>(...)` — covering optional
+// chaining and parenthesized callee expressions, e.g. `(Object?.defineProperty)(...)`.
+// This is the common shape for detecting property-descriptor arguments in
+// `Object.defineProperty` / `Reflect.defineProperty`, mutation targets in
+// `Object.assign`, and similar well-known API calls.
+func IsArgumentOfSpecificCall(node *ast.Node, index int, objectName, methodName string) bool {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindCallExpression {
+		return false
+	}
+	call := node.Parent.AsCallExpression()
+	if call.Arguments == nil {
+		return false
+	}
+	args := call.Arguments.Nodes
+	if index < 0 || index >= len(args) || args[index] != node {
+		return false
+	}
+	return IsSpecificMemberAccess(call.Expression, objectName, methodName)
 }
