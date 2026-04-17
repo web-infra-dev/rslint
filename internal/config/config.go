@@ -153,6 +153,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
+	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
@@ -583,6 +584,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-unmodified-loop-condition", no_unmodified_loop_condition.NoUnmodifiedLoopConditionRule)
 	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
 	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
+	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.

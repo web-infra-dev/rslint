@@ -161,6 +161,27 @@ func Flatten[T any](array [][]T) []T {
 	return result
 }
 
+// IsConstructorName reports whether `name` follows the ESLint constructor
+// naming convention: the first character that is not `_`, `$`, or an ASCII
+// digit is uppercase. Names consisting only of `_`, `$` and ASCII digits
+// (e.g. `_`, `$$`, `_8`) are not treated as constructors.
+//
+// Matches the `isConstructor` helper used by ESLint's `new-cap` and
+// `object-shorthand` rules, including Unicode identifier characters
+// (e.g. `Π`). ESLint's regex `/[^_$0-9]/u` pairs an ASCII-only digit range
+// with a Unicode-aware `toUpperCase()` check — we mirror that: the digit
+// prefix is strictly ASCII while the case test is `unicode.IsUpper`.
+func IsConstructorName(name string) bool {
+	for _, r := range name {
+		if r == '_' || r == '$' || (r >= '0' && r <= '9') {
+			continue
+		}
+		// First non-prefix rune: constructor iff uppercase.
+		return unicode.IsUpper(r)
+	}
+	return false
+}
+
 func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
 	modifiers := node.Modifiers()
 	if modifiers == nil {
