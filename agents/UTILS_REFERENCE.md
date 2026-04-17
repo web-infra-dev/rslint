@@ -396,6 +396,55 @@ set.Clear()
 
 ---
 
+## `shim/ast/` - AST Utilities
+
+```go
+import "github.com/microsoft/typescript-go/shim/ast"
+```
+
+Reach for these **before** writing a helper of your own — the shim already covers a wide surface. This list is curated to the functions most commonly reused when porting rules; see `shim/ast/shim.go` for the full inventory.
+
+### Navigation (paren-transparency)
+
+Use these instead of hand-rolled loops. See [AST_PATTERNS.md § ParenthesizedExpression](./AST_PATTERNS.md#parenthesizedexpression).
+
+- `ast.SkipParentheses(node)` — innermost non-paren expression
+- `ast.WalkUpParenthesizedExpressions(node)` — first non-paren ancestor
+
+### Optional chain
+
+- `ast.IsOptionalChain(node)` — true iff node is in an optional chain
+- `ast.IsOptionalChainRoot(node)` — true iff node introduces the chain
+- `ast.IsOutermostOptionalChain(node)` — true iff node is the top of its chain
+- Flag: `ast.NodeFlagsOptionalChain`
+
+### Node-kind predicates (prefer over `node.Kind == ast.Kind*`)
+
+- `ast.IsStringLiteralLike(node)` — covers `KindStringLiteral` + `KindNoSubstitutionTemplateLiteral`
+- `ast.IsTemplateLiteralKind(kind)` — any of the `KindTemplate*` family
+- `ast.IsNumericLiteral(node)`
+- `ast.IsIdentifier(node)`
+- `ast.IsCallExpression(node)`, `ast.IsNewExpression(node)`
+- `ast.IsBinaryExpression(node)` (check `OperatorToken.Kind` separately for specific operator matching)
+- `ast.IsPropertyAccessExpression(node)`, `ast.IsElementAccessExpression(node)`
+- `ast.IsAssignmentExpression(node, excludeCompoundAssignment)`
+- `ast.IsBindingPattern(node)` — object / array destructuring
+- `ast.IsClassLike(node)` — class declaration or expression
+- `ast.IsIterationStatement(node, lookInLabeledStatements)` — for/while variants
+
+### Function-like
+
+- `ast.IsFunctionLike(node)` / `ast.IsFunctionLikeDeclaration(node)` — covers all 7 function-like kinds
+- `ast.IsFunctionLikeOrClassStaticBlockDeclaration(node)`
+- `ast.GetThisContainer(node, …, …)` — **warning**: treats `PropertyDeclaration`, `ClassStaticBlockDeclaration`, `ModuleDeclaration`, etc. as `this` containers, which does NOT match ESLint's scope model; verify before reusing
+
+### Modifiers
+
+- `ast.HasSyntacticModifier(node, flags)` — bit-flag check (readonly, static, abstract, …)
+- `ast.GetCombinedModifierFlags(node)`
+
+---
+
 ## `shim/scanner/` - Scanner Utilities
 
 ```go
@@ -411,6 +460,14 @@ Skip whitespace, comments (line and block), BOM, shebang, and conflict markers t
 sourceText := ctx.SourceFile.Text()
 nextTokenPos := scanner.SkipTrivia(sourceText, startPos)
 ```
+
+### Identifier character classification
+
+Unicode-aware, matches the scanner's own lexing rules. Use these instead of hand-written `[A-Za-z_$]` checks.
+
+- `scanner.IsIdentifierStart(ch rune) bool` — valid first character of an identifier
+- `scanner.IsIdentifierPart(ch rune) bool` — valid non-first character
+- `scanner.IsValidIdentifier(s string) bool` — whole-string check (start + parts + no reserved-word collision)
 
 ### GetScannerForSourceFile
 

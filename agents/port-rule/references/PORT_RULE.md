@@ -150,6 +150,8 @@ Before starting, familiarize yourself with these key source locations:
 
 ## Phase 2: Implementation (Go)
 
+> **AST note**: rslint is built on the tsgo AST, which is structurally different from ESLint's ESTree. Child-access patterns (`node.left`, `node.argument`, `node.callee`, …) do **not** correspond 1:1: parentheses are explicit nodes, optional chains are flag-based (no `ChainExpression` wrapper), `Literal` is split across several `Kind*Literal` kinds, and `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`. Review [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials) before implementing, and run the Alignment Audit (end of Step 2) before tests.
+
 ### Step 1: Directory Setup
 
 - **Core Rules**: `internal/rules/<rule_name_snake_case>/`
@@ -255,6 +257,32 @@ func parseOptions(options any) Options {
     return opts
 }
 ```
+
+### Alignment Audit
+
+Before moving on, walk through each check. Each one targets a class of AST-shape bug that is not caught by compilation and may slip past narrowly-written unit tests. Skip a row when it doesn't apply to your rule.
+
+| If the rule …                                                                   | Audit                                                                                                                                                             | Reference                                                                                  |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Reads a child node (every rule)                                                 | Any `.Kind ==` / `.Kind !=` / `.As<Type>()` / `.Text` access on a child must go through `ast.SkipParentheses` first (directly or via a helper).                   | [AST_PATTERNS.md § ParenthesizedExpression](../../AST_PATTERNS.md#parenthesizedexpression) |
+| Handles `foo?.bar` / `foo?.()`                                                  | Use `ast.IsOptionalChain(node)`; don't hand-check node flags.                                                                                                     | [AST_PATTERNS.md § Optional Chain](../../AST_PATTERNS.md#optional-chain)                   |
+| Compares literal values                                                         | Match the precise `Kind*Literal`; normalize numeric text via `utils.NormalizeNumericLiteral` before value comparison.                                             | [AST_PATTERNS.md § Literal Kinds](../../AST_PATTERNS.md#literal-kinds)                     |
+| Has separate ESLint listeners for `AssignmentExpression` / `SequenceExpression` | Collapse into one `BinaryExpression` listener and branch on `OperatorToken.Kind`.                                                                                 | [AST_PATTERNS.md § Binary Operator Kinds](../../AST_PATTERNS.md#binary-operator-kinds)     |
+| Emits fix/suggestion text starting with an identifier                           | Guard against token fusion with the preceding character before emitting (otherwise e.g. `typeof` + `Number(foo)` becomes `typeofNumber(foo)`).                    | —                                                                                          |
+| Checks whether a name resolves to a global                                      | Use `utils.IsShadowed(node, name)`. Note: stricter than ESLint's scope manager on TS type-only bindings — document in the rule's `.md` if the difference matters. | —                                                                                          |
+| Reads source text for recommendation / fix                                      | Prefer `utils.TrimmedNodeText(sf, node)` (skips leading trivia) over raw `node.Pos()/End()`.                                                                      | [AST_PATTERNS.md § Node Text and Positions](../../AST_PATTERNS.md#node-text-and-positions) |
+
+### Helper Extraction
+
+After Step 2 is done, review each helper for extraction to `internal/utils/`:
+
+**Extract if all hold:**
+
+- Input/output is AST- or source-oriented (not encoding the rule's own semantics)
+- The name reads sensibly without context of the current rule
+- Another rule would plausibly need the same thing
+
+**Keep local otherwise.** Predicates that encode a specific rule's definition (e.g. a `isDoubleLogicalNegating`-style helper that codifies "what counts as a double-negation coercion for THIS rule") stay with the rule — extracting would mislead future readers.
 
 ### Step 3: Write Documentation
 
@@ -462,6 +490,41 @@ Follow this **strict order** — each step depends on the previous one:
    pnpm format      # Fix JS/TS formatting
    pnpm format:go   # Fix Go formatting (e.g., import order)
    ```
+
+7. **Differential Validation** (recommended for rules with non-trivial branching):
+
+   Unit tests verify cases you thought of; diffing against the reference implementation on a real codebase catches the rest. Skip when the rule has ≤ 2 branches and trivial messages, or when the rule is a new rslint invention with no reference.
+
+   **Procedure**:
+
+   ```bash
+   # 1. Scratch-install the reference tool.
+   mkdir -p /tmp/ref-cmp && cd /tmp/ref-cmp
+   npm init -y >/dev/null
+   npm i --silent eslint @typescript-eslint/parser  # + plugin if non-core
+   cat > eslint.config.mjs <<'EOF'
+   import parser from '@typescript-eslint/parser';
+   export default [{
+     files: ['**/*.ts', '**/*.tsx'],
+     languageOptions: { parser },
+     rules: { '<rule-name>': 'warn' },
+   }];
+   EOF
+
+   # 2. Pick a target codebase that exercises typical patterns.
+   # 3. Run both; normalize to sorted JSON of {file, line, col, messageId, message}; diff.
+   ```
+
+   **Prerequisite for type-info rules**: the reference tool must run with the same `parserOptions.project` / `tsconfig.json` as rslint, otherwise the comparison is meaningless. Pick a target codebase where the tsconfig loads cleanly under both tools.
+
+   **Interpreting a non-empty diff**:
+
+   | Diff kind                       | Likely cause                                           |
+   | ------------------------------- | ------------------------------------------------------ |
+   | rslint misses a report          | AST-shape mismatch (often a missing `SkipParentheses`) |
+   | rslint over-reports             | Same as above, inverted                                |
+   | Different message text          | paren / text-range handling in the recommendation      |
+   | Same count, different positions | column offset (0- vs 1-based, multibyte)               |
 
 ---
 
