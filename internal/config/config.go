@@ -132,6 +132,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_control_regex"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
@@ -539,6 +540,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-constant-binary-expression", no_constant_binary_expression.NoConstantBinaryExpressionRule)
 	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)
 	GlobalRuleRegistry.Register("no-constructor-return", no_constructor_return.NoConstructorReturnRule)
+	GlobalRuleRegistry.Register("no-control-regex", no_control_regex.NoControlRegexRule)
 	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
 	GlobalRuleRegistry.Register("no-delete-var", no_delete_var.NoDeleteVarRule)
 	GlobalRuleRegistry.Register("no-dupe-args", no_dupe_args.NoDupeArgsRule)
