@@ -160,10 +160,16 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	jsConfigs        map[string]config.RslintConfig                // configDirectory -> config entries (from JS/TS configs)
+	jsConfigs        map[string]config.RslintConfig                // configDirectory URI -> config entries (from JS/TS configs)
 	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
 	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
-	tsConfigPaths    []string                                       // resolved parserOptions.project tsconfig paths
+	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
+	// For the JSON-config path this is a single global list.
+	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
+	// which keys per-config-directory so a nested config with no tsconfig
+	// does not disable filtering for files under other configs.
+	tsConfigPaths         []string
+	tsConfigPathsByConfig map[string][]string // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
 	documents        map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
