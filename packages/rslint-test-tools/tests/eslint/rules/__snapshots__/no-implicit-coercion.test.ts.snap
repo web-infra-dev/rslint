@@ -1,0 +1,989 @@
+// Rstest Snapshot v1
+
+exports[`no-implicit-coercion > invalid 1`] = `
+{
+  "code": "!!foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Boolean(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 2`] = `
+{
+  "code": "!!(foo + bar)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Boolean(foo + bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 3`] = `
+{
+  "code": "!!(foo + bar); var Boolean = null;",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Boolean(foo + bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 4`] = `
+{
+  "code": "~foo.indexOf(1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo.indexOf(1) !== -1\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 5`] = `
+{
+  "code": "~foo.bar.indexOf(2)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo.bar.indexOf(2) !== -1\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 6`] = `
+{
+  "code": "+foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 7`] = `
+{
+  "code": "-(-foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 8`] = `
+{
+  "code": "+foo.bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 9`] = `
+{
+  "code": "1*foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 10`] = `
+{
+  "code": "foo*1",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 11`] = `
+{
+  "code": "1*foo.bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 12`] = `
+{
+  "code": "foo.bar-0",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 13`] = `
+{
+  "code": """+foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 14`] = `
+{
+  "code": "\`\`+foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 15`] = `
+{
+  "code": "foo+""",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 16`] = `
+{
+  "code": "foo+\`\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 17`] = `
+{
+  "code": """+foo.bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 18`] = `
+{
+  "code": "\`\`+foo.bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 19`] = `
+{
+  "code": "foo.bar+""",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 20`] = `
+{
+  "code": "foo.bar+\`\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo.bar)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 21`] = `
+{
+  "code": "\`\${foo}\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 22`] = `
+{
+  "code": "foo += """,
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo = String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 23`] = `
+{
+  "code": "foo += \`\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo = String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 24`] = `
+{
+  "code": "var a = !!foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Boolean(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 25`] = `
+{
+  "code": "var a = ~foo.indexOf(1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo.indexOf(1) !== -1\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 26`] = `
+{
+  "code": "var a = 1 * foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 27`] = `
+{
+  "code": "var a = +foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 28`] = `
+{
+  "code": "var a = "" + foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 29`] = `
+{
+  "code": "var a = \`\` + foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 30`] = `
+{
+  "code": "typeof+foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 31`] = `
+{
+  "code": "typeof +foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(foo)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 32`] = `
+{
+  "code": "let x ='' + 1n;",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`String(1n)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 33`] = `
+{
+  "code": "~foo?.indexOf(1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`foo?.indexOf(1) >= 0\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 34`] = `
+{
+  "code": "~(foo?.indexOf)(1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`(foo?.indexOf)(1) !== -1\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 35`] = `
+{
+  "code": "1 * a / 2",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(a)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 36`] = `
+{
+  "code": "(a * 1) / 2",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(a)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 37`] = `
+{
+  "code": "a * 1 / (b * 1)",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(b)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implicit-coercion > invalid 38`] = `
+{
+  "code": "a * 1 + 2",
+  "diagnostics": [
+    {
+      "message": "Unexpected implicit coercion encountered. Use \`Number(a)\` instead.",
+      "messageId": "implicitCoercion",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implicit-coercion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

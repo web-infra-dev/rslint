@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -286,6 +287,31 @@ func ToStringSlice(val interface{}) []string {
 		return nil
 	}
 	return result
+}
+
+// NeedsLeadingSpaceForReplacement reports whether inserting `replacement`
+// at `insertPos` in `src` would merge with the preceding character into a
+// single identifier token. Callers use this when synthesizing a fix whose
+// text starts with an identifier (e.g. `Boolean(foo)`, `Number(foo)`,
+// `String(foo)`) to decide whether a leading space is required.
+//
+// Mirrors the identifier/keyword case of ESLint's `canTokensBeAdjacent`:
+// `typeof+foo` replaced with `Number(foo)` would otherwise become
+// `typeofNumber(foo)` (a single identifier). Multi-byte identifier chars
+// are handled via `scanner.IsIdentifierPart` / `scanner.IsIdentifierStart`.
+func NeedsLeadingSpaceForReplacement(src string, insertPos int, replacement string) bool {
+	if insertPos <= 0 || insertPos > len(src) || replacement == "" {
+		return false
+	}
+	firstRune, _ := utf8.DecodeRuneInString(replacement)
+	if firstRune == utf8.RuneError || !scanner.IsIdentifierStart(firstRune) {
+		return false
+	}
+	prevRune, _ := utf8.DecodeLastRuneInString(src[:insertPos])
+	if prevRune == utf8.RuneError {
+		return false
+	}
+	return scanner.IsIdentifierPart(prevRune)
 }
 
 // NaturalCompare compares two strings using natural sort order,
