@@ -157,6 +157,41 @@ function foo(): Set<number> {
         }
       }
     `},
+		{Code: `
+      function foo(): readonly [1, 2] {
+        return [1, 2] as const;
+      }
+    `},
+		{Code: `
+      function foo(): unknown {
+        return 1 as unknown;
+      }
+    `},
+		{Code: `
+      function foo(this: { n: number }) {
+        return this;
+      }
+    `},
+		{Code: `
+      function foo(): void {
+        return undefined;
+      }
+    `},
+		{Code: `
+      type AsArray<T> = T extends any[] ? T : [T];
+      interface Hook<T> {
+        call(data: AsArray<T>[0]): AsArray<T>[0];
+      }
+      declare function getHooks<T>(): Hook<T>[];
+      function reduceHooks<T>(
+        data: AsArray<T>[0],
+        fn: (hook: Hook<T>, data: AsArray<T>[0]) => AsArray<T>[0],
+      ): AsArray<T>[0] {
+        return getHooks<T>().reduce((d, hook) => {
+          return fn(hook, d);
+        }, data);
+      }
+    `},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
@@ -600,6 +635,200 @@ async function foo() {
 					Line:      8,
 					Column:    3,
 				},
+			},
+		},
+		{
+			Code: `
+class Foo {
+  bar() {
+    return 1 as any;
+  }
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 5},
+			},
+		},
+		{
+			Code: `
+class Foo {
+  bar(): string {
+    return 1 as any;
+  }
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 5},
+			},
+		},
+		{
+			Code: `
+class Foo {
+  get val() {
+    return 1 as any;
+  }
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 5},
+			},
+		},
+		{
+			Code: `
+function* gen() {
+  return 1 as any;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 3, Column: 3},
+			},
+		},
+		{
+			Code: `
+async function* gen() {
+  return 1 as any;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 3, Column: 3},
+			},
+		},
+		{
+			Code: `
+function outer() {
+  function inner() {
+    return 1 as any;
+  }
+  return 1;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 5},
+			},
+		},
+		{
+			Code: `
+function foo(): string {
+  return 1 as unknown as any;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 3, Column: 3},
+			},
+		},
+		{
+			Code: `
+function foo(): string {
+  const x: any = 1;
+  return x satisfies any;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 3},
+			},
+		},
+		{
+			Code: `
+function foo(): string {
+  const x: any = 1;
+  return x!;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 3},
+			},
+		},
+		{
+			Code: `
+declare const cond: boolean;
+function foo(): string {
+  return cond ? (1 as any) : 'x';
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 3},
+			},
+		},
+		{
+			Code: `
+function foo(): string {
+  try {
+    return 1 as any;
+  } catch {
+    return 'x';
+  }
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 5},
+			},
+		},
+		{
+			Code: `
+function foo(n: number): string {
+  switch (n) {
+    case 1:
+      return 1 as any;
+    default:
+      return 'x';
+  }
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 5, Column: 7},
+			},
+		},
+		{
+			Code: `
+function foo(x: boolean): string {
+  if (x) return 'y';
+  return 1 as any;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 4, Column: 3},
+			},
+		},
+		{
+			Code: `
+class Foo {
+  make: () => Set<string> = () => new Set<any>();
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturnAssignment", Line: 3, Column: 35},
+			},
+		},
+		{
+			Code: `
+const f: () => Promise<number> = async () => 1 as any;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 2, Column: 46},
+			},
+		},
+		{
+			Code: `
+const obj = {
+  foo() {
+    return this;
+  },
+};
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturnThis", Line: 4, Column: 5},
+			},
+		},
+		{
+			Code: `
+function overload(x: number): number;
+function overload(x: string): string;
+function overload(x: any): any {
+  return x;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeReturn", Line: 5, Column: 3},
 			},
 		},
 	})
