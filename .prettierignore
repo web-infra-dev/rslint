@@ -20,7 +20,7 @@ npm/tsgo/**/lib/
 binaries/
 target/
 internal/plugins/**/rules/**/*.md
-internal/rules/max_lines/max_lines.md
+internal/rules/**/*.md
 website/docs/en/rules/_meta.json
 website/docs/en/rules/*/
 packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/
