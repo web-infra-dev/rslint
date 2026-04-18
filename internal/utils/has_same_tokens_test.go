@@ -94,14 +94,21 @@ func TestHasSameTokens(t *testing.T) {
 		{"template head differ", "`a${x}b` === `c${x}d`", false},
 		{"template expr differ", "`a${x}b` === `a${y}b`", false},
 
-		// ---- Parentheses on the operand are transparent ----
-		// ESLint: ESTree doesn't model parens as nodes, so getTokens(node.left)
-		// on `(x)` returns tokens inside the Identifier `x`'s own range — just
-		// `[x]`. rslint: SkipParentheses in HasSameTokens drops the parens
-		// before comparison. Both flag `(x) === x`.
-		{"paren left, bare right", `(x) === x`, true},
-		{"paren both sides", `(x) === (x)`, true},
-		{"nested parens", `((x)) === x`, true},
+		// ---- Parentheses ----
+		// OUTER parens (wrapping a top-level operand) are transparent: they
+		// match ESLint/ESTree where `(x)` as an operand has range == the
+		// Identifier's own range, so getTokens sees just `[x]`. HasSameTokens
+		// applies SkipParentheses once at entry to replicate this.
+		{"paren outer left", `(x) === x`, true},
+		{"paren outer both", `(x) === (x)`, true},
+		{"nested outer parens", `((x)) === x`, true},
+		// INNER parens (inside a compound expression) are VISIBLE tokens in
+		// ESLint's view — `(x).y` has range including `(` and `)`, so tokens
+		// `[(, x, ), ., y]` differ from `x.y`'s `[x, ., y]`. The recursion
+		// does NOT re-strip parens, so these correctly differ here too.
+		{"inner paren vs bare", `(x).y === x.y`, false},
+		{"inner paren both sides", `(x).y === (x).y`, true},
+		{"deep inner paren differ", `a((x)).b === a(x).b`, false},
 
 		// ---- Unary / type-only syntax ----
 		{"unary vs bare", `+x === x`, false},
@@ -128,9 +135,21 @@ func TestHasSameTokens(t *testing.T) {
 		{"prefix bitwise vs logical not", `~x === !x`, false},
 
 		// ---- MetaProperty (new.target / import.meta) ----
-		// KeywordToken is a Kind field, not a child — name already
-		// distinguishes them in practice, but the keyword check is principled.
+		// KeywordToken is a Kind field, not a child — the general gap scan
+		// catches the `new` / `import` keyword in the prefix gap.
 		{"new.target equal", `new.target === new.target`, true},
+
+		// ---- Trailing commas / optional empty-arg parens ----
+		// These all have identical AST children but differ in the trivia
+		// tokens that live in the gaps (commas, parens). The general gap
+		// scan catches them; a naive children-only compare would not.
+		{"new without vs with parens", `new foo === new foo()`, false},
+		{"new with vs without parens", `new foo() === new foo`, false},
+		{"trailing comma left", `foo(a,) === foo(a)`, false},
+		{"trailing comma right", `foo(a) === foo(a,)`, false},
+		{"trailing comma both", `foo(a,) === foo(a,)`, true},
+		{"array trailing comma", `[a,] === [a]`, false},
+		{"array trailing comma both", `[a,] === [a,]`, true},
 
 		// ---- Regex ----
 		{"regex equal", `/a/ === /a/`, true},

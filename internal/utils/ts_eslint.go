@@ -1393,23 +1393,33 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 // Implementation: we recurse on the AST using [ast.SkipParentheses] and
 // [ast.Node.ForEachChild]. At leaf nodes (no children — identifiers,
 // literals, keyword tokens) we compare the raw source slice via
-// [scanner.GetSourceTextOfNodeFromSourceFile]. Whitespace and comments
-// between tokens live only in composite-node source ranges and are never
-// part of any leaf's text, so the comparison is whitespace-insensitive in
-// the same way ESLint's `getTokens` is.
+// [scanner.GetSourceTextOfNodeFromSourceFile]. For composite nodes we
+// recurse on children pairwise AND scan the "gaps" between children
+// (and before/after the first/last child) with [scanner.Scanner] to pick
+// up punctuation, keyword tokens, and operators that tsgo's ForEachChild
+// does not visit — `(` `)` `,` `.` between children of a CallExpression,
+// the `+`/`-` operator of a PrefixUnaryExpression, the `new`/`import`
+// keyword of a MetaProperty, and so on. Whitespace and comments in a
+// gap are trivia (scanner skips them), so the comparison is
+// whitespace-insensitive exactly like ESLint's `getTokens`.
 //
-// A raw-scanner implementation (walking [scanner.Scanner.Scan] over each
-// node's source span) would be closer to ESLint mechanically but cannot
-// re-scan template-literal middles/tails without parser context
-// (`ReScanTemplateToken` is not exposed in the shim). The AST-recursion
-// route sidesteps that limitation while preserving the key property: raw
-// source at every leaf.
+// Parens: stripped once at the top level (matches ESLint / ESTree, where
+// outer parens wrapping an operand aren't nodes and their tokens fall
+// outside the operand's range). Parens INSIDE a compound expression —
+// e.g. `(x).y` — ARE visible tokens in ESLint's view, and preserved here
+// by the recursion not calling SkipParentheses again.
+//
+// Templates: TemplateExpression / TemplateSpan children already cover
+// the whole template source range contiguously, so the gap between any
+// two children inside a template is empty. This means gap scanning never
+// enters template-expression context and thus never needs the scanner's
+// `ReScanTemplateToken` (which isn't exposed through the shim).
 //
 // Use this helper when porting an ESLint rule whose oracle is token-level
 // equality (e.g. `no-self-compare`'s `hasSameTokens`); use
 // [AreNodesStructurallyEqual] when the rule's oracle is structural AST
-// equality and literal-form differences should NOT matter (e.g. duplicate
-// case detection).
+// equality and literal-form / trivia differences should NOT matter (e.g.
+// duplicate case detection).
 func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return a == b
@@ -1419,23 +1429,17 @@ func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
+	return hasSameTokensInner(sourceFile, a, b)
+}
+
+// hasSameTokensInner is the recursive core of [HasSameTokens]. It does
+// NOT call SkipParentheses — parens nested inside a compound expression
+// are visible tokens in ESLint's per-node getTokens view (e.g. `(x).y`
+// has tokens `[(, x, ), ., y]`), so a recursive paren strip would
+// collapse them incorrectly.
+func hasSameTokensInner(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a.Kind != b.Kind {
 		return false
-	}
-	// tsgo's ForEachChild does not visit operator/keyword fields that are
-	// stored as Kind enums rather than *Node children. Left to the generic
-	// recursion below, `+x` and `-x` would collapse (both PrefixUnary, same
-	// single Operand child). Compare those fields explicitly here.
-	switch a.Kind {
-	case ast.KindPrefixUnaryExpression:
-		ap, bp := a.AsPrefixUnaryExpression(), b.AsPrefixUnaryExpression()
-		return ap.Operator == bp.Operator && HasSameTokens(sourceFile, ap.Operand, bp.Operand)
-	case ast.KindPostfixUnaryExpression:
-		ap, bp := a.AsPostfixUnaryExpression(), b.AsPostfixUnaryExpression()
-		return ap.Operator == bp.Operator && HasSameTokens(sourceFile, ap.Operand, bp.Operand)
-	case ast.KindMetaProperty:
-		am, bm := a.AsMetaProperty(), b.AsMetaProperty()
-		return am.KeywordToken == bm.KeywordToken && HasSameTokens(sourceFile, am.Name(), bm.Name())
 	}
 	var aKids, bKids []*ast.Node
 	a.ForEachChild(func(c *ast.Node) bool {
@@ -1455,11 +1459,81 @@ func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 		return false
 	}
 	for i := range aKids {
-		if !HasSameTokens(sourceFile, aKids[i], bKids[i]) {
+		if !hasSameTokensInner(sourceFile, aKids[i], bKids[i]) {
 			return false
 		}
 	}
-	return true
+	return sameGapTokens(sourceFile, a, aKids, b, bKids)
+}
+
+// sameGapTokens compares the token streams lying BETWEEN the children
+// of two composite nodes (plus the prefix gap before the first child
+// and the suffix gap after the last child). Those gaps hold operators,
+// punctuation, and keywords that ForEachChild does not yield as nodes.
+// Callers must have already verified len(aKids) == len(bKids).
+func sameGapTokens(sourceFile *ast.SourceFile, a *ast.Node, aKids []*ast.Node, b *ast.Node, bKids []*ast.Node) bool {
+	prevA, prevB := a.Pos(), b.Pos()
+	for i := range aKids {
+		if !sameTokensInRange(sourceFile, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
+			return false
+		}
+		prevA, prevB = aKids[i].End(), bKids[i].End()
+	}
+	return sameTokensInRange(sourceFile, prevA, a.End(), prevB, b.End())
+}
+
+// sameTokensInRange reports whether scanning [aStart, aEnd) and
+// [bStart, bEnd) produces the same sequence of (kind, raw text) pairs.
+// Trivia (whitespace, comments) is skipped by the scanner, matching
+// ESLint's `getTokens` which excludes comments by default.
+func sameTokensInRange(sourceFile *ast.SourceFile, aStart, aEnd, bStart, bEnd int) bool {
+	sa := openRangeScanner(sourceFile, aStart, aEnd)
+	sb := openRangeScanner(sourceFile, bStart, bEnd)
+	for {
+		kindA, textA, okA := nextRangeToken(sa, aEnd)
+		kindB, textB, okB := nextRangeToken(sb, bEnd)
+		if !okA && !okB {
+			return true
+		}
+		if okA != okB || kindA != kindB || textA != textB {
+			return false
+		}
+	}
+}
+
+// rangeScanner pairs a scanner with its range end so nextRangeToken can
+// stop at the right place and truncate defensively against over-read.
+type rangeScanner struct {
+	s   *scanner.Scanner
+	end int
+}
+
+func openRangeScanner(sourceFile *ast.SourceFile, pos, end int) *rangeScanner {
+	if pos >= end {
+		return nil
+	}
+	return &rangeScanner{s: scanner.GetScannerForSourceFile(sourceFile, pos), end: end}
+}
+
+func nextRangeToken(rs *rangeScanner, end int) (ast.Kind, string, bool) {
+	if rs == nil || rs.s.Token() == ast.KindEndOfFile {
+		return 0, "", false
+	}
+	if rs.s.TokenStart() >= end {
+		return 0, "", false
+	}
+	// Defensive: don't accept a token that would spill past the gap end
+	// (can happen when a stray backtick inside the gap region gets
+	// scanned as a NoSubstitutionTemplateLiteral extending to the next
+	// backtick — rare in practice since template gaps are empty, but
+	// harmless to guard).
+	if rs.s.TokenEnd() > end {
+		return 0, "", false
+	}
+	kind := rs.s.Token()
+	text := rs.s.TokenText()
+	rs.s.Scan()
+	return kind, text, true
 }
 
 // IsArgumentOfSpecificCall reports whether `node` sits at argument position
