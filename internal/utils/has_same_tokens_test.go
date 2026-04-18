@@ -168,6 +168,88 @@ func TestHasSameTokens(t *testing.T) {
 	}
 }
 
+// TestHasSameTokensFullAudit is a systematic sweep of every class of
+// divergence I can think of between tsgo's AST structure and ESLint's
+// token-level view. Any regression here indicates either a newly-found
+// tsgo ForEachChild hole or a drift in the gap-scan logic.
+func TestHasSameTokensFullAudit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		code string
+		want bool
+		why  string
+	}{
+		// Operator-field holes
+		{`+x === -x`, false, "prefix unary operator"},
+		{`x++ === x--`, false, "postfix unary operator"},
+		{`++x === --x`, false, "prefix update operator"},
+		{`~x === !x`, false, "bitwise vs logical not"},
+
+		// Meta property keyword
+		{`new.target === new.target`, true, "same meta keyword"},
+
+		// Trivia that isn't an AST node
+		{`new foo === new foo()`, false, "empty parens"},
+		{`foo(a,) === foo(a)`, false, "trailing comma in args"},
+		{`[a,] === [a]`, false, "trailing comma in array"},
+
+		// Paren visibility
+		{`(x).y === x.y`, false, "inner parens visible"},
+		{`(x) === x`, true, "outer parens stripped once"},
+
+		// Optional chain flag via *Node child
+		{`a?.b === a.b`, false, "optional dot preserved"},
+		{`a?.() === a()`, false, "optional call preserved"},
+
+		// Type args
+		{`foo<T>() === foo()`, false, "type arg list differs"},
+		{`foo<T>() === foo<U>()`, false, "type arg differs"},
+		{`foo<T>() === foo<T>()`, true, "same type args"},
+
+		// Modifiers
+		{`(async () => x) === (() => x)`, false, "async modifier differs"},
+		{`(function* g() {}) === (function g() {})`, false, "generator star differs"},
+
+		// Sequence / spread
+		{`(a, b) === (b, a)`, false, "sequence order differs"},
+		{`foo(...a) === foo(a)`, false, "spread vs no spread"},
+
+		// Literal forms (tsgo normalization defeated by raw source)
+		{`0b1 === 1`, false, "binary vs decimal"},
+		{`0o7 === 7`, false, "octal vs decimal"},
+		{`1_000 === 1000`, false, "underscore separator visible"},
+		{`foo === \u0066oo`, false, "unicode escape vs plain"},
+
+		// Null / undefined
+		{`null === null`, true, "null keyword self"},
+		{`undefined === undefined`, true, "undefined identifier self"},
+		{`null === undefined`, false, "null vs undefined"},
+
+		// Regex
+		{`/a/ === /a/g`, false, "regex flags differ"},
+		{`/a/g === /a/i`, false, "regex flags differ 2"},
+
+		// String escapes
+		{`'\n' === '\n'`, true, "same escape"},
+		{"'\\n' === '\\\\n'", false, "escape differs"},
+
+		// Template
+		{"`a${x}b` === `a${y}b`", false, "template expr differs"},
+		{"`a${x}b` === `a${x}b`", true, "template equal"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.why, func(t *testing.T) {
+			t.Parallel()
+			sf, l, r := parseBinaryOperands(t, tt.code)
+			if got := HasSameTokens(sf, l, r); got != tt.want {
+				t.Errorf("%q: got %v want %v", tt.code, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestHasSameTokensNilHandling(t *testing.T) {
 	t.Parallel()
 
