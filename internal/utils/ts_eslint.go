@@ -1424,116 +1424,83 @@ func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	a = ast.SkipParentheses(a)
-	b = ast.SkipParentheses(b)
+	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b))
+}
+
+// hasSameTokens is the recursive core. It does NOT call SkipParentheses
+// on its inputs — parens nested inside a compound expression are visible
+// tokens in ESLint's per-node getTokens view (e.g. `(x).y` has tokens
+// `[(, x, ), ., y]`), so a recursive paren strip would collapse them.
+func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return a == b
 	}
-	return hasSameTokensInner(sourceFile, a, b)
-}
-
-// hasSameTokensInner is the recursive core of [HasSameTokens]. It does
-// NOT call SkipParentheses — parens nested inside a compound expression
-// are visible tokens in ESLint's per-node getTokens view (e.g. `(x).y`
-// has tokens `[(, x, ), ., y]`), so a recursive paren strip would
-// collapse them incorrectly.
-func hasSameTokensInner(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a.Kind != b.Kind {
 		return false
 	}
-	var aKids, bKids []*ast.Node
-	a.ForEachChild(func(c *ast.Node) bool {
-		aKids = append(aKids, c)
-		return false
-	})
-	b.ForEachChild(func(c *ast.Node) bool {
-		bKids = append(bKids, c)
-		return false
-	})
-	// Leaves: identifiers, literals, keyword tokens. Compare raw source.
+	aKids, bKids := collectKids(a), collectKids(b)
+	// Leaves (no children via ForEachChild): compare raw source text.
 	if len(aKids) == 0 && len(bKids) == 0 {
-		return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, a, false) ==
-			scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, b, false)
+		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
+			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
 	}
 	if len(aKids) != len(bKids) {
 		return false
 	}
-	for i := range aKids {
-		if !hasSameTokensInner(sourceFile, aKids[i], bKids[i]) {
-			return false
-		}
-	}
-	return sameGapTokens(sourceFile, a, aKids, b, bKids)
-}
-
-// sameGapTokens compares the token streams lying BETWEEN the children
-// of two composite nodes (plus the prefix gap before the first child
-// and the suffix gap after the last child). Those gaps hold operators,
-// punctuation, and keywords that ForEachChild does not yield as nodes.
-// Callers must have already verified len(aKids) == len(bKids).
-func sameGapTokens(sourceFile *ast.SourceFile, a *ast.Node, aKids []*ast.Node, b *ast.Node, bKids []*ast.Node) bool {
+	// Composite: compare children pairwise AND compare the token sequences
+	// living in the gaps between children (and the prefix / suffix gaps).
+	// Gap tokens are the operators / punctuation / keywords that
+	// ForEachChild does not yield as nodes — `(` `)` `,` `.` between call
+	// arguments, `+` / `-` for PrefixUnaryExpression, `new` / `import` for
+	// MetaProperty, and so on.
 	prevA, prevB := a.Pos(), b.Pos()
 	for i := range aKids {
-		if !sameTokensInRange(sourceFile, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
+		if !sameTokensInRange(sf, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
+			return false
+		}
+		if !hasSameTokens(sf, aKids[i], bKids[i]) {
 			return false
 		}
 		prevA, prevB = aKids[i].End(), bKids[i].End()
 	}
-	return sameTokensInRange(sourceFile, prevA, a.End(), prevB, b.End())
+	return sameTokensInRange(sf, prevA, a.End(), prevB, b.End())
+}
+
+func collectKids(n *ast.Node) []*ast.Node {
+	var out []*ast.Node
+	n.ForEachChild(func(c *ast.Node) bool { out = append(out, c); return false })
+	return out
 }
 
 // sameTokensInRange reports whether scanning [aStart, aEnd) and
 // [bStart, bEnd) produces the same sequence of (kind, raw text) pairs.
 // Trivia (whitespace, comments) is skipped by the scanner, matching
 // ESLint's `getTokens` which excludes comments by default.
-func sameTokensInRange(sourceFile *ast.SourceFile, aStart, aEnd, bStart, bEnd int) bool {
-	sa := openRangeScanner(sourceFile, aStart, aEnd)
-	sb := openRangeScanner(sourceFile, bStart, bEnd)
+func sameTokensInRange(sf *ast.SourceFile, aStart, aEnd, bStart, bEnd int) bool {
+	var sa, sb *scanner.Scanner
+	if aStart < aEnd {
+		sa = scanner.GetScannerForSourceFile(sf, aStart)
+	}
+	if bStart < bEnd {
+		sb = scanner.GetScannerForSourceFile(sf, bStart)
+	}
+	liveA := func() bool {
+		return sa != nil && sa.Token() != ast.KindEndOfFile && sa.TokenStart() < aEnd && sa.TokenEnd() <= aEnd
+	}
+	liveB := func() bool {
+		return sb != nil && sb.Token() != ast.KindEndOfFile && sb.TokenStart() < bEnd && sb.TokenEnd() <= bEnd
+	}
 	for {
-		kindA, textA, okA := nextRangeToken(sa, aEnd)
-		kindB, textB, okB := nextRangeToken(sb, bEnd)
-		if !okA && !okB {
+		la, lb := liveA(), liveB()
+		if !la && !lb {
 			return true
 		}
-		if okA != okB || kindA != kindB || textA != textB {
+		if la != lb || sa.Token() != sb.Token() || sa.TokenText() != sb.TokenText() {
 			return false
 		}
+		sa.Scan()
+		sb.Scan()
 	}
-}
-
-// rangeScanner pairs a scanner with its range end so nextRangeToken can
-// stop at the right place and truncate defensively against over-read.
-type rangeScanner struct {
-	s   *scanner.Scanner
-	end int
-}
-
-func openRangeScanner(sourceFile *ast.SourceFile, pos, end int) *rangeScanner {
-	if pos >= end {
-		return nil
-	}
-	return &rangeScanner{s: scanner.GetScannerForSourceFile(sourceFile, pos), end: end}
-}
-
-func nextRangeToken(rs *rangeScanner, end int) (ast.Kind, string, bool) {
-	if rs == nil || rs.s.Token() == ast.KindEndOfFile {
-		return 0, "", false
-	}
-	if rs.s.TokenStart() >= end {
-		return 0, "", false
-	}
-	// Defensive: don't accept a token that would spill past the gap end
-	// (can happen when a stray backtick inside the gap region gets
-	// scanned as a NoSubstitutionTemplateLiteral extending to the next
-	// backtick — rare in practice since template gaps are empty, but
-	// harmless to guard).
-	if rs.s.TokenEnd() > end {
-		return 0, "", false
-	}
-	kind := rs.s.Token()
-	text := rs.s.TokenText()
-	rs.s.Scan()
-	return kind, text, true
 }
 
 // IsArgumentOfSpecificCall reports whether `node` sits at argument position
