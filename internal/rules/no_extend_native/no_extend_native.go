@@ -1,8 +1,6 @@
 package no_extend_native
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -167,7 +165,7 @@ var NoExtendNativeRule = rule.Rule{
 							bin.Left == memberAccess {
 							ctx.ReportNode(assign, rule.RuleMessage{
 								Id:          "unexpected",
-								Description: fmt.Sprintf("%s prototype is read only, properties should not be added.", name),
+								Description: name + " prototype is read only, properties should not be added.",
 							})
 							return
 						}
@@ -186,7 +184,7 @@ var NoExtendNativeRule = rule.Rule{
 						utils.IsSpecificMemberAccess(call.Expression, "Object", "defineProperties") {
 						ctx.ReportNode(next, rule.RuleMessage{
 							Id:          "unexpected",
-							Description: fmt.Sprintf("%s prototype is read only, properties should not be added.", name),
+							Description: name + " prototype is read only, properties should not be added.",
 						})
 					}
 				}
