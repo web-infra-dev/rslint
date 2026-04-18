@@ -349,6 +349,31 @@ func TestNoReturnAssignRule(t *testing.T) {
 					{MessageId: "arrowAssignment", Line: 1, Column: 1, EndLine: 2, EndColumn: 8},
 				},
 			},
+			// ---- Multi-byte character position assertions (UTF-16 code unit counting) ----
+			// BMP-outside emoji (surrogate pair) in a string literal: 🍌 counts as
+			// 2 UTF-16 units. Catches implementations that would use rune / code-point
+			// counts instead. (Emojis are not valid identifier starts in JS.)
+			{
+				Code: "function x() {\n  return a\n    = \"🍌\";\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "returnAssignment", Line: 2, Column: 3, EndLine: 3, EndColumn: 12},
+				},
+			},
+			// BMP CJK characters as identifiers: 中 / 文 are each 1 UTF-16 unit but
+			// 3 bytes in UTF-8. Catches implementations that would use byte offsets.
+			{
+				Code: "function x() {\n  return 中\n    = 文;\n}",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "returnAssignment", Line: 2, Column: 3, EndLine: 3, EndColumn: 9},
+				},
+			},
+			// Emoji inside an arrow-body assignment (arrowAssignment path).
+			{
+				Code: "() =>\n  a = \"🍎\"",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "arrowAssignment", Line: 1, Column: 1, EndLine: 2, EndColumn: 11},
+				},
+			},
 
 			// ---- Extra: compound assignment operators (legacy kept) ----
 			{
