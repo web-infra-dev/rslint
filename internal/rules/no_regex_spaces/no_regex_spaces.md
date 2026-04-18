@@ -34,19 +34,6 @@ contains escape sequences that differ from the raw source (e.g.
 `new RegExp('\\d  ')`), the rule reports but does not autofix — the index into
 the parsed pattern would not map cleanly back to source positions.
 
-## Implementation Notes
-
-Character-class boundaries are walked via `utils.IterateRegexCharacterClasses`
-(shared with `no-misleading-character-class`), so regular classes, v-flag
-nested classes, and `\q{...}` string disjunction are all handled uniformly.
-
-Pattern syntax is validated with `regexp2` (ECMAScript mode, plus Unicode when
-`u` or `v` is set), supplemented by narrow checks for two classes of construct
-that ECMAScript u/v-mode rejects but regexp2's .NET lineage accepts: identity
-escapes on letters/digits (`\a`, `\9`) and a bare `{` that doesn't open a valid
-quantifier. Patterns that fail validation are skipped, matching ESLint's
-`regexpp.parsePattern` try/catch behavior.
-
 ## Original Documentation
 
 - ESLint rule: <https://eslint.org/docs/latest/rules/no-regex-spaces>
