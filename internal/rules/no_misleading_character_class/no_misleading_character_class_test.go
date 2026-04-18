@@ -100,6 +100,15 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			// ---- Solo emoji modifier (no base) inside a class ----
 			{Code: `var r = /[\u{1F3FB}]/u`},
 
+			// ---- RegExp(regexLiteralViaIdentifier, overrideFlags) must NOT
+			// re-analyze the regex under override flags. Matches ESLint's
+			// `getStaticValueOrRegex` which returns null for RegExp objects,
+			// so flag-stripping patterns (`/[👍]/u` safe → `new RegExp(r, "")`
+			// technically misleading at runtime) are intentionally not flagged
+			// through the constructor. The standalone literal listener still
+			// fires on misleading literals themselves.
+			{Code: `const r = /[👍]/u; new RegExp(r, "");`},
+
 			// ---- ESLint-aligned "don't resolve" cases (all valid) ----
 			// ESLint's getStaticValue does NOT resolve:
 			//   - method calls like `.repeat(n)`

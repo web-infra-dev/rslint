@@ -135,11 +135,13 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 	// TypeChecker is available. Files without type info (JS-only, no project)
 	// have TypeChecker == nil; in that case we intentionally skip the
 	// resolution path (same policy as other rules that rely on type info).
-	resolvedViaIdentifier := false
+	// Note: identifiers resolving to *regex* literals are NOT followed — this
+	// matches ESLint's `getStaticValueOrRegex`, which returns null for RegExp
+	// objects so that flag-stripping patterns (e.g. `const r = /x/u;
+	// new RegExp(r, "")`) aren't re-analyzed under override flags.
 	if patternNode.Kind == ast.KindIdentifier && ctx.TypeChecker != nil {
 		if resolved := resolveBindingInitializer(ctx, patternNode, eval); resolved != nil {
 			patternNode = resolved
-			resolvedViaIdentifier = true
 		}
 	}
 
@@ -155,24 +157,6 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 	}
 
 	rxFlags := utils.ParseRegexFlags(flags)
-
-	// Dedup only for the identifier-resolved case: when a regex literal is
-	// reached through a separate `const r = /.../`, the literal listener
-	// already fires on the var-decl initializer. If the call's override u/v
-	// state matches the literal's own, the call path produces identical
-	// diagnostics — skip it.
-	//
-	// For the INLINE case (`RegExp(/.../, flags)`) we always route through
-	// the call path here and the literal listener defers (see
-	// isRegexLiteralHandledByConstructor). This matches ESLint, which routes
-	// inline regex-literal args through its Program handler so the override
-	// flags can drive a flag-string-level autofix (`'i'` → `'iu'`).
-	if resolvedViaIdentifier && patternNode.Kind == ast.KindRegularExpressionLiteral {
-		_, litFlagsStr := utils.ExtractRegexPatternAndFlags(patternNode.Text())
-		if utils.ParseRegexFlags(litFlagsStr) == rxFlags {
-			return
-		}
-	}
 
 	var matches []foundMatch
 	var patternForUFlagCheck string
@@ -324,10 +308,18 @@ func resolveBindingInitializer(ctx rule.RuleContext, ident *ast.Node, eval *stat
 	if init == nil {
 		return nil
 	}
+	// Note: we deliberately do NOT resolve identifiers whose initializer is a
+	// regex literal. ESLint's `getStaticValueOrRegex` (from eslint-utils)
+	// explicitly returns null when `getStaticValue` yields a RegExp object —
+	// so `const r = /x/u; new RegExp(r, "")` is NOT analyzed under the
+	// override flags by ESLint. Resolving here would cause us to over-report
+	// on flag-stripping patterns (e.g., the regex literal may be safe under
+	// its own `u` but "misleading" under `""`). The standalone literal
+	// listener still fires on the var-decl initializer, which is enough to
+	// flag genuinely broken patterns.
 	switch init.Kind {
 	case ast.KindStringLiteral,
-		ast.KindNoSubstitutionTemplateLiteral,
-		ast.KindRegularExpressionLiteral:
+		ast.KindNoSubstitutionTemplateLiteral:
 		return init
 	}
 	return nil
