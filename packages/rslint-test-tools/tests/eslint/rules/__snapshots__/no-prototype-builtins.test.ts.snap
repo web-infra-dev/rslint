@@ -1,0 +1,495 @@
+// Rstest Snapshot v1
+
+exports[`no-prototype-builtins > invalid 1`] = `
+{
+  "code": "foo.hasOwnProperty('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 2`] = `
+{
+  "code": "foo.isPrototypeOf('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'isPrototypeOf' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 3`] = `
+{
+  "code": "foo.propertyIsEnumerable('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'propertyIsEnumerable' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 4`] = `
+{
+  "code": "foo.bar.hasOwnProperty('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 5`] = `
+{
+  "code": "foo.bar.baz.isPrototypeOf('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'isPrototypeOf' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 6`] = `
+{
+  "code": "foo['hasOwnProperty']('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 7`] = `
+{
+  "code": "foo[\`isPrototypeOf\`]('bar').baz",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'isPrototypeOf' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 8`] = `
+{
+  "code": "foo.bar["propertyIsEnumerable"]('baz')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'propertyIsEnumerable' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 9`] = `
+{
+  "code": "(function(Object) {return foo.hasOwnProperty('bar');})",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 10`] = `
+{
+  "code": "foo?.hasOwnProperty('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 11`] = `
+{
+  "code": "foo?.bar.hasOwnProperty('baz')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 12`] = `
+{
+  "code": "foo.hasOwnProperty?.('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 13`] = `
+{
+  "code": "foo?.hasOwnProperty('bar').baz",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 14`] = `
+{
+  "code": "foo.hasOwnProperty('bar')?.baz",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 15`] = `
+{
+  "code": "(a,b).hasOwnProperty('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 16`] = `
+{
+  "code": "(foo?.hasOwnProperty)('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 17`] = `
+{
+  "code": "(foo?.hasOwnProperty)?.('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 18`] = `
+{
+  "code": "foo?.['hasOwnProperty']('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-prototype-builtins > invalid 19`] = `
+{
+  "code": "(foo?.[\`hasOwnProperty\`])('bar')",
+  "diagnostics": [
+    {
+      "message": "Do not access Object.prototype method 'hasOwnProperty' from target object.",
+      "messageId": "prototypeBuildIn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-prototype-builtins",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
