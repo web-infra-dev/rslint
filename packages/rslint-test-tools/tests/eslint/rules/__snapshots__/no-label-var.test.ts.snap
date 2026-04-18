@@ -1,0 +1,730 @@
+// Rstest Snapshot v1
+
+exports[`no-label-var > invalid 1`] = `
+{
+  "code": "var x = foo; function bar() { x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 2`] = `
+{
+  "code": "function bar() { var x = foo; x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 3`] = `
+{
+  "code": "function bar(x) { x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 4`] = `
+{
+  "code": "function bar() { let x = 1; x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 5`] = `
+{
+  "code": "function bar() { const x = 1; x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 6`] = `
+{
+  "code": "function bar() { function x() {} x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 7`] = `
+{
+  "code": "class X {}
+X: for(;;) { break X; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 8`] = `
+{
+  "code": "function bar({ x }) { x: for(;;) { break x; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 9`] = `
+{
+  "code": "try {} catch (e) { e: for(;;) { break e; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 10`] = `
+{
+  "code": "try {} catch ({ a }) { a: for(;;) { break a; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 11`] = `
+{
+  "code": "for (let i = 0; i < 1; i++) { i: for(;;) { break i; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 12`] = `
+{
+  "code": "for (let v of arr) { v: for(;;) { break v; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 13`] = `
+{
+  "code": "for (const k in obj) { k: for(;;) { break k; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 14`] = `
+{
+  "code": "function f() { x: for(;;) { break x; } { var x = 1; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 15`] = `
+{
+  "code": "function foo() { foo: for(;;) { break foo; } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 16`] = `
+{
+  "code": "(function fee() { fee: for(;;) { break fee; } })()",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 17`] = `
+{
+  "code": "import x from 'mod'; x: for(;;) { break x; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 18`] = `
+{
+  "code": "import { x } from 'mod'; x: for(;;) { break x; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 19`] = `
+{
+  "code": "import * as x from 'mod'; x: for(;;) { break x; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 20`] = `
+{
+  "code": "import { y as x } from 'mod'; x: for(;;) { break x; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 21`] = `
+{
+  "code": "import type { X } from 'mod'; X: for(;;) { break X; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 22`] = `
+{
+  "code": "enum X { A } X: for(;;) { break X; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 23`] = `
+{
+  "code": "namespace N { export const x = 1; } N: for(;;) { break N; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 24`] = `
+{
+  "code": "var a = 1; function f() { a: for(;;) { b: for(;;) { break b; } } }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 25`] = `
+{
+  "code": "Promise: for (;;) { break Promise; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 26`] = `
+{
+  "code": "Array: for (;;) { break Array; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 27`] = `
+{
+  "code": "Math: for (;;) { break Math; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-label-var > invalid 28`] = `
+{
+  "code": "Symbol: for (;;) { break Symbol; }",
+  "diagnostics": [
+    {
+      "message": "Found identifier with same name as label.",
+      "messageId": "identifierClashWithLabel",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-label-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
