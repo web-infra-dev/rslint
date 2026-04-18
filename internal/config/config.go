@@ -144,6 +144,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extend_native"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
 	"github.com/web-infra-dev/rslint/internal/rules/no_fallthrough"
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
@@ -552,6 +553,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-eval", no_eval.NoEvalRule)
 	GlobalRuleRegistry.Register("no-ex-assign", no_ex_assign.NoExAssignRule)
+	GlobalRuleRegistry.Register("no-extend-native", no_extend_native.NoExtendNativeRule)
 	GlobalRuleRegistry.Register("no-extra-bind", no_extra_bind.NoExtraBindRule)
 	GlobalRuleRegistry.Register("no-labels", no_labels.NoLabelsRule)
 	GlobalRuleRegistry.Register("no-func-assign", no_func_assign.NoFuncAssignRule)
