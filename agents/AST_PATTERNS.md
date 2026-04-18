@@ -136,22 +136,23 @@ When porting a rule that switches on "is the argument a `ChainExpression`?", tra
 
 ESTree uses one `Literal` node carrying a typed `value`. tsgo splits the literal family across kinds, and booleans / null are keyword tokens rather than literal nodes:
 
-| Value                   | tsgo kind                              | Text accessor                                                        |
-| ----------------------- | -------------------------------------- | -------------------------------------------------------------------- |
-| Number                  | `KindNumericLiteral`                   | `node.AsNumericLiteral().Text` (raw source — may be `0x1` / `1_000`) |
-| String                  | `KindStringLiteral`                    | `node.AsStringLiteral().Text` (cooked)                               |
-| BigInt                  | `KindBigIntLiteral`                    | `node.AsBigIntLiteral().Text` (includes `n` suffix in source text)   |
-| Regex                   | `KindRegularExpressionLiteral`         | `node.Text()`                                                        |
-| `true` / `false`        | `KindTrueKeyword` / `KindFalseKeyword` | —                                                                    |
-| `null`                  | `KindNullKeyword`                      | —                                                                    |
-| `` `…` `` without `${}` | `KindNoSubstitutionTemplateLiteral`    | `node.AsNoSubstitutionTemplateLiteral().Text` (cooked)               |
-| `` `…${x}…` ``          | `KindTemplateExpression`               | `Head.Text()` + each `TemplateSpan.Literal.Text()` (all cooked)      |
+| Value                   | tsgo kind                              | Text accessor                                                                                                                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Number                  | `KindNumericLiteral`                   | `node.AsNumericLiteral().Text` is **decimal-normalized at parse time** (`0x1`, `1e2`, `1.0` are all stored as their canonical decimal string — `"1"`, `"100"`, `"1"`). If you need the raw source form (e.g. for ESLint token-level parity), use `scanner.GetSourceTextOfNodeFromSourceFile(sf, node, false)` instead. |
+| String                  | `KindStringLiteral`                    | `node.AsStringLiteral().Text` (cooked)                                                                                                                                                                                                                                                                                 |
+| BigInt                  | `KindBigIntLiteral`                    | `node.AsBigIntLiteral().Text` retains the `n` suffix. Same caveat as NumericLiteral regarding base normalization — use `scanner.GetSourceTextOfNodeFromSourceFile` for raw form.                                                                                                                                       |
+| Regex                   | `KindRegularExpressionLiteral`         | `node.Text()`                                                                                                                                                                                                                                                                                                          |
+| `true` / `false`        | `KindTrueKeyword` / `KindFalseKeyword` | —                                                                                                                                                                                                                                                                                                                      |
+| `null`                  | `KindNullKeyword`                      | —                                                                                                                                                                                                                                                                                                                      |
+| `` `…` `` without `${}` | `KindNoSubstitutionTemplateLiteral`    | `node.AsNoSubstitutionTemplateLiteral().Text` (cooked)                                                                                                                                                                                                                                                                 |
+| `` `…${x}…` ``          | `KindTemplateExpression`               | `Head.Text()` + each `TemplateSpan.Literal.Text()` (all cooked)                                                                                                                                                                                                                                                        |
 
 Common translations:
 
 - ESTree `node.type === "Literal" && typeof node.value === "number"` → `node.Kind == ast.KindNumericLiteral`.
 - ESTree's `isStringLiteral` helper (StringLiteral + TemplateLiteral) → `ast.IsStringLiteralLike(node)` covers `StringLiteral` + `NoSubstitutionTemplateLiteral`. For TemplateExpression add it explicitly.
-- Comparing numeric literal value (e.g. "is this `1`"): `utils.NormalizeNumericLiteral(text) == "1"` — handles `1`, `1.0`, `0x1`, `1e0`, `1_000`, etc. with one comparison.
+- Comparing numeric literal value (e.g. "is this `1`"): since `.Text` is already normalized, `node.AsNumericLiteral().Text == "1"` works — or call `utils.NormalizeNumericLiteral(text)` for an explicit, intent-revealing comparison.
+- Distinguishing source forms (`0x1` vs `1` — rare, only when porting an ESLint rule that compares tokens by raw value): use `scanner.GetSourceTextOfNodeFromSourceFile(sf, node, false)`; `.Text` cannot be used for this.
 
 ### Binary Operator Kinds
 
@@ -177,6 +178,35 @@ For fixes:
 
 - `rule.RuleFixReplace(sf, node, text)` — replaces the trimmed span.
 - `rule.RuleFixReplaceRange(range, text)` — replaces a specific range (useful for precision edits across multiple nodes).
+
+### Object Literal Member Kinds
+
+ESTree collapses several distinct object-literal members into a single `Property` node with `method` / `shorthand` / `computed` flags. tsgo uses **five different kinds**, and a rule that filters only on `KindPropertyAssignment` will silently miss the other four:
+
+| Source                               | tsgo kind                             | ESTree equivalent                            |
+| ------------------------------------ | ------------------------------------- | -------------------------------------------- |
+| `{ a: b }`                           | `KindPropertyAssignment`              | `Property { kind: "init" }`                  |
+| `{ a() {} }` (method shorthand)      | `KindMethodDeclaration`               | `Property { kind: "init", method: true }`    |
+| `{ a }` (shorthand property)         | `KindShorthandPropertyAssignment`     | `Property { kind: "init", shorthand: true }` |
+| `{ get a() {} }` / `{ set a(v) {} }` | `KindGetAccessor` / `KindSetAccessor` | `Property { kind: "get"/"set" }`             |
+| `{ ...x }` (spread)                  | `KindSpreadAssignment`                | `SpreadElement`                              |
+
+When porting a rule that uses `p.type === "Property" && p.kind === "init"` to collect "init-shape" members (e.g. `Object.defineProperty` descriptor detection), include all three of `KindPropertyAssignment`, `KindMethodDeclaration`, and `KindShorthandPropertyAssignment` — otherwise method-shorthand and shorthand-property forms silently go missing.
+
+### ComputedPropertyName as a Wrapper
+
+ESTree marks computed keys with `Property.computed = true` and puts the inner expression directly in `Property.key`. tsgo wraps the inner expression in a separate `KindComputedPropertyName` node:
+
+```go
+// { [x + 1]: ... }  or  class A { get [x + 1]() {} }
+nameNode := node.Name()                          // → KindComputedPropertyName
+if nameNode.Kind == ast.KindComputedPropertyName {
+    expr := nameNode.AsComputedPropertyName().Expression  // the actual key expression
+    expr = ast.SkipParentheses(expr)             // and don't forget parens
+}
+```
+
+`utils.GetStaticPropertyName` already handles the wrapper and returns the static name for `[ 'a' ]` / `[ 1e2 ]` / `[ true ]` / `[ null ]` / `[ /re/ ]` / ``[`a`]`` forms — prefer it over hand-unwrapping.
 
 ---
 

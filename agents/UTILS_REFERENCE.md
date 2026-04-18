@@ -475,6 +475,53 @@ Create a token-by-token scanner for more complex scanning needs. See [AST_PATTER
 
 ---
 
+## `shim/checker/` - TypeChecker Native Methods
+
+```go
+import "github.com/microsoft/typescript-go/shim/checker"
+```
+
+For type-aware rules, **check `internal/utils/ts_api_utils.go` and `internal/utils/ts_eslint.go` first** — they wrap the common patterns with the correct invariants (e.g. `IsPromiseLike` handles subclass resolution, `NeedsToBeAwaited` handles generic constraints). Only fall through to the raw `Checker_*` functions below when no wrapper exists. Do **not** hand-roll type analysis on top of AST shape alone — the checker already answers those questions authoritatively.
+
+### Resolution & Signatures
+
+- `checker.Checker_getResolvedSignature(c, callLike)` — resolve the actual signature chosen for a call / new / decorator
+- `checker.Checker_getSignaturesOfType(c, t, kind)` — all call/construct signatures of a type
+- `checker.Checker_getReturnTypeOfSignature(c, sig)` — return type of a signature
+
+### Type Structure
+
+- `checker.Checker_getApparentType(c, t)` — apparent type (for member lookup; widens primitives to wrapper types)
+- `checker.Checker_getWidenedType(c, t)` — widened type (e.g. literal → base)
+- `checker.Checker_getBaseTypes(c, t)` — base types of an interface / class
+- `checker.Checker_getTypeArguments(c, t)` — type arguments of a generic instance
+- `checker.Checker_getBaseConstraintOfType(c, t)` — constraint of a type parameter (nil if unconstrained)
+
+### Type / Symbol Navigation
+
+- `checker.Checker_getTypeOfSymbol(c, sym)` — type of a symbol at its declaration
+- `checker.Checker_getPropertyOfType(c, t, name)` — look up a property symbol by name
+- `checker.Checker_getPropertiesOfType(c, t)` — all properties of a type
+- `checker.Checker_getIndexInfosOfType(c, t)` — index signatures of a type
+- `checker.Checker_getIndexTypeOfType(c, t, kind)` — value type for a given index kind
+
+### From AST Nodes
+
+- `checker.Checker_getTypeFromTypeNode(c, typeNode)` — type from a syntactic type annotation (`number`, `Foo<T>`, etc.)
+- `checker.Checker_isArrayType(c, t)` — array-type classification
+- `checker.IsTupleType(t)` — package-level tuple-type classification (does not need a Checker receiver)
+
+### Type / Symbol Field Accessors
+
+Internal struct fields that Go cannot expose via methods across packages are reachable through top-level accessors:
+
+- `checker.Type_flags(t)` — `TypeFlags` bitset
+- `checker.Type_symbol(t)` — associated symbol (for named types)
+
+See `shim/checker/shim.go` for the full surface (~50 functions). If you find yourself reaching for a method that isn't exposed, add it to the shim rather than duplicating the logic.
+
+---
+
 ## See Also
 
 - [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow

@@ -112,8 +112,9 @@ Before starting, familiarize yourself with these key source locations:
 
 3. **Collect Test Cases**:
    - Extract **ALL** `valid` and `invalid` cases from the official documentation.
-   - Extract representative cases from the official unit tests, covering all branches of logic.
-   - **Add Boundary Cases**: Add sufficient boundary cases (e.g., empty files, nested structures, edge cases in syntax).
+   - Migrate **ALL** `valid` and `invalid` cases from the official unit test file (`tests/lib/rules/<rule>.js` for ESLint core; plugin equivalents otherwise) — not a representative subset. The ESLint suite is the **lower bound** for coverage, not the upper bound.
+   - **Skip with explanation**: If a case exercises an option or syntax we intentionally don't support, keep it in the file as a `Skip: true` test with a `// SKIP: <reason>` comment — don't drop it silently.
+   - **Add extra edge cases on top**: Beyond the ESLint suite, add cases that exercise tsgo-specific AST quirks (see [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials)) — nested expressions, paren / bracket forms, reserved words in various positions, declaration merging, computed keys the upstream parser may not distinguish, etc.
    - **Ensure Coverage**: Ensure Line and Column numbers are tested in invalid cases.
 
 4. **Identify Edge Cases**:
@@ -139,18 +140,26 @@ Before starting, familiarize yourself with these key source locations:
    - Parenthesized expressions (multiple levels)
    - Multi-line code with varying whitespace
 
-5. **Document Intentional Differences**:
+5. **Document Divergence from ESLint**:
 
-   If the implementation intentionally differs from ESLint (e.g., more precise error locations, different reporting granularity), complete all three:
-   1. **Source code comment**: Add a `// NOTE: Unlike ESLint...` comment explaining the difference and rationale
-   2. **Rule documentation**: Add a "Differences from ESLint" section in the rule's `.md` file
-   3. **Test cases**: Ensure the differing behavior is covered by tests
+   Two classes of divergence may arise when porting. Both must be documented; they differ in _how_ and _where_.
+
+   **A. Intentional divergence** — a choice we make (e.g. more precise error locations, different reporting granularity). Do all three:
+   1. **Source code comment**: Add a `// NOTE: Unlike ESLint...` explaining the difference and rationale.
+   2. **Rule documentation**: Add a "Differences from ESLint" section in the rule's `.md` file.
+   3. **Test cases**: Ensure the differing behavior is covered by a dedicated test — a green-path `ValidTestCase` or a case with an exact `Message` / position assertion — so that future refactors can't silently flip it.
+
+   **B. Language-natural divergence** — a side effect of tsgo's AST or Go semantics that we don't actively choose (e.g. tsgo decimal-normalizes `NumericLiteral` at parse time, so a dynamic computed key `[0x1]` compares equal to `[1]` where ESLint's token-level comparison sees them as distinct). Usually more permissive than ESLint.
+   1. **Rule documentation** (or [AST_PATTERNS.md](../../AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
+   2. **Test cases**: Lock the current behavior in with a test — typically the ESLint-fails-but-we-pass case stays on the `valid` side with a comment pointing at the underlying quirk, so the behavior can't flip silently.
 
 ---
 
 ## Phase 2: Implementation (Go)
 
 > **AST note**: rslint is built on the tsgo AST, which is structurally different from ESLint's ESTree. Child-access patterns (`node.left`, `node.argument`, `node.callee`, …) do **not** correspond 1:1: parentheses are explicit nodes, optional chains are flag-based (no `ChainExpression` wrapper), `Literal` is split across several `Kind*Literal` kinds, and `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`. Review [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials) before implementing, and run the Alignment Audit (end of Step 2) before tests.
+>
+> **If you discover a new tsgo↔ESTree shape difference during porting** (e.g. a kind that has no ESTree analog, an `.Text` field that's normalized at parse time when ESLint sees raw source, an access pattern that requires an extra unwrap), **append it to [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials) as part of your PR**. That file is the living knowledge base; every new rule is a chance to grow it.
 
 ### Step 1: Directory Setup
 
@@ -174,10 +183,23 @@ Before starting, familiarize yourself with these key source locations:
 - Review AST node types in `shim/ast/shim.go`
 - See [AST_PATTERNS.md](../../AST_PATTERNS.md) for traversal patterns and examples
 
-**Check for reusable shim utilities**: Before implementing custom helpers, check if the `shim/` packages already provide what you need:
+**Check for reusable `internal/utils/` helpers** (FIRST): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
 
-- `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`
-- `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, and other AST utilities
+- `IsSpecific*`, `IsArgument*` — well-known API-call recognition (`Object.defineProperty`-style, member-access patterns, nth-argument-of)
+- `GetStatic*`, `Normalize*` — property-name / literal-value normalization (e.g. `GetStaticPropertyName`, `NormalizeNumericLiteral`, `NormalizeBigIntLiteral`)
+- `AreNodes*`, `IsSame*` — structural / reference AST comparison
+- `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
+- `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries
+- `GetOptionsMap` — options parsing (handles both array and map inputs)
+- **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
+
+See [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
+
+**Check for reusable shim utilities** (SECOND): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
+
+- `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`, `GetSourceTextOfNodeFromSourceFile` (raw source text — useful when an AST node's `.Text` field has been normalized at parse time)
+- `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, `SkipParentheses`, `IsOptionalChain`, and other AST utilities
+- `shim/checker/` — native tsgo TypeChecker methods exposed as `Checker_*` functions (`GetReturnTypeOfSignature`, `GetApparentType`, `GetWidenedType`, `GetTypeArguments`, `GetPropertyOfType`, `GetIndexInfosOfType`, …). Reach here **only when** `internal/utils/` doesn't already wrap what you need; the wrappers encode invariants you'd otherwise have to re-derive. See `shim/checker/shim.go` for the full surface.
 - `shim/core/` — `NewTextRange` and other core utilities
 
 > **Warning**: Some shim functions have different semantics from ESLint's model. For example, `ast.GetThisContainer` treats `PropertyDeclaration`, `ClassStaticBlockDeclaration`, `ModuleDeclaration`, etc. as `this` containers, which does not match ESLint's scope model. Always compare the shim function's behavior against ESLint before reusing.
@@ -321,6 +343,8 @@ var x = { a: 1, b: 2 };
 **File**: `<rule_name>_test.go`
 
 - Use `rule_tester.RunRuleTester`
+- **All Go test cases go into one `<rule_name>_test.go` file** — do not split by feature, option, or container type. Single-file organization keeps grep / diff against the upstream ESLint test file trivial.
+- **Preserve ESLint's original grouping as inline comments** (e.g. `// ---- Various getter keys ----`, `// ---- Property descriptors ----`). Future audits should be able to read the file top-to-bottom and match the upstream layout.
 - Invalid cases **MUST** include `Line` and `Column` assertions
 - Use `map[string]interface{}` to pass options in Go tests
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`
@@ -452,7 +476,7 @@ Follow this **strict order** — each step depends on the previous one:
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
-5. **Verify Test Coverage Alignment**:
+5. **Verify Test Coverage Alignment (Go ↔ JS)**:
 
    Ensure Go tests cover the same cases as JS tests:
    - Check the JS test snapshot file for the number of invalid cases
@@ -471,7 +495,19 @@ Follow this **strict order** — each step depends on the previous one:
    | Multiple errors  | `Errors: []...{{...}, {...}}`           | `errors: [{...}, {...}]`                    |
    | MessageId format | camelCase (e.g., `"noLossOfPrecision"`) | camelCase (e.g., `"noLossOfPrecision"`)     |
 
-6. **Project-wide Checks**:
+6. **Contract Alignment Checklist (Go ↔ ESLint)**:
+
+   Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 5.B); contract differences are not.
+
+   Before claiming the port is aligned, confirm every row. Missing any row means the claim is premature:
+   - [ ] **Full ESLint test migration** — every `valid` / `invalid` case from the upstream unit-test file has a corresponding Go case (or a `Skip: true` with a `// SKIP: <reason>` comment).
+   - [ ] **Message text assertions** — each `messageId` has **at least one** test using the `InvalidTestCaseError.Message` field (exact string match), covering every modifier combination the rule can emit (`static`, `private`, `async`, computed-no-name, etc.).
+   - [ ] **Position assertions per container** — for each container the rule emits into (object literal / class / type / descriptor / …), at least 2 cases assert `Line` + `Column` + `EndLine` + `EndColumn`, including one multi-line case.
+   - [ ] **Options schema match** — option names, types, and **defaults** match ESLint's schema byte-for-byte. Assert every default by running an invalid/valid case with no options vs. `[{}]` options and confirming identical output.
+   - [ ] **Options combination matrix** — for every boolean option, include at least one test where it is `true` and one where it is `false`. Triggering combinations (e.g. rule behaves differently when two options are both on) get dedicated cases.
+   - [ ] **Three-way equivalence classes** (if the rule compares names / keys) — static / private / dynamic keys form separate equivalence classes; test at least one cross-class negative (e.g. `'#a'` string vs `#a` private identifier should NOT pair up).
+
+7. **Project-wide Checks**:
 
    ```bash
    # Type check and lint
@@ -491,7 +527,7 @@ Follow this **strict order** — each step depends on the previous one:
    pnpm format:go   # Fix Go formatting (e.g., import order)
    ```
 
-7. **Differential Validation** (recommended for rules with non-trivial branching):
+8. **Differential Validation** (recommended for rules with non-trivial branching):
 
    Unit tests verify cases you thought of; diffing against the reference implementation on a real codebase catches the rest. Skip when the rule has ≤ 2 branches and trivial messages, or when the rule is a new rslint invention with no reference.
 
@@ -525,6 +561,14 @@ Follow this **strict order** — each step depends on the previous one:
    | rslint over-reports             | Same as above, inverted                                |
    | Different message text          | paren / text-range handling in the recommendation      |
    | Same count, different positions | column offset (0- vs 1-based, multibyte)               |
+
+   **Disposition standard**: a non-empty diff is **not** automatically a failure. Every differing line must fall into exactly one of the three categories below — anything that cannot be confidently classified is treated as (c).
+
+   | Category                            | What it means                                                                                                                                                                                   | Action                                                                                                                        |
+   | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+   | **(a) Language-natural divergence** | tsgo AST or Go-semantic effect we don't actively choose (see Phase 1 Step 5.B — e.g. `NumericLiteral` parse-time normalization, normalized string cooked values).                               | Document under the rule's `.md` "Differences from ESLint" (or in [AST_PATTERNS.md](../../AST_PATTERNS.md) if general). Leave. |
+   | **(b) Scan-scope divergence**       | The two tools see different file sets (e.g., rslint respects `.gitignore` by default; ESLint does not; tsconfig `include` excludes a dir). Not a rule issue.                                    | No action. Optionally note in the PR description if a reviewer might be confused.                                             |
+   | **(c) Genuine bug**                 | Neither (a) nor (b). Rule logic, message text, or position is actually wrong on our side (or, rarely, ESLint's — but we align to ESLint unless we have a standing Phase 1 Step 5.A divergence). | **Must fix** before merging. Re-run the diff until it clears or reduces to (a)/(b) only.                                      |
 
 ---
 
