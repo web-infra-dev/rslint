@@ -184,6 +184,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
@@ -605,6 +606,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
 	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
+	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
