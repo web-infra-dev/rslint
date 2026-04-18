@@ -1,0 +1,729 @@
+// Rstest Snapshot v1
+
+exports[`no-misleading-character-class > invalid 1`] = `
+{
+  "code": "var r = /[👍]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected surrogate pair in character class. Use 'u' flag.",
+      "messageId": "surrogatePairWithoutUFlag",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 2`] = `
+{
+  "code": "var r = /[\\uD83D\\uDC4D]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected surrogate pair in character class. Use 'u' flag.",
+      "messageId": "surrogatePairWithoutUFlag",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 3`] = `
+{
+  "code": "var r = /before[\\uD83D\\uDC4D]after/",
+  "diagnostics": [
+    {
+      "message": "Unexpected surrogate pair in character class. Use 'u' flag.",
+      "messageId": "surrogatePairWithoutUFlag",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 4`] = `
+{
+  "code": "var r = /[before\\uD83D\\uDC4Dafter]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected surrogate pair in character class. Use 'u' flag.",
+      "messageId": "surrogatePairWithoutUFlag",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 5`] = `
+{
+  "code": "var r = /[Á]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 6`] = `
+{
+  "code": "var r = /[Á]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 7`] = `
+{
+  "code": "var r = /[\\u0041\\u0301]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 8`] = `
+{
+  "code": "var r = /[\\u0041\\u0301]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 9`] = `
+{
+  "code": "var r = /[\\u{41}\\u{301}]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 10`] = `
+{
+  "code": "var r = /[❇️]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 11`] = `
+{
+  "code": "var r = /[❇️]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 12`] = `
+{
+  "code": "var r = /[👶🏻]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected modified Emoji in character class.",
+      "messageId": "emojiModifier",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 13`] = `
+{
+  "code": "var r = /[a\\uD83C\\uDFFB]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected modified Emoji in character class.",
+      "messageId": "emojiModifier",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 14`] = `
+{
+  "code": "var r = /[\\u{1F476}\\u{1F3FB}]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected modified Emoji in character class.",
+      "messageId": "emojiModifier",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 15`] = `
+{
+  "code": "var r = /[🇯🇵]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected national flag in character class.",
+      "messageId": "regionalIndicatorSymbol",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 16`] = `
+{
+  "code": "var r = /[\\uD83C\\uDDEF\\uD83C\\uDDF5]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected national flag in character class.",
+      "messageId": "regionalIndicatorSymbol",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 17`] = `
+{
+  "code": "var r = /[\\u{1F1EF}\\u{1F1F5}]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected national flag in character class.",
+      "messageId": "regionalIndicatorSymbol",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 18`] = `
+{
+  "code": "var r = /[👨‍👩‍👦]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected joined character sequence in character class.",
+      "messageId": "zwj",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 19`] = `
+{
+  "code": "var r = /[👩‍👦]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected joined character sequence in character class.",
+      "messageId": "zwj",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 20`] = `
+{
+  "code": "var r = /[\\uD83D\\uDC68\\u200D\\uD83D\\uDC69\\u200D\\uD83D\\uDC66]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected joined character sequence in character class.",
+      "messageId": "zwj",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 21`] = `
+{
+  "code": "var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected joined character sequence in character class.",
+      "messageId": "zwj",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 22`] = `
+{
+  "code": "var r = RegExp("[👍]", "")",
+  "diagnostics": [
+    {
+      "message": "Unexpected surrogate pair in character class. Use 'u' flag.",
+      "messageId": "surrogatePairWithoutUFlag",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 23`] = `
+{
+  "code": "var r = new RegExp("[👍]", "")",
+  "diagnostics": [
+    {
+      "message": "Unexpected surrogate pair in character class. Use 'u' flag.",
+      "messageId": "surrogatePairWithoutUFlag",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 24`] = `
+{
+  "code": "var r = new RegExp("[Á]", "")",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 25`] = `
+{
+  "code": "var r = new RegExp("[👶🏻]", "u")",
+  "diagnostics": [
+    {
+      "message": "Unexpected modified Emoji in character class.",
+      "messageId": "emojiModifier",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 26`] = `
+{
+  "code": "var r = new RegExp("[🇯🇵]", "u")",
+  "diagnostics": [
+    {
+      "message": "Unexpected national flag in character class.",
+      "messageId": "regionalIndicatorSymbol",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 27`] = `
+{
+  "code": "var r = new globalThis.RegExp("[❇️]", "")",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misleading-character-class > invalid 28`] = `
+{
+  "code": "var r = /[Á]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected combined character in character class.",
+      "messageId": "combiningClass",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-misleading-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

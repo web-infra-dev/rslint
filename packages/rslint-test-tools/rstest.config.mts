@@ -259,6 +259,7 @@ export default defineConfig({
     './tests/eslint/rules/no-empty-character-class.test.ts',
     './tests/eslint/rules/no-fallthrough.test.ts',
     './tests/eslint/rules/no-invalid-regexp.test.ts',
+    './tests/eslint/rules/no-misleading-character-class.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
     './tests/eslint/rules/no-obj-calls.test.ts',
