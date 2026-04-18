@@ -276,6 +276,7 @@ export default defineConfig({
     './tests/eslint/rules/no-bitwise.test.ts',
     './tests/eslint/rules/max-lines.test.ts',
     './tests/eslint/rules/no-labels.test.ts',
+    './tests/eslint/rules/no-lone-blocks.test.ts',
     './tests/eslint/rules/no-multi-str.test.ts',
     './tests/eslint/rules/no-nested-ternary.test.ts',
     './tests/eslint/rules/object-shorthand.test.ts',
