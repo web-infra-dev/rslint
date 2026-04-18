@@ -49,6 +49,7 @@ export default defineConfig({
     './tests/eslint/rules/default-case-last.test.ts',
     './tests/eslint/rules/no-extend-native.test.ts',
     './tests/eslint/rules/no-extra-bind.test.ts',
+    './tests/eslint/rules/no-extra-label.test.ts',
     './tests/eslint/rules/no-func-assign.test.ts',
     './tests/eslint/rules/no-global-assign.test.ts',
     './tests/eslint/rules/no-import-assign.test.ts',
