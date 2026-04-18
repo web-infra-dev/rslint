@@ -44,9 +44,11 @@ This rule accepts a single options object.
 
 When `true`, the rule also reports redundant boolean casts that are operands of `||` or `&&` when the overall logical expression is used in a boolean context.
 
-```javascript
-/* eslint no-extra-boolean-cast: ["error", { "enforceForLogicalOperands": true }] */
+```json
+{ "no-extra-boolean-cast": ["error", { "enforceForLogicalOperands": true }] }
+```
 
+```javascript
 if (x || !!y) {
 } // reported
 ```
@@ -55,9 +57,11 @@ if (x || !!y) {
 
 A superset of `enforceForLogicalOperands`. Additionally reports redundant casts on the right-hand side of `??`, on the branches of ternaries, and on the last expression of a sequence (`a, b, c`).
 
-```javascript
-/* eslint no-extra-boolean-cast: ["error", { "enforceForInnerExpressions": true }] */
+```json
+{ "no-extra-boolean-cast": ["error", { "enforceForInnerExpressions": true }] }
+```
 
+```javascript
 if (x ?? !!y) {
 } // reported
 if (cond ? Boolean(a) : b) {

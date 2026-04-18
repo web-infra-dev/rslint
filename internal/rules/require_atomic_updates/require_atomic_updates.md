@@ -50,9 +50,11 @@ async function baz() {
 
 When set to `true`, the rule does not report assignments to properties (only variables).
 
-```javascript
-/* eslint require-atomic-updates: ["error", { "allowProperties": true }] */
+```json
+{ "require-atomic-updates": ["error", { "allowProperties": true }] }
+```
 
+```javascript
 async function foo(obj) {
   if (!obj.done) {
     obj.something = await getSomething(); // OK with allowProperties
