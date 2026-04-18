@@ -11,6 +11,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/collections => ./shim/collections
 	github.com/microsoft/typescript-go/shim/compiler => ./shim/compiler
 	github.com/microsoft/typescript-go/shim/core => ./shim/core
+	github.com/microsoft/typescript-go/shim/evaluator => ./shim/evaluator
 	github.com/microsoft/typescript-go/shim/jsonrpc => ./shim/jsonrpc
 	github.com/microsoft/typescript-go/shim/ls => ./shim/ls
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
@@ -42,6 +43,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
+	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.42.0
@@ -54,7 +56,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/microsoft/typescript-go/shim/evaluator v0.0.0-00010101000000-000000000000 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/mod v0.34.0 // indirect

@@ -51,6 +51,7 @@ func main() {
 		"checker",
 		"compiler",
 		"core",
+		"evaluator",
 		"jsonrpc",
 		"scanner",
 		"tsoptions",

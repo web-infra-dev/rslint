@@ -5,7 +5,25 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// patternHasEmptyClass mirrors the rule body for unit-testing pattern strings
+// directly (without wrapping each in a regex literal).
+func patternHasEmptyClass(pattern string, vFlag bool) bool {
+	flags := utils.RegexFlags{UnicodeSets: vFlag}
+	found := false
+	utils.IterateRegexCharacterClasses(pattern, flags, func(start, end int) {
+		if found {
+			return
+		}
+		body := pattern[start+1 : end-1]
+		if body == "" {
+			found = true
+		}
+	})
+	return found
+}
 
 func TestHasEmptyCharacterClassLegacy(t *testing.T) {
 	// Each test: pattern (the part between / and /flags), expected result.
@@ -86,9 +104,9 @@ func TestHasEmptyCharacterClassLegacy(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasEmptyCharacterClassLegacy(tt.pattern)
+			got := patternHasEmptyClass(tt.pattern, false)
 			if got != tt.want {
-				t.Errorf("hasEmptyCharacterClassLegacy(%q) = %v, want %v", tt.pattern, got, tt.want)
+				t.Errorf("patternHasEmptyClass(%q, false) = %v, want %v", tt.pattern, got, tt.want)
 			}
 		})
 	}
@@ -264,9 +282,9 @@ func TestHasEmptyCharacterClassV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasEmptyCharacterClassV(tt.pattern)
+			got := patternHasEmptyClass(tt.pattern, true)
 			if got != tt.want {
-				t.Errorf("hasEmptyCharacterClassV(%q) = %v, want %v", tt.pattern, got, tt.want)
+				t.Errorf("patternHasEmptyClass(%q, true) = %v, want %v", tt.pattern, got, tt.want)
 			}
 		})
 	}

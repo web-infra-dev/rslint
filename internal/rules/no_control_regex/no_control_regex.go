@@ -2,7 +2,6 @@ package no_control_regex
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -89,11 +88,12 @@ func checkRegExpConstructor(
 // that appear after the syntax error. Syntactically-invalid patterns are
 // independently flagged by the `no-invalid-regexp` rule, so in practice a
 // user running both rules sees every issue; the rule attribution differs.
-func collectControlChars(pattern, flags string) []string {
-	uvMode := strings.ContainsAny(flags, "uv")
+func collectControlChars(pattern, flagsStr string) []string {
+	flags := utils.ParseRegexFlags(flagsStr)
+	uvMode := flags.UV()
 
 	var results []string
-	record := func(cp uint64) {
+	record := func(cp uint32) {
 		results = append(results, fmt.Sprintf(`\x%02x`, cp))
 	}
 
@@ -105,20 +105,21 @@ func collectControlChars(pattern, flags string) []string {
 			switch pattern[i+1] {
 			case 'x':
 				// \xHH — 2 hex digits required.
-				if i+3 < len(pattern) {
-					if cp, ok := parseFixedHex(pattern[i+2 : i+4]); ok {
-						if cp <= 0x1f {
-							record(cp)
-						}
-						i += 4
-						continue
+				if i+3 < len(pattern) && utils.IsHexDigit(pattern[i+2]) && utils.IsHexDigit(pattern[i+3]) {
+					cp := utils.ParseHexUint(pattern[i+2 : i+4])
+					if cp <= 0x1f {
+						record(cp)
 					}
+					i += 4
+					continue
 				}
 			case 'u':
 				// \u{H...} — only recognized under u / v flag.
 				if uvMode && i+2 < len(pattern) && pattern[i+2] == '{' {
 					if closeRel := strings.IndexByte(pattern[i+3:], '}'); closeRel > 0 {
-						if cp, ok := parseFixedHex(pattern[i+3 : i+3+closeRel]); ok {
+						hex := pattern[i+3 : i+3+closeRel]
+						if utils.AllHexDigits(hex) {
+							cp := utils.ParseHexUint(hex)
 							if cp <= 0x1f {
 								record(cp)
 							}
@@ -128,39 +129,29 @@ func collectControlChars(pattern, flags string) []string {
 					}
 				}
 				// \uHHHH — 4 hex digits.
-				if i+5 < len(pattern) {
-					if cp, ok := parseFixedHex(pattern[i+2 : i+6]); ok {
-						if cp <= 0x1f {
-							record(cp)
-						}
-						i += 6
-						continue
+				if i+5 < len(pattern) && utils.AllHexDigits(pattern[i+2:i+6]) {
+					cp := utils.ParseHexUint(pattern[i+2 : i+6])
+					if cp <= 0x1f {
+						record(cp)
 					}
+					i += 6
+					continue
 				}
 			}
-			// Any other escape (\t, \n, \\, \cI, \0, etc.): consume 2 bytes.
+			// Any other escape (\t, \n, \\, \cI, \0, \d, \p{…}, \q{…}, etc.):
+			// consume 2 bytes. Multi-byte escape bodies (e.g. `\q{…}` under v
+			// flag) are NOT skipped as a unit — their contents may legitimately
+			// contain nested escapes (`\u{1F}` etc.) that should be detected by
+			// the subsequent loop iterations.
 			i += 2
 			continue
 		}
 
 		if c <= 0x1f {
-			record(uint64(c))
+			record(uint32(c))
 		}
 		i++
 	}
 
 	return results
-}
-
-// parseFixedHex parses a hex literal. Returns ok=false when the string is
-// empty or contains any non-hex byte.
-func parseFixedHex(s string) (uint64, bool) {
-	if s == "" {
-		return 0, false
-	}
-	v, err := strconv.ParseUint(s, 16, 32)
-	if err != nil {
-		return 0, false
-	}
-	return v, true
 }
