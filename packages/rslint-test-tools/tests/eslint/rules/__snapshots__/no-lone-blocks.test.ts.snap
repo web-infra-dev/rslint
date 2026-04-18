@@ -1,0 +1,1386 @@
+// Rstest Snapshot v1
+
+exports[`no-lone-blocks > invalid 1`] = `
+{
+  "code": "{}",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 2`] = `
+{
+  "code": "{var x = 1;}",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 3`] = `
+{
+  "code": "foo(); {} bar();",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 4`] = `
+{
+  "code": "{} {}",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 5`] = `
+{
+  "code": "if (foo) { bar(); {} baz(); }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 6`] = `
+{
+  "code": "function foo() { bar(); {} baz(); }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 7`] = `
+{
+  "code": "while (foo) { {} }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 8`] = `
+{
+  "code": "for (;;) { {} }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 9`] = `
+{
+  "code": "do { {} } while (foo)",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 10`] = `
+{
+  "code": "try { {} } catch {}",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 11`] = `
+{
+  "code": "try {} catch { {} }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 12`] = `
+{
+  "code": "try {} finally { {} }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 13`] = `
+{
+  "code": "class C { method() { {} } }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 14`] = `
+{
+  "code": "class C { constructor() { {} } }",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 15`] = `
+{
+  "code": "const f = () => { {} };",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 16`] = `
+{
+  "code": "{ 
+{ } }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 17`] = `
+{
+  "code": "{
+    var x = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 18`] = `
+{
+  "code": "{ { {} } }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 19`] = `
+{
+  "code": "{ function bar() {} }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 20`] = `
+{
+  "code": "{ lbl: foo(); }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 21`] = `
+{
+  "code": "{ type X = number; }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 22`] = `
+{
+  "code": "{ interface I {} }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 23`] = `
+{
+  "code": "{ declare var x: number; }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 24`] = `
+{
+  "code": "{ /* comment */ }",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 25`] = `
+{
+  "code": "{ 
+{var x = 1;}
+ let y = 2; } {let z = 1;}",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 26`] = `
+{
+  "code": "{ 
+{let x = 1;}
+ var y = 2; } {let z = 1;}",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 27`] = `
+{
+  "code": "{ 
+{var x = 1;}
+ var y = 2; }
+ {var z = 1;}",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 2,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 28`] = `
+{
+  "code": "
+switch (foo) {
+    case 1:
+        foo();
+        {
+            bar;
+        }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 29`] = `
+{
+  "code": "
+switch (foo) {
+    case 1:
+    {
+        bar;
+    }
+    foo();
+}
+",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 30`] = `
+{
+  "code": "
+switch (foo) {
+    default:
+        foo();
+        {
+            bar;
+        }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 31`] = `
+{
+  "code": "
+switch (foo) {
+    default:
+    {
+        bar;
+    }
+    foo();
+}
+",
+  "diagnostics": [
+    {
+      "message": "Block is redundant.",
+      "messageId": "redundantBlock",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 32`] = `
+{
+  "code": "
+function foo () {
+    {
+        const x = 4;
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 33`] = `
+{
+  "code": "
+function foo () {
+    {
+        var x = 4;
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 34`] = `
+{
+  "code": "
+class C {
+    static {
+        if (foo) {
+            {
+                let block;
+            }
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 35`] = `
+{
+  "code": "
+class C {
+    static {
+        if (foo) {
+            {
+                block;
+            }
+            something;
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 36`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            block;
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 37`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            let block;
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 38`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            const block = 1;
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 39`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            function block() {}
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 40`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            class block {}
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 41`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            var block;
+        }
+        something;
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 42`] = `
+{
+  "code": "
+class C {
+    static {
+        something;
+        {
+            var block;
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 43`] = `
+{
+  "code": "
+class C {
+    static {
+        {
+            block;
+        }
+        something;
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-lone-blocks > invalid 44`] = `
+{
+  "code": "
+class C {
+    static {
+        something;
+        {
+            block;
+        }
+    }
+}
+",
+  "diagnostics": [
+    {
+      "message": "Nested block is redundant.",
+      "messageId": "redundantNestedBlock",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-lone-blocks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
