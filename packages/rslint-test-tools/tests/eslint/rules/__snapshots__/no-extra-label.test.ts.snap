@@ -1,0 +1,1342 @@
+// Rstest Snapshot v1
+
+exports[`no-extra-label > invalid 1`] = `
+{
+  "code": "A: while (a) break A;",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 2`] = `
+{
+  "code": "A: while (a) { B: { continue A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 3`] = `
+{
+  "code": "X: while (x) { A: while (a) { B: { break A; break B; continue X; } } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 4`] = `
+{
+  "code": "A: do { break A; } while (a);",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 5`] = `
+{
+  "code": "A: for (;;) { break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 6`] = `
+{
+  "code": "A: for (a in obj) { break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 7`] = `
+{
+  "code": "A: for (a of ary) { break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 8`] = `
+{
+  "code": "A: switch (a) { case 0: break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 9`] = `
+{
+  "code": "X: while (x) { A: switch (a) { case 0: break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 10`] = `
+{
+  "code": "X: switch (a) { case 0: A: while (b) break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 11`] = `
+{
+  "code": "
+                A: while (true) {
+                    break A;
+                    while (true) {
+                        break A;
+                    }
+                }
+            ",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 12`] = `
+{
+  "code": "A: while(true) { /*comment*/break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 13`] = `
+{
+  "code": "A: while(true) { break/**/ A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 14`] = `
+{
+  "code": "A: while(true) { continue /**/ A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 15`] = `
+{
+  "code": "A: while(true) { break /**/A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 16`] = `
+{
+  "code": "A: while(true) { continue/**/A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 17`] = `
+{
+  "code": "A: while(true) { continue A/*comment*/; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 18`] = `
+{
+  "code": "A: while(true) { break A//comment
+ }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 19`] = `
+{
+  "code": "A: while(true) { break A/*comment*/
+foo() }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 20`] = `
+{
+  "code": "A: while (a) { continue A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 21`] = `
+{
+  "code": "A: do { continue A; } while (x);",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 22`] = `
+{
+  "code": "A: for (;;) { continue A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 23`] = `
+{
+  "code": "A: for (const k in obj) { continue A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 24`] = `
+{
+  "code": "A: for (const x of ary) { continue A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 25`] = `
+{
+  "code": "A: while (a) { A: while (b) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 26`] = `
+{
+  "code": "A: { A: while (b) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 27`] = `
+{
+  "code": "A: B: while (true) { break B; }",
+  "diagnostics": [
+    {
+      "message": "This label 'B' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 28`] = `
+{
+  "code": "A: B: C: while (true) { continue C; }",
+  "diagnostics": [
+    {
+      "message": "This label 'C' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 29`] = `
+{
+  "code": "A: while (a) { break A; } B: while (b) { break B; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+    {
+      "message": "This label 'B' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 30`] = `
+{
+  "code": "A: while (a) { B: while (b) { break B; break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'B' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 31`] = `
+{
+  "code": "A: while (a) { break A; continue A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 32`] = `
+{
+  "code": "outer: for (let i = 0; i < 10; i++) { inner: for (let j = 0; j < 10; j++) { if (i === j) { break inner; } } }",
+  "diagnostics": [
+    {
+      "message": "This label 'inner' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 103,
+          "line": 1,
+        },
+        "start": {
+          "column": 98,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 33`] = `
+{
+  "code": "function f() { A: while (a) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 34`] = `
+{
+  "code": "const f = () => { A: while (a) { break A; } };",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 35`] = `
+{
+  "code": "class C { m() { A: while (a) { break A; } } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 36`] = `
+{
+  "code": "async function f() { A: while (a) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 37`] = `
+{
+  "code": "function* g() { A: while (a) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 38`] = `
+{
+  "code": "function f<T>(arr: T[]) { A: while (arr.length) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 39`] = `
+{
+  "code": "A: for (const x of (ary as number[])) { break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 40`] = `
+{
+  "code": "A: while (a) {
+  break /* note */ A;
+}",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 41`] = `
+{
+  "code": "A: switch (a) { case 0: B: switch (b) { case 0: break B; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'B' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 42`] = `
+{
+  "code": "A: do { if (x) continue A; } while (y);",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 43`] = `
+{
+  "code": "A: while (a) { B: switch (b) { case 0: break B; case 1: break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'B' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 44`] = `
+{
+  "code": "A: switch (a) { case 0: B: { if (x) break B; break A; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 45`] = `
+{
+  "code": "A: while (a) { B: while (b) { if (x) break A; else continue B; } }",
+  "diagnostics": [
+    {
+      "message": "This label 'B' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 46`] = `
+{
+  "code": "A: for (;;) { B: for (;;) { C: for (;;) { break A; continue B; break C; } } }",
+  "diagnostics": [
+    {
+      "message": "This label 'C' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 70,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 47`] = `
+{
+  "code": "中文: while (a) break 中文;",
+  "diagnostics": [
+    {
+      "message": "This label '中文' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 48`] = `
+{
+  "code": "A: while(true) { break/*日本語*/ A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 49`] = `
+{
+  "code": "A: while(true) { /*日本語*/break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 50`] = `
+{
+  "code": "const s = "🚀"; A: while (a) { break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

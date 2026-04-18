@@ -148,6 +148,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_extend_native"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_boolean_cast"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extra_label"
 	"github.com/web-infra-dev/rslint/internal/rules/no_fallthrough"
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
@@ -558,6 +559,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-ex-assign", no_ex_assign.NoExAssignRule)
 	GlobalRuleRegistry.Register("no-extend-native", no_extend_native.NoExtendNativeRule)
 	GlobalRuleRegistry.Register("no-extra-bind", no_extra_bind.NoExtraBindRule)
+	GlobalRuleRegistry.Register("no-extra-label", no_extra_label.NoExtraLabelRule)
 	GlobalRuleRegistry.Register("no-labels", no_labels.NoLabelsRule)
 	GlobalRuleRegistry.Register("no-func-assign", no_func_assign.NoFuncAssignRule)
 	GlobalRuleRegistry.Register("no-global-assign", no_global_assign.NoGlobalAssignRule)
