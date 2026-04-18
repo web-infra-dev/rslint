@@ -133,6 +133,16 @@ func TestNoExtraLabelRule(t *testing.T) {
 			{Code: `A: while (a) {}`},
 			{Code: `A: {}`},
 			{Code: `A: ;`},
+
+			// =================================================================
+			// Multi-byte characters — UTF-16 code unit positioning must not
+			// produce false positives/negatives. CJK identifier used as label
+			// across an outer loop (legitimate) and multi-byte content in
+			// surrounding strings/comments that don't affect rule semantics.
+			// =================================================================
+			{Code: `中文: while (a) { while (b) { break 中文; } }`},
+			{Code: `const s = "日本語"; A: while (a) { while (b) { break A; } }`},
+			{Code: `const s = "🚀"; A: while (a) { while (b) { break A; } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// =================================================================
@@ -562,6 +572,55 @@ func TestNoExtraLabelRule(t *testing.T) {
 				Output: []string{`A: do { if (x) continue; } while (y);`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 25},
+				},
+			},
+
+			// =================================================================
+			// Multi-byte characters — verify UTF-16 code unit column math and
+			// that autofix byte-range handling stays correct when multi-byte
+			// chars sit in the label, in a comment on the keyword/label
+			// boundary, or in preceding source text.
+			// =================================================================
+			// CJK identifier as label: columns count each CJK char as one
+			// UTF-16 code unit; autofix deletes the bytes for ` 中文`.
+			{
+				Code:   `中文: while (a) break 中文;`,
+				Output: []string{`中文: while (a) break;`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "unexpected",
+						Message:   "This label '中文' is unnecessary.",
+						Line:      1,
+						Column:    21,
+						EndLine:   1,
+						EndColumn: 23,
+					},
+				},
+			},
+			// CJK comment between keyword and label suppresses autofix; label
+			// column must account for the multi-byte trivia inside the gap.
+			{
+				Code: `A: while(true) { break/*日本語*/ A; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 31},
+				},
+			},
+			// CJK comment BEFORE the keyword — autofix still applies; the
+			// keyword-end position must survive multi-byte leading trivia.
+			{
+				Code:   `A: while(true) { /*日本語*/break A; }`,
+				Output: []string{`A: while(true) { /*日本語*/break; }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 31},
+				},
+			},
+			// Emoji (surrogate pair) in preceding source — reported column
+			// for `A` must count 🚀 as 2 UTF-16 code units.
+			{
+				Code:   `const s = "🚀"; A: while (a) { break A; }`,
+				Output: []string{`const s = "🚀"; A: while (a) { break; }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 38},
 				},
 			},
 		},

@@ -1236,3 +1236,107 @@ exports[`no-extra-label > invalid 46`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-extra-label > invalid 47`] = `
+{
+  "code": "中文: while (a) break 中文;",
+  "diagnostics": [
+    {
+      "message": "This label '中文' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 48`] = `
+{
+  "code": "A: while(true) { break/*日本語*/ A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 49`] = `
+{
+  "code": "A: while(true) { /*日本語*/break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-label > invalid 50`] = `
+{
+  "code": "const s = "🚀"; A: while (a) { break A; }",
+  "diagnostics": [
+    {
+      "message": "This label 'A' is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-label",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

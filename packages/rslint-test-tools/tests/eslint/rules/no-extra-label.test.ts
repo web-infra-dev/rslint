@@ -74,6 +74,12 @@ ruleTester.run('no-extra-label', {
     'A: while (a) {}',
     'A: {}',
     'A: ;',
+
+    // Multi-byte characters — CJK identifier label with legitimate nested break,
+    // and multi-byte content in surrounding strings that don't affect semantics
+    '中文: while (a) { while (b) { break 中文; } }',
+    'const s = "日本語"; A: while (a) { while (b) { break A; } }',
+    'const s = "🚀"; A: while (a) { while (b) { break A; } }',
   ],
   invalid: [
     // Upstream ESLint invalid suite
@@ -290,6 +296,25 @@ ruleTester.run('no-extra-label', {
     },
     {
       code: 'A: for (;;) { B: for (;;) { C: for (;;) { break A; continue B; break C; } } }',
+      errors: [{ messageId: 'unexpected' }],
+    },
+
+    // Multi-byte characters — verifies UTF-16 column math and autofix byte
+    // ranges across CJK identifier labels and multi-byte trivia
+    {
+      code: '中文: while (a) break 中文;',
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'A: while(true) { break/*日本語*/ A; }',
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'A: while(true) { /*日本語*/break A; }',
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'const s = "🚀"; A: while (a) { break A; }',
       errors: [{ messageId: 'unexpected' }],
     },
   ],
