@@ -1,4 +1,4 @@
-// cspell:ignore aeiou DFFB DDEF
+// cspell:ignore aeiou DFFB DDEF dedup
 package no_misleading_character_class
 
 import (
@@ -859,6 +859,54 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 				Code: `var r = /[👍]\u{1F/`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "surrogatePairWithoutUFlag"}, // no suggestion
+				},
+			},
+
+			// ==== Regression: trailing-comma fix for `new RegExp(..., )` ====
+			{
+				// The fix must produce `new RegExp("...", "u",)` — NOT
+				// `new RegExp("..." "u",,)` (which was the pre-fix bug where
+				// the trailing-comma branch inserted text before the existing
+				// comma, producing a double-comma + missing separator).
+				Code: `var r = new RegExp("[🇯🇵]",)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `var r = new RegExp("[🇯🇵]", "u",)`},
+						},
+					},
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `var r = new RegExp("[🇯🇵]", "u",)`},
+						},
+					},
+				},
+			},
+
+			// ==== Regression: dedup by parsed u/v state (not raw flag string) ====
+			// `g` vs `i` have equivalent parser semantics (both non-uv), so the
+			// rule must not double-report when a literal with one of those
+			// flags is passed to RegExp() with the other.
+			{
+				Code: `const r = /[🇯🇵]/g; new RegExp(r, "i");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `const r = /[🇯🇵]/gu; new RegExp(r, "i");`},
+						},
+					},
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `const r = /[🇯🇵]/gu; new RegExp(r, "i");`},
+						},
+					},
+				},
+			},
+			// Flag reordering — `"gu"` vs `"ug"` — should also dedup.
+			{
+				Code: `const r = /[🇯🇵]/gu; new RegExp(r, "ug");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "regionalIndicatorSymbol"},
 				},
 			},
 

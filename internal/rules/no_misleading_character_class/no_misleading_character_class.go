@@ -1,4 +1,4 @@
-// cspell:ignore FFFD
+// cspell:ignore FFFD Dedup
 
 // Package no_misleading_character_class implements ESLint's
 // no-misleading-character-class rule on top of the layered regex / JS string
@@ -135,9 +135,11 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 	// TypeChecker is available. Files without type info (JS-only, no project)
 	// have TypeChecker == nil; in that case we intentionally skip the
 	// resolution path (same policy as other rules that rely on type info).
+	resolvedViaIdentifier := false
 	if patternNode.Kind == ast.KindIdentifier && ctx.TypeChecker != nil {
 		if resolved := resolveBindingInitializer(ctx, patternNode, eval); resolved != nil {
 			patternNode = resolved
+			resolvedViaIdentifier = true
 		}
 	}
 
@@ -152,18 +154,25 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 		return
 	}
 
-	// Skip the call path for a regex literal whose effective flags after
-	// override are identical to its own flags — the regex-literal listener
-	// already covers that case exactly. This prevents duplicate diagnostics
-	// on `const r = /[🇯🇵]/u; new RegExp(r, "u")` and siblings.
-	if patternNode.Kind == ast.KindRegularExpressionLiteral {
-		_, litFlags := utils.ExtractRegexPatternAndFlags(patternNode.Text())
-		if litFlags == flags {
+	rxFlags := utils.ParseRegexFlags(flags)
+
+	// Dedup only for the identifier-resolved case: when a regex literal is
+	// reached through a separate `const r = /.../`, the literal listener
+	// already fires on the var-decl initializer. If the call's override u/v
+	// state matches the literal's own, the call path produces identical
+	// diagnostics — skip it.
+	//
+	// For the INLINE case (`RegExp(/.../, flags)`) we always route through
+	// the call path here and the literal listener defers (see
+	// isRegexLiteralHandledByConstructor). This matches ESLint, which routes
+	// inline regex-literal args through its Program handler so the override
+	// flags can drive a flag-string-level autofix (`'i'` → `'iu'`).
+	if resolvedViaIdentifier && patternNode.Kind == ast.KindRegularExpressionLiteral {
+		_, litFlagsStr := utils.ExtractRegexPatternAndFlags(patternNode.Text())
+		if utils.ParseRegexFlags(litFlagsStr) == rxFlags {
 			return
 		}
 	}
-
-	rxFlags := utils.ParseRegexFlags(flags)
 
 	var matches []foundMatch
 	var patternForUFlagCheck string
@@ -226,8 +235,11 @@ func scanStringValueForMatches(ctx rule.RuleContext, reportNode *ast.Node, value
 
 // isRegexLiteralHandledByConstructor reports whether `node` (a regex literal)
 // is the first argument of a RegExp()/new RegExp() call that supplies an
-// explicit flags argument. When true, the constructor listener processes it
-// with override flags, so the regex-literal listener should skip.
+// explicit flags argument. When true, the constructor listener owns the
+// pattern (running under the override flags) and this literal listener
+// defers so we don't double-report. This mirrors ESLint's `checkedPatternNodes`
+// which routes inline regex-literal args through the Program handler so the
+// flag-string-level autofix (inserting `u` into the flags arg) can apply.
 func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bool {
 	parent := node.Parent
 	// Walk through parenthesized expressions upward.
@@ -257,9 +269,18 @@ func isRegexLiteralHandledByConstructor(ctx rule.RuleContext, node *ast.Node) bo
 	if args == nil || len(args.Nodes) < 2 {
 		return false
 	}
-	// Confirm node is the first argument (possibly through parens).
-	first := ast.SkipParentheses(args.Nodes[0])
-	return first == node
+	// Confirm node is the first argument (possibly through parens) AND the
+	// flags argument is statically known — otherwise the constructor path
+	// short-circuits and this listener must be the one to report.
+	if first := ast.SkipParentheses(args.Nodes[0]); first != node {
+		return false
+	}
+	flagsNode := ast.SkipParentheses(args.Nodes[1])
+	if flagsNode == nil {
+		return false
+	}
+	return flagsNode.Kind == ast.KindStringLiteral ||
+		flagsNode.Kind == ast.KindNoSubstitutionTemplateLiteral
 }
 
 // resolveBindingInitializer attempts to resolve an identifier to its
@@ -968,43 +989,20 @@ func hasInvalidIdentityEscapeForUFlag(pattern string) bool {
 // Suggestion fix builders
 // ---------------------------------------------------------------------------
 
-func buildAddUFlagFixesForCall(sf *ast.SourceFile, callNode *ast.Node, args *ast.NodeList, hasFlags bool) []rule.RuleFix {
+func buildAddUFlagFixesForCall(sf *ast.SourceFile, _ *ast.Node, args *ast.NodeList, hasFlags bool) []rule.RuleFix {
 	if !hasFlags {
-		text := sf.Text()
-		callRange := utils.TrimNodeTextRange(sf, callNode)
-		closeParen := -1
-		for j := callRange.End() - 1; j >= callRange.Pos(); j-- {
-			if text[j] == ')' {
-				closeParen = j
-				break
-			}
-		}
-		if closeParen < 0 {
-			return nil
-		}
+		// Insert `, "u"` immediately after the last argument. This is safe
+		// whether or not a trailing comma follows — ES2017+ allows trailing
+		// commas in argument lists, so `Fn(a,)` → `Fn(a, "u",)` stays valid,
+		// and `Fn(a)` → `Fn(a, "u")` is the canonical non-trailing form.
 		lastArg := args.Nodes[len(args.Nodes)-1]
 		lastArgEnd := utils.TrimNodeTextRange(sf, lastArg).End()
-		hasTrailingComma := false
-		for j := lastArgEnd; j < closeParen; j++ {
-			if text[j] == ',' {
-				hasTrailingComma = true
-				break
-			}
-			if !isWS(text[j]) {
-				break
-			}
-		}
-		if hasTrailingComma {
-			return []rule.RuleFix{{
-				Range: core.NewTextRange(lastArgEnd, lastArgEnd),
-				Text:  ` "u",`,
-			}}
-		}
 		return []rule.RuleFix{{
-			Range: core.NewTextRange(closeParen, closeParen),
+			Range: core.NewTextRange(lastArgEnd, lastArgEnd),
 			Text:  `, "u"`,
 		}}
 	}
+
 	flagsNode := ast.SkipParentheses(args.Nodes[1])
 	if flagsNode == nil {
 		return nil
@@ -1019,8 +1017,6 @@ func buildAddUFlagFixesForCall(sf *ast.SourceFile, callNode *ast.Node, args *ast
 		Text:  "u",
 	}}
 }
-
-func isWS(b byte) bool { return b == ' ' || b == '\t' || b == '\n' || b == '\r' }
 
 func nodeRawText(sf *ast.SourceFile, n *ast.Node) string {
 	r := utils.TrimNodeTextRange(sf, n)
