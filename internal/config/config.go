@@ -145,6 +145,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extra_boolean_cast"
 	"github.com/web-infra-dev/rslint/internal/rules/no_fallthrough"
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
@@ -573,6 +574,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-useless-concat", no_useless_concat.NoUselessConcatRule)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
+	GlobalRuleRegistry.Register("no-extra-boolean-cast", no_extra_boolean_cast.NoExtraBooleanCastRule)
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
 	GlobalRuleRegistry.Register("no-undef-init", no_undef_init.NoUndefInitRule)
 	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
