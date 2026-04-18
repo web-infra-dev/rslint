@@ -1,0 +1,525 @@
+// Rstest Snapshot v1
+
+exports[`no-self-compare > invalid 1`] = `
+{
+  "code": "if (x === x) { }",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 2`] = `
+{
+  "code": "if (x !== x) { }",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 3`] = `
+{
+  "code": "if (x > x) { }",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 4`] = `
+{
+  "code": "if ('x' > 'x') { }",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 5`] = `
+{
+  "code": "do {} while (x === x)",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 6`] = `
+{
+  "code": "x === x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 7`] = `
+{
+  "code": "x !== x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 8`] = `
+{
+  "code": "x == x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 9`] = `
+{
+  "code": "x != x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 10`] = `
+{
+  "code": "x > x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 11`] = `
+{
+  "code": "x < x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 12`] = `
+{
+  "code": "x >= x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 13`] = `
+{
+  "code": "x <= x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 14`] = `
+{
+  "code": "foo.bar().baz.qux >= foo.bar ().baz .qux",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 15`] = `
+{
+  "code": "class C { #field; foo() { this.#field === this.#field; } }",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 16`] = `
+{
+  "code": "a.b.c === a.b.c",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 17`] = `
+{
+  "code": "a[0] === a[0]",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 18`] = `
+{
+  "code": "foo() === foo()",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 19`] = `
+{
+  "code": "(x) === x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 20`] = `
+{
+  "code": "if (
+  x
+  ===
+  x
+) {}",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

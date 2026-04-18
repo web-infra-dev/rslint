@@ -1362,6 +1362,74 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 	return true
 }
 
+// HasSameTokens reports whether two nodes produce the same token stream when
+// viewed at the raw-source level — matching ESLint's
+// `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)` semantics, which
+// preserves the original source form of each literal. Unlike
+// [AreNodesStructurallyEqual], this helper distinguishes:
+//
+//   - `'a'` vs `"a"` (different quote style)
+//   - `0x1` vs `1` (different numeric source form)
+//   - `1n` vs `0x1n` (different bigint source form)
+//   - `1e2` vs `100` / `1.0` vs `1`
+//
+// Implementation: we recurse on the AST using [ast.SkipParentheses] and
+// [ast.Node.ForEachChild]. At leaf nodes (no children — identifiers,
+// literals, keyword tokens) we compare the raw source slice via
+// [scanner.GetSourceTextOfNodeFromSourceFile]. Whitespace and comments
+// between tokens live only in composite-node source ranges and are never
+// part of any leaf's text, so the comparison is whitespace-insensitive in
+// the same way ESLint's `getTokens` is.
+//
+// A raw-scanner implementation (walking [scanner.Scanner.Scan] over each
+// node's source span) would be closer to ESLint mechanically but cannot
+// re-scan template-literal middles/tails without parser context
+// (`ReScanTemplateToken` is not exposed in the shim). The AST-recursion
+// route sidesteps that limitation while preserving the key property: raw
+// source at every leaf.
+//
+// Use this helper when porting an ESLint rule whose oracle is token-level
+// equality (e.g. `no-self-compare`'s `hasSameTokens`); use
+// [AreNodesStructurallyEqual] when the rule's oracle is structural AST
+// equality and literal-form differences should NOT matter (e.g. duplicate
+// case detection).
+func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	a = ast.SkipParentheses(a)
+	b = ast.SkipParentheses(b)
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Kind != b.Kind {
+		return false
+	}
+	var aKids, bKids []*ast.Node
+	a.ForEachChild(func(c *ast.Node) bool {
+		aKids = append(aKids, c)
+		return false
+	})
+	b.ForEachChild(func(c *ast.Node) bool {
+		bKids = append(bKids, c)
+		return false
+	})
+	// Leaves: identifiers, literals, keyword tokens. Compare raw source.
+	if len(aKids) == 0 && len(bKids) == 0 {
+		return scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, a, false) ==
+			scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, b, false)
+	}
+	if len(aKids) != len(bKids) {
+		return false
+	}
+	for i := range aKids {
+		if !HasSameTokens(sourceFile, aKids[i], bKids[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 // IsArgumentOfSpecificCall reports whether `node` sits at argument position
 // `index` of a call to `<objectName>.<methodName>(...)` — covering optional
 // chaining and parenthesized callee expressions, e.g. `(Object?.defineProperty)(...)`.
