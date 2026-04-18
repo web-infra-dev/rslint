@@ -1338,6 +1338,23 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 	case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail,
 		ast.KindRegularExpressionLiteral:
 		return a.Text() == b.Text()
+	case ast.KindPrefixUnaryExpression:
+		// tsgo stores the operator as a Kind field, not as a child node, so
+		// ForEachChild would otherwise collapse `+x` and `-x` (both have one
+		// child, the Operand). Compare the Operator field before recursing.
+		ap, bp := a.AsPrefixUnaryExpression(), b.AsPrefixUnaryExpression()
+		return ap.Operator == bp.Operator && AreNodesStructurallyEqual(ap.Operand, bp.Operand)
+	case ast.KindPostfixUnaryExpression:
+		// Same gotcha as PrefixUnaryExpression — ForEachChild omits Operator.
+		ap, bp := a.AsPostfixUnaryExpression(), b.AsPostfixUnaryExpression()
+		return ap.Operator == bp.Operator && AreNodesStructurallyEqual(ap.Operand, bp.Operand)
+	case ast.KindMetaProperty:
+		// `new.target` and `import.meta` both use MetaProperty; the meta
+		// keyword lives in KeywordToken (Kind), which ForEachChild doesn't
+		// visit. In practice `name` (target vs meta) already distinguishes
+		// them, but compare the keyword explicitly for principled alignment.
+		am, bm := a.AsMetaProperty(), b.AsMetaProperty()
+		return am.KeywordToken == bm.KeywordToken && AreNodesStructurallyEqual(am.Name(), bm.Name())
 	}
 	// Composite / pure-token kinds: compare children pairwise. Token kinds
 	// without children (operators, keywords) fall through the empty loop and
@@ -1404,6 +1421,21 @@ func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	}
 	if a.Kind != b.Kind {
 		return false
+	}
+	// tsgo's ForEachChild does not visit operator/keyword fields that are
+	// stored as Kind enums rather than *Node children. Left to the generic
+	// recursion below, `+x` and `-x` would collapse (both PrefixUnary, same
+	// single Operand child). Compare those fields explicitly here.
+	switch a.Kind {
+	case ast.KindPrefixUnaryExpression:
+		ap, bp := a.AsPrefixUnaryExpression(), b.AsPrefixUnaryExpression()
+		return ap.Operator == bp.Operator && HasSameTokens(sourceFile, ap.Operand, bp.Operand)
+	case ast.KindPostfixUnaryExpression:
+		ap, bp := a.AsPostfixUnaryExpression(), b.AsPostfixUnaryExpression()
+		return ap.Operator == bp.Operator && HasSameTokens(sourceFile, ap.Operand, bp.Operand)
+	case ast.KindMetaProperty:
+		am, bm := a.AsMetaProperty(), b.AsMetaProperty()
+		return am.KeywordToken == bm.KeywordToken && HasSameTokens(sourceFile, am.Name(), bm.Name())
 	}
 	var aKids, bKids []*ast.Node
 	a.ForEachChild(func(c *ast.Node) bool {

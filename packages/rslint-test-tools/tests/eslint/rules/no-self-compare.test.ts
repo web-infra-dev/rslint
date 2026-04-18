@@ -32,6 +32,12 @@ ruleTester.run('no-self-compare', {
     `1 === 1n`,
     `1 === 2`,
     `'a' === 'b'`,
+
+    // ---- Operator-sensitivity regression guards ----
+    `+x === -x`,
+    `++x === --x`,
+    `x++ === x--`,
+    `~x === !x`,
   ],
   invalid: [
     // ---- Upstream ESLint suite ----
@@ -116,6 +122,20 @@ ruleTester.run('no-self-compare', {
     {
       code: 'if (\n  x\n  ===\n  x\n) {}',
       errors: [{ messageId: 'comparingToSelf', line: 2, column: 3 }],
+    },
+    // ---- Unary self-compare (positive cases for the operator gate) ----
+    {
+      code: `+x === +x`,
+      errors: [{ messageId: 'comparingToSelf', line: 1, column: 1 }],
+    },
+    {
+      code: `x++ === x++`,
+      errors: [{ messageId: 'comparingToSelf', line: 1, column: 1 }],
+    },
+    // ---- Emoji (UTF-16 surrogate pair) inside string literal ----
+    {
+      code: `'🍎' === '🍎'`,
+      errors: [{ messageId: 'comparingToSelf', line: 1, column: 1 }],
     },
   ],
 });

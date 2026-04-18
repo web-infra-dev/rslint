@@ -50,12 +50,21 @@ func TestNoSelfCompareRule(t *testing.T) {
 			{Code: `foo.bar() === foo.bar`},
 			{Code: `a?.b === a.b`}, // optional chain preserved
 
-			// ---- Unary / update differences ----
+			// ---- Unary / update differences (different Kind on one side) ----
 			{Code: `+x === x`},
 			{Code: `-x === x`},
 			{Code: `!x === x`},
 			{Code: `typeof x === x`},
 			{Code: `++x === x`},
+
+			// ---- Same Kind, different operator token ----
+			// Regression guard: PrefixUnary / PostfixUnary store their operator
+			// as a Kind enum that tsgo's ForEachChild does NOT visit, so these
+			// would collapse under a naive children-only compare.
+			{Code: `+x === -x`},
+			{Code: `++x === --x`},
+			{Code: `x++ === x--`},
+			{Code: `~x === !x`},
 
 			// ---- Different literal kinds or values ----
 			{Code: `1 === 1n`},
@@ -226,6 +235,30 @@ func TestNoSelfCompareRule(t *testing.T) {
 				Code: `1n === 1n`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "comparingToSelf", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
+				},
+			},
+
+			// ---- Same-operator unary/update — regression guard that the operator
+			//      gate doesn't over-filter the valid self-compare cases. ----
+			{
+				Code: `+x === +x`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "comparingToSelf", Line: 1, Column: 1, EndLine: 1, EndColumn: 10},
+				},
+			},
+			{
+				Code: `x++ === x++`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "comparingToSelf", Line: 1, Column: 1, EndLine: 1, EndColumn: 12},
+				},
+			},
+
+			// ---- Multi-byte (UTF-16 surrogate pair, BMP-outside emoji in string) ----
+			// LSP ranges are UTF-16-based; an emoji is 2 code units, not 1 rune.
+			{
+				Code: `'🍎' === '🍎'`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "comparingToSelf", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
 				},
 			},
 		},

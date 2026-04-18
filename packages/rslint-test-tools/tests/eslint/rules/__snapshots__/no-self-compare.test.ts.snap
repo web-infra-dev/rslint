@@ -523,3 +523,81 @@ exports[`no-self-compare > invalid 20`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-self-compare > invalid 21`] = `
+{
+  "code": "+x === +x",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 22`] = `
+{
+  "code": "x++ === x++",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-compare > invalid 23`] = `
+{
+  "code": "'🍎' === '🍎'",
+  "diagnostics": [
+    {
+      "message": "Comparing to itself is potentially pointless.",
+      "messageId": "comparingToSelf",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
