@@ -64,11 +64,7 @@ Whitelists the listed bitwise operators as exceptions. Only operators exactly ma
 Example configuration:
 
 ```json
-{
-  "rules": {
-    "no-bitwise": ["error", { "allow": ["~"] }]
-  }
-}
+{ "no-bitwise": ["error", { "allow": ["~"] }] }
 ```
 
 Examples of **correct** code with the above configuration:
@@ -87,11 +83,7 @@ When `true`, permits the `x | 0` idiom commonly used to coerce a number to a 32-
 Example configuration:
 
 ```json
-{
-  "rules": {
-    "no-bitwise": ["error", { "int32Hint": true }]
-  }
-}
+{ "no-bitwise": ["error", { "int32Hint": true }] }
 ```
 
 Examples of **correct** code with the above configuration:

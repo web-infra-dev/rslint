@@ -333,10 +333,22 @@ Examples of **correct** code for this rule:
 var x = { a: 1, b: 2 };
 ```
 
+Examples of **incorrect** code for this rule with `{ "someOption": true }`:
+
+```json
+{ "<rule-name>": ["error", { "someOption": true }] }
+```
+
+```javascript
+// Example
+```
+
 ## Original Documentation
 
 [Link to ESLint documentation]
 ````
+
+**Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
 
 ### Step 4: Write Go Tests
 

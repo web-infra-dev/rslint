@@ -10,11 +10,7 @@ going on. This rule caps the number of lines in a file.
 With the `{ "max": 3 }` option:
 
 ```json
-{
-  "rules": {
-    "max-lines": ["error", 3]
-  }
-}
+{ "max-lines": ["error", 3] }
 ```
 
 Examples of **incorrect** code for this rule:
@@ -48,11 +44,7 @@ following properties:
 ### `skipBlankLines`
 
 ```json
-{
-  "rules": {
-    "max-lines": ["error", { "max": 2, "skipBlankLines": true }]
-  }
-}
+{ "max-lines": ["error", { "max": 2, "skipBlankLines": true }] }
 ```
 
 Examples of **correct** code with the above configuration:
@@ -67,11 +59,7 @@ var b = 2;
 ### `skipComments`
 
 ```json
-{
-  "rules": {
-    "max-lines": ["error", { "max": 2, "skipComments": true }]
-  }
-}
+{ "max-lines": ["error", { "max": 2, "skipComments": true }] }
 ```
 
 Examples of **correct** code with the above configuration:

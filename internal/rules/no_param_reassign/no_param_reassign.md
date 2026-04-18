@@ -32,9 +32,7 @@ function foo(bar) {
 ## Options
 
 ```json
-{
-  "no-param-reassign": ["error", { "props": false }]
-}
+{ "no-param-reassign": ["error", { "props": false }] }
 ```
 
 ```json
@@ -56,8 +54,11 @@ function foo(bar) {
 
 Examples of **incorrect** code with `{ "props": true }`:
 
+```json
+{ "no-param-reassign": ["error", { "props": true }] }
+```
+
 ```javascript
-/*eslint no-param-reassign: ["error", { "props": true }]*/
 function foo(bar) {
   bar.prop = 'value';
 }
@@ -73,8 +74,16 @@ function foo(bar) {
 
 Examples of **correct** code with `{ "props": true, "ignorePropertyModificationsFor": ["bar"] }`:
 
+```json
+{
+  "no-param-reassign": [
+    "error",
+    { "props": true, "ignorePropertyModificationsFor": ["bar"] }
+  ]
+}
+```
+
 ```javascript
-/*eslint no-param-reassign: ["error", { "props": true, "ignorePropertyModificationsFor": ["bar"] }]*/
 function foo(bar) {
   bar.prop = 'value';
 }
