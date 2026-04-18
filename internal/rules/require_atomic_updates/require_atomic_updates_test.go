@@ -53,6 +53,19 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			// ---- Shadowed variable in inner closure ----
 			{Code: `async function x() { let foo; bar(() => { let foo; blah(foo); }); foo += await result; }`},
 
+			// ---- Property access name in closure is NOT a variable reference ----
+			// `(item) => item.foo` only references `item`, not outer `foo`.
+			// So outer `foo` is still local-without-escape.
+			{Code: `
+				async function x(list, api) {
+					list.map((item) => item.foo);
+					let foo = 1;
+					if (list.length && foo !== 2) {
+						await api.update({ foo });
+						foo = 2;
+					}
+				}`},
+
 			// ---- Read and write before await (separate statements) ----
 			{Code: `let foo; async function x() { foo = foo + 1; await bar; }`},
 
@@ -211,6 +224,107 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			// ---- for-await-of: no read of outer var before loop ----
 			{Code: `let foo; async function x() { for await (const item of gen) { foo = item; } }`},
 
+			// ---- ESLint quirk: for-of / for-in / for-await-of bodies don't inherit
+			//      pre-loop read state, so an outer read isn't outdated by body awaits. ----
+			{Code: `let foo; function cb() { return foo; }
+				async function x(gen) { foo; for await (const item of gen) { foo = item; } }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function x(arr, hook) { foo; for (const c of arr) { await hook(); foo = 1; } }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function x(arr, hook) { foo; for (const k in arr) { await hook(); foo = 1; } }`},
+
+			// ---- for-of assignment form: bare-identifier target is pure-write ----
+			// ESLint's getWriteExpr breaks at the for-of boundary only WHEN traversing
+			// through a member access. A bare identifier is treated as a pure write,
+			// so `foo` doesn't get marked as read → body await can't outdate it.
+			{Code: `let foo; function cb() { return foo; }
+				async function f(gen, x) { for (foo of gen) { await x; foo = 1; } }`},
+
+			// ---- for-of assignment form: destructure target without pre-read ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(gen) { for ({foo} of gen) {} }`},
+
+			// ---- for-of with plain const binding: no reads in initializer ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(gen, x) { for (const it of gen) { await x; foo = it; } }`},
+
+			// ---- for-loop's update runs in a fresh segment: a simple `foo = await x`
+			//      in the update doesn't see pre-loop reads, so no race is reported. ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; for(;; foo = await x) {} }`},
+
+			// ---- switch where every case exits via return/throw: post-switch
+			//      doesn't inherit any case's outdated state. ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x, n) { foo; switch (n) { case 1: await x; return; case 2: return; } foo = 1; }`},
+
+			// ---- Catch binding shadows outer: inner write doesn't see outer state ----
+			// Also covers: optional catch (no binding) leaves the outer variable
+			// visible, see invalid counterpart below.
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { try { foo; await x; } catch (foo) { foo = 1; } }`},
+
+			// ---- Catch binding destructured: same shadow rule applies ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { try { foo; await x; } catch ({ foo }) { foo = 1; } }`},
+
+			// ---- let/const in a bare block shadow outer for the block duration ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; await x; { let foo = 1; foo = 2; } }`},
+
+			// ---- Block-scoped function / class declarations shadow outer ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; await x; { function foo() {} foo(); } }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; await x; { class foo {} new foo(); } }`},
+
+			// ---- for-loop let shadow covers init / cond / body / update ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; await x; for (let foo = 0; foo < 1; foo++) {} }`},
+
+			// ---- Nested async function is a separate scope ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f() { async function inner() { foo; } }`},
+
+			// ---- namespace with a function export + function RHS: no report
+			//      (function-like RHS skip aligns with ESLint's :expression:exit quirk). ----
+			{Code: `namespace NS { export function foo() {} }
+				function cb() { return NS.foo; }
+				async function f(x: any) { NS.foo; await x; NS.foo = () => {}; }`},
+
+			// ---- RHS is a function/arrow expression: ESLint silently skips the
+			//      outdated check (the :expression:exit fires inside the inner
+			//      function's CodePath whose referenceMap is null). Match it. ----
+			{Code: `let foo: any; function cb() { return foo; }
+				async function f(x: any) { foo; await x; foo = () => {}; }`},
+			{Code: `let foo: any; function cb() { return foo; }
+				async function f(x: any) { foo; await x; foo = function () {}; }`},
+			{Code: `let foo: any; function cb() { return foo; }
+				async function f(x: any) { foo; await x; foo = async () => {}; }`},
+			// Class / object RHS still reports (they don't start a function CodePath).
+			{Code: `let foo = {}; function cb() { return foo; }
+				async function f(x: any) { await x; foo.bar = 1; }`},
+
+			// ---- try that ALWAYS returns: catch entry = pre-try state ----
+			// Outdates produced late in the try don't leak into catch's state.
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; try { await x; return; } catch {} foo = 1; }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { try { foo; await x; return; } catch { foo = 1; } }`},
+
+			// ---- Both try and catch always exit: post-try unreachable ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { try { await x; return; } catch { throw 0; } foo = 1; }`},
+
+			// ---- Member write target where base is NOT read-before-await ----
+			// `await x; foo.bar = 1` has no race because `foo` was never read before await.
+			{Code: `let foo = {}; function cb() { return foo; }
+				async function f(x) { await x; foo.bar = 1; foo = 2; }`},
+
+			// ---- `foo[k] = 1` — the computed key `k` read marks k, clearing its outdated ----
+			{Code: `let foo, k; function cb() { return foo + k; }
+				async function f(x) { k; await x; foo[k] = 1; }`},
+
 			// ---- yield*: still a yield, but local var is safe ----
 			{Code: `function* x() { let foo; foo += yield* gen; }`},
 
@@ -297,6 +411,31 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 					}`,
 				Options: map[string]interface{}{"allowProperties": true},
 			},
+
+			// ---- Loop body awaits don't propagate to post-loop code ----
+			// ESLint per-segment initialization: post-loop sees entry state, not body state.
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; for (let i = 0; i < 10; i++) { await x; } foo = 1; }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; while (x) { await x; } foo = 1; }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; do { await x; } while (x); foo = 1; }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function f(gen) { foo; for (const it of gen) { await it; } foo = 1; }`},
+			{Code: `let foo; function cb() { return foo; }
+				async function f(gen) { foo; for await (const it of gen) {} foo = 1; }`},
+
+			// ---- Update expressions (foo++, --foo) are not tracked as assignments ----
+			{Code: `let foo; function cb() { return foo; } async function f(x) { foo; await x; foo++; }`},
+			{Code: `let foo; function cb() { return foo; } async function f(x) { await x; --foo; }`},
+
+			// ---- Await in LHS base doesn't register the member target ----
+			// `(await ptr).foo = x` — the chain breaks at AwaitExpression, foo isn't tracked.
+			{Code: `let foo; function cb() { return foo; } async function f(ptr, x) { foo; (await ptr).foo = x; }`},
+
+			// ---- Labeled break before await: no race ----
+			{Code: `let foo; function cb() { return foo; }
+				async function f(x) { foo; outer: for (;;) { if (x) break outer; await x; } foo = 1; }`},
 
 			// ---- Exponential time regression test (many branches) ----
 			{Code: `
@@ -797,10 +936,13 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			},
 
 			// ---- TypeScript: type assertion wrapping LHS ----
+			// The type wrapper keeps foo as the write target but ESLint reports
+			// as nonAtomicObjectUpdate with the wrapper text as the value
+			// (since AssignmentExpression.left !== identifier).
 			{
 				Code: `let foo; async function x() { (foo as any) += await bar; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "nonAtomicUpdate"},
+					{MessageId: "nonAtomicObjectUpdate"},
 				},
 			},
 
@@ -935,10 +1077,12 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			},
 
 			// ---- NonNull assertion on LHS ----
+			// Same as type-assertion: ESLint reports the wrapper form as
+			// nonAtomicObjectUpdate since the LHS is not the bare identifier.
 			{
 				Code: `let foo: number | null; async function x() { foo! += await bar; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "nonAtomicUpdate"},
+					{MessageId: "nonAtomicObjectUpdate"},
 				},
 			},
 
@@ -963,21 +1107,6 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 			// ---- void expression wrapping assignment ----
 			{
 				Code: `let foo; async function x() { void (foo += await bar); }`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "nonAtomicUpdate"},
-				},
-			},
-
-			// ---- for-await-of: read before loop, write inside ----
-			{
-				Code: `
-					let foo;
-					async function x() {
-						foo;
-						for await (const item of gen) {
-							foo = item;
-						}
-					}`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicUpdate"},
 				},
@@ -1270,6 +1399,263 @@ func TestRequireAtomicUpdatesRule(t *testing.T) {
 							case 1: await bar; foo = 1;
 						}
 					}`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Element access: computed index on LHS of simple `=` is read ----
+			// `foo[x] = await bar` reads `x`; `x = 1` after must report.
+			{
+				Code: `let x; let foo = {}; function cb() { return x; }
+					async function f(bar) { foo[x] = await bar; x = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Destructuring assignment: object pattern ----
+			{
+				Code: `let foo; function cb() { return foo; } async function f(src, x) { foo; await x; ({foo} = src); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// ---- Destructuring assignment: array pattern ----
+			{
+				Code: `let foo; function cb() { return foo; } async function f(src, x) { foo; await x; [foo] = src; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// ---- Destructuring: aliased target `{a: foo}` ----
+			{
+				Code: `let foo; function cb() { return foo; } async function f(src, x) { foo; await x; ({a: foo} = src); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// ---- Destructuring: multiple variables ----
+			{
+				Code: `let foo, bar; function cb() { return foo + bar; } async function f(src, x) { foo; bar; await x; ({foo, bar} = src); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// ---- Destructuring: default with await outdates target ----
+			{
+				Code: `let foo; function cb() { return foo; } async function f(src, x) { foo; ({foo = await x} = src); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// ---- Outer variable still outdated after shadowed inner block ----
+			// Inner `let foo`'s writes don't affect outer foo; the outer write
+			// after the block still sees the outdated state from the earlier await.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { foo; await x; { let foo = 1; foo = 2; } foo = 3; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// Same with if-block containing the shadowing let.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x, cond) { foo; await x; if (cond) { let foo = 1; foo = 2; } foo = 3; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// Block-scoped function declaration shadow: outer write after block reports.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { foo; await x; { function foo() {} foo(); } foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// Block-scoped class declaration shadow.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { foo; await x; { class foo {} new foo(); } foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// for-loop let shadow: outer write after for reports.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { foo; await x; for (let foo = 0; foo < 1; foo++) {} foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// Catch binding shadow: outer write after try/catch reports.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { try { foo; await x; } catch (foo) { foo = 1; } foo = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// TypeScript namespace / module at outer scope creates a value binding
+			// that is tracked as declared.
+			{
+				Code: `namespace NS { export var foo = 1; }
+					function cb() { return NS.foo; }
+					async function f(x: any) { NS.foo; await x; NS.foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// Namespace with a function export, value RHS still reports
+			{
+				Code: `namespace NS { export function foo() {} }
+					function cb() { return NS.foo; }
+					async function f(x: any) { NS.foo; await x; NS.foo = 1 as any; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// Nested namespace: outer member read + await + inner member write
+			{
+				Code: `namespace A { export namespace B { export var foo = 1; } }
+					function cb() { return A.B.foo; }
+					async function f(x: any) { A.B.foo; await x; A.B.foo = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+			// declare namespace at outer scope is tracked too
+			{
+				Code: `declare namespace NS { var foo: number; }
+					async function f(x: any) { NS.foo; await x; NS.foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+
+			// TS type wrappers on the LHS are transparent for the write-target chain:
+			// `(foo as any) = 1` treats foo as write target (no extra markRead), and
+			// ESLint reports the write itself as nonAtomicObjectUpdate (wrapper text).
+			{
+				Code: `let foo: any; function cb() { return foo; }
+					async function f(x: any) { foo; await x; (foo as any) = 1; foo = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// Non-null assertion directly on simple LHS
+			{
+				Code: `let foo: any; function cb() { return foo; }
+					async function f(x: any) { foo; await x; foo! = 1; foo = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// Optional catch (no binding): `foo` inside catch IS the outer variable.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { try { foo; await x; } catch { foo = 1; } foo = 2; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- for-of declaration with await default in destructure ----
+			// The default `foo + await gen.y` reads foo then awaits, outdating foo
+			// within the loop's body state; the subsequent write reports.
+			{
+				Code: `let foo = 1; function cb() { return foo; }
+					async function f(gen) { for (const { x = foo + await gen.y } of [{}]) { foo = x; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// ---- for-of assignment-form destructure with await default ----
+			{
+				Code: `let foo = 1; function cb() { return foo; }
+					async function f(gen) { for ({ x = foo + await gen.y } of [{}]) { foo = x; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+			// ---- Compound `foo += await x` in a for-loop update still reports ----
+			// The LHS is a read+write, so `foo` is marked fresh inside the update
+			// segment; the await then outdates it and the implicit write reports.
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { for(;; foo += await x) {} }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Destructuring default with re-read doesn't clear outer outdated ----
+			// Defaults are conditional branches: an outdate from one default
+			// propagates by union, and a re-read inside another default does NOT
+			// clear the outer's outdated flag for that name.
+			{
+				Code: `let foo, bar; function cb() { return foo + bar; }
+					async function f(src, x) { foo; bar; const {a = await x, b = foo + bar} = src; foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Labeled break from nested loop carries state to the labeled
+			//      loop's post-loop point. After `break outer`, post-outer-loop
+			//      sees the state at the break (foo outdated). ----
+			{
+				Code: `let foo; function cb() { return foo; }
+					async function f(x) { outer: for (;;) { for (;;) { foo; await x; break outer; } } foo = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- for-of assignment form: member target base IS read ----
+			// `foo.bar of gen` reads foo (object base). await then outdates foo;
+			// subsequent `foo = 1` reports.
+			{
+				Code: `let foo = {}; function cb() { return foo; }
+					async function f(gen, x) { for (foo.bar of gen) { await x; foo = 1; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Destructuring: rest element ----
+			{
+				Code: `let foo; function cb() { return foo; } async function f(src, x) { foo; await x; ({...foo} = src); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicObjectUpdate"},
+				},
+			},
+
+			// ---- Chained assignment `a = b = 1` reports each target ----
+			{
+				Code: `let a, b; function cb() { return a + b; } async function f(x) { a; b; await x; a = b = 1; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "nonAtomicUpdate"},
+					{MessageId: "nonAtomicUpdate"},
+				},
+			},
+
+			// ---- Non-null assertion on LHS breaks write-target chain ----
+			// ESLint only walks MemberExpression.object; type assertions break the chain,
+			// so `foo` in `foo!.bar = X` is a read (not a write-target base). Thus `foo = 1`
+			// after an await is reported. The `foo!.bar =` line itself is NOT reported
+			// (the chain breaks before reaching the assignment for registration).
+			{
+				Code: `let foo: any; function cb() { return foo; }
+					async function f(bar) { foo!.bar = await bar; foo = 1; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "nonAtomicUpdate"},
 				},

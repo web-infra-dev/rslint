@@ -53,6 +53,21 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 		return false
 	}
 
+	// Property access name: a.b — `b` is a property key, not a variable reference.
+	if parent.Kind == ast.KindPropertyAccessExpression && parent.AsPropertyAccessExpression().Name() == node {
+		return true
+	}
+
+	// Qualified type name: A.B.C (used in types) — right-hand names are not refs.
+	if parent.Kind == ast.KindQualifiedName && parent.AsQualifiedName().Right == node {
+		return true
+	}
+
+	// Meta property: new.target, import.meta — `target`/`meta` are keywords.
+	if parent.Kind == ast.KindMetaProperty {
+		return true
+	}
+
 	// Re-export specifiers: export { x } from 'mod'
 	// All identifiers are source module names, not local references.
 	if parent.Kind == ast.KindExportSpecifier && isReExportSpecifier(parent) {
