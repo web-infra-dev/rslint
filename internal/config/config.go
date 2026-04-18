@@ -137,6 +137,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
+	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
@@ -601,6 +602,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
 	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
 	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
+	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
