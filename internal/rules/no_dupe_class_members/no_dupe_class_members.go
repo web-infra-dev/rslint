@@ -73,13 +73,15 @@ var NoDupeClassMembersRule = rule.Rule{
 
 				// "$" prefix avoids collisions with built-in map keys.
 				key := "$" + name
-				if stateMap[key] == nil {
-					stateMap[key] = &stateEntry{}
+				entry, ok := stateMap[key]
+				if !ok {
+					entry = &stateEntry{}
+					stateMap[key] = entry
 				}
 
-				state := &stateMap[key].nonStatic
+				state := &entry.nonStatic
 				if ast.IsStatic(member) {
-					state = &stateMap[key].static
+					state = &entry.static
 				}
 
 				var isDuplicate bool
