@@ -166,8 +166,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
-	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
-	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
@@ -199,9 +197,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
+	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
+	core_prefer_promise_reject_errors "github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
+	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
@@ -603,6 +604,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
 	GlobalRuleRegistry.Register("no-undef-init", no_undef_init.NoUndefInitRule)
 	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
+	GlobalRuleRegistry.Register("prefer-promise-reject-errors", core_prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
 	GlobalRuleRegistry.Register("prefer-template", prefer_template.PreferTemplateRule)
 	GlobalRuleRegistry.Register("no-this-before-super", no_this_before_super.NoThisBeforeSuperRule)
 	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
