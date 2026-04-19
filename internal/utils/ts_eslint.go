@@ -196,7 +196,13 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 		start := TrimNodeTextRange(sourceFile, node)
-		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+		// Start scanning for the parameters `(` after the method name to avoid
+		// matching the `(` of a decorator factory call like `@dec()`.
+		searchFrom := node.Pos()
+		if name := node.Name(); name != nil {
+			searchFrom = name.End()
+		}
+		if parenPos := findOpenParenPosFrom(sourceFile, searchFrom, node.End()); parenPos >= 0 {
 			return start.WithEnd(parenPos)
 		}
 		if node.Body() != nil {
@@ -257,8 +263,12 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 // findOpenParenPos finds the position of the first '(' token in a function node.
 func findOpenParenPos(sourceFile *ast.SourceFile, node *ast.Node) int {
-	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-	end := node.End()
+	return findOpenParenPosFrom(sourceFile, node.Pos(), node.End())
+}
+
+// findOpenParenPosFrom scans for the first '(' token within [start, end).
+func findOpenParenPosFrom(sourceFile *ast.SourceFile, start int, end int) int {
+	s := scanner.GetScannerForSourceFile(sourceFile, start)
 	for s.TokenStart() < end {
 		if s.Token() == ast.KindOpenParenToken {
 			return s.TokenStart()

@@ -204,6 +204,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
+	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
@@ -633,6 +634,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
+	GlobalRuleRegistry.Register("require-yield", require_yield.RequireYieldRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
