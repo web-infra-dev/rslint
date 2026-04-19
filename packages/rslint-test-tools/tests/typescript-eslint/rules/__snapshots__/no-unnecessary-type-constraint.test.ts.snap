@@ -1,0 +1,596 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-type-constraint > invalid 1`] = `
+{
+  "code": "function data<T extends any>() {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 2`] = `
+{
+  "code": "function data<T extends any, U>() {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 3`] = `
+{
+  "code": "function data<T, U extends any>() {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`U\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 4`] = `
+{
+  "code": "function data<T extends any, U extends T>() {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 5`] = `
+{
+  "code": "const data = <T extends any>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 6`] = `
+{
+  "code": "const data = <T extends any>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 7`] = `
+{
+  "code": "const data = <T extends any>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 8`] = `
+{
+  "code": "const data = <T extends any,>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 9`] = `
+{
+  "code": "const data = <T extends any, >() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 10`] = `
+{
+  "code": "const data = <T extends any ,>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 11`] = `
+{
+  "code": "const data = <T extends any , >() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 12`] = `
+{
+  "code": "const data = <T extends any = unknown>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 13`] = `
+{
+  "code": "const data = <T extends any, U extends any>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+    {
+      "message": "Constraining the generic type \`U\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 14`] = `
+{
+  "code": "function data<T extends unknown>() {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 15`] = `
+{
+  "code": "const data = <T extends any>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 16`] = `
+{
+  "code": "const data = <T extends unknown>() => {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 17`] = `
+{
+  "code": "class Data<T extends unknown> {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 18`] = `
+{
+  "code": "const Data = class<T extends unknown> {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 19`] = `
+{
+  "code": "
+class Data {
+  member<T extends unknown>() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 20`] = `
+{
+  "code": "
+const Data = class {
+  member<T extends unknown>() {}
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 21`] = `
+{
+  "code": "interface Data<T extends unknown> {}",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 22`] = `
+{
+  "code": "type Data<T extends unknown> = {};",
+  "diagnostics": [
+    {
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "messageId": "unnecessaryConstraint",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-constraint",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
