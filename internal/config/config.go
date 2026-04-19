@@ -35,7 +35,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_confusing_void_expression"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dupe_class_members"
+	ts_no_dupe_class_members "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_enum_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_type_constituents"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dynamic_delete"
@@ -140,6 +140,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_delete_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
+	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
@@ -467,7 +468,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
-	GlobalRuleRegistry.Register("@typescript-eslint/no-dupe-class-members", no_dupe_class_members.NoDupeClassMembersRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-dupe-class-members", ts_no_dupe_class_members.NoDupeClassMembersRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-enum-values", no_duplicate_enum_values.NoDuplicateEnumValuesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-dynamic-delete", no_dynamic_delete.NoDynamicDeleteRule)
@@ -582,6 +583,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
 	GlobalRuleRegistry.Register("no-delete-var", no_delete_var.NoDeleteVarRule)
 	GlobalRuleRegistry.Register("no-dupe-args", no_dupe_args.NoDupeArgsRule)
+	GlobalRuleRegistry.Register("no-dupe-class-members", no_dupe_class_members.NoDupeClassMembersRule)
 	GlobalRuleRegistry.Register("no-dupe-keys", no_dupe_keys.NoDupeKeysRule)
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
