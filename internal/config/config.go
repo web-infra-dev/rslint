@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
+	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
@@ -339,6 +340,11 @@ var KnownPlugins = []PluginInfo{
 		getAllRules: func() []rule.Rule { return jestPlugin.GetAllRules() },
 	},
 	{
+		RulePrefix:  "promise",
+		DeclNames:   []string{"eslint-plugin-promise", "promise"},
+		getAllRules: func() []rule.Rule { return promisePlugin.GetAllRules() },
+	},
+	{
 		RulePrefix:  "react",
 		DeclNames:   []string{"react"},
 		getAllRules: func() []rule.Rule { return reactPlugin.GetAllRules() },
@@ -411,6 +417,7 @@ func RegisterAllRules() {
 		registerAllEslintImportPluginRules()
 		registerAllReactPluginRules()
 		registerAllJestPluginRules()
+		registerAllPromisePluginRules()
 		registerAllCoreEslintRules()
 	})
 }
@@ -423,6 +430,12 @@ func registerAllReactPluginRules() {
 
 func registerAllJestPluginRules() {
 	for _, rule := range jestPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
+}
+
+func registerAllPromisePluginRules() {
+	for _, rule := range promisePlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }
