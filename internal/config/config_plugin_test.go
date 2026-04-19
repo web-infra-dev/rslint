@@ -84,14 +84,13 @@ func TestGetCoreRules(t *testing.T) {
 func TestGetPluginRules_Disjoint(t *testing.T) {
 	RegisterAllRules()
 
-	tsRules := GetPluginRules("@typescript-eslint")
-	coreRules := GetCoreRules()
-	importRules := GetPluginRules("import")
-	jestRules := GetPluginRules("jest")
-	reactRules := GetPluginRules("react")
+	// Sum across core + every known plugin, so this test does not need to be
+	// edited each time a new plugin is added.
+	total := len(GetCoreRules())
+	for _, plugin := range KnownPlugins {
+		total += len(GetPluginRules(plugin.RulePrefix))
+	}
 
-	// Together they should cover all registered rules
-	total := len(tsRules) + len(coreRules) + len(importRules) + len(jestRules) + len(reactRules)
 	allRules := GlobalRuleRegistry.GetAllRules()
 	if total != len(allRules) {
 		t.Errorf("Expected total %d to equal all rules %d", total, len(allRules))
