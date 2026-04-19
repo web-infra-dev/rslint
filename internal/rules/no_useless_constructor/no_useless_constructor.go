@@ -3,6 +3,7 @@ package no_useless_constructor
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -197,7 +198,20 @@ func isAsciiSpace(b byte) bool {
 // cases like `foo = 'bar'\n constructor() {}\n [0]() {}` where simply dropping
 // the constructor would leave `foo = 'bar'` followed by `[0]()` and ASI would
 // reparse that as `foo = 'bar'[0]()`. A preceding `;` is inserted in its place.
+//
+// Matches ESLint's token-level check (`nextToken.value === "["`): any class
+// element whose first non-trivia token is `[` is an ASI risk — this covers
+// computed property names, computed methods/accessors, and TS index
+// signatures. A decorator `@`, modifier keyword (`static`/`readonly`/`public`/
+// `private`/`protected`/`override`/`abstract`/`declare`/`async`), plain name,
+// or a stray `;` (SemicolonClassElement) all shift the first token away from
+// `[` and therefore are safe.
 func needsLeadingSemicolon(sf *ast.SourceFile, classNode *ast.Node, node *ast.Node) bool {
+	text := sf.Text()
+	nextTokPos := scanner.SkipTrivia(text, node.End())
+	if nextTokPos >= len(text) || text[nextTokPos] != '[' {
+		return false
+	}
 	members := classNode.Members()
 	idx := -1
 	for i, m := range members {
@@ -206,14 +220,7 @@ func needsLeadingSemicolon(sf *ast.SourceFile, classNode *ast.Node, node *ast.No
 			break
 		}
 	}
-	if idx < 0 || idx+1 >= len(members) {
-		return false
-	}
-	nextName := members[idx+1].Name()
-	if nextName == nil || !ast.IsComputedPropertyName(nextName) {
-		return false
-	}
-	if idx == 0 {
+	if idx <= 0 {
 		return false
 	}
 	prev := members[idx-1]
@@ -224,7 +231,6 @@ func needsLeadingSemicolon(sf *ast.SourceFile, classNode *ast.Node, node *ast.No
 	if !ast.IsPropertyDeclaration(prev) {
 		return false
 	}
-	text := sf.Text()
 	i := prev.End() - 1
 	for i > prev.Pos() && isAsciiSpace(text[i]) {
 		i--

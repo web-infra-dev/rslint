@@ -649,6 +649,65 @@ class A {
 				}},
 			},
 		},
+		// ---- Next member is a TS IndexSignature `[key: string]: any` — also
+		//      starts with `[`, so ASI fires; must insert `;`.
+		{
+			Code: `
+class A {
+  foo = 'bar'
+  constructor() {}
+  [key: string]: any;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  foo = 'bar'\n  ;\n  [key: string]: any;\n}"},
+				}},
+			},
+		},
+		// ---- Next computed member is preceded by a decorator — first token
+		//      after the constructor is `@`, not `[`, so ESLint does NOT add `;`.
+		{
+			Code: `
+class A {
+  foo = 'bar'
+  constructor() {}
+  @Dec
+  [0]() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  foo = 'bar'\n  \n  @Dec\n  [0]() {}\n}"},
+				}},
+			},
+		},
+		// ---- Next member is `static [x]()` — first token is `static`, not `[`.
+		{
+			Code: `
+class A {
+  foo = 'bar'
+  constructor() {}
+  static [0]() {}
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  foo = 'bar'\n  \n  static [0]() {}\n}"},
+				}},
+			},
+		},
+		// ---- Next member is `readonly [x] = 1` — first token is `readonly`.
+		{
+			Code: `
+class A {
+  foo = 'bar'
+  constructor() {}
+  readonly [x] = 1
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUselessConstructor", Line: 4, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					{MessageId: "removeConstructor", Output: "\nclass A {\n  foo = 'bar'\n  \n  readonly [x] = 1\n}"},
+				}},
+			},
+		},
 		// ---- Next member has a numeric-literal name → not computed, safe.
 		{
 			Code: `
