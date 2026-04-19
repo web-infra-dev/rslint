@@ -102,6 +102,12 @@ ruleTester.run('require-yield', {
     '// comment\nfunction* foo() { yield 0; }',
     `/* comment */ function* foo() { yield 0; }`,
     `class A { /** doc */ foo = function*() { yield 0; }; }`,
+
+    // ---- Yield attribution boundary scenarios ----
+    `function* foo() { const o = { [yield 1]() { return 0; } }; return 0; }`,
+    `function* foo() { class C { [yield 1]() { return 0; } } return 0; }`,
+    `function* foo() { class C extends (yield 1) {} return 0; }`,
+    `function* foo() { yield yield 1; }`,
   ],
   invalid: [
     // ---- Upstream ESLint suite ----
@@ -640,6 +646,128 @@ ruleTester.run('require-yield', {
           column: 22,
           endLine: 1,
           endColumn: 37,
+        },
+      ],
+    },
+
+    // ---- Illegal yield in nested non-generator scope must NOT rescue outer generator ----
+    {
+      code: `function* foo() { function inner() { yield 1; } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { const f = function() { yield 1; }; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { const f = () => { yield 1; }; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { const f = () => yield 1; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { class C { m() { yield 1; } } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { const o = { get x() { yield 1; return 0; } }; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { const o = { set x(v) { yield 1; } }; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { class C { constructor() { yield 1; } } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { class C { x = yield 1; } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
+        },
+      ],
+    },
+    {
+      code: `function* foo() { class C { m() { function* g() { yield 1; } } } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 14,
         },
       ],
     },

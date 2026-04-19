@@ -131,6 +131,16 @@ func TestRequireYieldRule(t *testing.T) {
 			{Code: `/* comment */ function* foo() { yield 0; }`},
 			// JSDoc on class field with FE
 			{Code: `class A { /** doc */ foo = function*() { yield 0; }; }`},
+
+			// ---- Yield attribution boundary scenarios ----
+			// Yield in computed property key of object method (belongs to outer generator).
+			{Code: `function* foo() { const o = { [yield 1]() { return 0; } }; return 0; }`},
+			// Yield in computed property key of class method.
+			{Code: `function* foo() { class C { [yield 1]() { return 0; } } return 0; }`},
+			// Yield in class heritage expression.
+			{Code: `function* foo() { class C extends (yield 1) {} return 0; }`},
+			// Nested yield expression.
+			{Code: `function* foo() { yield yield 1; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Upstream ESLint suite ----
@@ -437,6 +447,72 @@ func TestRequireYieldRule(t *testing.T) {
 				Code: `class A { /** doc */ foo = function*() { return 0; }; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingYield", Line: 1, Column: 22, EndLine: 1, EndColumn: 37},
+				},
+			},
+
+			// ---- Illegal yield in nested non-generator scope must NOT rescue outer generator ----
+			// tsgo performs error-recovery parsing and still emits a KindYieldExpression
+			// node for these illegal positions; attribution logic must isolate them.
+			{
+				Code: `function* foo() { function inner() { yield 1; } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { const f = function() { yield 1; }; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { const f = () => { yield 1; }; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { const f = () => yield 1; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { class C { m() { yield 1; } } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { const o = { get x() { yield 1; return 0; } }; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { const o = { set x(v) { yield 1; } }; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { class C { constructor() { yield 1; } } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			{
+				Code: `function* foo() { class C { x = yield 1; } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
+				},
+			},
+			// Two-level: outer gen -> non-generator method -> nested generator with yield.
+			// Outer gen has no yield; inner nested gen is a separate scope and does not count.
+			{
+				Code: `function* foo() { class C { m() { function* g() { yield 1; } } } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
 				},
 			},
 		},
