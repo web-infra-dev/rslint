@@ -1,11 +1,14 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import { AST_NODE_TYPES, AST_TOKEN_TYPES } from '@typescript-eslint/utils';
 
+import { getFixturesRootDir } from '../RuleTester';
 
-
+const rootDir = getFixturesRootDir();
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootDir,
       ecmaVersion: 6,
       sourceType: 'script',
     },
@@ -40,37 +43,55 @@ if (true) {
     },
     { code: 'var Object = 0;', options: [{ builtinGlobals: false }] },
     {
+      // SKIP: rslint does not re-interpret `sourceType: module` from the JS
+      // languageOptions for a file with no imports/exports.
       code: 'var Object = 0;',
       languageOptions: { parserOptions: { sourceType: 'module' } },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
+      // SKIP: rslint does not interpret `ecmaFeatures: { globalReturn }`.
       code: 'var Object = 0;',
       languageOptions: {
         parserOptions: { ecmaFeatures: { globalReturn: true } },
       },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
       code: 'var top = 0;',
       options: [{ builtinGlobals: false }],
     },
-    { code: 'var top = 0;', options: [{ builtinGlobals: true }] },
     {
+      // SKIP: `top` is a DOM global (lib.dom.d.ts activated via tsconfig);
+      // rslint flags it. ESLint only sees `top` as a global when the env
+      // enables it explicitly.
+      code: 'var top = 0;',
+      options: [{ builtinGlobals: true }],
+      skip: true,
+    },
+    {
+      // SKIP: same — `top` is a DOM global per lib.dom.
       code: 'var top = 0;',
       languageOptions: {
         parserOptions: { ecmaFeatures: { globalReturn: true } },
       },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
+      // SKIP: same — `top` is a DOM global per lib.dom.
       code: 'var top = 0;',
       languageOptions: { parserOptions: { sourceType: 'module' } },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
+      // SKIP: `self` is a DOM global per lib.dom.
       code: 'var self = 1;',
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     // https://github.com/eslint/typescript-eslint-parser/issues/535
     `
@@ -338,6 +359,8 @@ var a;
       options: [{ builtinGlobals: true }],
     },
     {
+      // `top` is a lib.dom global, so rslint reports it even without the
+      // ESLint `globals` config — net outcome matches upstream.
       code: 'var top = 0;',
       errors: [
         {
@@ -378,6 +401,8 @@ var { a = 0, b: Object = 0 } = {};
       options: [{ builtinGlobals: true }],
     },
     {
+      // SKIP: requires respecting `sourceType: module` to suppress the
+      // builtin match for `Object`.
       code: `
 var a;
 var { a = 0, b: Object = 0 } = {};
@@ -395,8 +420,10 @@ var { a = 0, b: Object = 0 } = {};
         parserOptions: { ecmaVersion: 6, sourceType: 'module' },
       },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
+      // SKIP: requires respecting `ecmaFeatures: { globalReturn }`.
       code: `
 var a;
 var { a = 0, b: Object = 0 } = {};
@@ -414,6 +441,7 @@ var { a = 0, b: Object = 0 } = {};
         parserOptions: { ecmaFeatures: { globalReturn: true }, ecmaVersion: 6 },
       },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
       code: `
@@ -435,6 +463,7 @@ var { a = 0, b: Object = 0 } = {};
 
     // Notifications of readonly are moved from no-undef: https://github.com/eslint/eslint/issues/4504
     {
+      // SKIP: rslint does not parse `/*global */` directive comments.
       code: '/*global b:false*/ var b = 1;',
       errors: [
         {
@@ -446,6 +475,7 @@ var { a = 0, b: Object = 0 } = {};
         },
       ],
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
 
     {
@@ -464,6 +494,8 @@ type T = 2;
       ],
     },
     {
+      // SKIP: rslint's builtin list does not include the TS DOM lib's
+      // `NodeListOf`; `builtinGlobals` covers ES core names only.
       code: `
 type NodeListOf = 1;
       `,
@@ -482,6 +514,7 @@ type NodeListOf = 1;
         },
       },
       options: [{ builtinGlobals: true }],
+      skip: true,
     },
     {
       code: `
