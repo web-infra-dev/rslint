@@ -193,7 +193,7 @@ func HasShadowingParameter(node *ast.Node, name string) bool {
 }
 
 // HasShadowingDeclaration checks if a block contains a variable, function,
-// or class declaration whose name matches the given name.
+// class, enum, or namespace declaration whose name matches the given name.
 func HasShadowingDeclaration(node *ast.Node, name string) bool {
 	if node.Kind != ast.KindBlock {
 		return false
@@ -242,6 +242,19 @@ func HasShadowingDeclaration(node *ast.Node, name string) bool {
 			}
 		case ast.KindClassDeclaration:
 			if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
+				return true
+			}
+		case ast.KindEnumDeclaration:
+			if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
+				return true
+			}
+		case ast.KindModuleDeclaration:
+			// `namespace X {}` / `module X {}` introduce a value binding when
+			// named by an identifier. Skip ambient modules (`declare module "x"`),
+			// which use a string literal name and don't bind a variable.
+			modDecl := stmt.AsModuleDeclaration()
+			if modDecl != nil && modDecl.Name() != nil &&
+				modDecl.Name().Kind == ast.KindIdentifier && modDecl.Name().Text() == name {
 				return true
 			}
 		}
@@ -293,8 +306,11 @@ func HasLocalDeclarationInStatements(statements []*ast.Node, name string) bool {
 			}
 
 		case ast.KindModuleDeclaration:
+			// Ambient module (`declare module "x"`) uses a string-literal name
+			// and doesn't bind a variable — only identifier-named namespaces do.
 			modDecl := stmt.AsModuleDeclaration()
-			if modDecl != nil && modDecl.Name() != nil && modDecl.Name().Text() == name {
+			if modDecl != nil && modDecl.Name() != nil &&
+				modDecl.Name().Kind == ast.KindIdentifier && modDecl.Name().Text() == name {
 				return true
 			}
 

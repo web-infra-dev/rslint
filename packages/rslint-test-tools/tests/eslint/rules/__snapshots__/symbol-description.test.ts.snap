@@ -1,0 +1,940 @@
+// Rstest Snapshot v1
+
+exports[`symbol-description > invalid 1`] = `
+{
+  "code": "Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 2`] = `
+{
+  "code": "Symbol(); Symbol = function () {};",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 3`] = `
+{
+  "code": "var foo = Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 4`] = `
+{
+  "code": "function f() { return Symbol(); }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 5`] = `
+{
+  "code": "Symbol(
+);",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 6`] = `
+{
+  "code": "(Symbol)();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 7`] = `
+{
+  "code": "((Symbol))();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 8`] = `
+{
+  "code": "Symbol?.();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 9`] = `
+{
+  "code": "Symbol(/* no description */);",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 10`] = `
+{
+  "code": "{ let Symbol = 1; } Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 11`] = `
+{
+  "code": "function f(Symbol) { Symbol(); } Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 12`] = `
+{
+  "code": "(function (Symbol) {})(1); Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 13`] = `
+{
+  "code": "const f = () => Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 14`] = `
+{
+  "code": "class C { m() { Symbol(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 15`] = `
+{
+  "code": "class C { static { Symbol(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 16`] = `
+{
+  "code": "var s = Symbol(
+
+);",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 17`] = `
+{
+  "code": "throw Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 18`] = `
+{
+  "code": "Symbol().toString();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 19`] = `
+{
+  "code": "x || Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 20`] = `
+{
+  "code": "(a, Symbol());",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 21`] = `
+{
+  "code": "class C { x = Symbol(); }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 22`] = `
+{
+  "code": "class C { [Symbol()]() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 23`] = `
+{
+  "code": "const obj = { [Symbol()]: 1 };",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 24`] = `
+{
+  "code": "type Symbol = string; Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 25`] = `
+{
+  "code": "interface Symbol {} Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 26`] = `
+{
+  "code": "declare module "x" {} Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 27`] = `
+{
+  "code": "type Symbol = string; var s: Symbol = "x"; Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 28`] = `
+{
+  "code": "class C { @Symbol() method() {} }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 29`] = `
+{
+  "code": "class C { accessor Symbol = 1; m() { Symbol(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 30`] = `
+{
+  "code": "({ Symbol } = obj); Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 31`] = `
+{
+  "code": "[Symbol] = arr; Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 32`] = `
+{
+  "code": "declare global { var Symbol: any; } Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 33`] = `
+{
+  "code": "const x: Symbol = null as any; Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 34`] = `
+{
+  "code": "const x: { Symbol: any } = {} as any; Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 35`] = `
+{
+  "code": "Symbol(); Symbol("b");",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`symbol-description > invalid 36`] = `
+{
+  "code": "Symbol("a"); Symbol();",
+  "diagnostics": [
+    {
+      "message": "Expected Symbol to have a description.",
+      "messageId": "expected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "symbol-description",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
