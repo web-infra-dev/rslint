@@ -1,0 +1,2039 @@
+// Rstest Snapshot v1
+
+exports[`no-new > invalid 1`] = `
+{
+  "code": "new Date()",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 2`] = `
+{
+  "code": "new Foo;",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 3`] = `
+{
+  "code": "new Foo('a', 1);",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 4`] = `
+{
+  "code": "new foo.Bar();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 5`] = `
+{
+  "code": "new foo.bar.Baz();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 6`] = `
+{
+  "code": "(new Foo());",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 7`] = `
+{
+  "code": "((new Foo()));",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 8`] = `
+{
+  "code": "new new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 9`] = `
+{
+  "code": "label: new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 10`] = `
+{
+  "code": "function f() { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 11`] = `
+{
+  "code": "var f = () => { new Foo(); };",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 12`] = `
+{
+  "code": "if (true) { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 13`] = `
+{
+  "code": "class C { m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 14`] = `
+{
+  "code": "for (;;) { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 15`] = `
+{
+  "code": "try { new Foo(); } catch {}",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 16`] = `
+{
+  "code": "new Foo(); new Bar();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 17`] = `
+{
+  "code": "new
+  Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 18`] = `
+{
+  "code": "new Foo<number>();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 19`] = `
+{
+  "code": "class C { static { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 20`] = `
+{
+  "code": "new class {}();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 21`] = `
+{
+  "code": "new Foo\`\`;",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 22`] = `
+{
+  "code": "do { new Foo(); } while (false);",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 23`] = `
+{
+  "code": "while (true) { new Foo(); break; }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 24`] = `
+{
+  "code": "switch (x) { case 1: new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 25`] = `
+{
+  "code": "if (a) {} else { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 26`] = `
+{
+  "code": "try {} finally { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 27`] = `
+{
+  "code": "{ new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 28`] = `
+{
+  "code": "/* a */ new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 29`] = `
+{
+  "code": "new /* a */ Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 30`] = `
+{
+  "code": "if (a) new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 31`] = `
+{
+  "code": "if (a) new Foo(); else new Bar();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 32`] = `
+{
+  "code": "for (var i = 0; i < 1; i++) new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 33`] = `
+{
+  "code": "while (a) new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 34`] = `
+{
+  "code": "new (function(){})();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 35`] = `
+{
+  "code": "new Foo(...args);",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 36`] = `
+{
+  "code": "new Foo[0];",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 37`] = `
+{
+  "code": "var a = b
+new Foo()",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 38`] = `
+{
+  "code": "new Foo();;",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 39`] = `
+{
+  "code": "namespace N { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 40`] = `
+{
+  "code": "new (class {})();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 41`] = `
+{
+  "code": "new (class extends Base {})();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 42`] = `
+{
+  "code": "new (async function(){})();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 43`] = `
+{
+  "code": "new obj[key]();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 44`] = `
+{
+  "code": "new a.b.c.d();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 45`] = `
+{
+  "code": "new foo.Bar\`x\`;",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 46`] = `
+{
+  "code": "new Promise(r => { new Foo(); r(); });",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 47`] = `
+{
+  "code": ""use strict"; new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 48`] = `
+{
+  "code": "foo; new Bar(); baz;",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 49`] = `
+{
+  "code": "class C { constructor() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 50`] = `
+{
+  "code": "class C extends B { constructor() { super(); new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 51`] = `
+{
+  "code": "class C { static m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 52`] = `
+{
+  "code": "class C { get x() { new Foo(); return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 53`] = `
+{
+  "code": "class C { set x(v) { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 54`] = `
+{
+  "code": "class C { #m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 55`] = `
+{
+  "code": "var obj = { m() { new Foo(); } };",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 56`] = `
+{
+  "code": "var obj = { get x() { new Foo(); return 1; } };",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 57`] = `
+{
+  "code": "var obj = { set x(v) { new Foo(); } };",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 58`] = `
+{
+  "code": "try {} catch (e) { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 59`] = `
+{
+  "code": "for (var x in arr) new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 60`] = `
+{
+  "code": "for (var x of arr) new Foo();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 61`] = `
+{
+  "code": "async function f() { for await (const x of arr) new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 62`] = `
+{
+  "code": "(async () => { new Foo(); })();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 63`] = `
+{
+  "code": "new Foo(function() { new Bar(); });",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 64`] = `
+{
+  "code": "namespace A.B { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 65`] = `
+{
+  "code": "module N { new Foo(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 66`] = `
+{
+  "code": "abstract class A { constructor() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 67`] = `
+{
+  "code": "class B extends A { override m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 68`] = `
+{
+  "code": "class C { @dec m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 69`] = `
+{
+  "code": "class C implements I { m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 70`] = `
+{
+  "code": "class C extends Mix(Base) { m() { new Foo(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 71`] = `
+{
+  "code": "class C { static { let x = new Foo(); new Bar(); } }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 72`] = `
+{
+  "code": "new Foo<number, string>();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 73`] = `
+{
+  "code": "new ns.Foo<number>();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 74`] = `
+{
+  "code": "new Foo!();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 75`] = `
+{
+  "code": "new (Foo as any)();",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new > invalid 76`] = `
+{
+  "code": "async function f() { new (await import("x")).default(); }",
+  "diagnostics": [
+    {
+      "message": "Do not use 'new' for side effects.",
+      "messageId": "noNewStatement",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
