@@ -1338,6 +1338,23 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 	case ast.KindTemplateHead, ast.KindTemplateMiddle, ast.KindTemplateTail,
 		ast.KindRegularExpressionLiteral:
 		return a.Text() == b.Text()
+	case ast.KindPrefixUnaryExpression:
+		// tsgo stores the operator as a Kind field, not as a child node, so
+		// ForEachChild would otherwise collapse `+x` and `-x` (both have one
+		// child, the Operand). Compare the Operator field before recursing.
+		ap, bp := a.AsPrefixUnaryExpression(), b.AsPrefixUnaryExpression()
+		return ap.Operator == bp.Operator && AreNodesStructurallyEqual(ap.Operand, bp.Operand)
+	case ast.KindPostfixUnaryExpression:
+		// Same gotcha as PrefixUnaryExpression — ForEachChild omits Operator.
+		ap, bp := a.AsPostfixUnaryExpression(), b.AsPostfixUnaryExpression()
+		return ap.Operator == bp.Operator && AreNodesStructurallyEqual(ap.Operand, bp.Operand)
+	case ast.KindMetaProperty:
+		// `new.target` and `import.meta` both use MetaProperty; the meta
+		// keyword lives in KeywordToken (Kind), which ForEachChild doesn't
+		// visit. In practice `name` (target vs meta) already distinguishes
+		// them, but compare the keyword explicitly for principled alignment.
+		am, bm := a.AsMetaProperty(), b.AsMetaProperty()
+		return am.KeywordToken == bm.KeywordToken && AreNodesStructurallyEqual(am.Name(), bm.Name())
 	}
 	// Composite / pure-token kinds: compare children pairwise. Token kinds
 	// without children (operators, keywords) fall through the empty loop and
@@ -1360,6 +1377,130 @@ func AreNodesStructurallyEqual(a, b *ast.Node) bool {
 		}
 	}
 	return true
+}
+
+// HasSameTokens reports whether two nodes produce the same token stream when
+// viewed at the raw-source level — matching ESLint's
+// `sourceCode.getTokens(a)` vs `sourceCode.getTokens(b)` semantics, which
+// preserves the original source form of each literal. Unlike
+// [AreNodesStructurallyEqual], this helper distinguishes:
+//
+//   - `'a'` vs `"a"` (different quote style)
+//   - `0x1` vs `1` (different numeric source form)
+//   - `1n` vs `0x1n` (different bigint source form)
+//   - `1e2` vs `100` / `1.0` vs `1`
+//
+// Implementation: we recurse on the AST using [ast.SkipParentheses] and
+// [ast.Node.ForEachChild]. At leaf nodes (no children — identifiers,
+// literals, keyword tokens) we compare the raw source slice via
+// [scanner.GetSourceTextOfNodeFromSourceFile]. For composite nodes we
+// recurse on children pairwise AND scan the "gaps" between children
+// (and before/after the first/last child) with [scanner.Scanner] to pick
+// up punctuation, keyword tokens, and operators that tsgo's ForEachChild
+// does not visit — `(` `)` `,` `.` between children of a CallExpression,
+// the `+`/`-` operator of a PrefixUnaryExpression, the `new`/`import`
+// keyword of a MetaProperty, and so on. Whitespace and comments in a
+// gap are trivia (scanner skips them), so the comparison is
+// whitespace-insensitive exactly like ESLint's `getTokens`.
+//
+// Parens: stripped once at the top level (matches ESLint / ESTree, where
+// outer parens wrapping an operand aren't nodes and their tokens fall
+// outside the operand's range). Parens INSIDE a compound expression —
+// e.g. `(x).y` — ARE visible tokens in ESLint's view, and preserved here
+// by the recursion not calling SkipParentheses again.
+//
+// Templates: TemplateExpression / TemplateSpan children already cover
+// the whole template source range contiguously, so the gap between any
+// two children inside a template is empty. This means gap scanning never
+// enters template-expression context and thus never needs the scanner's
+// `ReScanTemplateToken` (which isn't exposed through the shim).
+//
+// Use this helper when porting an ESLint rule whose oracle is token-level
+// equality (e.g. `no-self-compare`'s `hasSameTokens`); use
+// [AreNodesStructurallyEqual] when the rule's oracle is structural AST
+// equality and literal-form / trivia differences should NOT matter (e.g.
+// duplicate case detection).
+func HasSameTokens(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return hasSameTokens(sourceFile, ast.SkipParentheses(a), ast.SkipParentheses(b))
+}
+
+// hasSameTokens is the recursive core. It does NOT call SkipParentheses
+// on its inputs — parens nested inside a compound expression are visible
+// tokens in ESLint's per-node getTokens view (e.g. `(x).y` has tokens
+// `[(, x, ), ., y]`), so a recursive paren strip would collapse them.
+func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	if a.Kind != b.Kind {
+		return false
+	}
+	aKids, bKids := collectKids(a), collectKids(b)
+	// Leaves (no children via ForEachChild): compare raw source text.
+	if len(aKids) == 0 && len(bKids) == 0 {
+		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
+			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
+	}
+	if len(aKids) != len(bKids) {
+		return false
+	}
+	// Composite: compare children pairwise AND compare the token sequences
+	// living in the gaps between children (and the prefix / suffix gaps).
+	// Gap tokens are the operators / punctuation / keywords that
+	// ForEachChild does not yield as nodes — `(` `)` `,` `.` between call
+	// arguments, `+` / `-` for PrefixUnaryExpression, `new` / `import` for
+	// MetaProperty, and so on.
+	prevA, prevB := a.Pos(), b.Pos()
+	for i := range aKids {
+		if !sameTokensInRange(sf, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
+			return false
+		}
+		if !hasSameTokens(sf, aKids[i], bKids[i]) {
+			return false
+		}
+		prevA, prevB = aKids[i].End(), bKids[i].End()
+	}
+	return sameTokensInRange(sf, prevA, a.End(), prevB, b.End())
+}
+
+func collectKids(n *ast.Node) []*ast.Node {
+	var out []*ast.Node
+	n.ForEachChild(func(c *ast.Node) bool { out = append(out, c); return false })
+	return out
+}
+
+// sameTokensInRange reports whether scanning [aStart, aEnd) and
+// [bStart, bEnd) produces the same sequence of (kind, raw text) pairs.
+// Trivia (whitespace, comments) is skipped by the scanner, matching
+// ESLint's `getTokens` which excludes comments by default.
+func sameTokensInRange(sf *ast.SourceFile, aStart, aEnd, bStart, bEnd int) bool {
+	var sa, sb *scanner.Scanner
+	if aStart < aEnd {
+		sa = scanner.GetScannerForSourceFile(sf, aStart)
+	}
+	if bStart < bEnd {
+		sb = scanner.GetScannerForSourceFile(sf, bStart)
+	}
+	liveA := func() bool {
+		return sa != nil && sa.Token() != ast.KindEndOfFile && sa.TokenStart() < aEnd && sa.TokenEnd() <= aEnd
+	}
+	liveB := func() bool {
+		return sb != nil && sb.Token() != ast.KindEndOfFile && sb.TokenStart() < bEnd && sb.TokenEnd() <= bEnd
+	}
+	for {
+		la, lb := liveA(), liveB()
+		if !la && !lb {
+			return true
+		}
+		if la != lb || sa.Token() != sb.Token() || sa.TokenText() != sb.TokenText() {
+			return false
+		}
+		sa.Scan()
+		sb.Scan()
+	}
 }
 
 // IsArgumentOfSpecificCall reports whether `node` sits at argument position
