@@ -79,7 +79,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unused_expressions"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unused_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_use_before_define"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_constructor"
+	ts_no_useless_constructor "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_empty_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/non_nullable_type_assertion_style"
@@ -202,6 +202,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
@@ -518,7 +519,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-expressions", no_unused_expressions.NoUnusedExpressionsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-vars", no_unused_vars.NoUnusedVarsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-use-before-define", no_use_before_define.NoUseBeforeDefineRule)
-	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-constructor", no_useless_constructor.NoUselessConstructorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-constructor", ts_no_useless_constructor.NoUselessConstructorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-empty-export", no_useless_empty_export.NoUselessEmptyExportRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-var-requires", no_var_requires.NoVarRequiresRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/non-nullable-type-assertion-style", non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule)
@@ -665,6 +666,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-useless-call", no_useless_call.NoUselessCallRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
 	GlobalRuleRegistry.Register("no-useless-rename", no_useless_rename.NoUselessRenameRule)
+	GlobalRuleRegistry.Register("no-useless-constructor", no_useless_constructor.NoUselessConstructorRule)
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
 	GlobalRuleRegistry.Register("require-yield", require_yield.RequireYieldRule)
 	GlobalRuleRegistry.Register("symbol-description", symbol_description.SymbolDescriptionRule)
