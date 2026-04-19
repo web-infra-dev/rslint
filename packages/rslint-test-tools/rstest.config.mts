@@ -76,6 +76,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
 
     // eslint-plugin-react
+    './tests/eslint-plugin-react/rules/button-has-type.test.ts',
     './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',
     './tests/eslint-plugin-react/rules/void-dom-elements-no-children.test.ts',
     './tests/eslint-plugin-react/rules/style-prop-object.test.ts',

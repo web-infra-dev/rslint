@@ -108,14 +108,12 @@ var StylePropObjectRule = rule.Rule{
 				}
 			},
 
-			// Handle React.createElement('div', { style: ... })
-			// NOTE: Only hardcodes "React.createElement". ESLint also supports:
-			// - Custom pragma via settings.react.pragma or @jsx comment (e.g. Preact.h)
-			// - Destructured createElement (e.g. import { createElement } from 'react')
-			// These are not supported here as rslint does not have pragma configuration infrastructure.
+			// Handle <pragma>.createElement('div', { style: ... })
+			// NOTE: Destructured createElement (e.g. import { createElement } from 'react')
+			// and @jsx comment pragmas are not supported.
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression) {
+				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings)) {
 					return
 				}
 				args := call.Arguments

@@ -1,6 +1,7 @@
 package react_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
@@ -22,6 +23,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		button_has_type.ButtonHasTypeRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
 		jsx_equals_spacing.JsxEqualsSpacingRule,

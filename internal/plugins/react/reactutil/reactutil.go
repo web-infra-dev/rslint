@@ -6,11 +6,42 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 )
 
-// IsCreateElementCall checks if the callee is React.createElement.
-func IsCreateElementCall(callee *ast.Node) bool {
+// DefaultReactPragma is the fallback object name for createElement calls
+// when `settings.react.pragma` is not configured, matching eslint-plugin-react.
+const DefaultReactPragma = "React"
+
+// GetReactPragma reads `settings.react.pragma` from the config settings map.
+// Returns DefaultReactPragma when the setting is absent, not a string, or empty.
+func GetReactPragma(settings map[string]interface{}) string {
+	if settings == nil {
+		return DefaultReactPragma
+	}
+	reactSettings, ok := settings["react"].(map[string]interface{})
+	if !ok {
+		return DefaultReactPragma
+	}
+	pragma, ok := reactSettings["pragma"].(string)
+	if !ok || pragma == "" {
+		return DefaultReactPragma
+	}
+	return pragma
+}
+
+// IsCreateElementCall reports whether the callee is `<pragma>.createElement`.
+// Pass an empty pragma to default to "React"; pass GetReactPragma(ctx.Settings)
+// to honor the user's `settings.react.pragma` configuration.
+//
+// Parentheses are transparently skipped on both the callee itself and the
+// pragma identifier (e.g. `(React).createElement` / `(React.createElement)()`),
+// matching ESTree's flattened shape.
+func IsCreateElementCall(callee *ast.Node, pragma string) bool {
 	if callee == nil {
 		return false
 	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	callee = ast.SkipParentheses(callee)
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
@@ -19,7 +50,8 @@ func IsCreateElementCall(callee *ast.Node) bool {
 	if nameNode.Kind != ast.KindIdentifier || nameNode.AsIdentifier().Text != "createElement" {
 		return false
 	}
-	if prop.Expression.Kind != ast.KindIdentifier || prop.Expression.AsIdentifier().Text != "React" {
+	pragmaExpr := ast.SkipParentheses(prop.Expression)
+	if pragmaExpr.Kind != ast.KindIdentifier || pragmaExpr.AsIdentifier().Text != pragma {
 		return false
 	}
 	return true
