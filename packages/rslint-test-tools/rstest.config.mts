@@ -293,6 +293,7 @@ export default defineConfig({
     './tests/eslint/rules/no-self-compare.test.ts',
     './tests/eslint/rules/no-unneeded-ternary.test.ts',
     './tests/eslint/rules/no-delete-var.test.ts',
+    './tests/eslint/rules/prefer-promise-reject-errors.test.ts',
     './tests/eslint/rules/require-atomic-updates.test.ts',
 
     // eslint-plugin-jest
