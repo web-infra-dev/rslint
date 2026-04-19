@@ -1,0 +1,1251 @@
+// Rstest Snapshot v1
+
+exports[`no-shadow-restricted-names > invalid 1`] = `
+{
+  "code": "function NaN(NaN) { var NaN; !function NaN(NaN) { try {} catch(NaN) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'NaN'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'NaN'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'NaN'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'NaN'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'NaN'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'NaN'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 2`] = `
+{
+  "code": "function undefined(undefined) { !function undefined(undefined) { try {} catch(undefined) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 88,
+          "line": 1,
+        },
+        "start": {
+          "column": 79,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 3`] = `
+{
+  "code": "function Infinity(Infinity) { var Infinity; !function Infinity(Infinity) { try {} catch(Infinity) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'Infinity'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'Infinity'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'Infinity'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'Infinity'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'Infinity'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'Infinity'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 97,
+          "line": 1,
+        },
+        "start": {
+          "column": 89,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 4`] = `
+{
+  "code": "function arguments(arguments) { var arguments; !function arguments(arguments) { try {} catch(arguments) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'arguments'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'arguments'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'arguments'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'arguments'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'arguments'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 68,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'arguments'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 103,
+          "line": 1,
+        },
+        "start": {
+          "column": 94,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 5`] = `
+{
+  "code": "function eval(eval) { var eval; !function eval(eval) { try {} catch(eval) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 6`] = `
+{
+  "code": "var eval = (eval) => { var eval; !function eval(eval) { try {} catch(eval) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'eval'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 70,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 7`] = `
+{
+  "code": "var [undefined] = [1]",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 8`] = `
+{
+  "code": "var {undefined} = obj; var {a: undefined} = obj; var {a: {b: {undefined}}} = obj; var {a, ...undefined} = obj;",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 63,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 103,
+          "line": 1,
+        },
+        "start": {
+          "column": 94,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 9`] = `
+{
+  "code": "var undefined; undefined = 5;",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 10`] = `
+{
+  "code": "class undefined {}",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 11`] = `
+{
+  "code": "(class undefined {})",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 12`] = `
+{
+  "code": "import undefined from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 13`] = `
+{
+  "code": "import { undefined } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 14`] = `
+{
+  "code": "import { baz as undefined } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 15`] = `
+{
+  "code": "import * as undefined from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'undefined'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 16`] = `
+{
+  "code": "function globalThis(globalThis) { var globalThis; !function globalThis(globalThis) { try {} catch(globalThis) {} }; }",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 82,
+          "line": 1,
+        },
+        "start": {
+          "column": 72,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 109,
+          "line": 1,
+        },
+        "start": {
+          "column": 99,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 17`] = `
+{
+  "code": "const [globalThis] = [1]",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 18`] = `
+{
+  "code": "var {globalThis} = obj; var {a: globalThis} = obj; var {a: {b: {globalThis}}} = obj; var {a, ...globalThis} = obj;",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 65,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 107,
+          "line": 1,
+        },
+        "start": {
+          "column": 97,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 19`] = `
+{
+  "code": "let globalThis; globalThis = 5;",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 20`] = `
+{
+  "code": "class globalThis {}",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 21`] = `
+{
+  "code": "(class globalThis {})",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 22`] = `
+{
+  "code": "import globalThis from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 23`] = `
+{
+  "code": "import { globalThis } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 24`] = `
+{
+  "code": "import { baz as globalThis } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow-restricted-names > invalid 25`] = `
+{
+  "code": "import * as globalThis from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Shadowing of global property 'globalThis'.",
+      "messageId": "shadowingRestrictedName",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow-restricted-names",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
