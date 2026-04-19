@@ -211,6 +211,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
+	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
@@ -658,6 +659,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
 	GlobalRuleRegistry.Register("require-yield", require_yield.RequireYieldRule)
+	GlobalRuleRegistry.Register("symbol-description", symbol_description.SymbolDescriptionRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
