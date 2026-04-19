@@ -199,6 +199,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
@@ -652,6 +653,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
+	GlobalRuleRegistry.Register("no-useless-rename", no_useless_rename.NoUselessRenameRule)
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
 	GlobalRuleRegistry.Register("require-yield", require_yield.RequireYieldRule)
 }
