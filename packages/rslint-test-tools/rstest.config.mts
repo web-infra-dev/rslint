@@ -274,6 +274,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unsafe-negation.test.ts',
     './tests/eslint/rules/no-unsafe-optional-chaining.test.ts',
     './tests/eslint/rules/no-useless-catch.test.ts',
+    './tests/eslint/rules/no-useless-rename.test.ts',
     './tests/eslint/rules/no-prototype-builtins.test.ts',
     './tests/eslint/rules/use-isnan.test.ts',
     './tests/eslint/rules/eqeqeq.test.ts',
