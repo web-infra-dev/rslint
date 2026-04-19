@@ -51,6 +51,11 @@ func isValidRadixValue(f float64) bool {
 func isValidRadix(radix *ast.Node) bool {
 	switch radix.Kind {
 	case ast.KindNumericLiteral:
+		// tsgo normalizes NumericLiteral.Text to its decimal form at parse
+		// time (e.g. `0x10` → "16", `0b10` → "2", `1.6e1` → "16"), so we
+		// don't have to handle non-decimal prefixes ourselves.
+		// NormalizeNumericLiteral stays as a defensive pass in case that
+		// invariant ever changes.
 		text := utils.NormalizeNumericLiteral(radix.AsNumericLiteral().Text)
 		f, err := strconv.ParseFloat(text, 64)
 		if err != nil {
@@ -156,7 +161,11 @@ func checkArguments(ctx rule.RuleContext, node *ast.Node, call *ast.CallExpressi
 	case 1:
 		lastArg := args[0]
 		sourceText := ctx.SourceFile.Text()
-		insertPos := node.End() - 1 // position of the closing ')'
+		// TS AST node End() excludes trailing trivia, and the last token of a
+		// CallExpression is always `)`, so End()-1 is the byte offset of `)`.
+		// Byte offsets are the rule-layer convention — the LSP layer converts
+		// them to UTF-16 code units via scanner.GetECMALineAndUTF16CharacterOfPosition.
+		insertPos := node.End() - 1
 		text := ", 10"
 		if hasTrailingComma(sourceText, lastArg.End(), node.End()) {
 			text = " 10,"

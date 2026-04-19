@@ -365,5 +365,18 @@ ruleTester.run('radix', {
       code: 'export default parseInt("x");',
       errors: [{ messageId: 'missingRadix', line: 1, column: 16 }],
     },
+
+    // ---- Regression guards: insertion position ----
+    // Trailing trivia after `)` must not shift the insertion point.
+    {
+      code: 'parseInt("x")   /* after */   ;',
+      errors: [{ messageId: 'missingRadix', line: 1, column: 1 }],
+    },
+    // Multi-byte (UTF-16 surrogate pair) argument — locks in byte-range fix
+    // semantics; LSP layer handles UTF-16 conversion externally.
+    {
+      code: 'parseInt("𝟙")',
+      errors: [{ messageId: 'missingRadix', line: 1, column: 1 }],
+    },
   ],
 });

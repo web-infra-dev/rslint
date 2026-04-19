@@ -802,6 +802,40 @@ func TestRadixRule(t *testing.T) {
 				},
 			},
 
+			// ---- Trailing trivia after `)` — verify insertion point is
+			//      immediately before `)` and does NOT move past the `)`.
+			//      If CallExpression.End() wrongly included trailing trivia,
+			//      this suggestion output would be malformed. ----
+			{
+				Code: "parseInt('x')   /* after */   ;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingRadix",
+						Line:      1,
+						Column:    1,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addRadixParameter10", Output: "parseInt('x', 10)   /* after */   ;"},
+						},
+					},
+				},
+			},
+			{
+				// multi-byte (UTF-16 surrogate pair) in the argument — locks
+				// in the byte-range semantics used by rule fixes; LSP layer
+				// handles UTF-16 conversion externally.
+				Code: `parseInt("𝟙")`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingRadix",
+						Line:      1,
+						Column:    1,
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "addRadixParameter10", Output: `parseInt("𝟙", 10)`},
+						},
+					},
+				},
+			},
+
 			// ---- Multi-line case with EndLine/EndColumn assertion ----
 			{
 				Code: "parseInt(\n  \"10\",\n  37\n);",

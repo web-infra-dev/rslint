@@ -1373,3 +1373,55 @@ exports[`radix > invalid 51`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`radix > invalid 52`] = `
+{
+  "code": "parseInt("x")   /* after */   ;",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 53`] = `
+{
+  "code": "parseInt("𝟙")",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
