@@ -24,7 +24,7 @@ Examples of **correct** code for this rule:
 
 ## Limitations
 
-- Only detects `React.createElement(...)` calls. Destructured `createElement` (e.g. `import { createElement } from 'react'`) and custom pragma (e.g. `Preact.h`) are not supported.
+- Detects `<pragma>.createElement(...)` where `<pragma>` defaults to `React` and can be overridden via `settings.react.pragma`. Destructured `createElement` (e.g. `import { createElement } from 'react'`) and `@jsx` comment pragmas are not supported.
 
 ## Original Documentation
 
