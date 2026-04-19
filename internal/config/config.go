@@ -206,6 +206,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
+	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
@@ -601,6 +602,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-self-compare", no_self_compare.NoSelfCompareRule)
 	GlobalRuleRegistry.Register("no-sequences", no_sequences.NoSequencesRule)
 	GlobalRuleRegistry.Register("no-shadow-restricted-names", no_shadow_restricted_names.NoShadowRestrictedNamesRule)
+	GlobalRuleRegistry.Register("strict", strict.StrictRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-useless-concat", no_useless_concat.NoUselessConcatRule)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
