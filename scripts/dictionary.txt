@@ -94,6 +94,7 @@ lsproto
 marginx
 marginy
 Metas
+minimatch
 morestack
 multilines
 myfunc

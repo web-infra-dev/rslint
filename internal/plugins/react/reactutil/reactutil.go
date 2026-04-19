@@ -1,8 +1,6 @@
 package reactutil
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 )
 
@@ -84,11 +82,15 @@ func GetJsxTagName(element *ast.Node) *ast.Node {
 
 // IsDOMComponent reports whether a JSX opening/self-closing element refers to
 // an intrinsic (DOM) element like <div> or <svg:path>, rather than a user
-// component like <Foo> or <foo.Bar>.
+// component like <Foo> or <Foo.Bar>.
 //
 // Mirrors ESLint-plugin-react's `jsxUtil.isDOMComponent`: a tag name is
-// intrinsic iff its string form starts with a lowercase letter and contains
-// no ".". Property-access tag names (<foo.bar>) are user components.
+// intrinsic iff `elementType(node)` starts with a lowercase letter (regex
+// `/^[a-z]/`). For member-expression tags (`<foo.bar>`, `<this.Foo>`) this
+// means the classification is decided by the leftmost base identifier's
+// first character — so `<foo.bar>` is DOM (matches ESLint, even though the
+// runtime React behavior is "always user component"), while `<Foo.Bar>` is
+// a user component.
 func IsDOMComponent(element *ast.Node) bool {
 	tagName := GetJsxTagName(element)
 	if tagName == nil {
@@ -104,10 +106,27 @@ func IsDOMComponent(element *ast.Node) bool {
 			return false
 		}
 		text = ns.Namespace.AsIdentifier().Text + ":" + ns.Name().AsIdentifier().Text
+	case ast.KindPropertyAccessExpression:
+		// Walk to the leftmost base — its first character decides the
+		// classification, matching `/^[a-z]/.test(elementType(node))`.
+		base := tagName
+		for base.Kind == ast.KindPropertyAccessExpression {
+			base = base.AsPropertyAccessExpression().Expression
+		}
+		switch base.Kind {
+		case ast.KindIdentifier:
+			text = base.AsIdentifier().Text
+		case ast.KindThisKeyword:
+			// `<this.Foo>` — jsx-ast-utils' elementType returns "this.Foo",
+			// first char is lowercase → DOM per ESLint's regex.
+			text = "this"
+		default:
+			return false
+		}
 	default:
 		return false
 	}
-	if text == "" || strings.Contains(text, ".") {
+	if text == "" {
 		return false
 	}
 	first := text[0]

@@ -47,6 +47,10 @@ func TestJsxNoBindRule(t *testing.T) {
 		{Code: `var x = <div onClick={function () { alert("1337"); }}></div>`, Tsx: true, Options: map[string]interface{}{"ignoreDOMComponents": true}},
 		// Namespaced DOM element is also intrinsic
 		{Code: `var x = <svg:path onClick={() => 1} />`, Tsx: true, Options: map[string]interface{}{"ignoreDOMComponents": true}},
+		// Property-access tag with a lowercase base — ESLint's isDOMComponent
+		// tests the first character of elementType only, so `<foo.Bar>` is
+		// classified as DOM and skipped under `ignoreDOMComponents: true`.
+		{Code: `var x = <foo.Bar onClick={() => 1} />`, Tsx: true, Options: map[string]interface{}{"ignoreDOMComponents": true}},
 
 		// ---------- 5. Bind-not-used-for-JSX-prop ----------
 		{
@@ -386,8 +390,9 @@ function C() {
 			},
 		},
 		{
-			// Property-access tag name is NOT a DOM component
-			Code:    `var x = <foo.Bar onClick={() => 1} />`,
+			// Property-access tag name with UPPERCASE base is a user component,
+			// so `ignoreDOMComponents: true` still reports it.
+			Code:    `var x = <Foo.Bar onClick={() => 1} />`,
 			Tsx:     true,
 			Options: map[string]interface{}{"ignoreDOMComponents": true},
 			Errors: []rule_tester.InvalidTestCaseError{
