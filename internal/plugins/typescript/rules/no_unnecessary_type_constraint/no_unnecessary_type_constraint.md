@@ -36,10 +36,6 @@ function Baz<T>() {}
 const Quux = <T>() => {};
 ```
 
-## Differences from ESLint
-
-- JSDoc `@template {any} T` / `@template {unknown} T` will be reported; the upstream ESLint rule does not report them.
-
 ## Original Documentation
 
 - [typescript-eslint rule: no-unnecessary-type-constraint](https://typescript-eslint.io/rules/no-unnecessary-type-constraint)

@@ -51,6 +51,41 @@ function data<T extends TODO>() {}
 		// either.
 		{Code: `function data<T extends keyof any>() {}`},
 		{Code: `type Idx<T extends keyof any> = Record<T, unknown>;`},
+		// ---- JSDoc `@template` guard ----
+		// tsgo may or may not parse these into KindTypeParameter nodes depending on file
+		// extension / allowJs. The guard ensures that if it does, the rule stays silent (matching
+		// ESLint, which never sees JSDoc templates as TSTypeParameterDeclaration).
+		{Code: `
+/** @template T */
+function data() {}
+    `},
+		{Code: `
+/** @template {any} T */
+function data() {}
+    `},
+		{Code: `
+/** @template {unknown} T, U */
+function data() {}
+    `},
+		// ---- Mapped-type guard under modifiers / name remap ----
+		// Make sure the `KindMappedType` guard survives readonly / negative modifiers and
+		// `as` name-remap clauses — those wrap the type parameter differently but parent is
+		// still KindMappedType.
+		{Code: `type R = { readonly [K in any]: K };`},
+		{Code: `type O = { -readonly [K in any]-?: K };`},
+		{Code: `type N = { [K in any as ` + "`prefix_${string & K}`" + `]: K };`},
+		// ---- InferType guard across nested contexts ----
+		// Template-literal type containing infer.
+		{Code: "type Head<T> = T extends `${infer U extends any}${string}` ? U : never;"},
+		// Multiple `infer` in a tuple extends-clause, each independently guarded.
+		{Code: `type Pair<T> = T extends [infer A extends any, infer B extends unknown] ? [A, B] : never;`},
+		// ---- Constraint shapes whose kind is NOT KindAnyKeyword/KindUnknownKeyword ----
+		// ConditionalType that happens to yield any in one branch — still a KindConditionalType.
+		{Code: `function data<T extends (1 extends 1 ? any : never)>() {}`},
+		// IntersectionType with any inside — IntersectionType kind at the top.
+		{Code: `function data<T extends any & string>() {}`},
+		// Readonly-qualified array of any — TypeOperator wraps the ArrayType.
+		{Code: `function data<T extends readonly any[]>() {}`},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `function data<T extends any>() {}`,
@@ -1278,6 +1313,78 @@ function data<T>(x: T): T { return x; }`,
 						{
 							MessageId: "removeUnnecessaryConstraint",
 							Output:    `const obj = { m: <T>() => {} };`,
+						},
+					},
+				},
+			},
+		},
+		// ---- Object-literal shorthand method (distinct AST from arrow property value) ----
+		{
+			Code: `const obj = { m<T extends any>() {} };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unnecessaryConstraint",
+					Line:      1,
+					Column:    17,
+					EndLine:   1,
+					EndColumn: 30,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "removeUnnecessaryConstraint",
+							Output:    `const obj = { m<T>() {} };`,
+						},
+					},
+				},
+			},
+		},
+		// ---- Outer TypeParameter is reported, inner mapped-type is guarded ----
+		// Proves the guard is parent-scoped and doesn't swallow the outer-level constraint.
+		{
+			Code: `type X<T extends any> = { [K in keyof T]: T[K] };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unnecessaryConstraint",
+					Line:      1,
+					Column:    8,
+					EndLine:   1,
+					EndColumn: 21,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "removeUnnecessaryConstraint",
+							Output:    `type X<T> = { [K in keyof T]: T[K] };`,
+						},
+					},
+				},
+			},
+		},
+		// ---- Outer TypeParameter is reported, inner FunctionType's TypeParameter also reported;
+		// ---- the `infer R` inside the function-type's return is guarded (InferType) ----
+		{
+			Code: `type X<T extends any> = T extends <U extends any>(x: U) => infer R ? R : never;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "unnecessaryConstraint",
+					Line:      1,
+					Column:    8,
+					EndLine:   1,
+					EndColumn: 21,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "removeUnnecessaryConstraint",
+							Output:    `type X<T> = T extends <U extends any>(x: U) => infer R ? R : never;`,
+						},
+					},
+				},
+				{
+					MessageId: "unnecessaryConstraint",
+					Line:      1,
+					Column:    36,
+					EndLine:   1,
+					EndColumn: 49,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "removeUnnecessaryConstraint",
+							Output:    `type X<T extends any> = T extends <U>(x: U) => infer R ? R : never;`,
 						},
 					},
 				},

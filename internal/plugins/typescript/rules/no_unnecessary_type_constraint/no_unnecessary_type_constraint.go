@@ -34,17 +34,17 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindTypeParameter: func(node *ast.Node) {
-				// Match typescript-eslint's selector: `TSTypeParameterDeclaration > TSTypeParameter[constraint]`.
-				// In tsgo, `infer U` and mapped-type `[P in K]` also surface as KindTypeParameter but
-				// have no TSTypeParameterDeclaration analog, so upstream doesn't report them.
-				// JSDoc `@template` is intentionally not guarded here — see the rule's doc for the
-				// diverging behavior.
+				// Match typescript-eslint's selector:
+				// `TSTypeParameterDeclaration > TSTypeParameter[constraint]`.
+				// In tsgo, `infer U`, mapped-type `[P in K]`, and JSDoc `@template` also
+				// surface as KindTypeParameter but have no TSTypeParameterDeclaration
+				// analog, so upstream doesn't report them.
 				parent := node.Parent
 				if parent == nil {
 					return
 				}
 				switch parent.Kind {
-				case ast.KindInferType, ast.KindMappedType:
+				case ast.KindInferType, ast.KindMappedType, ast.KindJSDocTemplateTag:
 					return
 				}
 
@@ -78,6 +78,13 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 							addTrailingComma = true
 						}
 					}
+				}
+
+				// Fix replaces ` extends <constraint>` (between name end and constraint end). This
+				// assumes source order `name extends constraint`. Bail if the AST ever violates
+				// that — better to skip than to emit a destructive fix.
+				if nameNode.End() > typeParam.Constraint.End() {
+					return
 				}
 
 				replacement := ""
