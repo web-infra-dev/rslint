@@ -32,6 +32,7 @@ export default defineConfig({
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
     './tests/eslint/rules/no-dupe-args.test.ts',
+    './tests/eslint/rules/no-dupe-class-members.test.ts',
     './tests/eslint/rules/no-dupe-keys.test.ts',
     './tests/eslint/rules/no-duplicate-case.test.ts',
     './tests/eslint/rules/no-empty.test.ts',
