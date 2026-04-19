@@ -1,0 +1,939 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-call > invalid 1`] = `
+{
+  "code": "foo.call(undefined, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 2`] = `
+{
+  "code": "foo.call(void 0, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 3`] = `
+{
+  "code": "foo.call(null, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 4`] = `
+{
+  "code": "obj.foo.call(obj, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 5`] = `
+{
+  "code": "a.b.c.foo.call(a.b.c, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 6`] = `
+{
+  "code": "a.b(x, y).c.foo.call(a.b(x, y).c, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 7`] = `
+{
+  "code": "foo.apply(undefined, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 8`] = `
+{
+  "code": "foo.apply(void 0, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 9`] = `
+{
+  "code": "foo.apply(null, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 10`] = `
+{
+  "code": "obj.foo.apply(obj, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 11`] = `
+{
+  "code": "a.b.c.foo.apply(a.b.c, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 12`] = `
+{
+  "code": "a.b(x, y).c.foo.apply(a.b(x, y).c, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 13`] = `
+{
+  "code": "[].concat.apply([ ], [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 14`] = `
+{
+  "code": "[].concat.apply([
+/*empty*/
+], [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 15`] = `
+{
+  "code": "abc.get("foo", 0).concat.apply(abc . get("foo",  0 ), [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 16`] = `
+{
+  "code": "foo.call?.(undefined, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 17`] = `
+{
+  "code": "foo?.call(undefined, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 18`] = `
+{
+  "code": "(foo?.call)(undefined, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 19`] = `
+{
+  "code": "obj.foo.call?.(obj, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 20`] = `
+{
+  "code": "obj?.foo.call(obj, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 21`] = `
+{
+  "code": "(obj?.foo).call(obj, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 22`] = `
+{
+  "code": "(obj?.foo.call)(obj, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 23`] = `
+{
+  "code": "obj?.foo.bar.call(obj?.foo, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 24`] = `
+{
+  "code": "(obj?.foo).bar.call(obj?.foo, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 25`] = `
+{
+  "code": "obj.foo?.bar.call(obj.foo, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 26`] = `
+{
+  "code": "obj['foo'].call(obj, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 27`] = `
+{
+  "code": "obj['foo'].apply(obj, [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 28`] = `
+{
+  "code": "class C { run() { this.foo.call(this, 1, 2); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 29`] = `
+{
+  "code": "class C { run() { this.foo.apply(this, [1, 2]); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 30`] = `
+{
+  "code": "(() => 1).call(undefined);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 31`] = `
+{
+  "code": "(function () {}).apply(null, []);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 32`] = `
+{
+  "code": "foo.call((null), 1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 33`] = `
+{
+  "code": "foo.apply((undefined), [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 34`] = `
+{
+  "code": "[].concat.apply([/*c*/], [1, 2]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 35`] = `
+{
+  "code": "({}).valueOf.call({ }, );",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.call()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-call > invalid 36`] = `
+{
+  "code": "foo.apply(null, [...args]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary '.apply()'.",
+      "messageId": "unnecessaryCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

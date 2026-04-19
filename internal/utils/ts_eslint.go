@@ -1449,8 +1449,24 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 		return false
 	}
 	aKids, bKids := collectKids(a), collectKids(b)
-	// Leaves (no children via ForEachChild): compare raw source text.
+	// Leaves (no children via ForEachChild). Two sub-classes collide here:
+	//   1. True leaves (Identifier, Literal, keyword tokens) — raw source
+	//      text is exactly the single token's text, so raw-text equality
+	//      is correct.
+	//   2. Empty composites (`[]`, `{}`) — raw text includes the brackets
+	//      AND any whitespace/comments inside, so raw-text would
+	//      incorrectly distinguish `[]` from `[ ]` or `[\n/*c*/\n]`. ESLint's
+	//      `getTokens` treats these as equivalent (only `[`, `]` tokens).
+	// For class 2 we scan tokens; for class 1 we keep the raw-text shortcut
+	// because some leaf kinds (e.g. TemplateHead / TemplateTail inside a
+	// TemplateExpression) cannot be re-scanned standalone — the scanner
+	// needs `ReScanTemplateToken` context that isn't exposed through the
+	// shim.
 	if len(aKids) == 0 && len(bKids) == 0 {
+		switch a.Kind {
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+			return sameTokensInRange(sf, a.Pos(), a.End(), b.Pos(), b.End())
+		}
 		return scanner.GetSourceTextOfNodeFromSourceFile(sf, a, false) ==
 			scanner.GetSourceTextOfNodeFromSourceFile(sf, b, false)
 	}
