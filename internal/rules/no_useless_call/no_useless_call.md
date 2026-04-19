@@ -49,10 +49,14 @@ obj.foo.apply(obj, args);
 
 ## Known Limitations
 
-This rule compares the applied receiver and `thisArg` at the token level, so
-it cannot reason about dynamic expressions whose runtime values may diverge
-even though their source forms differ. For example,
-`a[i++].foo.call(a[i++], 1, 2, 3)` is intentionally not reported.
+This rule compares the applied receiver and `thisArg` at the token level
+and does not model runtime side effects. Two source-identical expressions
+may produce different runtime values — most notably when they contain
+mutating operators. For example, `a[i++].foo.call(a[i++], 1, 2, 3)` is
+flagged as unnecessary, but rewriting it to `a[i++].foo(1, 2, 3)` would
+change behavior because `i` is incremented twice in the original and only
+once after the rewrite. Apply the suggested rewrite with care in such
+cases.
 
 ## Original Documentation
 
