@@ -296,6 +296,7 @@ export default defineConfig({
     './tests/eslint/rules/no-delete-var.test.ts',
     './tests/eslint/rules/prefer-promise-reject-errors.test.ts',
     './tests/eslint/rules/require-atomic-updates.test.ts',
+    './tests/eslint/rules/require-yield.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
