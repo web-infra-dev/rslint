@@ -200,6 +200,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
@@ -627,6 +628,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-shadow-restricted-names", no_shadow_restricted_names.NoShadowRestrictedNamesRule)
 	GlobalRuleRegistry.Register("strict", strict.StrictRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
+	GlobalRuleRegistry.Register("no-useless-computed-key", no_useless_computed_key.NoUselessComputedKeyRule)
 	GlobalRuleRegistry.Register("no-useless-concat", no_useless_concat.NoUselessConcatRule)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 	GlobalRuleRegistry.Register("no-extra-boolean-cast", no_extra_boolean_cast.NoExtraBooleanCastRule)
