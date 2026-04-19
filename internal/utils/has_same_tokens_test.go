@@ -151,6 +151,16 @@ func TestHasSameTokens(t *testing.T) {
 		{"array trailing comma", `[a,] === [a]`, false},
 		{"array trailing comma both", `[a,] === [a,]`, true},
 
+		// ---- Empty composite bodies — whitespace/comments are trivia. ----
+		// ForEachChild yields no children for `[]` / `{}` so they hit the
+		// "leaf" branch; raw-text comparison would wrongly distinguish them
+		// from `[ ]` / `{ }`. Token-stream equality is the right contract.
+		{"empty array space-padded", `[] === [ ]`, true},
+		{"empty array with comment", "[] === [/*c*/]", true},
+		{"empty array multiline", "[] === [\n]", true},
+		{"empty object space-padded", `({}) === ({ })`, true},
+		{"empty object with comment", "({}) === ({/*c*/})", true},
+
 		// ---- Regex ----
 		{"regex equal", `/a/ === /a/`, true},
 		{"regex differ", `/a/ === /b/`, false},
