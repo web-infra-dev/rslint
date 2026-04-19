@@ -47,11 +47,11 @@ func walkUpSkippingParens(node *ast.Node) (parent *ast.Node, child *ast.Node, pa
 	return
 }
 
-// isForInitOrUpdate reports whether the outermost paren-skipped wrapper of
-// `node` sits in the init or update slot of a `for` statement. ESLint always
-// allows sequences in those positions regardless of `allowInParentheses`.
-func isForInitOrUpdate(node *ast.Node) bool {
-	parent, child, _ := walkUpSkippingParens(node)
+// isForInitOrUpdate reports whether `child` sits in the init or update slot
+// of the `for` statement `parent`. Callers pass the paren-skipped ancestor
+// pair from walkUpSkippingParens. ESLint always allows sequences in those
+// positions regardless of `allowInParentheses`.
+func isForInitOrUpdate(parent, child *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindForStatement {
 		return false
 	}
@@ -62,28 +62,19 @@ func isForInitOrUpdate(node *ast.Node) bool {
 	return child == forStmt.Initializer || child == forStmt.Incrementor
 }
 
-// isGrammarParenArrowBody reports whether the outermost wrapper of `node`
-// occupies the body slot of an arrow function. In tsgo the disambiguating
-// parens in `a => (x, y)` materialize as a ParenthesizedExpression wrapper,
-// so arrow bodies — unlike do-while / while / if / switch / with grammar
-// parens, which are consumed by the statement — need *two* wrappers before a
+// isGrammarParenArrowBody reports whether `child` occupies the body slot of
+// the arrow function `parent`. Callers pass the paren-skipped ancestor pair
+// from walkUpSkippingParens. In tsgo the disambiguating parens in
+// `a => (x, y)` materialize as a ParenthesizedExpression wrapper, so arrow
+// bodies — unlike do-while / while / if / switch / with grammar parens,
+// which are consumed by the statement — need *two* wrappers before a
 // sequence expression counts as explicitly parenthesised.
-func isGrammarParenArrowBody(node *ast.Node) bool {
-	parent, child, _ := walkUpSkippingParens(node)
+func isGrammarParenArrowBody(parent, child *ast.Node) bool {
 	if parent == nil || !ast.IsArrowFunction(parent) {
 		return false
 	}
 	arrow := parent.AsArrowFunction()
 	return arrow != nil && arrow.Body == child
-}
-
-// isNestedInCommaBinary reports whether node is itself the operand of another
-// comma BinaryExpression (possibly through ParenthesizedExpression wrappers).
-// We only fire on the outermost comma so that a chain like `a, b, c` (parsed
-// left-associatively as `(a, b), c` in tsgo) produces a single diagnostic.
-func isNestedInCommaBinary(node *ast.Node) bool {
-	parent, _, _ := walkUpSkippingParens(node)
-	return isCommaBinary(parent)
 }
 
 // firstCommaToken walks down the left spine of a comma BinaryExpression chain
@@ -113,22 +104,24 @@ var NoSequencesRule = rule.Rule{
 				if !isCommaBinary(node) {
 					return
 				}
+				// Single walk-up; all downstream checks read from these.
+				parent, child, parenDepth := walkUpSkippingParens(node)
+
 				// Only report once per comma chain — skip inner nodes of
 				// `(a, b), c` / `a, b, c`.
-				if isNestedInCommaBinary(node) {
+				if isCommaBinary(parent) {
 					return
 				}
 				// `for (init; cond; update)` — ESLint unconditionally allows
 				// sequences in init/update, even when allowInParentheses is
 				// false.
-				if isForInitOrUpdate(node) {
+				if isForInitOrUpdate(parent, child) {
 					return
 				}
 
 				if opts.allowInParentheses {
-					_, _, parenDepth := walkUpSkippingParens(node)
 					required := 1
-					if isGrammarParenArrowBody(node) {
+					if isGrammarParenArrowBody(parent, child) {
 						// Arrow body parens are materialized as a
 						// ParenthesizedExpression wrapper in tsgo, so an
 						// "extra" pair of parens bumps the wrapper count to 2.
