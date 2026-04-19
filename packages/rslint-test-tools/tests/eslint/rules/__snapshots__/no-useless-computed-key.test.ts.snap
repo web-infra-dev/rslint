@@ -1,0 +1,2994 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-computed-key > invalid 1`] = `
+{
+  "code": "({ ['0']: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 2`] = `
+{
+  "code": "var { ['0']: a } = obj",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 3`] = `
+{
+  "code": "({ ['0+1,234']: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0+1,234'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 4`] = `
+{
+  "code": "({ [0]: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [0] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 5`] = `
+{
+  "code": "var { [0]: a } = obj",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [0] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 6`] = `
+{
+  "code": "({ ['x']: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 7`] = `
+{
+  "code": "var { ['x']: a } = obj",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 8`] = `
+{
+  "code": "var { ['__proto__']: a } = obj",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 9`] = `
+{
+  "code": "({ ['x']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 10`] = `
+{
+  "code": "({ [/* this comment prevents a fix */ 'x']: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 11`] = `
+{
+  "code": "({ ['x' /* this comment also prevents a fix */]: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 12`] = `
+{
+  "code": "({ [('x')]: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 13`] = `
+{
+  "code": "var { [('x')]: a } = obj",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 14`] = `
+{
+  "code": "({ *['x']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 15`] = `
+{
+  "code": "({ async ['x']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 16`] = `
+{
+  "code": "({ get[.2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [.2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 17`] = `
+{
+  "code": "({ set[.2](value) {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [.2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 18`] = `
+{
+  "code": "({ async[.2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [.2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 19`] = `
+{
+  "code": "({ [2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 20`] = `
+{
+  "code": "({ get [2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 21`] = `
+{
+  "code": "({ set [2](value) {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 22`] = `
+{
+  "code": "({ async [2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 23`] = `
+{
+  "code": "({ get[2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 24`] = `
+{
+  "code": "({ set[2](value) {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 25`] = `
+{
+  "code": "({ async[2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 26`] = `
+{
+  "code": "({ get['foo']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['foo'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 27`] = `
+{
+  "code": "({ *[2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 28`] = `
+{
+  "code": "({ async*[2]() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 29`] = `
+{
+  "code": "({ ['constructor']: 1 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['constructor'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 30`] = `
+{
+  "code": "({ ['prototype']: 1 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['prototype'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 31`] = `
+{
+  "code": "class Foo { ['0']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 32`] = `
+{
+  "code": "class Foo { ['0+1,234']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0+1,234'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 33`] = `
+{
+  "code": "class Foo { ['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 34`] = `
+{
+  "code": "class Foo { [/* this comment prevents a fix */ 'x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 35`] = `
+{
+  "code": "class Foo { ['x' /* this comment also prevents a fix */]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 36`] = `
+{
+  "code": "class Foo { [('x')]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 37`] = `
+{
+  "code": "class Foo { *['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 38`] = `
+{
+  "code": "class Foo { async ['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 39`] = `
+{
+  "code": "class Foo { get[.2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [.2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 40`] = `
+{
+  "code": "class Foo { set[.2](value) {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [.2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 41`] = `
+{
+  "code": "class Foo { async[.2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [.2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 42`] = `
+{
+  "code": "class Foo { [2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 43`] = `
+{
+  "code": "class Foo { get [2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 44`] = `
+{
+  "code": "class Foo { set [2](value) {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 45`] = `
+{
+  "code": "class Foo { async [2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 46`] = `
+{
+  "code": "class Foo { get[2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 47`] = `
+{
+  "code": "class Foo { set[2](value) {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 48`] = `
+{
+  "code": "class Foo { async[2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 49`] = `
+{
+  "code": "class Foo { get['foo']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['foo'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 50`] = `
+{
+  "code": "class Foo { *[2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 51`] = `
+{
+  "code": "class Foo { async*[2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 52`] = `
+{
+  "code": "class Foo { static ['constructor']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['constructor'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 53`] = `
+{
+  "code": "class Foo { ['prototype']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['prototype'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 54`] = `
+{
+  "code": "(class { ['x']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 55`] = `
+{
+  "code": "(class { ['__proto__']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 56`] = `
+{
+  "code": "(class { static ['__proto__']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 57`] = `
+{
+  "code": "(class { static ['constructor']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['constructor'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 58`] = `
+{
+  "code": "(class { ['prototype']() {} })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['prototype'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 59`] = `
+{
+  "code": "class Foo { ['0'] }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 60`] = `
+{
+  "code": "class Foo { ['0'] = 0 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['0'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 61`] = `
+{
+  "code": "class Foo { static[0] }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [0] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 62`] = `
+{
+  "code": "class Foo { ['#foo'] }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['#foo'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 63`] = `
+{
+  "code": "(class { ['__proto__'] })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 64`] = `
+{
+  "code": "(class { static ['__proto__'] })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 65`] = `
+{
+  "code": "(class { ['prototype'] })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['prototype'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 66`] = `
+{
+  "code": "({
+  ['x']: 0
+})",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 67`] = `
+{
+  "code": "class Foo {
+  static ['x']() {
+    return 1;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 68`] = `
+{
+  "code": "({ [0x1]: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [0x1] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 69`] = `
+{
+  "code": "({ [1e2]: 0 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [1e2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 70`] = `
+{
+  "code": "const x = { ["x"]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ["x"] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 71`] = `
+{
+  "code": "const x = { [""]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [""] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 72`] = `
+{
+  "code": "const x = { ["\\u00e9"]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ["\\u00e9"] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 73`] = `
+{
+  "code": "const x = { ["delete"]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ["delete"] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 74`] = `
+{
+  "code": "const x = { [0b10]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [0b10] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 75`] = `
+{
+  "code": "const x = { [0o7]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [0o7] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 76`] = `
+{
+  "code": "const x = { [1_000]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [1_000] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 77`] = `
+{
+  "code": "const x = { [1e-2]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property [1e-2] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 78`] = `
+{
+  "code": "const x = { [(('x'))]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 79`] = `
+{
+  "code": "class Foo { public static ['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 80`] = `
+{
+  "code": "class Foo { static readonly ['x'] = 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 81`] = `
+{
+  "code": "class Foo { static async *['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 82`] = `
+{
+  "code": "const arrow = () => ({ ['x']: 1 })",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 83`] = `
+{
+  "code": "const cond = true ? { ['x']: 1 } : { a: 2 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 84`] = `
+{
+  "code": "function f() { return { ['x']: 1 } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 85`] = `
+{
+  "code": "function f({ ['x']: a } = {} as any) { return a }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 86`] = `
+{
+  "code": "const { ['x']: a, ...rest } = { x: 1, y: 2 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 87`] = `
+{
+  "code": "try {} catch ({ ['x']: e }) {}",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 88`] = `
+{
+  "code": "const x = { ['x']: 1, ['y']: 2, a: 3, ['z']: 4 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+    {
+      "message": "Unnecessarily computed property ['y'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+    {
+      "message": "Unnecessarily computed property ['z'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 89`] = `
+{
+  "code": "const x = {
+  [
+    'x'
+  ]: 1,
+}",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 90`] = `
+{
+  "code": "interface I { x(): void } class C implements I { ['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 91`] = `
+{
+  "code": "class Box<T> { ['x']: T | undefined }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 92`] = `
+{
+  "code": "namespace N { export class C { ['x']() {} } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 93`] = `
+{
+  "code": "for (const { a: { ['x']: b } } of [{ a: { x: 1 } }]) { void b }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 94`] = `
+{
+  "code": "const x = { async ['async']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['async'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 95`] = `
+{
+  "code": "const x = { get ['get']() { return 1 } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['get'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 96`] = `
+{
+  "code": "const x = { set ['set'](v) {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['set'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 97`] = `
+{
+  "code": "class Foo { ['prototype']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['prototype'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 98`] = `
+{
+  "code": "class Foo { get ['k']() { return 1 } set ['k'](v) {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['k'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+    {
+      "message": "Unnecessarily computed property ['k'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 99`] = `
+{
+  "code": "class Foo { get ['x']() { return 1 } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 100`] = `
+{
+  "code": "class Foo { set ['x'](v) {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 101`] = `
+{
+  "code": "var { ['x']: a = 1 } = obj",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 102`] = `
+{
+  "code": "({ ['x']: a = 1 } = b)",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 103`] = `
+{
+  "code": "class Base { x() {} }; class Sub extends Base { override ['x']() {} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 68,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 104`] = `
+{
+  "code": "declare class Foo { ['x']: string }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 105`] = `
+{
+  "code": "declare class Foo { ['x'](): void }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 106`] = `
+{
+  "code": "const x = <const>{ ['x']: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 107`] = `
+{
+  "code": "const x = { ['x']: 1 } as const",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 108`] = `
+{
+  "code": "const x = { ['x']: 1 } satisfies Record<string, number>",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['x'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 109`] = `
+{
+  "code": "({ ['__proto__']: a } = b)",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 110`] = `
+{
+  "code": "({ y: { ['__proto__']: a } } = b)",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 111`] = `
+{
+  "code": "for ({ ['__proto__']: a } of arr) {}",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 112`] = `
+{
+  "code": "for ({ ['__proto__']: a } in arr) {}",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-computed-key > invalid 113`] = `
+{
+  "code": "[{ ['__proto__']: a }] = [b]",
+  "diagnostics": [
+    {
+      "message": "Unnecessarily computed property ['__proto__'] found.",
+      "messageId": "unnecessarilyComputedProperty",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-computed-key",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
