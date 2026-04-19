@@ -291,6 +291,7 @@ export default defineConfig({
     './tests/eslint/rules/no-proto.test.ts',
     './tests/eslint/rules/no-return-assign.test.ts',
     './tests/eslint/rules/no-self-compare.test.ts',
+    './tests/eslint/rules/no-sequences.test.ts',
     './tests/eslint/rules/no-unneeded-ternary.test.ts',
     './tests/eslint/rules/no-delete-var.test.ts',
     './tests/eslint/rules/require-atomic-updates.test.ts',
