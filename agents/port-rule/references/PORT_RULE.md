@@ -6,6 +6,24 @@ You are an expert Software Engineer tasked with porting ESLint rules to `rslint`
 
 ---
 
+## Scope: rule semantics, not framework parity
+
+Your job is porting the **rule's semantics** — given equivalent input, produce equivalent diagnostics. You are **not** responsible for re-implementing ESLint framework concepts that rslint deliberately does not expose. Examples:
+
+- `/*global ...*/` / `/*eslint ...*/` directive comments
+- `languageOptions.globals` / `parserOptions.sourceType` override / `parserOptions.ecmaFeatures.*`
+- `env: 'browser' | 'node' | ...`
+
+When an upstream test case depends on one of these:
+
+- **Don't** reimplement the concept inside your rule (e.g., parsing `/*global*/` comments yourself).
+- **Don't** list the gap under the rule's "Differences from ESLint" section — framework gaps apply to every rule, not yours.
+- **Do** mark the upstream case `skip: true` with an inline reason such as `// SKIP: rslint does not support ESLint's <concept>`.
+
+The rule doc's "Differences from ESLint" section is reserved for semantic differences of this specific rule — either intentional choices (Phase 1 Step 5.A) or tsgo/Go-semantic side effects (Phase 1 Step 5.B).
+
+---
+
 ## Related Documents
 
 | Document                                       | Description                                                         |
