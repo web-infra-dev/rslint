@@ -44,14 +44,6 @@ f(x ? x : 1);
 | ------------------- | ------- | ------- | ---------------------------------------------------------------------------------------- |
 | `defaultAssignment` | boolean | `true`  | When `false`, also flag the `a ? a : b` default-assignment pattern (auto-fixed to `a \|\| b`). |
 
-## Differences from ESLint
-
-- TypeScript-specific expressions (`as`, `satisfies`, type assertions, etc.)
-  are unknown to ESLint's precedence table; ESLint treats them as the lowest
-  precedence and wraps them in parentheses defensively when emitting `||`
-  fixes. rslint mirrors that behavior so an alternate like `bar as any`
-  becomes `(bar as any)` after the fix, matching ESLint's output.
-
 ## Original Documentation
 
 [no-unneeded-ternary - ESLint](https://eslint.org/docs/latest/rules/no-unneeded-ternary)
