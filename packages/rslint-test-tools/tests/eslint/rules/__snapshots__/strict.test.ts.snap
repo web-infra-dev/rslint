@@ -1,0 +1,1294 @@
+// Rstest Snapshot v1
+
+exports[`strict > invalid 1`] = `
+{
+  "code": ""use strict"; foo();",
+  "diagnostics": [
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 2`] = `
+{
+  "code": "function foo() { 'use strict'; return; }",
+  "diagnostics": [
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 3`] = `
+{
+  "code": "var foo = function() { 'use strict'; return; };",
+  "diagnostics": [
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 4`] = `
+{
+  "code": "function foo() { return function() { 'use strict'; return; }; }",
+  "diagnostics": [
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 5`] = `
+{
+  "code": "'use strict'; function foo() { "use strict"; return; }",
+  "diagnostics": [
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 6`] = `
+{
+  "code": ""use strict"; foo(); export {};",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of modules.",
+      "messageId": "module",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 7`] = `
+{
+  "code": "foo();",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 8`] = `
+{
+  "code": "function foo() { 'use strict'; return; }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 9`] = `
+{
+  "code": "var foo = function() { 'use strict'; return; }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 10`] = `
+{
+  "code": "var foo = () => { 'use strict'; return () => 1; }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 11`] = `
+{
+  "code": "'use strict'; function foo() { 'use strict'; return; }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 12`] = `
+{
+  "code": "'use strict'; 'use strict'; foo();",
+  "diagnostics": [
+    {
+      "message": "Multiple 'use strict' directives.",
+      "messageId": "multiple",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 13`] = `
+{
+  "code": "'use strict'; foo(); export {};",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of modules.",
+      "messageId": "module",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 14`] = `
+{
+  "code": "'use strict'; foo();",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 15`] = `
+{
+  "code": "'use strict'; (function() { 'use strict'; return true; }());",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 16`] = `
+{
+  "code": "(function() { 'use strict'; function f() { 'use strict'; return } return true; }());",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'use strict' directive.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 17`] = `
+{
+  "code": "(function() { return true; }());",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 18`] = `
+{
+  "code": "(() => { return true; })();",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 19`] = `
+{
+  "code": "function foo() { 'use strict'; 'use strict'; return; }",
+  "diagnostics": [
+    {
+      "message": "Multiple 'use strict' directives.",
+      "messageId": "multiple",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 20`] = `
+{
+  "code": "function foo() { return function() { 'use strict'; return; }; }",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 21`] = `
+{
+  "code": "function foo() { 'use strict'; return function() { 'use strict'; 'use strict'; return; }; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'use strict' directive.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Multiple 'use strict' directives.",
+      "messageId": "multiple",
+      "range": {
+        "end": {
+          "column": 79,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 22`] = `
+{
+  "code": "var foo = () => { return; };",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 23`] = `
+{
+  "code": "class A { constructor() { "use strict"; } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of classes.",
+      "messageId": "unnecessaryInClasses",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 24`] = `
+{
+  "code": "class A { foo() { "use strict"; } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of classes.",
+      "messageId": "unnecessaryInClasses",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 25`] = `
+{
+  "code": "class A { foo() { function bar() { "use strict"; } } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of classes.",
+      "messageId": "unnecessaryInClasses",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 26`] = `
+{
+  "code": "class A { field = () => { "use strict"; } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of classes.",
+      "messageId": "unnecessaryInClasses",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 27`] = `
+{
+  "code": "class A { field = function() { "use strict"; } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of classes.",
+      "messageId": "unnecessaryInClasses",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 28`] = `
+{
+  "code": "'use strict'; function foo() { return; }",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 29`] = `
+{
+  "code": "'use strict'; function foo() { return; }",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 30`] = `
+{
+  "code": "function foo() { return; }",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 31`] = `
+{
+  "code": "function foo(a = 0) { 'use strict' }",
+  "diagnostics": [
+    {
+      "message": "'use strict' directive inside a function with non-simple parameter list throws a syntax error since ES2016.",
+      "messageId": "nonSimpleParameterList",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 32`] = `
+{
+  "code": "function foo(a = 0) { 'use strict' }",
+  "diagnostics": [
+    {
+      "message": "Use the global form of 'use strict'.",
+      "messageId": "global",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+    {
+      "message": "'use strict' directive inside a function with non-simple parameter list throws a syntax error since ES2016.",
+      "messageId": "nonSimpleParameterList",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 33`] = `
+{
+  "code": "function foo(a = 0) { 'use strict' }",
+  "diagnostics": [
+    {
+      "message": "'use strict' directive inside a function with non-simple parameter list throws a syntax error since ES2016.",
+      "messageId": "nonSimpleParameterList",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 34`] = `
+{
+  "code": "function foo(a = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Wrap function 'foo' in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 35`] = `
+{
+  "code": "async function foo(a = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Wrap async function 'foo' in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 36`] = `
+{
+  "code": "function* gen(a = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Wrap generator function 'gen' in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 37`] = `
+{
+  "code": "async function* gen(a = 0) { }",
+  "diagnostics": [
+    {
+      "message": "Wrap async generator function 'gen' in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 38`] = `
+{
+  "code": "(function(a = 0) { })();",
+  "diagnostics": [
+    {
+      "message": "Wrap function in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 39`] = `
+{
+  "code": "(function named(a = 0) { })();",
+  "diagnostics": [
+    {
+      "message": "Wrap function 'named' in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 40`] = `
+{
+  "code": "var foo = (a = 0) => { };",
+  "diagnostics": [
+    {
+      "message": "Wrap arrow function in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 41`] = `
+{
+  "code": "var foo = async (a = 0) => { };",
+  "diagnostics": [
+    {
+      "message": "Wrap async arrow function in a function with 'use strict' directive.",
+      "messageId": "wrap",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 42`] = `
+{
+  "code": "class C { static { function foo() { 
+'use strict'; } } }",
+  "diagnostics": [
+    {
+      "message": "Strict mode is not permitted.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 43`] = `
+{
+  "code": "function foo() {'use strict'; class C { static { function foo() { 
+'use strict'; } } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'use strict' directive.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 44`] = `
+{
+  "code": "class C { static { function foo() { 
+'use strict'; } } }",
+  "diagnostics": [
+    {
+      "message": "'use strict' is unnecessary inside of classes.",
+      "messageId": "unnecessaryInClasses",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict > invalid 45`] = `
+{
+  "code": "class Foo extends (function() { return class {}; }()) {}",
+  "diagnostics": [
+    {
+      "message": "Use the function form of 'use strict'.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "strict",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
