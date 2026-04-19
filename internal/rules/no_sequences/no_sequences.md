@@ -71,14 +71,6 @@ var foo = (1, 2);
 foo(a, (b, c), d);
 ```
 
-## Differences from ESLint
-
-- **Report position on 3+-element chains.** tsgo parses `a, b, c` as the
-  left-associative BinaryExpression `(a, b), c` rather than a flat
-  `SequenceExpression`. rslint walks down the left spine to report at the
-  first (leftmost) comma — matching ESLint's
-  `sourceCode.getTokenAfter(node.expressions[0], isCommaToken)`.
-
 ## Original Documentation
 
 - [ESLint rule: no-sequences](https://eslint.org/docs/latest/rules/no-sequences)
