@@ -1,0 +1,1427 @@
+// Rstest Snapshot v1
+
+exports[`radix > invalid 1`] = `
+{
+  "code": "parseInt();",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 2`] = `
+{
+  "code": "parseInt("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 3`] = `
+{
+  "code": "parseInt("10",);",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 4`] = `
+{
+  "code": "parseInt((0, "10"));",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 5`] = `
+{
+  "code": "parseInt((0, "10"),);",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 6`] = `
+{
+  "code": "parseInt("10", null);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 7`] = `
+{
+  "code": "parseInt("10", undefined);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 8`] = `
+{
+  "code": "parseInt("10", true);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 9`] = `
+{
+  "code": "parseInt("10", "foo");",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 10`] = `
+{
+  "code": "parseInt("10", "123");",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 11`] = `
+{
+  "code": "parseInt("10", 1);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 12`] = `
+{
+  "code": "parseInt("10", 37);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 13`] = `
+{
+  "code": "parseInt("10", 10.5);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 14`] = `
+{
+  "code": "Number.parseInt();",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 15`] = `
+{
+  "code": "Number.parseInt("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 16`] = `
+{
+  "code": "Number.parseInt("10", 1);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 17`] = `
+{
+  "code": "Number.parseInt("10", 37);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 18`] = `
+{
+  "code": "Number.parseInt("10", 10.5);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 19`] = `
+{
+  "code": "parseInt?.("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 20`] = `
+{
+  "code": "Number.parseInt?.("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 21`] = `
+{
+  "code": "Number?.parseInt("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 22`] = `
+{
+  "code": "(Number?.parseInt)("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 23`] = `
+{
+  "code": "parseInt();",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 24`] = `
+{
+  "code": "parseInt();",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 25`] = `
+{
+  "code": "parseInt("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 26`] = `
+{
+  "code": "parseInt("10");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 27`] = `
+{
+  "code": "parseInt("10", 1);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 28`] = `
+{
+  "code": "parseInt("10", 1);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 29`] = `
+{
+  "code": "Number.parseInt();",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 30`] = `
+{
+  "code": "Number.parseInt();",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 31`] = `
+{
+  "code": "parseInt("10", 0);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 32`] = `
+{
+  "code": "parseInt("10", 0x25);",
+  "diagnostics": [
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 33`] = `
+{
+  "code": "parseInt();
+parseInt('10');
+parseInt('10', 1);",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "radix",
+    },
+    {
+      "message": "Invalid radix parameter, must be an integer between 2 and 36.",
+      "messageId": "invalidRadix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 34`] = `
+{
+  "code": "parseInt(parseInt("10"));",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 35`] = `
+{
+  "code": "class C { foo() { parseInt('x'); } }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 36`] = `
+{
+  "code": "class C { x = parseInt('x'); }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 37`] = `
+{
+  "code": "class C { static { parseInt('x'); } }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 38`] = `
+{
+  "code": "const f = () => parseInt('x');",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 39`] = `
+{
+  "code": "(function () { parseInt('x'); })();",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 40`] = `
+{
+  "code": "function f() { parseInt(); }",
+  "diagnostics": [
+    {
+      "message": "Missing parameters.",
+      "messageId": "missingParameters",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 41`] = `
+{
+  "code": "parseInt('x');
+function f() { var parseInt; parseInt(); }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 42`] = `
+{
+  "code": "parseInt("10" /* hi */);",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 43`] = `
+{
+  "code": "parseInt(...args);",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 44`] = `
+{
+  "code": "async function f() { return parseInt("x"); }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 45`] = `
+{
+  "code": "function* g() { yield parseInt("x"); }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 46`] = `
+{
+  "code": "const obj = { m() { parseInt("x"); } };",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 47`] = `
+{
+  "code": "throw parseInt("x");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 48`] = `
+{
+  "code": "const x = parseInt(\`\${foo}\`);",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 49`] = `
+{
+  "code": "class C { [parseInt("x")]() {} }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 50`] = `
+{
+  "code": "function f(x = parseInt("x")) { return x; }",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 51`] = `
+{
+  "code": "export default parseInt("x");",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 52`] = `
+{
+  "code": "parseInt("x")   /* after */   ;",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`radix > invalid 53`] = `
+{
+  "code": "parseInt("𝟙")",
+  "diagnostics": [
+    {
+      "message": "Missing radix parameter.",
+      "messageId": "missingRadix",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "radix",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
