@@ -189,6 +189,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
@@ -596,6 +597,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-useless-concat", no_useless_concat.NoUselessConcatRule)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 	GlobalRuleRegistry.Register("no-extra-boolean-cast", no_extra_boolean_cast.NoExtraBooleanCastRule)
+	GlobalRuleRegistry.Register("no-unneeded-ternary", no_unneeded_ternary.NoUnneededTernaryRule)
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
 	GlobalRuleRegistry.Register("no-undef-init", no_undef_init.NoUndefInitRule)
 	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
