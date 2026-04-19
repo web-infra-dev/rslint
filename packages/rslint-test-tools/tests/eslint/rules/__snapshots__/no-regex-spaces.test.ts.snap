@@ -1,0 +1,755 @@
+// Rstest Snapshot v1
+
+exports[`no-regex-spaces > invalid 1`] = `
+{
+  "code": "var foo = /bar  baz/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 2`] = `
+{
+  "code": "var foo = /bar    baz/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 3`] = `
+{
+  "code": "var foo = / a b  c d /;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 4`] = `
+{
+  "code": "var foo = RegExp(' a b c d  ');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 5`] = `
+{
+  "code": "var foo = RegExp('bar    baz');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 6`] = `
+{
+  "code": "var foo = new RegExp('bar    baz');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 7`] = `
+{
+  "code": "{ let RegExp = function() {}; } var foo = RegExp('bar    baz');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 8`] = `
+{
+  "code": "var foo = /bar   {3}baz/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 9`] = `
+{
+  "code": "var foo = /bar    ?baz/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {3}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 10`] = `
+{
+  "code": "var foo = new RegExp('bar   *baz')",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 11`] = `
+{
+  "code": "var foo = RegExp('bar   +baz')",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 12`] = `
+{
+  "code": "var foo = new RegExp('bar    ');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 13`] = `
+{
+  "code": "var foo = /bar\\  baz/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 14`] = `
+{
+  "code": "var foo = /[   ]  /;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 15`] = `
+{
+  "code": "var foo = /  [   ] /;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 16`] = `
+{
+  "code": "var foo = new RegExp('[   ]  ');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 17`] = `
+{
+  "code": "var foo = RegExp('  [ ]');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 18`] = `
+{
+  "code": "var foo = /\\[  /;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 19`] = `
+{
+  "code": "var foo = /\\[  \\]/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 20`] = `
+{
+  "code": "var foo = /(?:  )/;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 21`] = `
+{
+  "code": "var foo = RegExp('^foo(?=   )');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {3}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 22`] = `
+{
+  "code": "var foo = /\\  /",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 23`] = `
+{
+  "code": "var foo = / \\  /",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 24`] = `
+{
+  "code": "var foo = /  foo   /;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 25`] = `
+{
+  "code": "var foo = new RegExp('\\d  ')",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 26`] = `
+{
+  "code": "var foo = RegExp('\\u0041   ')",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {3}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 27`] = `
+{
+  "code": "var foo = new RegExp('\\\\[  \\\\]');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {2}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 28`] = `
+{
+  "code": "var foo = /[[    ]    ]    /v;",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-regex-spaces > invalid 29`] = `
+{
+  "code": "var foo = new RegExp('[[    ]    ]    ', 'v');",
+  "diagnostics": [
+    {
+      "message": "Spaces are hard to count. Use {4}.",
+      "messageId": "multipleSpaces",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-regex-spaces",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

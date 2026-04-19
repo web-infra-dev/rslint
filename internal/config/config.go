@@ -176,6 +176,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_param_reassign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
+	"github.com/web-infra-dev/rslint/internal/rules/no_regex_spaces"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_return_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
@@ -585,6 +586,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-octal-escape", no_octal_escape.NoOctalEscapeRule)
 	GlobalRuleRegistry.Register("no-param-reassign", no_param_reassign.NoParamReassignRule)
 	GlobalRuleRegistry.Register("no-proto", no_proto.NoProtoRule)
+	GlobalRuleRegistry.Register("no-regex-spaces", no_regex_spaces.NoRegexSpacesRule)
 	GlobalRuleRegistry.Register("no-return-assign", no_return_assign.NoReturnAssignRule)
 	GlobalRuleRegistry.Register("no-script-url", no_script_url.NoScriptUrlRule)
 	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
