@@ -771,5 +771,93 @@ ruleTester.run('require-yield', {
         },
       ],
     },
+
+    // ---- Illegal yield in parameter default values (nested non-gen) ----
+    {
+      code: `function* outer() { function bar(x = yield 1) { return x; } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `function* outer() { const f = (x = yield 1) => x; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `function* outer() { class C { m(x = yield 1) { return x; } } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `function* outer() { const o = { set x(v = yield 1) {} }; return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `function* outer() { class C { constructor(x = yield 1) {} } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+
+    // ---- Class static block (illegal yield) ----
+    {
+      code: `function* outer() { class C { static { yield 1; } } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
+    {
+      code: `function* outer() { class C { static { function* g() { yield 1; } yield 2; } } return 0; }`,
+      errors: [
+        {
+          messageId: 'missingYield',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 16,
+        },
+      ],
+    },
   ],
 });

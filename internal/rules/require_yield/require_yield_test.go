@@ -515,6 +515,53 @@ func TestRequireYieldRule(t *testing.T) {
 					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 14},
 				},
 			},
+
+			// ---- Illegal yield in parameter default values (nested non-gen) ----
+			{
+				Code: `function* outer() { function bar(x = yield 1) { return x; } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: `function* outer() { const f = (x = yield 1) => x; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: `function* outer() { class C { m(x = yield 1) { return x; } } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: `function* outer() { const o = { set x(v = yield 1) {} }; return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code: `function* outer() { class C { constructor(x = yield 1) {} } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
+
+			// ---- Class static block (illegal yield) ----
+			{
+				Code: `function* outer() { class C { static { yield 1; } } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
+			// Static block with both illegal and legal yields in sub-scopes.
+			{
+				Code: `function* outer() { class C { static { function* g() { yield 1; } yield 2; } } return 0; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "missingYield", Line: 1, Column: 1, EndLine: 1, EndColumn: 16},
+				},
+			},
 		},
 	)
 }

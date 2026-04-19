@@ -29,16 +29,22 @@ func hasNonEmptyBody(node *ast.Node) bool {
 	return len(block.Statements.Nodes) > 0
 }
 
-// bodyLikeRange returns the [pos, end) of the "execution body" of a scope-
-// bearing node. Yield expressions whose position falls inside this range
-// are attributed to this scope; yields outside it (e.g. in a computed
-// property key) pass through to an outer scope.
+// bodyLikeRange returns the [pos, end) of the "execution scope" of a
+// scope-bearing node. Yield expressions whose position falls inside this
+// range are attributed to this scope; yields outside it (e.g. in a
+// computed property key or a decorator expression) pass through to an
+// outer scope.
 //
 // Required because tsgo performs error-recovery parsing: an illegally
-// placed `yield` (e.g. inside a non-generator function body) still
-// produces a KindYieldExpression AST node. Without position-aware
-// attribution, such a yield would bubble up to the nearest enclosing
-// generator on the stack and cause a false negative.
+// placed `yield` (e.g. inside a non-generator function body or in a
+// parameter default value of a non-generator) still produces a
+// KindYieldExpression AST node. Without position-aware attribution, such
+// a yield would bubble up to the nearest enclosing generator on the
+// stack and cause a false negative.
+//
+// For function-like nodes the scope starts at the parameter list, so
+// that yield in parameter default values is attributed here rather than
+// leaking to an outer generator.
 func bodyLikeRange(node *ast.Node) (int, int, bool) {
 	switch node.Kind {
 	case ast.KindFunctionDeclaration,
@@ -52,13 +58,23 @@ func bodyLikeRange(node *ast.Node) (int, int, bool) {
 		if body == nil {
 			return 0, 0, false
 		}
-		return body.Pos(), body.End(), true
+		pos := body.Pos()
+		if params := node.ParameterList(); params != nil {
+			pos = params.Loc.Pos()
+		}
+		return pos, body.End(), true
 	case ast.KindPropertyDeclaration:
 		init := node.AsPropertyDeclaration().Initializer
 		if init == nil {
 			return 0, 0, false
 		}
 		return init.Pos(), init.End(), true
+	case ast.KindClassStaticBlockDeclaration:
+		body := node.AsClassStaticBlockDeclaration().Body
+		if body == nil {
+			return 0, 0, false
+		}
+		return body.Pos(), body.End(), true
 	}
 	return 0, 0, false
 }
@@ -85,9 +101,11 @@ var RequireYieldRule = rule.Rule{
 			}
 			top := stack[n-1]
 			stack = stack[:n-1]
-			// PropertyDeclaration represents an implicit constructor scope
-			// for its initializer; it is never a generator itself.
-			if top.node.Kind == ast.KindPropertyDeclaration {
+			// PropertyDeclaration initializer and ClassStaticBlockDeclaration
+			// both represent implicit-constructor-like scopes that are never
+			// themselves generators.
+			if top.node.Kind == ast.KindPropertyDeclaration ||
+				top.node.Kind == ast.KindClassStaticBlockDeclaration {
 				return
 			}
 			if isGenerator(top.node) && top.count == 0 && hasNonEmptyBody(top.node) {
@@ -112,22 +130,24 @@ var RequireYieldRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			ast.KindFunctionDeclaration:                      enter,
-			rule.ListenerOnExit(ast.KindFunctionDeclaration): exit,
-			ast.KindFunctionExpression:                       enter,
-			rule.ListenerOnExit(ast.KindFunctionExpression):  exit,
-			ast.KindMethodDeclaration:                        enter,
-			rule.ListenerOnExit(ast.KindMethodDeclaration):   exit,
-			ast.KindArrowFunction:                            enter,
-			rule.ListenerOnExit(ast.KindArrowFunction):       exit,
-			ast.KindGetAccessor:                              enter,
-			rule.ListenerOnExit(ast.KindGetAccessor):         exit,
-			ast.KindSetAccessor:                              enter,
-			rule.ListenerOnExit(ast.KindSetAccessor):         exit,
-			ast.KindConstructor:                              enter,
-			rule.ListenerOnExit(ast.KindConstructor):         exit,
-			ast.KindPropertyDeclaration:                      enter,
-			rule.ListenerOnExit(ast.KindPropertyDeclaration): exit,
+			ast.KindFunctionDeclaration:                              enter,
+			rule.ListenerOnExit(ast.KindFunctionDeclaration):         exit,
+			ast.KindFunctionExpression:                               enter,
+			rule.ListenerOnExit(ast.KindFunctionExpression):          exit,
+			ast.KindMethodDeclaration:                                enter,
+			rule.ListenerOnExit(ast.KindMethodDeclaration):           exit,
+			ast.KindArrowFunction:                                    enter,
+			rule.ListenerOnExit(ast.KindArrowFunction):               exit,
+			ast.KindGetAccessor:                                      enter,
+			rule.ListenerOnExit(ast.KindGetAccessor):                 exit,
+			ast.KindSetAccessor:                                      enter,
+			rule.ListenerOnExit(ast.KindSetAccessor):                 exit,
+			ast.KindConstructor:                                      enter,
+			rule.ListenerOnExit(ast.KindConstructor):                 exit,
+			ast.KindPropertyDeclaration:                              enter,
+			rule.ListenerOnExit(ast.KindPropertyDeclaration):         exit,
+			ast.KindClassStaticBlockDeclaration:                      enter,
+			rule.ListenerOnExit(ast.KindClassStaticBlockDeclaration): exit,
 
 			ast.KindYieldExpression: countYield,
 		}

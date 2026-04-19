@@ -1372,3 +1372,185 @@ exports[`require-yield > invalid 52`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`require-yield > invalid 53`] = `
+{
+  "code": "function* outer() { function bar(x = yield 1) { return x; } return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-yield > invalid 54`] = `
+{
+  "code": "function* outer() { const f = (x = yield 1) => x; return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-yield > invalid 55`] = `
+{
+  "code": "function* outer() { class C { m(x = yield 1) { return x; } } return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-yield > invalid 56`] = `
+{
+  "code": "function* outer() { const o = { set x(v = yield 1) {} }; return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-yield > invalid 57`] = `
+{
+  "code": "function* outer() { class C { constructor(x = yield 1) {} } return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-yield > invalid 58`] = `
+{
+  "code": "function* outer() { class C { static { yield 1; } } return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-yield > invalid 59`] = `
+{
+  "code": "function* outer() { class C { static { function* g() { yield 1; } yield 2; } } return 0; }",
+  "diagnostics": [
+    {
+      "message": "This generator function does not have 'yield'.",
+      "messageId": "missingYield",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-yield",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
