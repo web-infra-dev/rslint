@@ -210,6 +210,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	core_prefer_promise_reject_errors "github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
 	"github.com/web-infra-dev/rslint/internal/rules/radix"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
@@ -643,6 +644,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
 	GlobalRuleRegistry.Register("no-with", no_with.NoWithRule)
 	GlobalRuleRegistry.Register("prefer-rest-params", prefer_rest_params.PreferRestParamsRule)
+	GlobalRuleRegistry.Register("prefer-spread", prefer_spread.PreferSpreadRule)
 	GlobalRuleRegistry.Register("no-empty-character-class", no_empty_character_class.NoEmptyCharacterClassRule)
 	GlobalRuleRegistry.Register("no-invalid-regexp", no_invalid_regexp.NoInvalidRegexpRule)
 	GlobalRuleRegistry.Register("no-iterator", no_iterator.NoIteratorRule)

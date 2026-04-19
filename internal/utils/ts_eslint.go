@@ -1260,6 +1260,10 @@ func VisitDestructuringIdentifiers(node *ast.Node, fn func(*ast.Node)) {
 // each transparently unwrapping parentheses (e.g. `(Object).defineProperty`)
 // and optional chaining (`Object?.defineProperty`, `Object?.['defineProperty']`).
 // Mirrors ESLint's `astUtils.isSpecificMemberAccess`.
+//
+// If `objectName` is the empty string, the object identity check is skipped
+// — any expression on the left of the method is accepted — matching ESLint's
+// behavior when the `objectName` argument is `null`.
 func IsSpecificMemberAccess(node *ast.Node, objectName, methodName string) bool {
 	node = ast.SkipParentheses(node)
 	if node == nil {
@@ -1283,6 +1287,9 @@ func IsSpecificMemberAccess(node *ast.Node, objectName, methodName string) bool 
 		obj = eae.Expression
 	default:
 		return false
+	}
+	if objectName == "" {
+		return true
 	}
 	obj = ast.SkipParentheses(obj)
 	return obj != nil && ast.IsIdentifier(obj) && obj.AsIdentifier().Text == objectName
@@ -1473,12 +1480,18 @@ func hasSameTokens(sf *ast.SourceFile, a, b *ast.Node) bool {
 	if len(aKids) != len(bKids) {
 		return false
 	}
-	// Composite: compare children pairwise AND compare the token sequences
-	// living in the gaps between children (and the prefix / suffix gaps).
-	// Gap tokens are the operators / punctuation / keywords that
-	// ForEachChild does not yield as nodes — `(` `)` `,` `.` between call
-	// arguments, `+` / `-` for PrefixUnaryExpression, `new` / `import` for
-	// MetaProperty, and so on.
+	// Compare children pairwise AND compare the token sequences living in
+	// the gaps between children (and the prefix / suffix gaps). Gap tokens
+	// are the operators / punctuation / keywords that ForEachChild does not
+	// yield as nodes — `(` `)` `,` `.` between call arguments, `+` / `-` for
+	// PrefixUnaryExpression, `new` / `import` for MetaProperty, and so on.
+	//
+	// With zero children the loop is skipped and the two nodes are compared
+	// entirely via the trailing gap scan — this covers both simple leaves
+	// (identifiers, literals, keyword tokens: one token each) AND empty
+	// composites (`[]`, `{}`: bracket/brace tokens only). The scanner treats
+	// whitespace and comments as trivia, so `[]` and `[ ]` compare equal —
+	// matching ESLint's `getTokens` semantics.
 	prevA, prevB := a.Pos(), b.Pos()
 	for i := range aKids {
 		if !sameTokensInRange(sf, prevA, aKids[i].Pos(), prevB, bKids[i].Pos()) {
