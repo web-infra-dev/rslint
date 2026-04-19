@@ -863,3 +863,81 @@ exports[`prefer-spread > invalid 33`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`prefer-spread > invalid 34`] = `
+{
+  "code": "foo.apply((null), args);",
+  "diagnostics": [
+    {
+      "message": "Use the spread operator instead of '.apply()'.",
+      "messageId": "preferSpread",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-spread > invalid 35`] = `
+{
+  "code": "obj.foo.apply((obj), args);",
+  "diagnostics": [
+    {
+      "message": "Use the spread operator instead of '.apply()'.",
+      "messageId": "preferSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-spread > invalid 36`] = `
+{
+  "code": "foo.apply(null, (args));",
+  "diagnostics": [
+    {
+      "message": "Use the spread operator instead of '.apply()'.",
+      "messageId": "preferSpread",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

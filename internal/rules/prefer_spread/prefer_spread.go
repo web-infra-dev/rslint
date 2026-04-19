@@ -26,8 +26,13 @@ var PreferSpreadRule = rule.Rule{
 				if len(args) != 2 {
 					return
 				}
-				if args[1].Kind == ast.KindArrayLiteralExpression ||
-					args[1].Kind == ast.KindSpreadElement {
+				// Match ESLint: ESTree has no ParenthesizedExpression node, so
+				// `([1, 2])` appears as a bare ArrayExpression. Strip parens
+				// before checking the kind, otherwise `foo.apply(null, ([1,2]))`
+				// would diverge from ESLint (which skips the call).
+				arg1 := ast.SkipParentheses(args[1])
+				if arg1.Kind == ast.KindArrayLiteralExpression ||
+					arg1.Kind == ast.KindSpreadElement {
 					return
 				}
 

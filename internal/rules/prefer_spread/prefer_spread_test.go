@@ -61,6 +61,13 @@ func TestPreferSpreadRule(t *testing.T) {
 			{Code: `foo.bind(null, args);`},
 			// Uppercase method name — not "apply"
 			{Code: `foo.APPLY(null, args);`},
+
+			// ---- Parenthesized operands (ESTree paren-transparency) ----
+			// `([1, 2])` must be treated as an ArrayExpression (parens are
+			// transparent in ESTree), so the rule skips the call.
+			{Code: `foo.apply(null, ([1, 2]));`},
+			// Nested parens + internal trivia — still an ArrayLiteral
+			{Code: "foo.apply(null, (([\n/* x */\n])));"},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -291,6 +298,29 @@ func TestPreferSpreadRule(t *testing.T) {
 			// identical-token thisArg
 			{
 				Code: `outer(inner(x)).m.apply(outer(inner(x)), args);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferSpread", Line: 1, Column: 1},
+				},
+			},
+			// ---- Parenthesized operands (ESTree paren-transparency) ----
+			// Paren-wrapped `null` as thisArg — IsNullOrUndefined sees through
+			{
+				Code: `foo.apply((null), args);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferSpread", Line: 1, Column: 1},
+				},
+			},
+			// Paren-wrapped thisArg matching member-access receiver — HasSameTokens sees through outer parens
+			{
+				Code: `obj.foo.apply((obj), args);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferSpread", Line: 1, Column: 1},
+				},
+			},
+			// Paren-wrapped identifier as args[1] — still NOT an array/spread
+			// after stripping parens, so the rule proceeds normally
+			{
+				Code: `foo.apply(null, (args));`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferSpread", Line: 1, Column: 1},
 				},

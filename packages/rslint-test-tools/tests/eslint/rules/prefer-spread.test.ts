@@ -39,6 +39,9 @@ ruleTester.run('prefer-spread', {
     'foo["#apply"](null, args);',
     'foo.bind(null, args);',
     'foo.APPLY(null, args);',
+    // ESTree paren-transparency: `([1, 2])` still counts as an array literal
+    'foo.apply(null, ([1, 2]));',
+    'foo.apply(null, (([\n/* x */\n])));',
   ],
   invalid: [
     {
@@ -174,6 +177,19 @@ ruleTester.run('prefer-spread', {
     },
     {
       code: 'outer(inner(x)).m.apply(outer(inner(x)), args);',
+      errors: [{ messageId: 'preferSpread' }],
+    },
+    // ---- Parenthesized operands (ESTree paren-transparency) ----
+    {
+      code: 'foo.apply((null), args);',
+      errors: [{ messageId: 'preferSpread' }],
+    },
+    {
+      code: 'obj.foo.apply((obj), args);',
+      errors: [{ messageId: 'preferSpread' }],
+    },
+    {
+      code: 'foo.apply(null, (args));',
       errors: [{ messageId: 'preferSpread' }],
     },
   ],
