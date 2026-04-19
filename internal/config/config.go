@@ -206,6 +206,7 @@ import (
 	core_prefer_promise_reject_errors "github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
+	"github.com/web-infra-dev/rslint/internal/rules/radix"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
@@ -610,6 +611,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-octal-escape", no_octal_escape.NoOctalEscapeRule)
 	GlobalRuleRegistry.Register("no-param-reassign", no_param_reassign.NoParamReassignRule)
 	GlobalRuleRegistry.Register("no-proto", no_proto.NoProtoRule)
+	GlobalRuleRegistry.Register("radix", radix.RadixRule)
 	GlobalRuleRegistry.Register("no-regex-spaces", no_regex_spaces.NoRegexSpacesRule)
 	GlobalRuleRegistry.Register("no-return-assign", no_return_assign.NoReturnAssignRule)
 	GlobalRuleRegistry.Register("no-script-url", no_script_url.NoScriptUrlRule)
