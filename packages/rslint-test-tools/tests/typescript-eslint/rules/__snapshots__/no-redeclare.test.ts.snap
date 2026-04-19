@@ -1,0 +1,848 @@
+// Rstest Snapshot v1
+
+exports[`no-redeclare > invalid 1`] = `
+{
+  "code": "
+var a = 3;
+var a = 10;
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 2`] = `
+{
+  "code": "
+switch (foo) {
+  case a:
+    var b = 3;
+  case b:
+    var b = 4;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'b' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 3`] = `
+{
+  "code": "
+var a = 3;
+var a = 10;
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 4`] = `
+{
+  "code": "
+var a = {};
+var a = [];
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 5`] = `
+{
+  "code": "
+var a;
+function a() {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 6`] = `
+{
+  "code": "
+function a() {}
+function a() {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 7`] = `
+{
+  "code": "
+var a = function () {};
+var a = function () {};
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 8`] = `
+{
+  "code": "
+var a = function () {};
+var a = new Date();
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 9`] = `
+{
+  "code": "
+var a = 3;
+var a = 10;
+var a = 15;
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 10`] = `
+{
+  "code": "
+var a;
+var a;
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 11`] = `
+{
+  "code": "
+export var a;
+var a;
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 12`] = `
+{
+  "code": "var Object = 0;",
+  "diagnostics": [
+    {
+      "message": "'Object' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 13`] = `
+{
+  "code": "var top = 0;",
+  "diagnostics": [
+    {
+      "message": "'top' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 14`] = `
+{
+  "code": "
+var a;
+var { a = 0, b: Object = 0 } = {};
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+    {
+      "message": "'Object' is already defined as a built-in global variable.",
+      "messageId": "redeclaredAsBuiltin",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 15`] = `
+{
+  "code": "
+var a;
+var { a = 0, b: Object = 0 } = {};
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 16`] = `
+{
+  "code": "
+type T = 1;
+type T = 2;
+      ",
+  "diagnostics": [
+    {
+      "message": "'T' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 17`] = `
+{
+  "code": "
+interface A {}
+interface A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 18`] = `
+{
+  "code": "
+interface A {}
+class A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 19`] = `
+{
+  "code": "
+class A {}
+namespace A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 20`] = `
+{
+  "code": "
+interface A {}
+class A {}
+namespace A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 21`] = `
+{
+  "code": "
+class A {}
+class A {}
+namespace A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 22`] = `
+{
+  "code": "
+function A() {}
+namespace A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 23`] = `
+{
+  "code": "
+function A() {}
+function A() {}
+namespace A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 24`] = `
+{
+  "code": "
+function A() {}
+class A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 25`] = `
+{
+  "code": "
+enum A {}
+namespace A {}
+enum A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 26`] = `
+{
+  "code": "
+function A() {}
+class A {}
+namespace A {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+    {
+      "message": "'A' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redeclare > invalid 27`] = `
+{
+  "code": "
+type something = string;
+const something = 2;
+      ",
+  "diagnostics": [
+    {
+      "message": "'something' is already defined.",
+      "messageId": "redeclared",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redeclare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -172,7 +172,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-non-null-asserted-nullish-coalescing.test.ts',
     './tests/typescript-eslint/rules/no-non-null-asserted-optional-chain.test.ts',
     './tests/typescript-eslint/rules/no-non-null-assertion.test.ts',
-    // './tests/typescript-eslint/rules/no-redeclare.test.ts',
+    './tests/typescript-eslint/rules/no-redeclare.test.ts',
     './tests/typescript-eslint/rules/no-redundant-type-constituents.test.ts',
     './tests/typescript-eslint/rules/no-require-imports.test.ts',
     // './tests/typescript-eslint/rules/no-restricted-imports.test.ts',
