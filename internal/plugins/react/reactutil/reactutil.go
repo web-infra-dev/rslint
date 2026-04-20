@@ -189,6 +189,43 @@ func isComponentName(name string) bool {
 	return name == "Component" || name == "PureComponent"
 }
 
+// GetJsxTagBaseIdentifier returns the leftmost Identifier of a JSX tag name —
+// i.e. the symbol a rule must resolve to classify the tag. Returns nil when
+// the tag does not terminate in an Identifier (ThisKeyword base, namespaced
+// tag, unknown shape).
+//
+// Shapes handled:
+//
+//   - `<Foo />`                 → Identifier("Foo")
+//   - `<Foo.Bar />`             → Identifier("Foo")
+//   - `<Foo.Bar.Baz />`         → Identifier("Foo")
+//   - `<this />` / `<this.X />` → nil (ThisKeyword base)
+//   - `<a:b />`                 → nil (JsxNamespacedName — not an identifier
+//     reference in any scope)
+//   - `<foo-bar />`             → Identifier("foo-bar") (tsgo preserves the
+//     hyphenated text verbatim; callers decide whether that's DOM)
+//
+// Pair with `IsDOMComponent` to decide whether to skip lowercase-first tags.
+func GetJsxTagBaseIdentifier(element *ast.Node) *ast.Node {
+	tagName := GetJsxTagName(element)
+	if tagName == nil {
+		return nil
+	}
+	switch tagName.Kind {
+	case ast.KindIdentifier:
+		return tagName
+	case ast.KindPropertyAccessExpression:
+		base := tagName
+		for base.Kind == ast.KindPropertyAccessExpression {
+			base = base.AsPropertyAccessExpression().Expression
+		}
+		if base.Kind == ast.KindIdentifier {
+			return base
+		}
+	}
+	return nil
+}
+
 // IsInsideReactComponent reports whether `node` is lexically contained within
 // a React component — either an ES5 component (object literal passed as an
 // argument to `<createClass>(...)` / `<pragma>.<createClass>(...)`) or an

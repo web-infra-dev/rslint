@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_bind"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_multi_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
@@ -41,6 +42,7 @@ func GetAllRules() []rule.Rule {
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
 		jsx_no_bind.JsxNoBindRule,
 		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
+		jsx_no_undef.JsxNoUndefRule,
 		jsx_props_no_multi_spaces.JsxPropsNoMultiSpacesRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
