@@ -17,6 +17,7 @@ bleh
 bmatcuk
 bodyless
 cachedvfs
+callees
 catchable
 clazz
 clientrc
@@ -95,6 +96,7 @@ marginx
 marginy
 Metas
 minimatch
+mobx
 morestack
 multilines
 myfunc
@@ -110,6 +112,7 @@ nonconstructor
 nonoctal
 noregabi
 notcool
+notunique
 nsec
 nullary
 Nullishness
@@ -119,6 +122,7 @@ optionable
 osvfs
 parenless
 preact
+Prag
 Prettier
 propertyassignment
 Ptrs
@@ -160,6 +164,7 @@ sourcegraph
 spreadassignment
 spreadelement
 stdjson
+stmts
 stringutil
 stub
 stype
@@ -167,8 +172,10 @@ subclassing
 symb
 symbolname
 testdata
+testrule
 textnodes
 thenables
+tmdb
 tmpl
 trae
 tsconfiga

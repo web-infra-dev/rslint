@@ -34,6 +34,29 @@ func GetReactPragma(settings map[string]interface{}) string {
 	return pragma
 }
 
+// DefaultReactFragment is the fallback fragment name for JSX shorthand
+// fragment diagnostics when `settings.react.fragment` is not configured,
+// matching eslint-plugin-react.
+const DefaultReactFragment = "Fragment"
+
+// GetReactFragmentPragma reads `settings.react.fragment` from the config
+// settings map. Returns DefaultReactFragment when the setting is absent,
+// not a string, or empty.
+func GetReactFragmentPragma(settings map[string]interface{}) string {
+	if settings == nil {
+		return DefaultReactFragment
+	}
+	reactSettings, ok := settings["react"].(map[string]interface{})
+	if !ok {
+		return DefaultReactFragment
+	}
+	v, ok := reactSettings["fragment"].(string)
+	if !ok || v == "" {
+		return DefaultReactFragment
+	}
+	return v
+}
+
 // GetReactCreateClass reads `settings.react.createClass` from the config
 // settings map. Returns DefaultReactCreateClass when the setting is absent,
 // not a string, or empty.
