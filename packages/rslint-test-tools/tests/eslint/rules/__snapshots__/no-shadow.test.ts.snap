@@ -1,0 +1,6478 @@
+// Rstest Snapshot v1
+
+exports[`no-shadow > invalid 1`] = `
+{
+  "code": "function a(x) { var b = function c() { var x = 'foo'; }; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 2`] = `
+{
+  "code": "var a = (x) => { var b = () => { var x = 'foo'; }; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 3`] = `
+{
+  "code": "function a(x) { var b = function () { var x = 'foo'; }; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 4`] = `
+{
+  "code": "var x = 1; function a(x) { return ++x; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 5`] = `
+{
+  "code": "var a=3; function b() { var a=10; }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 6`] = `
+{
+  "code": "var a=3; function b() { var a=10; }; setTimeout(function() { b(); }, 0);",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 7`] = `
+{
+  "code": "var a=3; function b() { var a=10; var b=0; }; setTimeout(function() { b(); }, 0);",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'b' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 8`] = `
+{
+  "code": "var x = 1; { let x = 2; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 9`] = `
+{
+  "code": "let x = 1; { const x = 2; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 10`] = `
+{
+  "code": "{ let a; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 21.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 11`] = `
+{
+  "code": "{ const a = 0; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 27.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 12`] = `
+{
+  "code": "function foo() { let a; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 36.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 13`] = `
+{
+  "code": "function foo() { var a; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 36.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 14`] = `
+{
+  "code": "function foo(a) { } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 30.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 15`] = `
+{
+  "code": "{ let a; } let a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 16.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 16`] = `
+{
+  "code": "{ let a; } var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 16.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 17`] = `
+{
+  "code": "{ let a; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 21.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 18`] = `
+{
+  "code": "{ const a = 0; } const a = 1;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 24.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 19`] = `
+{
+  "code": "{ const a = 0; } var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 22.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 20`] = `
+{
+  "code": "{ const a = 0; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 27.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 21`] = `
+{
+  "code": "function foo() { let a; } let a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 31.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 22`] = `
+{
+  "code": "function foo() { let a; } var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 31.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 23`] = `
+{
+  "code": "function foo() { let a; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 36.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 24`] = `
+{
+  "code": "function foo() { var a; } let a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 31.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 25`] = `
+{
+  "code": "function foo() { var a; } var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 31.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 26`] = `
+{
+  "code": "function foo() { var a; } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 36.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 27`] = `
+{
+  "code": "function foo(a) { } let a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 25.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 28`] = `
+{
+  "code": "function foo(a) { } var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 25.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 29`] = `
+{
+  "code": "function foo(a) { } function a() {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 30.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 30`] = `
+{
+  "code": "(function a() { function a(){} })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 31`] = `
+{
+  "code": "(function a() { class a{} })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 32`] = `
+{
+  "code": "(function a() { (function a(){}); })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 33`] = `
+{
+  "code": "(function a() { (class a{}); })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 34`] = `
+{
+  "code": "(function() { var a = function(a) {}; })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 35`] = `
+{
+  "code": "(function() { var a = function() { function a() {} }; })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 36`] = `
+{
+  "code": "(function() { var a = function() { class a{} }; })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 37`] = `
+{
+  "code": "(function() { var a = function() { (function a() {}); }; })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 38`] = `
+{
+  "code": "(function() { var a = function() { (class a{}); }; })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 39`] = `
+{
+  "code": "(function() { var a = class { constructor() { class a {} } }; })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 40`] = `
+{
+  "code": "class A { constructor() { var A; } }",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 41`] = `
+{
+  "code": "(function a() { function a(){ function a(){} } })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 26.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 42`] = `
+{
+  "code": "function foo() { var Object = 0; }",
+  "diagnostics": [
+    {
+      "message": "'Object' is already a global variable.",
+      "messageId": "noShadowGlobal",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 43`] = `
+{
+  "code": "var Object = 0;",
+  "diagnostics": [
+    {
+      "message": "'Object' is already a global variable.",
+      "messageId": "noShadowGlobal",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 44`] = `
+{
+  "code": "(function Array() {})",
+  "diagnostics": [
+    {
+      "message": "'Array' is already a global variable.",
+      "messageId": "noShadowGlobal",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 45`] = `
+{
+  "code": "function foo(cb) { (function (cb) { cb(42); })(cb); }",
+  "diagnostics": [
+    {
+      "message": "'cb' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 46`] = `
+{
+  "code": "class C { static { let a; { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 24.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 47`] = `
+{
+  "code": "class C { static { var C; } }",
+  "diagnostics": [
+    {
+      "message": "'C' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 48`] = `
+{
+  "code": "class C { static { let C; } }",
+  "diagnostics": [
+    {
+      "message": "'C' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 49`] = `
+{
+  "code": "var a; class C { static { var a; } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 50`] = `
+{
+  "code": "class C { static { var a; } } var a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 35.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 51`] = `
+{
+  "code": "class C { static { let a; } } let a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 35.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 52`] = `
+{
+  "code": "class C { static { var a; } } let a;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 35.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 53`] = `
+{
+  "code": "class C { static { var a; class D { static { var a; } } } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 24.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 54`] = `
+{
+  "code": "class C { static { let a; class D { static { let a; } } } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 24.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 55`] = `
+{
+  "code": "let x = foo((x,y) => {});
+let y;",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 2 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 56`] = `
+{
+  "code": "let x = ((x,y) => {})();
+let y;",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 2 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 57`] = `
+{
+  "code": "const a = fn(()=>{ class C { fn () { const a = 42; return a } } return new C() })",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 58`] = `
+{
+  "code": "function a() {}
+foo(a => {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 59`] = `
+{
+  "code": "const a = fn(()=>{ function C() { this.fn=function() { const a = 42; return a } } return new C() });",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 60`] = `
+{
+  "code": "const x = foo(() => { const bar = () => { return x => {}; }; return bar; });",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 61`] = `
+{
+  "code": "const x = foo(() => { return { bar(x) {} }; });",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 62`] = `
+{
+  "code": "const x = () => { foo(x => x); }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 63`] = `
+{
+  "code": "const foo = () => { let x; bar(x => x); }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 25.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 64`] = `
+{
+  "code": "foo(() => { const x = x => x; });",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 19.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 65`] = `
+{
+  "code": "const foo = (x) => { bar(x => {}) }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 66`] = `
+{
+  "code": "const a = (()=>{ class C { fn () { const a = 42; return a } } return new C() })()",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 67`] = `
+{
+  "code": "const x = () => { (x => x)(); }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 68`] = `
+{
+  "code": "const a = wrap(function a() {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 69`] = `
+{
+  "code": "const a = foo || wrap(function a() {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 70`] = `
+{
+  "code": "const { a = wrap(function a() {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 71`] = `
+{
+  "code": "const { a = foo || wrap(function a() {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 72`] = `
+{
+  "code": "const { a = foo, b = function a() {} } = {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 73`] = `
+{
+  "code": "const { A = Foo, B = class A {} } = {}",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 74`] = `
+{
+  "code": "function foo(a = wrap(function a() {})) {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 75`] = `
+{
+  "code": "function foo(a = foo || wrap(function a() {})) {}",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 76`] = `
+{
+  "code": "const A = wrap(class A {});",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 77`] = `
+{
+  "code": "const A = foo || wrap(class A {});",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 78`] = `
+{
+  "code": "const { A = wrap(class A {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 79`] = `
+{
+  "code": "const { A = foo || wrap(class A {}) } = obj;",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 80`] = `
+{
+  "code": "function foo(A = wrap(class A {})) {}",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 81`] = `
+{
+  "code": "function foo(A = foo || wrap(class A {})) {}",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 82`] = `
+{
+  "code": "var a = function a() {} ? foo : bar",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 83`] = `
+{
+  "code": "var A = class A {} ? foo : bar",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 84`] = `
+{
+  "code": "(function Array() {})",
+  "diagnostics": [
+    {
+      "message": "'Array' is already a global variable.",
+      "messageId": "noShadowGlobal",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 85`] = `
+{
+  "code": "let a; { let b = (function a() {}) }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 86`] = `
+{
+  "code": "let a = foo; { let b = (function a() {}) }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 87`] = `
+{
+  "code": "
+  type T = 1;
+  {
+	type T = 2;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 88`] = `
+{
+  "code": "
+  type T = 1;
+  function foo<T>(arg: T) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 89`] = `
+{
+  "code": "
+  function foo<T>() {
+	return function <T>() {};
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 16.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 90`] = `
+{
+  "code": "
+  type T = string;
+  function foo<T extends (arg: any) => void>(arg: T) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 91`] = `
+{
+  "code": "
+  const x = 1;
+  {
+	type x = string;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 92`] = `
+{
+  "code": "
+  const test = 1;
+  type Fn = (test: string) => typeof test;
+		",
+  "diagnostics": [
+    {
+      "message": "'test' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 93`] = `
+{
+  "code": "
+  const arg = 0;
+  interface Test {
+	(arg: string): typeof arg;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 94`] = `
+{
+  "code": "
+  const arg = 0;
+  interface Test {
+	p1(arg: string): typeof arg;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 95`] = `
+{
+  "code": "
+  const arg = 0;
+  declare function test(arg: string): typeof arg;
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 96`] = `
+{
+  "code": "
+  const arg = 0;
+  declare const test: (arg: string) => typeof arg;
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 97`] = `
+{
+  "code": "
+  const arg = 0;
+  declare class Test {
+	p1(arg: string): typeof arg;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 98`] = `
+{
+  "code": "
+  const arg = 0;
+  declare const Test: {
+	new (arg: string): typeof arg;
+  };
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 99`] = `
+{
+  "code": "
+  const arg = 0;
+  type Bar = new (arg: number) => typeof arg;
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 100`] = `
+{
+  "code": "
+  const arg = 0;
+  declare namespace Lib {
+	function test(arg: string): typeof arg;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 101`] = `
+{
+  "code": "
+import type { foo } from './foo';
+function doThing(foo: number) {}
+",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 15.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 102`] = `
+{
+  "code": "
+import { type foo } from './foo';
+function doThing(foo: number) {}
+",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 15.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 103`] = `
+{
+  "code": "
+import { foo } from './foo';
+function doThing(foo: number, bar: number) {}
+",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 104`] = `
+{
+  "code": "
+interface Foo {}
+declare module 'bar' { export interface Foo { x: string } }
+",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 41,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 105`] = `
+{
+  "code": "
+import type { Foo } from 'bar';
+declare module 'baz' { export interface Foo { x: string } }
+",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 15.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 41,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 106`] = `
+{
+  "code": "
+import { type Foo } from 'bar';
+declare module 'baz' { export interface Foo { x: string } }
+",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 15.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 41,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 107`] = `
+{
+  "code": "
+  let x = foo((x, y) => {});
+  let y;
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 3 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 108`] = `
+{
+  "code": "
+  let x = foo((x, y) => {});
+  let y;
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 109`] = `
+{
+  "code": "
+  type Foo<A> = 1;
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 110`] = `
+{
+  "code": "
+  interface Foo<A> {}
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 111`] = `
+{
+  "code": "
+  interface Foo<A> {}
+  interface A {}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 112`] = `
+{
+  "code": "
+  type Foo<A> = 1;
+  interface A {}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 113`] = `
+{
+  "code": "
+  {
+	type A = 1;
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 114`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 115`] = `
+{
+  "code": "
+  type Foo<A> = 1;
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 116`] = `
+{
+  "code": "
+  interface Foo<A> {}
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 117`] = `
+{
+  "code": "
+  interface Foo<A> {}
+  interface A {}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 118`] = `
+{
+  "code": "
+  type Foo<A> = 1;
+  interface A {}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 119`] = `
+{
+  "code": "
+  {
+	type A = 1;
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 120`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 121`] = `
+{
+  "code": "
+  type Foo<A> = 1;
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 122`] = `
+{
+  "code": "
+	if (true) {
+		const foo = 6;
+	}
+
+	function foo() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 6 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 123`] = `
+{
+  "code": "
+	// types
+	type Bar<Foo> = 1;
+	type Foo = 1;
+
+	// functions
+	if (true) {
+		const b = 6;
+	}
+
+	function b() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 4 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'b' is already declared in the upper scope on line 11 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 124`] = `
+{
+  "code": "
+	// types
+	type Bar<Foo> = 1;
+	type Foo = 1;
+
+	// functions
+	if (true) {
+		const b = 6;
+	}
+
+	function b() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 4 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 125`] = `
+{
+  "code": "
+  interface Foo<A> {}
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 126`] = `
+{
+  "code": "
+  interface Foo<A> {}
+  interface A {}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 127`] = `
+{
+  "code": "
+  type Foo<A> = 1;
+  interface A {}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 3 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 128`] = `
+{
+  "code": "
+  {
+	type A = 1;
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 129`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 130`] = `
+{
+  "code": "
+		const A = 2;
+		enum Test {
+			A = 1,
+			B = A,
+		}
+	",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 4,
+        },
+        "start": {
+          "column": 4,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 131`] = `
+{
+  "code": "type X<T> = T extends (infer U) ? (U extends (infer U) ? U : never) : never;",
+  "diagnostics": [
+    {
+      "message": "'U' is already declared in the upper scope on line 1 column 30.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 132`] = `
+{
+  "code": "const x = 1; const o = { foo(x: number) { return x; } };",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 133`] = `
+{
+  "code": "const x = 1; const o = { get foo() { const x = 2; return x; } };",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 134`] = `
+{
+  "code": "const x = 1; const o = { async foo(x: number) { return x; } };",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 135`] = `
+{
+  "code": "const x = 1; const o = { *foo(x: number) { yield x; } };",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 136`] = `
+{
+  "code": "using u = { [Symbol.dispose]() {} }; { using u = { [Symbol.dispose]() {} }; }",
+  "diagnostics": [
+    {
+      "message": "'u' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 137`] = `
+{
+  "code": "class C<T> { static s<T>(): T { return null as any; } i<T>(): T { return null as any; } }",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 138`] = `
+{
+  "code": "const a = 1; function f({ x: a }: any) { return a; }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 139`] = `
+{
+  "code": "const fn = function f(f: number) { return f; };",
+  "diagnostics": [
+    {
+      "message": "'f' is already declared in the upper scope on line 1 column 21.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 140`] = `
+{
+  "code": "function dec(x: any) { return x; }
+@dec class CD { method() { const dec = 1; return dec; } }",
+  "diagnostics": [
+    {
+      "message": "'dec' is already declared in the upper scope on line 1 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 141`] = `
+{
+  "code": "const k = 'x'; class C { foo() { const k = 1; return k; } }",
+  "diagnostics": [
+    {
+      "message": "'k' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 142`] = `
+{
+  "code": "const a = 1; function f({ a = a }: any) { return a; }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 143`] = `
+{
+  "code": "const e = 1; try {} catch ({ message: e }) { return e; }",
+  "diagnostics": [
+    {
+      "message": "'e' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 144`] = `
+{
+  "code": "async function* g() { const v = 1; for await (const v of [Promise.resolve(1)]) yield v; }",
+  "diagnostics": [
+    {
+      "message": "'v' is already declared in the upper scope on line 1 column 29.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 145`] = `
+{
+  "code": "const a = 1, b = 2; function f() { const a = 3, b = 4; return a + b; }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'b' is already declared in the upper scope on line 1 column 14.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 146`] = `
+{
+  "code": "function f() { const z = 1; switch (z) { case 1: { const z = 2; break; } case 2: { const z = 3; break; } } }",
+  "diagnostics": [
+    {
+      "message": "'z' is already declared in the upper scope on line 1 column 22.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'z' is already declared in the upper scope on line 1 column 22.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 91,
+          "line": 1,
+        },
+        "start": {
+          "column": 90,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 147`] = `
+{
+  "code": "import * as Mods from 'fs'; function f(Mods: number) { return Mods; }",
+  "diagnostics": [
+    {
+      "message": "'Mods' is already declared in the upper scope on line 1 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 148`] = `
+{
+  "code": "const Z = 1; const make = () => class Z {};",
+  "diagnostics": [
+    {
+      "message": "'Z' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 149`] = `
+{
+  "code": "const t = 1; type T = typeof t; function f(t: number) { return t; }",
+  "diagnostics": [
+    {
+      "message": "'t' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 150`] = `
+{
+  "code": "const opts = { x: 1 }; function f(opts: typeof opts = opts) { return opts; }",
+  "diagnostics": [
+    {
+      "message": "'opts' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 151`] = `
+{
+  "code": "const a = 1; const fn = function() { const a = 2; return a; };",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 152`] = `
+{
+  "code": "const A = 1; class A_outer { x = class A {}; }",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 153`] = `
+{
+  "code": "function f(...args: number[]) { function g({ args }: any) { return args; } }",
+  "diagnostics": [
+    {
+      "message": "'args' is already declared in the upper scope on line 1 column 15.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 154`] = `
+{
+  "code": "function* g() { const v = 1; for (const v of [1,2,3]) { yield v; } }",
+  "diagnostics": [
+    {
+      "message": "'v' is already declared in the upper scope on line 1 column 23.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 155`] = `
+{
+  "code": "function f<A>(fn: <A>(x: A) => A): A { return fn as any; }",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 1 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 156`] = `
+{
+  "code": "function f<T>(): <T>(x: T) => T { return null as any; }",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 1 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 157`] = `
+{
+  "code": "try {} catch (e) { try {} catch (e) {} }",
+  "diagnostics": [
+    {
+      "message": "'e' is already declared in the upper scope on line 1 column 15.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 158`] = `
+{
+  "code": "class C<T> { m<T>(x: T): T { return x; } }",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 1 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 159`] = `
+{
+  "code": "const x = 1; function f(x: number) { function g(x: number) { return x; } return g; }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 25.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 160`] = `
+{
+  "code": "const a = 1; function f([, a]: any[]) { return a; }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 161`] = `
+{
+  "code": "const a = 1; const fn = { call: (cb: any) => cb }; fn.call?.(a => a);",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 162`] = `
+{
+  "code": "const x = 1; class C { constructor(public x: number) {} m() { const x = 1; return x; } }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 163`] = `
+{
+  "code": "const mod = 1; import('m').then((mod) => mod);",
+  "diagnostics": [
+    {
+      "message": "'mod' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 164`] = `
+{
+  "code": "type X<T> = T extends Array<infer U> ? (U extends Array<infer U> ? U : never) : never;",
+  "diagnostics": [
+    {
+      "message": "'U' is already declared in the upper scope on line 1 column 35.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 63,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 165`] = `
+{
+  "code": "const g = Array<number>; function f(Array: any) { return Array; }",
+  "diagnostics": [
+    {
+      "message": "'Array' is already a global variable.",
+      "messageId": "noShadowGlobal",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 166`] = `
+{
+  "code": "const x = 1; class C { accessor x = 1; m() { const x = 2; return x; } }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 167`] = `
+{
+  "code": "async function f() { const x = 1; for await (const { v: x } of [Promise.resolve({ v: 1 })]) { return x; } }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 28.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 168`] = `
+{
+  "code": "async function f() { using u = { [Symbol.dispose]() {} }; for (const u of [] as any[]) { void u; } }",
+  "diagnostics": [
+    {
+      "message": "'u' is already declared in the upper scope on line 1 column 28.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 70,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 169`] = `
+{
+  "code": "const k = 'a'; function f({ [k]: v }: any) { const k = 1; return [v, k]; }",
+  "diagnostics": [
+    {
+      "message": "'k' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 170`] = `
+{
+  "code": "function withTheme<P>(Component: any) { return function ThemedComponent(props: P) { const Component = 1; return Component; }; }",
+  "diagnostics": [
+    {
+      "message": "'Component' is already declared in the upper scope on line 1 column 23.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 100,
+          "line": 1,
+        },
+        "start": {
+          "column": 91,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 171`] = `
+{
+  "code": "type A = { type: 'inc' } | { type: 'set'; value: number }; function reducer(state: number, action: A) { switch (action.type) { case 'inc': { const state = 1; return state + 1; } case 'set': return action.value; } }",
+  "diagnostics": [
+    {
+      "message": "'state' is already declared in the upper scope on line 1 column 77.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 153,
+          "line": 1,
+        },
+        "start": {
+          "column": 148,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 172`] = `
+{
+  "code": "function chain() { const item = { id: 1 }; [1, 2, 3].map(item => item + 1).filter(item => item > 1).forEach(item => void item); void item; }",
+  "diagnostics": [
+    {
+      "message": "'item' is already declared in the upper scope on line 1 column 26.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'item' is already declared in the upper scope on line 1 column 26.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 87,
+          "line": 1,
+        },
+        "start": {
+          "column": 83,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'item' is already declared in the upper scope on line 1 column 26.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 113,
+          "line": 1,
+        },
+        "start": {
+          "column": 109,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 173`] = `
+{
+  "code": "const e = 1; try { try { throw new Error(); } catch (e) { try { throw e; } catch (e) {} } } catch (e) {} void e;",
+  "diagnostics": [
+    {
+      "message": "'e' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'e' is already declared in the upper scope on line 1 column 54.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 84,
+          "line": 1,
+        },
+        "start": {
+          "column": 83,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'e' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 101,
+          "line": 1,
+        },
+        "start": {
+          "column": 100,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 174`] = `
+{
+  "code": "const methodName = 'foo'; const obj = { [methodName](methodName: string) { return methodName; } };",
+  "diagnostics": [
+    {
+      "message": "'methodName' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 175`] = `
+{
+  "code": "function f() { for (let i = 0; i < 1; i++) { for (let i = 0; i < 1; i++) {} } }",
+  "diagnostics": [
+    {
+      "message": "'i' is already declared in the upper scope on line 1 column 25.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 176`] = `
+{
+  "code": "const a = 1; class C { m(x: string): void; m(x: number): void; m(a: any): void { void a; } }",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 177`] = `
+{
+  "code": "function mk<T>(x: T) { return { get<T>(): T { return null as any; } }; }",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 1 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 178`] = `
+{
+  "code": "const c = 1; { /* empty */ } { const c = 2; void c; }",
+  "diagnostics": [
+    {
+      "message": "'c' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 179`] = `
+{
+  "code": "const enum E { A, B } function f(E: number) { return E; }",
+  "diagnostics": [
+    {
+      "message": "'E' is already declared in the upper scope on line 1 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 180`] = `
+{
+  "code": "abstract class C<T extends object> { abstract m<T>(): T; }",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 1 column 18.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 181`] = `
+{
+  "code": "const iter = 1; class C { [Symbol.iterator](iter: number) { return iter; } }",
+  "diagnostics": [
+    {
+      "message": "'iter' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 182`] = `
+{
+  "code": "const x = 1; class C { constructor(x?: number) { void x; } }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 183`] = `
+{
+  "code": "const val = { x: 1 }; function f(val: typeof val) { return val; }",
+  "diagnostics": [
+    {
+      "message": "'val' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 184`] = `
+{
+  "code": "const x = 1; class C { async m(x: number) { return x; } }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 185`] = `
+{
+  "code": "const x = 1; class C { *m(x: number) { yield x; } }",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 186`] = `
+{
+  "code": "declare function foo(): void; function bar() { const foo = 1; return foo; }",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 1 column 18.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 187`] = `
+{
+  "code": "const h = 1; class C extends (function() { const h = 2; return class {}; })() {}",
+  "diagnostics": [
+    {
+      "message": "'h' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 188`] = `
+{
+  "code": "const h = 1; class C extends ((h => h)(1), Object) {}",
+  "diagnostics": [
+    {
+      "message": "'h' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 189`] = `
+{
+  "code": "function dec(x: any) { return x; }
+@((target: any) => { const dec = 1; return dec && target; })
+class D {}",
+  "diagnostics": [
+    {
+      "message": "'dec' is already declared in the upper scope on line 1 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 28,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 190`] = `
+{
+  "code": "const md = 1; class C { @((t: any, k: string) => { const md = 1; void md; }) method() {} }",
+  "diagnostics": [
+    {
+      "message": "'md' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 191`] = `
+{
+  "code": "const pd = 1; class C { method(@((t: any, k: any, i: number) => { const pd = 1; void pd; }) x: number) {} }",
+  "diagnostics": [
+    {
+      "message": "'pd' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 73,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 192`] = `
+{
+  "code": "const k = 1; class C { [((k) => k)(2)]() {} }",
+  "diagnostics": [
+    {
+      "message": "'k' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 193`] = `
+{
+  "code": "const k = 1; class C { [((k) => k)(2)] = 1; }",
+  "diagnostics": [
+    {
+      "message": "'k' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 194`] = `
+{
+  "code": "const g = 1; class C { get [((g) => g)(1)]() { return 1; } }",
+  "diagnostics": [
+    {
+      "message": "'g' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 195`] = `
+{
+  "code": "const m = 1; class C { async *[((m) => m)(1)]() {} }",
+  "diagnostics": [
+    {
+      "message": "'m' is already declared in the upper scope on line 1 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 196`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 197`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 198`] = `
+{
+  "code": "
+	if (true) {
+		const foo = 6;
+	}
+
+	function foo() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 6 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 199`] = `
+{
+  "code": "
+	// types
+	type Bar<Foo> = 1;
+	type Foo = 1;
+
+	// functions
+	if (true) {
+		const b = 6;
+	}
+
+	function b() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 4 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'b' is already declared in the upper scope on line 11 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 200`] = `
+{
+  "code": "
+	// types
+	type Bar<Foo> = 1;
+	type Foo = 1;
+
+	// functions
+	if (true) {
+		const b = 6;
+	}
+
+	function b() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 4 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 201`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 202`] = `
+{
+  "code": "let x = foo((x,y) => {});
+let y;",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 2 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 203`] = `
+{
+  "code": "function a() {}
+foo(a => {});",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 204`] = `
+{
+  "code": "let x = ((x,y) => {})();
+let y;",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 1 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 2 column 5.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 205`] = `
+{
+  "code": "let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });",
+  "diagnostics": [
+    {
+      "message": "'a' is already declared in the upper scope on line 1 column 29.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 206`] = `
+{
+  "code": "
+  type T = 1;
+  {
+	type T = 2;
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 207`] = `
+{
+  "code": "
+  type T = 1;
+  function foo<T>(arg: T) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 208`] = `
+{
+  "code": "
+  function foo<T>() {
+	return function <T>() {};
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 16.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 209`] = `
+{
+  "code": "
+  type T = string;
+  function foo<T extends (arg: any) => void>(arg: T) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'T' is already declared in the upper scope on line 2 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 210`] = `
+{
+  "code": "
+  const arg = 0;
+  
+  declare const Test: {
+	new (arg: string): typeof arg;
+  };
+		",
+  "diagnostics": [
+    {
+      "message": "'arg' is already declared in the upper scope on line 2 column 9.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 211`] = `
+{
+  "code": "
+  import type { foo } from './foo';
+  function doThing(foo: number) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 212`] = `
+{
+  "code": "
+  import { type foo } from './foo';
+  function doThing(foo: number) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 213`] = `
+{
+  "code": "
+  import { foo } from './foo';
+  function doThing(foo: number, bar: number) {}
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 2 column 12.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 214`] = `
+{
+  "code": "
+  interface Foo {}
+  
+  declare module 'bar' {
+	export interface Foo {
+	  x: string;
+	}
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 13.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 215`] = `
+{
+  "code": "
+  import type { Foo } from 'bar';
+  
+  declare module 'baz' {
+	export interface Foo {
+	  x: string;
+	}
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 216`] = `
+{
+  "code": "
+  import { type Foo } from 'bar';
+  
+  declare module 'baz' {
+	export interface Foo {
+	  x: string;
+	}
+  }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 2 column 17.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 217`] = `
+{
+  "code": "
+  let x = foo((x, y) => {});
+  let y;
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'y' is already declared in the upper scope on line 3 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 218`] = `
+{
+  "code": "
+  let x = foo((x, y) => {});
+  let y;
+		",
+  "diagnostics": [
+    {
+      "message": "'x' is already declared in the upper scope on line 2 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 219`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 220`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 221`] = `
+{
+  "code": "
+	if (true) {
+		const foo = 6;
+	}
+
+	function foo() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'foo' is already declared in the upper scope on line 6 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 222`] = `
+{
+  "code": "
+	// types
+	type Bar<Foo> = 1;
+	type Foo = 1;
+
+	// functions
+	if (true) {
+		const b = 6;
+	}
+
+	function b() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 4 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+    {
+      "message": "'b' is already declared in the upper scope on line 11 column 11.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 223`] = `
+{
+  "code": "
+	// types
+	type Bar<Foo> = 1;
+	type Foo = 1;
+
+	// functions
+	if (true) {
+		const b = 6;
+	}
+
+	function b() { }
+		",
+  "diagnostics": [
+    {
+      "message": "'Foo' is already declared in the upper scope on line 4 column 7.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 224`] = `
+{
+  "code": "
+  {
+	interface A {}
+  }
+  type A = 1;
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 5 column 8.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-shadow > invalid 225`] = `
+{
+  "code": "
+			const A = 2;
+			enum Test {
+				A = 1,
+				B = A,
+			}
+		",
+  "diagnostics": [
+    {
+      "message": "'A' is already declared in the upper scope on line 2 column 10.",
+      "messageId": "noShadow",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-shadow",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

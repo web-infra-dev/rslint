@@ -189,6 +189,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_compare"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sequences"
 	"github.com/web-infra-dev/rslint/internal/rules/no_setter_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_shadow"
 	"github.com/web-infra-dev/rslint/internal/rules/no_shadow_restricted_names"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
@@ -633,6 +634,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
 	GlobalRuleRegistry.Register("no-self-compare", no_self_compare.NoSelfCompareRule)
 	GlobalRuleRegistry.Register("no-sequences", no_sequences.NoSequencesRule)
+	GlobalRuleRegistry.Register("no-shadow", no_shadow.NoShadowRule)
 	GlobalRuleRegistry.Register("no-shadow-restricted-names", no_shadow_restricted_names.NoShadowRestrictedNamesRule)
 	GlobalRuleRegistry.Register("strict", strict.StrictRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
