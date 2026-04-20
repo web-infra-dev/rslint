@@ -191,6 +191,9 @@ Unregisterations
 Unregistration
 unrooted
 unstrict
+funcs
+unconfig
+unconfigured
 unstub
 untest
 subtests
