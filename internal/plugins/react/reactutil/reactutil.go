@@ -1,12 +1,21 @@
 package reactutil
 
 import (
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 )
 
 // DefaultReactPragma is the fallback object name for createElement calls
 // when `settings.react.pragma` is not configured, matching eslint-plugin-react.
 const DefaultReactPragma = "React"
+
+// DefaultReactCreateClass is the fallback ES5 factory name when
+// `settings.react.createClass` is not configured, matching
+// eslint-plugin-react.
+const DefaultReactCreateClass = "createReactClass"
 
 // GetReactPragma reads `settings.react.pragma` from the config settings map.
 // Returns DefaultReactPragma when the setting is absent, not a string, or empty.
@@ -23,6 +32,254 @@ func GetReactPragma(settings map[string]interface{}) string {
 		return DefaultReactPragma
 	}
 	return pragma
+}
+
+// GetReactCreateClass reads `settings.react.createClass` from the config
+// settings map. Returns DefaultReactCreateClass when the setting is absent,
+// not a string, or empty.
+func GetReactCreateClass(settings map[string]interface{}) string {
+	if settings == nil {
+		return DefaultReactCreateClass
+	}
+	reactSettings, ok := settings["react"].(map[string]interface{})
+	if !ok {
+		return DefaultReactCreateClass
+	}
+	v, ok := reactSettings["createClass"].(string)
+	if !ok || v == "" {
+		return DefaultReactCreateClass
+	}
+	return v
+}
+
+// reactVersionRe captures the leading major[.minor[.patch]] numeric triple of
+// a semver-ish string. Prerelease / build metadata / range qualifiers are
+// ignored — matching eslint-plugin-react's `semver.coerce`-like behavior for
+// the simple comparisons this package performs.
+var reactVersionRe = regexp.MustCompile(`(\d+)(?:\.(\d+))?(?:\.(\d+))?`)
+
+// ParseReactVersion returns the (major, minor, patch) triple of
+// `settings.react.version`. When the setting is missing, not a string, empty,
+// or not recognizable as a version, it defaults to (999, 999, 999) — matching
+// eslint-plugin-react's `getReactVersionFromContext`, which treats an absent
+// version as "latest".
+func ParseReactVersion(settings map[string]interface{}) (int, int, int) {
+	if settings == nil {
+		return 999, 999, 999
+	}
+	reactSettings, ok := settings["react"].(map[string]interface{})
+	if !ok {
+		return 999, 999, 999
+	}
+	raw, _ := reactSettings["version"].(string)
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 999, 999, 999
+	}
+	m := reactVersionRe.FindStringSubmatch(raw)
+	if m == nil {
+		return 999, 999, 999
+	}
+	toInt := func(s string) int {
+		if s == "" {
+			return 0
+		}
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return 0
+		}
+		return n
+	}
+	return toInt(m[1]), toInt(m[2]), toInt(m[3])
+}
+
+// ReactVersionLessThan reports whether `settings.react.version` is strictly
+// less than the given major.minor.patch. See ParseReactVersion for the default
+// when the setting is missing.
+func ReactVersionLessThan(settings map[string]interface{}, major, minor, patch int) bool {
+	a, b, c := ParseReactVersion(settings)
+	if a != major {
+		return a < major
+	}
+	if b != minor {
+		return b < minor
+	}
+	return c < patch
+}
+
+// IsCreateClassCall reports whether the given CallExpression's callee is
+// `<createClass>(...)` or `<pragma>.<createClass>(...)`. Parentheses are
+// skipped on both the callee and the pragma identifier. Pass the empty string
+// for pragma/createClass to fall back to `DefaultReactPragma` /
+// `DefaultReactCreateClass`.
+func IsCreateClassCall(call *ast.CallExpression, pragma, createClass string) bool {
+	if call == nil {
+		return false
+	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	if createClass == "" {
+		createClass = DefaultReactCreateClass
+	}
+	callee := ast.SkipParentheses(call.Expression)
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		return callee.AsIdentifier().Text == createClass
+	case ast.KindPropertyAccessExpression:
+		pa := callee.AsPropertyAccessExpression()
+		obj := ast.SkipParentheses(pa.Expression)
+		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
+			return false
+		}
+		name := pa.Name()
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		return name.AsIdentifier().Text == createClass
+	}
+	return false
+}
+
+// ExtendsReactComponent reports whether `classNode` (a ClassDeclaration or
+// ClassExpression) has an `extends` clause referencing `Component` or
+// `PureComponent` — either as a bare identifier or qualified by the
+// configured pragma (e.g. `React.Component`). Parentheses are skipped. Pass
+// the empty string for pragma to default to `DefaultReactPragma`.
+//
+// NOTE: Matches the name regex used by eslint-plugin-react's
+// `componentUtil.isES6Component` (`/^(Pure)?Component$/`). Aliased imports
+// (e.g. `import { Component as C }`) are not resolved — same as the upstream
+// rule.
+func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
+	if classNode == nil {
+		return false
+	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	heritage := ast.GetClassExtendsHeritageElement(classNode)
+	if heritage == nil {
+		return false
+	}
+	hc := heritage.AsExpressionWithTypeArguments()
+	if hc == nil || hc.Expression == nil {
+		return false
+	}
+	expr := ast.SkipParentheses(hc.Expression)
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return isComponentName(expr.AsIdentifier().Text)
+	case ast.KindPropertyAccessExpression:
+		pa := expr.AsPropertyAccessExpression()
+		obj := ast.SkipParentheses(pa.Expression)
+		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
+			return false
+		}
+		nameNode := pa.Name()
+		if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
+			return false
+		}
+		return isComponentName(nameNode.AsIdentifier().Text)
+	}
+	return false
+}
+
+func isComponentName(name string) bool {
+	return name == "Component" || name == "PureComponent"
+}
+
+// IsInsideReactComponent reports whether `node` is lexically contained within
+// a React component — either an ES5 component (object literal passed as an
+// argument to `<createClass>(...)` / `<pragma>.<createClass>(...)`) or an
+// ES6 component (ClassDeclaration / ClassExpression extending Component or
+// PureComponent, optionally qualified by pragma).
+//
+// Pass the empty string for pragma/createClass to fall back to
+// `DefaultReactPragma` / `DefaultReactCreateClass`.
+//
+// Mirrors eslint-plugin-react's componentUtil:
+//
+//   - ES6 path: only the nearest enclosing class decides component status
+//     (matching `getParentES6Component`'s `while scope.type !== 'class'`).
+//     A non-component class does not "pass through" to let an outer component
+//     class match — this prevents false positives like a non-React inner
+//     class nested inside a React class.
+//
+//   - ES5 path: `this` / `this.refs` must occur inside some function, whose
+//     ObjectExpression parent is the argument to `<createClass>(...)`. We
+//     approximate this by requiring that an enclosing function has been
+//     passed on the walk up before an ObjectExpression is accepted — which
+//     rules out pathological cases like `createReactClass({ x: this.refs.y })`
+//     where `this` is not inside any function (ESLint's scope walk returns
+//     null for that too).
+func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
+	if node == nil {
+		return false
+	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	if createClass == "" {
+		createClass = DefaultReactCreateClass
+	}
+	seenNearestClass := false
+	seenEnclosingFunction := false
+	for p := node.Parent; p != nil; p = p.Parent {
+		if ast.IsFunctionLike(p) {
+			seenEnclosingFunction = true
+		}
+		switch p.Kind {
+		case ast.KindClassDeclaration, ast.KindClassExpression:
+			if seenNearestClass {
+				// The nearest class already decided ES6 classification;
+				// outer classes do not get a second chance (matches ESLint's
+				// scope-walk that stops at the first class scope).
+				continue
+			}
+			seenNearestClass = true
+			if ExtendsReactComponent(p, pragma) {
+				return true
+			}
+		case ast.KindObjectLiteralExpression:
+			if !seenEnclosingFunction {
+				continue
+			}
+			// The ObjectLiteralExpression may be wrapped in one or more
+			// ParenthesizedExpressions before reaching the CallExpression
+			// (ESTree would flatten these; tsgo preserves them), e.g.
+			// `createReactClass(({...}))`. Walk up through paren wrappers
+			// to find the actual argument position.
+			arg := p
+			for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
+				arg = arg.Parent
+			}
+			parent := arg.Parent
+			if parent == nil || parent.Kind != ast.KindCallExpression {
+				continue
+			}
+			call := parent.AsCallExpression()
+			if !isObjectArgumentOf(call, arg) {
+				continue
+			}
+			if IsCreateClassCall(call, pragma, createClass) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isObjectArgumentOf(call *ast.CallExpression, obj *ast.Node) bool {
+	if call.Arguments == nil {
+		return false
+	}
+	for _, arg := range call.Arguments.Nodes {
+		if arg == obj {
+			return true
+		}
+	}
+	return false
 }
 
 // IsCreateElementCall reports whether the callee is `<pragma>.createElement`.

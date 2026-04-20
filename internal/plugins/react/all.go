@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
@@ -39,6 +40,7 @@ func GetAllRules() []rule.Rule {
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
 		no_danger.NoDangerRule,
 		no_is_mounted.NoIsMountedRule,
+		no_string_refs.NoStringRefsRule,
 		no_unescaped_entities.NoUnescapedEntitiesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		self_closing_comp.SelfClosingCompRule,
