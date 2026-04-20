@@ -189,10 +189,12 @@ func isComponentName(name string) bool {
 	return name == "Component" || name == "PureComponent"
 }
 
-// GetJsxTagBaseIdentifier returns the leftmost Identifier of a JSX tag name —
-// i.e. the symbol a rule must resolve to classify the tag. Returns nil when
-// the tag does not terminate in an Identifier (ThisKeyword base, namespaced
-// tag, unknown shape).
+// GetJsxTagBaseIdentifier returns the leftmost Identifier of a JSX tag-name
+// node — i.e. the symbol a rule must resolve to classify the tag. Pass the
+// tag-name node obtained from `GetJsxTagName` (or directly from
+// `JsxOpeningElement.TagName` / `JsxSelfClosingElement.TagName`). Returns nil
+// when the tag does not terminate in an Identifier (ThisKeyword base,
+// JsxNamespacedName, unknown shape).
 //
 // Shapes handled:
 //
@@ -203,11 +205,8 @@ func isComponentName(name string) bool {
 //   - `<a:b />`                 → nil (JsxNamespacedName — not an identifier
 //     reference in any scope)
 //   - `<foo-bar />`             → Identifier("foo-bar") (tsgo preserves the
-//     hyphenated text verbatim; callers decide whether that's DOM)
-//
-// Pair with `IsDOMComponent` to decide whether to skip lowercase-first tags.
-func GetJsxTagBaseIdentifier(element *ast.Node) *ast.Node {
-	tagName := GetJsxTagName(element)
+//     hyphenated text verbatim; callers decide whether that's DOM).
+func GetJsxTagBaseIdentifier(tagName *ast.Node) *ast.Node {
 	if tagName == nil {
 		return nil
 	}

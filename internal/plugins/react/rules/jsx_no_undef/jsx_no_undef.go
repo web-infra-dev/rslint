@@ -17,23 +17,29 @@ var JsxNoUndefRule = rule.Rule{
 			if tagName == nil {
 				return
 			}
-			// Upstream short-circuits on IsDOMComponent ONLY for a bare
-			// JSXIdentifier tag (`<div>`, `<x-gif>`). Member-expression tags
-			// with a lowercase base (`<appp.Foo>`) must still be reported on
-			// the base — even though jsxUtil.isDOMComponent would call the
-			// whole tag "DOM" by the leftmost-first-char rule.
-			if tagName.Kind == ast.KindIdentifier && reactutil.IsDOMComponent(element) {
-				return
+			// Upstream short-circuits intrinsic tags ONLY in the
+			// `case 'JSXIdentifier'` branch — an Identifier whose first
+			// character is lowercase (`/^[a-z]/` per jsxUtil.isDOMComponent).
+			// Member-expression tags with a lowercase base (`<appp.Foo>`)
+			// must still be checked against the base identifier, so this
+			// guard deliberately does not apply to them.
+			if tagName.Kind == ast.KindIdentifier {
+				text := tagName.AsIdentifier().Text
+				if text != "" && text[0] >= 'a' && text[0] <= 'z' {
+					return
+				}
 			}
-			identNode := reactutil.GetJsxTagBaseIdentifier(element)
+			identNode := reactutil.GetJsxTagBaseIdentifier(tagName)
 			if identNode == nil {
+				// ThisKeyword base, JsxNamespacedName, or any tsgo shape we
+				// don't classify — upstream treats all of these as "skip".
 				return
 			}
 			name := identNode.AsIdentifier().Text
-			// `<this />` — ThisKeyword is not an Identifier so
-			// GetJsxTagBaseIdentifier already returns nil for it. This guards
-			// the pathological tsgo edge where a JSX parser recovery produces
-			// an Identifier whose text happens to be `this`.
+			// Defensive: upstream returns early on `node.name === 'this'`.
+			// tsgo normally emits ThisKeyword for `this` (already handled
+			// via GetJsxTagBaseIdentifier returning nil), but a parser
+			// recovery edge could still produce Identifier("this").
 			if name == "this" {
 				return
 			}
