@@ -238,6 +238,27 @@ for (var i = 0; i < 10; i++) {
 			// only through an outer IIFE; only the inner FE should be flagged, not the outer ----
 			// (covered by the "outer IIFE skipped, inner FE reported" invariant)
 			{Code: `for (var i = 0; i < l; i++) { (function() { /* no through refs */ var local = 1; local; })(); }`},
+
+			// ---- Switch-case closure over fresh let ----
+			{Code: `for (let i = 0; i < l; i++) { switch (x) { case 1: (function() { i; }); break; } }`},
+
+			// ---- Try/catch/finally wrapper — block-scoped let is fresh per iteration ----
+			{Code: `for (let i = 0; i < l; i++) { try { const f = () => i; } catch (e) {} }`},
+
+			// ---- Parameter-default that is itself an arrow referencing fresh let ----
+			{Code: `for (let i = 0; i < l; i++) { const m = (x = () => i) => x(); }`},
+
+			// ---- Class property initializer arrow — each iteration fresh let ----
+			{Code: `for (let i = 0; i < l; i++) { class C { f = () => i; } }`},
+
+			// ---- Tagged template with arrow in interpolation, fresh let ----
+			{Code: "for (let i = 0; i < l; i++) { tag`${() => i}`; }"},
+
+			// ---- Spread argument — arrow captures fresh let ----
+			{Code: `for (let i = 0; i < l; i++) { foo(...[() => i]); }`},
+
+			// ---- Conditional expression branching to arrow, fresh let ----
+			{Code: `for (let i = 0; i < l; i++) { const f = cond ? (() => i) : null; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// Each of these four asserts a complete position range so future
@@ -902,6 +923,76 @@ for (var i = 0; i < l; i++) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "unsafeRefs",
 					Message:   "Function declared in a loop contains unsafe references to variable(s) 'a', 'b'.",
+				}},
+			},
+
+			// ---- Closure-in-loop-in-skipped-IIFE-in-loop: both loops' vars should leak ----
+			{
+				Code: `
+for (var i = 0; i < 3; i++) {
+    (() => {
+        for (var j = 0; j < 3; j++) {
+            (function() { i + j; });
+        }
+    })();
+}`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'i', 'j'.",
+				}},
+			},
+
+			// ---- Closure inside a catch clause inside a loop — `e` binds per exception,
+			// but `i` (loop var) leaks ----
+			{
+				Code: `for (var i = 0; i < l; i++) { try {} catch (e) { (function() { i; }); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+				}},
+			},
+
+			// ---- Closure inside a switch case inside a loop ----
+			{
+				Code: `for (var i = 0; i < l; i++) { switch (x) { case 1: (function() { i; }); break; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+				}},
+			},
+
+			// ---- Closure inside a conditional expression inside a loop ----
+			{
+				Code: `for (var i = 0; i < l; i++) { const f = cond ? (() => i) : null; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+				}},
+			},
+
+			// ---- Class property initializer arrow — class re-created each iteration,
+			// the arrow closes over the loop var ----
+			{
+				Code: `for (var i = 0; i < l; i++) { class C { f = () => i; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+				}},
+			},
+
+			// ---- Parameter default arrow capturing a loop var of an outer function ----
+			{
+				Code: `for (var i = 0; i < l; i++) { function m(x = () => i) { return x(); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+				}},
+			},
+
+			// ---- Catch binding captured by a closure in a loop ----
+			// ESLint's scope manager treats `catch (e)` as an implicit write per
+			// exception, so a closure capturing `e` inside a loop is unsafe.
+			{
+				Code: `for (var i = 0; i < l; i++) { try { throw 0; } catch (e) { (function() { e; }); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'e'.",
 				}},
 			},
 		},

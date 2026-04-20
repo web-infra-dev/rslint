@@ -1852,3 +1852,165 @@ exports[`no-loop-func > invalid 65`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-loop-func > invalid 66`] = `
+{
+  "code": "for (var i = 0; i < 3; i++) {
+    (() => {
+        for (var j = 0; j < 3; j++) {
+            (function() { i + j; });
+        }
+    })();
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i', 'j'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 67`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { try { throw 0; } catch (e) { (function() { e; }); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'e'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 68`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { switch (x) { case 1: (function() { i; }); break; } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 69`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { const f = cond ? (() => i) : null; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 70`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { class C { f = () => i; } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 71`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { function m(x = () => i) { return x(); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

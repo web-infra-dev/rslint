@@ -172,6 +172,21 @@ for (let i = 0; i < 10; i += 1) {
 
     // Non-loop-enclosing outer function: inner function safe (loop variable is fresh let).
     'function outer() { for (var i = 0; i < l; i++) { let j = i; (function() { j; }); } }',
+
+    // Switch-case / try-catch / ternary wrapping around a closure over fresh let.
+    'for (let i = 0; i < l; i++) { switch (x) { case 1: (function() { i; }); break; } }',
+    'for (let i = 0; i < l; i++) { try { const f = () => i; } catch (e) {} }',
+    'for (let i = 0; i < l; i++) { const f = cond ? (() => i) : null; }',
+
+    // Class property initializer arrow with fresh let.
+    'for (let i = 0; i < l; i++) { class C { f = () => i; } }',
+
+    // Parameter default arrow with fresh let.
+    'for (let i = 0; i < l; i++) { function m(x = () => i) { return x(); } }',
+
+    // Tagged template / spread wrapping closures that capture fresh let.
+    'for (let i = 0; i < l; i++) { tag`${() => i}`; }',
+    'for (let i = 0; i < l; i++) { foo(...[() => i]); }',
   ],
   invalid: [
     {
@@ -608,6 +623,48 @@ for (var i = 0; i < 10; i++) {
     // Multiple distinct unsafe refs listed in source order.
     {
       code: 'var a, b; for (var i = 0; i < l; i++) { a = i; b = i; (function() { a + b; }) }',
+      errors: [{ messageId: 'unsafeRefs' }],
+    },
+
+    // Nested loops inside a skipped IIFE, closure captures both loop vars.
+    {
+      code: `for (var i = 0; i < 3; i++) {
+    (() => {
+        for (var j = 0; j < 3; j++) {
+            (function() { i + j; });
+        }
+    })();
+}`,
+      errors: [{ messageId: 'unsafeRefs' }],
+    },
+
+    // Catch binding captured by a closure — `e` rebinds per exception.
+    {
+      code: 'for (var i = 0; i < l; i++) { try { throw 0; } catch (e) { (function() { e; }); } }',
+      errors: [{ messageId: 'unsafeRefs' }],
+    },
+
+    // Closure inside a switch case.
+    {
+      code: 'for (var i = 0; i < l; i++) { switch (x) { case 1: (function() { i; }); break; } }',
+      errors: [{ messageId: 'unsafeRefs' }],
+    },
+
+    // Closure inside a conditional expression.
+    {
+      code: 'for (var i = 0; i < l; i++) { const f = cond ? (() => i) : null; }',
+      errors: [{ messageId: 'unsafeRefs' }],
+    },
+
+    // Class property initializer arrow.
+    {
+      code: 'for (var i = 0; i < l; i++) { class C { f = () => i; } }',
+      errors: [{ messageId: 'unsafeRefs' }],
+    },
+
+    // Parameter default arrow capturing loop var.
+    {
+      code: 'for (var i = 0; i < l; i++) { function m(x = () => i) { return x(); } }',
       errors: [{ messageId: 'unsafeRefs' }],
     },
   ],

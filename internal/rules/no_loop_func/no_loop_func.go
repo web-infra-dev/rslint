@@ -325,8 +325,9 @@ func enclosingVarDeclOfBindingElement(bindingElement *ast.Node) *ast.Node {
 // isWriteRef reports whether an identifier participates in a write to its
 // variable. Extends utils.IsWriteReference with the cases ESLint's scope
 // manager marks as writes but we don't otherwise detect: the binding names of
-// `var/let/const` declarations with initializers, and the bindings introduced
-// by `for (var/let/const ... in/of ...)` iteration.
+// `var/let/const` declarations with initializers, the bindings introduced
+// by `for (var/let/const ... in/of ...)` iteration, and catch-clause
+// parameters (bound anew per thrown exception).
 func isWriteRef(node *ast.Node) bool {
 	if utils.IsWriteReference(node) {
 		return true
@@ -341,10 +342,7 @@ func isWriteRef(node *ast.Node) bool {
 		if varDecl == nil || varDecl.Name() != node {
 			return false
 		}
-		if varDecl.Initializer != nil {
-			return true
-		}
-		return isVarDeclInForInOrOf(parent)
+		return varDeclIntroducesWrite(parent)
 	case ast.KindBindingElement:
 		be := parent.AsBindingElement()
 		if be == nil || be.Name() != node {
@@ -354,16 +352,27 @@ func isWriteRef(node *ast.Node) bool {
 		if varDecl == nil {
 			return false
 		}
-		vd := varDecl.AsVariableDeclaration()
-		if vd == nil {
-			return false
-		}
-		if vd.Initializer != nil {
-			return true
-		}
-		return isVarDeclInForInOrOf(varDecl)
+		return varDeclIntroducesWrite(varDecl)
 	}
 	return false
+}
+
+// varDeclIntroducesWrite reports whether a VariableDeclaration's binding is
+// written at its introduction: it has an initializer, is the target of a
+// for-in/for-of iteration, or is a catch-clause parameter.
+func varDeclIntroducesWrite(varDecl *ast.Node) bool {
+	vd := varDecl.AsVariableDeclaration()
+	if vd == nil {
+		return false
+	}
+	if vd.Initializer != nil {
+		return true
+	}
+	if isVarDeclInForInOrOf(varDecl) {
+		return true
+	}
+	// `catch (e) {...}` binds `e` per thrown exception.
+	return varDecl.Parent != nil && varDecl.Parent.Kind == ast.KindCatchClause
 }
 
 // isVarDeclInForInOrOf reports whether a VariableDeclaration sits directly
