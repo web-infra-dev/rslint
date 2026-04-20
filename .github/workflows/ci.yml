@@ -184,7 +184,7 @@ jobs:
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
           version: v2.11.3
-          args: --timeout=5m ./cmd/... ./internal/...
+          args: --timeout=10m ./cmd/... ./internal/...
 
       - name: go vet
         run: npm run lint:go
