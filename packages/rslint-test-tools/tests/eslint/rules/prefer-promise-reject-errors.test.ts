@@ -43,12 +43,6 @@ ruleTester.run('prefer-promise-reject-errors', {
     'class C { #reject; foo() { Promise.#reject(5); } }',
     'class C { #error; foo() { Promise.reject(this.#error); } }',
 
-    // ---- TypeScript-only syntax should be transparent to couldBeError ----
-    'Promise.reject(foo as Error)',
-    'Promise.reject(<Error>foo)',
-    'Promise.reject(foo!)',
-    'Promise.reject(foo satisfies Error)',
-
     // ---- ESLint requires params[1].type === "Identifier"; non-plain
     // second-parameter shapes are not analyzed.
     'new Promise((resolve, reject = foo) => reject(5))',
@@ -71,8 +65,40 @@ ruleTester.run('prefer-promise-reject-errors', {
     // ---- Reject method-like access (.call / .bind / .apply) is treated
     // as a different operation by ESLint and is not flagged.
     'new Promise((resolve, reject) => reject.call(null, new Error()))',
+
+    // ---- TS assertion wrappers around the Promise constructor / executor /
+    // reject call are NOT recognized as the Promise constructor pattern by
+    // upstream ESLint (verified empirically against ESLint + @typescript-eslint/parser).
+    'new (Promise as any)((resolve, reject) => reject(5))',
+    'new (Promise!)((resolve, reject) => reject(5))',
+    'new (<any>Promise)((resolve, reject) => reject(5))',
+    'new Promise(((resolve: any, reject: any) => reject(5)) as any)',
+    'new Promise(((resolve: any, reject: any) => reject(5))!)',
+    'new Promise((resolve, reject) => (reject as any)(5))',
+    'new Promise((resolve, reject) => reject!(5))',
+    '(Promise as any).reject(5)',
+    // Parens-only controls — still analyzed.
+    'new Promise(((resolve, reject) => reject(new Error())))',
+    'new Promise((resolve, reject) => (reject)(new Error()))',
   ],
   invalid: [
+    // ---- TS assertion wrappers — NOT transparent in upstream ESLint ----
+    {
+      code: 'Promise.reject(foo as Error)',
+      errors: [{ messageId: 'rejectAnError', line: 1, column: 1 }],
+    },
+    {
+      code: 'Promise.reject(<Error>foo)',
+      errors: [{ messageId: 'rejectAnError', line: 1, column: 1 }],
+    },
+    {
+      code: 'Promise.reject(foo!)',
+      errors: [{ messageId: 'rejectAnError', line: 1, column: 1 }],
+    },
+    {
+      code: 'Promise.reject(foo satisfies Error)',
+      errors: [{ messageId: 'rejectAnError', line: 1, column: 1 }],
+    },
     {
       code: 'Promise.reject(5)',
       errors: [{ messageId: 'rejectAnError', line: 1, column: 1 }],

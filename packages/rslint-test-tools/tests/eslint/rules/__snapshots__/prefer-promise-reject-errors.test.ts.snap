@@ -2,6 +2,110 @@
 
 exports[`prefer-promise-reject-errors > invalid 1`] = `
 {
+  "code": "Promise.reject(foo as Error)",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 2`] = `
+{
+  "code": "Promise.reject(<Error>foo)",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 3`] = `
+{
+  "code": "Promise.reject(foo!)",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 4`] = `
+{
+  "code": "Promise.reject(foo satisfies Error)",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 5`] = `
+{
   "code": "Promise.reject(5)",
   "diagnostics": [
     {
@@ -26,7 +130,7 @@ exports[`prefer-promise-reject-errors > invalid 1`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 2`] = `
+exports[`prefer-promise-reject-errors > invalid 6`] = `
 {
   "code": "Promise.reject('foo')",
   "diagnostics": [
@@ -52,7 +156,7 @@ exports[`prefer-promise-reject-errors > invalid 2`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 3`] = `
+exports[`prefer-promise-reject-errors > invalid 7`] = `
 {
   "code": "Promise.reject(\`foo\`)",
   "diagnostics": [
@@ -78,7 +182,7 @@ exports[`prefer-promise-reject-errors > invalid 3`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 4`] = `
+exports[`prefer-promise-reject-errors > invalid 8`] = `
 {
   "code": "Promise.reject(!foo)",
   "diagnostics": [
@@ -104,7 +208,7 @@ exports[`prefer-promise-reject-errors > invalid 4`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 5`] = `
+exports[`prefer-promise-reject-errors > invalid 9`] = `
 {
   "code": "Promise.reject(void foo)",
   "diagnostics": [
@@ -114,110 +218,6 @@ exports[`prefer-promise-reject-errors > invalid 5`] = `
       "range": {
         "end": {
           "column": 25,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "prefer-promise-reject-errors",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`prefer-promise-reject-errors > invalid 6`] = `
-{
-  "code": "Promise.reject()",
-  "diagnostics": [
-    {
-      "message": "Expected the Promise rejection reason to be an Error.",
-      "messageId": "rejectAnError",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "prefer-promise-reject-errors",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`prefer-promise-reject-errors > invalid 7`] = `
-{
-  "code": "Promise.reject(undefined)",
-  "diagnostics": [
-    {
-      "message": "Expected the Promise rejection reason to be an Error.",
-      "messageId": "rejectAnError",
-      "range": {
-        "end": {
-          "column": 26,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "prefer-promise-reject-errors",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`prefer-promise-reject-errors > invalid 8`] = `
-{
-  "code": "Promise.reject({ foo: 1 })",
-  "diagnostics": [
-    {
-      "message": "Expected the Promise rejection reason to be an Error.",
-      "messageId": "rejectAnError",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "prefer-promise-reject-errors",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`prefer-promise-reject-errors > invalid 9`] = `
-{
-  "code": "Promise.reject([1, 2, 3])",
-  "diagnostics": [
-    {
-      "message": "Expected the Promise rejection reason to be an Error.",
-      "messageId": "rejectAnError",
-      "range": {
-        "end": {
-          "column": 26,
           "line": 1,
         },
         "start": {
@@ -262,6 +262,110 @@ exports[`prefer-promise-reject-errors > invalid 10`] = `
 
 exports[`prefer-promise-reject-errors > invalid 11`] = `
 {
+  "code": "Promise.reject(undefined)",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 12`] = `
+{
+  "code": "Promise.reject({ foo: 1 })",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 13`] = `
+{
+  "code": "Promise.reject([1, 2, 3])",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 14`] = `
+{
+  "code": "Promise.reject()",
+  "diagnostics": [
+    {
+      "message": "Expected the Promise rejection reason to be an Error.",
+      "messageId": "rejectAnError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-promise-reject-errors",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-promise-reject-errors > invalid 15`] = `
+{
   "code": "new Promise(function(resolve, reject) { reject() })",
   "diagnostics": [
     {
@@ -286,7 +390,7 @@ exports[`prefer-promise-reject-errors > invalid 11`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 12`] = `
+exports[`prefer-promise-reject-errors > invalid 16`] = `
 {
   "code": "Promise.reject(undefined)",
   "diagnostics": [
@@ -312,7 +416,7 @@ exports[`prefer-promise-reject-errors > invalid 12`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 13`] = `
+exports[`prefer-promise-reject-errors > invalid 17`] = `
 {
   "code": "Promise.reject('foo', somethingElse)",
   "diagnostics": [
@@ -338,7 +442,7 @@ exports[`prefer-promise-reject-errors > invalid 13`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 14`] = `
+exports[`prefer-promise-reject-errors > invalid 18`] = `
 {
   "code": "new Promise(function(resolve, reject) { reject(5) })",
   "diagnostics": [
@@ -364,7 +468,7 @@ exports[`prefer-promise-reject-errors > invalid 14`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 15`] = `
+exports[`prefer-promise-reject-errors > invalid 19`] = `
 {
   "code": "new Promise((resolve, reject) => { reject(5) })",
   "diagnostics": [
@@ -390,7 +494,7 @@ exports[`prefer-promise-reject-errors > invalid 15`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 16`] = `
+exports[`prefer-promise-reject-errors > invalid 20`] = `
 {
   "code": "new Promise((resolve, reject) => reject(5))",
   "diagnostics": [
@@ -416,7 +520,7 @@ exports[`prefer-promise-reject-errors > invalid 16`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 17`] = `
+exports[`prefer-promise-reject-errors > invalid 21`] = `
 {
   "code": "new Promise((resolve, reject) => reject())",
   "diagnostics": [
@@ -442,7 +546,7 @@ exports[`prefer-promise-reject-errors > invalid 17`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 18`] = `
+exports[`prefer-promise-reject-errors > invalid 22`] = `
 {
   "code": "new Promise(function(yes, no) { no(5) })",
   "diagnostics": [
@@ -468,7 +572,7 @@ exports[`prefer-promise-reject-errors > invalid 18`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 19`] = `
+exports[`prefer-promise-reject-errors > invalid 23`] = `
 {
   "code": "
           new Promise((resolve, reject) => {
@@ -501,7 +605,7 @@ exports[`prefer-promise-reject-errors > invalid 19`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 20`] = `
+exports[`prefer-promise-reject-errors > invalid 24`] = `
 {
   "code": "new Promise(({foo, bar, baz}, reject) => reject(5))",
   "diagnostics": [
@@ -527,7 +631,7 @@ exports[`prefer-promise-reject-errors > invalid 20`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 21`] = `
+exports[`prefer-promise-reject-errors > invalid 25`] = `
 {
   "code": "new Promise(function(reject, reject) { reject(5) })",
   "diagnostics": [
@@ -553,7 +657,7 @@ exports[`prefer-promise-reject-errors > invalid 21`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 22`] = `
+exports[`prefer-promise-reject-errors > invalid 26`] = `
 {
   "code": "new Promise(function(foo, arguments) { arguments(5) })",
   "diagnostics": [
@@ -579,7 +683,7 @@ exports[`prefer-promise-reject-errors > invalid 22`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 23`] = `
+exports[`prefer-promise-reject-errors > invalid 27`] = `
 {
   "code": "new Promise((foo, arguments) => arguments(5))",
   "diagnostics": [
@@ -605,7 +709,7 @@ exports[`prefer-promise-reject-errors > invalid 23`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 24`] = `
+exports[`prefer-promise-reject-errors > invalid 28`] = `
 {
   "code": "new Promise(function({}, reject) { reject(5) })",
   "diagnostics": [
@@ -631,7 +735,7 @@ exports[`prefer-promise-reject-errors > invalid 24`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 25`] = `
+exports[`prefer-promise-reject-errors > invalid 29`] = `
 {
   "code": "new Promise(({}, reject) => reject(5))",
   "diagnostics": [
@@ -657,7 +761,7 @@ exports[`prefer-promise-reject-errors > invalid 25`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 26`] = `
+exports[`prefer-promise-reject-errors > invalid 30`] = `
 {
   "code": "new Promise((resolve, reject, somethingElse = reject(5)) => {})",
   "diagnostics": [
@@ -683,7 +787,7 @@ exports[`prefer-promise-reject-errors > invalid 26`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 27`] = `
+exports[`prefer-promise-reject-errors > invalid 31`] = `
 {
   "code": "new Promise(function(resolve, reject) { var reject = somethingElse; reject(5) })",
   "diagnostics": [
@@ -709,7 +813,7 @@ exports[`prefer-promise-reject-errors > invalid 27`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 28`] = `
+exports[`prefer-promise-reject-errors > invalid 32`] = `
 {
   "code": "new Promise((resolve, reject) => setTimeout(() => reject(5), 0))",
   "diagnostics": [
@@ -735,7 +839,7 @@ exports[`prefer-promise-reject-errors > invalid 28`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 29`] = `
+exports[`prefer-promise-reject-errors > invalid 33`] = `
 {
   "code": "new Promise((resolve, reject) => arr.forEach(function () { reject('bad') }))",
   "diagnostics": [
@@ -761,7 +865,7 @@ exports[`prefer-promise-reject-errors > invalid 29`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 30`] = `
+exports[`prefer-promise-reject-errors > invalid 34`] = `
 {
   "code": "Promise.reject(...args)",
   "diagnostics": [
@@ -787,7 +891,7 @@ exports[`prefer-promise-reject-errors > invalid 30`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 31`] = `
+exports[`prefer-promise-reject-errors > invalid 35`] = `
 {
   "code": "Promise.reject(null)",
   "diagnostics": [
@@ -813,7 +917,7 @@ exports[`prefer-promise-reject-errors > invalid 31`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 32`] = `
+exports[`prefer-promise-reject-errors > invalid 36`] = `
 {
   "code": "Promise.reject(0)",
   "diagnostics": [
@@ -839,7 +943,7 @@ exports[`prefer-promise-reject-errors > invalid 32`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 33`] = `
+exports[`prefer-promise-reject-errors > invalid 37`] = `
 {
   "code": "Promise.reject(true)",
   "diagnostics": [
@@ -865,7 +969,7 @@ exports[`prefer-promise-reject-errors > invalid 33`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 34`] = `
+exports[`prefer-promise-reject-errors > invalid 38`] = `
 {
   "code": "Promise['reject'](5)",
   "diagnostics": [
@@ -891,7 +995,7 @@ exports[`prefer-promise-reject-errors > invalid 34`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 35`] = `
+exports[`prefer-promise-reject-errors > invalid 39`] = `
 {
   "code": "Promise[\`reject\`](5)",
   "diagnostics": [
@@ -917,7 +1021,7 @@ exports[`prefer-promise-reject-errors > invalid 35`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 36`] = `
+exports[`prefer-promise-reject-errors > invalid 40`] = `
 {
   "code": "new Promise(function fn(resolve, reject) { reject(5) })",
   "diagnostics": [
@@ -943,7 +1047,7 @@ exports[`prefer-promise-reject-errors > invalid 36`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 37`] = `
+exports[`prefer-promise-reject-errors > invalid 41`] = `
 {
   "code": "new Promise(async (resolve, reject) => reject(5))",
   "diagnostics": [
@@ -969,7 +1073,7 @@ exports[`prefer-promise-reject-errors > invalid 37`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 38`] = `
+exports[`prefer-promise-reject-errors > invalid 42`] = `
 {
   "code": "new Promise(function *(resolve, reject) { reject(5) })",
   "diagnostics": [
@@ -995,7 +1099,7 @@ exports[`prefer-promise-reject-errors > invalid 38`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 39`] = `
+exports[`prefer-promise-reject-errors > invalid 43`] = `
 {
   "code": "new Promise((resolve, reject) => { reject(1); reject('x'); reject(); })",
   "diagnostics": [
@@ -1051,7 +1155,7 @@ exports[`prefer-promise-reject-errors > invalid 39`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 40`] = `
+exports[`prefer-promise-reject-errors > invalid 44`] = `
 {
   "code": "new Promise((resolve, reject) => (reject)(5))",
   "diagnostics": [
@@ -1077,7 +1181,7 @@ exports[`prefer-promise-reject-errors > invalid 40`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 41`] = `
+exports[`prefer-promise-reject-errors > invalid 45`] = `
 {
   "code": "new Promise((resolve, reject) => reject?.(5))",
   "diagnostics": [
@@ -1103,7 +1207,7 @@ exports[`prefer-promise-reject-errors > invalid 41`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 42`] = `
+exports[`prefer-promise-reject-errors > invalid 46`] = `
 {
   "code": "new (Promise)((resolve, reject) => reject(5))",
   "diagnostics": [
@@ -1129,7 +1233,7 @@ exports[`prefer-promise-reject-errors > invalid 42`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 43`] = `
+exports[`prefer-promise-reject-errors > invalid 47`] = `
 {
   "code": "new Promise(((resolve, reject) => reject(5)))",
   "diagnostics": [
@@ -1155,7 +1259,7 @@ exports[`prefer-promise-reject-errors > invalid 43`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 44`] = `
+exports[`prefer-promise-reject-errors > invalid 48`] = `
 {
   "code": "Promise.reject?.(5)",
   "diagnostics": [
@@ -1181,7 +1285,7 @@ exports[`prefer-promise-reject-errors > invalid 44`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 45`] = `
+exports[`prefer-promise-reject-errors > invalid 49`] = `
 {
   "code": "Promise?.reject(5)",
   "diagnostics": [
@@ -1207,7 +1311,7 @@ exports[`prefer-promise-reject-errors > invalid 45`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 46`] = `
+exports[`prefer-promise-reject-errors > invalid 50`] = `
 {
   "code": "Promise?.reject?.(5)",
   "diagnostics": [
@@ -1233,7 +1337,7 @@ exports[`prefer-promise-reject-errors > invalid 46`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 47`] = `
+exports[`prefer-promise-reject-errors > invalid 51`] = `
 {
   "code": "(Promise?.reject)(5)",
   "diagnostics": [
@@ -1259,7 +1363,7 @@ exports[`prefer-promise-reject-errors > invalid 47`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 48`] = `
+exports[`prefer-promise-reject-errors > invalid 52`] = `
 {
   "code": "(Promise?.reject)?.(5)",
   "diagnostics": [
@@ -1285,7 +1389,7 @@ exports[`prefer-promise-reject-errors > invalid 48`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 49`] = `
+exports[`prefer-promise-reject-errors > invalid 53`] = `
 {
   "code": "Promise.reject(foo += new Error())",
   "diagnostics": [
@@ -1311,7 +1415,7 @@ exports[`prefer-promise-reject-errors > invalid 49`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 50`] = `
+exports[`prefer-promise-reject-errors > invalid 54`] = `
 {
   "code": "Promise.reject(foo -= new Error())",
   "diagnostics": [
@@ -1337,7 +1441,7 @@ exports[`prefer-promise-reject-errors > invalid 50`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 51`] = `
+exports[`prefer-promise-reject-errors > invalid 55`] = `
 {
   "code": "Promise.reject(foo **= new Error())",
   "diagnostics": [
@@ -1363,7 +1467,7 @@ exports[`prefer-promise-reject-errors > invalid 51`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 52`] = `
+exports[`prefer-promise-reject-errors > invalid 56`] = `
 {
   "code": "Promise.reject(foo <<= new Error())",
   "diagnostics": [
@@ -1389,7 +1493,7 @@ exports[`prefer-promise-reject-errors > invalid 52`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 53`] = `
+exports[`prefer-promise-reject-errors > invalid 57`] = `
 {
   "code": "Promise.reject(foo |= new Error())",
   "diagnostics": [
@@ -1415,7 +1519,7 @@ exports[`prefer-promise-reject-errors > invalid 53`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 54`] = `
+exports[`prefer-promise-reject-errors > invalid 58`] = `
 {
   "code": "Promise.reject(foo &= new Error())",
   "diagnostics": [
@@ -1441,7 +1545,7 @@ exports[`prefer-promise-reject-errors > invalid 54`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 55`] = `
+exports[`prefer-promise-reject-errors > invalid 59`] = `
 {
   "code": "Promise.reject(foo && 5)",
   "diagnostics": [
@@ -1467,7 +1571,7 @@ exports[`prefer-promise-reject-errors > invalid 55`] = `
 }
 `;
 
-exports[`prefer-promise-reject-errors > invalid 56`] = `
+exports[`prefer-promise-reject-errors > invalid 60`] = `
 {
   "code": "Promise.reject(foo &&= 5)",
   "diagnostics": [

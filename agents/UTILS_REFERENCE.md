@@ -58,6 +58,15 @@ heritageClauses := utils.GetHeritageClauses(classNode) // *ast.NodeList
 
 // Check if a node has a specific modifier (e.g., async, static, public)
 isAsync := utils.IncludesModifier(funcNode, ast.KindAsyncKeyword)
+
+// Whether a node could plausibly evaluate to an Error object — mirrors
+// ESLint's astUtils.couldBeError. Unwraps parens + TS assertions internally.
+// Used by no-throw-literal, prefer-promise-reject-errors, etc.
+mayBeError := utils.CouldBeError(node)
+
+// Whether a node, after unwrapping parens + TS assertions, is the literal
+// identifier `undefined`. Lexical check only — does not detect `void 0`.
+isUndef := utils.IsUndefinedIdentifier(node)
 ```
 
 ### Collection Operations (Generic)

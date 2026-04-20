@@ -1,0 +1,1094 @@
+// Rstest Snapshot v1
+
+exports[`no-throw-literal > invalid 1`] = `
+{
+  "code": "throw 'error';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 2`] = `
+{
+  "code": "throw 0;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 3`] = `
+{
+  "code": "throw false;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 4`] = `
+{
+  "code": "throw null;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 5`] = `
+{
+  "code": "throw {};",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 6`] = `
+{
+  "code": "throw undefined;",
+  "diagnostics": [
+    {
+      "message": "Do not throw undefined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 7`] = `
+{
+  "code": "throw 'a' + 'b';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 8`] = `
+{
+  "code": "var b = new Error(); throw 'a' + b;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 9`] = `
+{
+  "code": "throw foo = 'error';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 10`] = `
+{
+  "code": "throw foo += new Error();",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 11`] = `
+{
+  "code": "throw foo &= new Error();",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 12`] = `
+{
+  "code": "throw foo &&= 'literal'",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 13`] = `
+{
+  "code": "throw new Error(), 1, 2, 3;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 14`] = `
+{
+  "code": "throw 'literal' && 'not an Error';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 15`] = `
+{
+  "code": "throw foo && 'literal'",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 16`] = `
+{
+  "code": "throw foo ? 'not an Error' : 'literal';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 17`] = `
+{
+  "code": "throw \`\${err}\`;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 18`] = `
+{
+  "code": "throw ('error');",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 19`] = `
+{
+  "code": "throw (undefined);",
+  "diagnostics": [
+    {
+      "message": "Do not throw undefined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 20`] = `
+{
+  "code": "throw (foo(), 'error');",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 21`] = `
+{
+  "code": "throw cond ? 'a' : 'b';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 22`] = `
+{
+  "code": "throw 1n;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 23`] = `
+{
+  "code": "throw /foo/;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 24`] = `
+{
+  "code": "throw void 0;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 25`] = `
+{
+  "code": "throw class {};",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 26`] = `
+{
+  "code": "throw function() {};",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 27`] = `
+{
+  "code": "throw () => {};",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 28`] = `
+{
+  "code": "throw [];",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 29`] = `
+{
+  "code": "class C { foo() { throw this; } }",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 30`] = `
+{
+  "code": "function foo() { throw new.target; }",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 31`] = `
+{
+  "code": "throw a && b && 'literal';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 32`] = `
+{
+  "code": "throw foo as Error;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 33`] = `
+{
+  "code": "throw foo!;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 34`] = `
+{
+  "code": "throw foo satisfies unknown;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 35`] = `
+{
+  "code": "throw <Error>foo;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 36`] = `
+{
+  "code": "throw obj?.foo!;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 37`] = `
+{
+  "code": "throw 'foo' as Error;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 38`] = `
+{
+  "code": "throw (5 as any);",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 39`] = `
+{
+  "code": "throw (((undefined)));",
+  "diagnostics": [
+    {
+      "message": "Do not throw undefined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 40`] = `
+{
+  "code": "throw undefined as any;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 41`] = `
+{
+  "code": "throw undefined!;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-throw-literal > invalid 42`] = `
+{
+  "code": "throw 'a' +
+  'b';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-throw-literal",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
