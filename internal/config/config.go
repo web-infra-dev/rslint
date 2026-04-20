@@ -164,6 +164,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_lone_blocks"
+	"github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
@@ -610,6 +611,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-import-assign", no_import_assign.NoImportAssignRule)
 	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
 	GlobalRuleRegistry.Register("no-lone-blocks", no_lone_blocks.NoLoneBlocksRule)
+	GlobalRuleRegistry.Register("no-loop-func", no_loop_func.NoLoopFuncRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-misleading-character-class", no_misleading_character_class.NoMisleadingCharacterClassRule)
 	GlobalRuleRegistry.Register("no-new", no_new.NoNewRule)
