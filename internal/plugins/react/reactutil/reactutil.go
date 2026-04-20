@@ -369,6 +369,32 @@ func GetJsxTagName(element *ast.Node) *ast.Node {
 	return nil
 }
 
+// GetJsxElementAttributes returns the attribute nodes of a JsxOpeningElement or
+// JsxSelfClosingElement, or nil for other kinds or when the element has no
+// attributes. Each returned node is either a JsxAttribute or a JsxSpreadAttribute.
+func GetJsxElementAttributes(element *ast.Node) []*ast.Node {
+	if element == nil {
+		return nil
+	}
+	var attrs *ast.Node
+	switch element.Kind {
+	case ast.KindJsxOpeningElement:
+		attrs = element.AsJsxOpeningElement().Attributes
+	case ast.KindJsxSelfClosingElement:
+		attrs = element.AsJsxSelfClosingElement().Attributes
+	default:
+		return nil
+	}
+	if attrs == nil {
+		return nil
+	}
+	list := attrs.AsJsxAttributes()
+	if list == nil || list.Properties == nil {
+		return nil
+	}
+	return list.Properties.Nodes
+}
+
 // IsDOMComponent reports whether a JSX opening/self-closing element refers to
 // an intrinsic (DOM) element like <div> or <svg:path>, rather than a user
 // component like <Foo> or <Foo.Bar>.
