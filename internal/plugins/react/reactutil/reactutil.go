@@ -273,8 +273,17 @@ func GetJsxTagBaseIdentifier(tagName *ast.Node) *ast.Node {
 //     where `this` is not inside any function (ESLint's scope walk returns
 //     null for that too).
 func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
+	return GetEnclosingReactComponent(node, pragma, createClass) != nil
+}
+
+// GetEnclosingReactComponent is IsInsideReactComponent's sibling that returns
+// the component node itself (the ClassDeclaration / ClassExpression, or the
+// ObjectLiteralExpression passed to createReactClass) rather than a bool.
+// Returns nil when `node` is not inside a React component. See
+// IsInsideReactComponent for the detection rules.
+func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast.Node {
 	if node == nil {
-		return false
+		return nil
 	}
 	if pragma == "" {
 		pragma = DefaultReactPragma
@@ -298,7 +307,7 @@ func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
 			}
 			seenNearestClass = true
 			if ExtendsReactComponent(p, pragma) {
-				return true
+				return p
 			}
 		case ast.KindObjectLiteralExpression:
 			if !seenEnclosingFunction {
@@ -322,11 +331,11 @@ func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
 				continue
 			}
 			if IsCreateClassCall(call, pragma, createClass) {
-				return true
+				return p
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 func isObjectArgumentOf(call *ast.CallExpression, obj *ast.Node) bool {
@@ -339,6 +348,191 @@ func isObjectArgumentOf(call *ast.CallExpression, obj *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// GetEnclosingReactComponentOrStateless is GetEnclosingReactComponent extended
+// with eslint-plugin-react's `getParentStatelessComponent` fallback: when no
+// enclosing ES6 class / ES5 createReactClass component is found, the nearest
+// FunctionLike ancestor that looks like a functional component (capital-cased
+// name + returns JSX/null) is returned.
+//
+// Priority matches upstream's `getParentComponent`:
+//
+//	getParentES6Component || getParentES5Component || getParentStatelessComponent
+//
+// so when a mutation node is inside an inner function nested within an outer
+// class component, the OUTER class component is returned (preventing the
+// inner stateless candidate from masking the class boundary).
+//
+// Only a restricted subset of upstream's heuristics is implemented — the
+// patterns covering production React code: named FunctionDeclaration,
+// FunctionExpression / ArrowFunction assigned to a capital-cased
+// VariableDeclarator, PropertyAssignment, or ExportAssignment (default export),
+// plus function expression in a CallExpression (e.g. React.memo wrapper —
+// approximate match). This is intentionally conservative: missed detection
+// causes a rule miss, over-detection would cause false-positive reports in
+// non-component functions.
+func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string) *ast.Node {
+	if comp := GetEnclosingReactComponent(node, pragma, createClass); comp != nil {
+		return comp
+	}
+	for p := node.Parent; p != nil; p = p.Parent {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponent(p) {
+			return p
+		}
+	}
+	return nil
+}
+
+// IsStatelessReactComponent reports whether `fn` (a FunctionLike) looks like a
+// React functional component — i.e. it has a capital-cased associated name
+// AND returns JSX or null on at least one path. Nested functions are not
+// considered when searching for returns.
+//
+// See GetEnclosingReactComponentOrStateless for the priority rules.
+func IsStatelessReactComponent(fn *ast.Node) bool {
+	if fn == nil {
+		return false
+	}
+	switch fn.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+	default:
+		return false
+	}
+	name := functionAssociatedName(fn)
+	if name == "" || !isFirstLetterCapitalized(name) {
+		return false
+	}
+	return functionReturnsJSXOrNull(fn)
+}
+
+// functionAssociatedName picks the name that identifies a function-like node
+// for React component detection:
+//
+//   - the function's own Identifier (FunctionDeclaration / named
+//     FunctionExpression)
+//   - otherwise the Identifier of the enclosing VariableDeclaration /
+//     PropertyAssignment
+//
+// Returns "" when no usable Identifier is found (e.g. computed keys,
+// destructuring patterns, anonymous default exports).
+func functionAssociatedName(fn *ast.Node) string {
+	switch fn.Kind {
+	case ast.KindFunctionDeclaration:
+		name := fn.Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			return name.AsIdentifier().Text
+		}
+	case ast.KindFunctionExpression:
+		name := fn.Name()
+		if name != nil && name.Kind == ast.KindIdentifier && isFirstLetterCapitalized(name.AsIdentifier().Text) {
+			return name.AsIdentifier().Text
+		}
+	}
+	parent := fn.Parent
+	if parent == nil {
+		return ""
+	}
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		binding := parent.AsVariableDeclaration().Name()
+		if binding != nil && binding.Kind == ast.KindIdentifier {
+			return binding.AsIdentifier().Text
+		}
+	case ast.KindPropertyAssignment:
+		name := parent.AsPropertyAssignment().Name()
+		if name != nil && name.Kind == ast.KindIdentifier {
+			return name.AsIdentifier().Text
+		}
+	case ast.KindBinaryExpression:
+		bin := parent.AsBinaryExpression()
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
+			left := ast.SkipParentheses(bin.Left)
+			if left.Kind == ast.KindIdentifier {
+				return left.AsIdentifier().Text
+			}
+		}
+	}
+	return ""
+}
+
+// functionReturnsJSXOrNull reports whether the function's body contains a
+// `return <jsx/>` / `return null` at depth ≤ 1 (nested functions excluded),
+// OR — for an arrow with expression body — whether that expression is JSX or
+// `null`. ConditionalExpression is traversed so `return cond ? <jsx/> : null`
+// qualifies.
+func functionReturnsJSXOrNull(fn *ast.Node) bool {
+	var body *ast.Node
+	switch fn.Kind {
+	case ast.KindFunctionDeclaration:
+		body = fn.AsFunctionDeclaration().Body
+	case ast.KindFunctionExpression:
+		body = fn.AsFunctionExpression().Body
+	case ast.KindArrowFunction:
+		body = fn.AsArrowFunction().Body
+		if body != nil && body.Kind != ast.KindBlock {
+			return isJSXOrNullExpression(body)
+		}
+	}
+	if body == nil {
+		return false
+	}
+	found := false
+	var visit ast.Visitor
+	visit = func(n *ast.Node) bool {
+		if found || n == nil {
+			return found
+		}
+		switch n.Kind {
+		case ast.KindReturnStatement:
+			rs := n.AsReturnStatement()
+			if rs.Expression != nil && isJSXOrNullExpression(rs.Expression) {
+				found = true
+				return true
+			}
+		case ast.KindFunctionExpression,
+			ast.KindFunctionDeclaration,
+			ast.KindArrowFunction,
+			ast.KindMethodDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor,
+			ast.KindConstructor:
+			return false
+		}
+		n.ForEachChild(visit)
+		return found
+	}
+	visit(body)
+	return found
+}
+
+// isJSXOrNullExpression reports whether `expr` is a JSX element, JSX fragment,
+// or the `null` literal — walking through ParenthesizedExpression,
+// ConditionalExpression branches, and comma-sequence (BinaryExpression with
+// `,`) right-most operands so `(<div/>)`, `cond ? <div/> : null`, and
+// `(side, <div/>)` all qualify (matches eslint-plugin-react's
+// jsxUtil.isReturningJSXOrNull).
+func isJSXOrNullExpression(expr *ast.Node) bool {
+	expr = ast.SkipParentheses(expr)
+	switch expr.Kind {
+	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
+		return true
+	case ast.KindNullKeyword:
+		return true
+	case ast.KindConditionalExpression:
+		ce := expr.AsConditionalExpression()
+		return isJSXOrNullExpression(ce.WhenTrue) || isJSXOrNullExpression(ce.WhenFalse)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken {
+			return isJSXOrNullExpression(bin.Right)
+		}
+	}
+	return false
+}
+
+func isFirstLetterCapitalized(s string) bool {
+	return len(s) > 0 && s[0] >= 'A' && s[0] <= 'Z'
 }
 
 // IsCreateElementCall reports whether the callee is `<pragma>.createElement`.
