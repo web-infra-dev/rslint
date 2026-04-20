@@ -167,33 +167,7 @@ var JsxKeyRule = rule.Rule{
 			if body == nil {
 				return
 			}
-			inner := ast.SkipParentheses(body)
-			if isJsxNode(inner) {
-				checkIteratorElement(inner)
-			}
-			if ast.IsConditionalExpression(inner) {
-				ce := inner.AsConditionalExpression()
-				if ce.WhenTrue != nil {
-					t := ast.SkipParentheses(ce.WhenTrue)
-					if isJsxNode(t) {
-						checkIteratorElement(t)
-					}
-				}
-				if ce.WhenFalse != nil {
-					f := ast.SkipParentheses(ce.WhenFalse)
-					if isJsxNode(f) {
-						checkIteratorElement(f)
-					}
-				}
-			} else if ast.IsLogicalOrCoalescingBinaryExpression(inner) {
-				right := inner.AsBinaryExpression().Right
-				if right != nil {
-					r := ast.SkipParentheses(right)
-					if isJsxNode(r) {
-						checkIteratorElement(r)
-					}
-				}
-			}
+			peelToJsxCandidates(body)
 		}
 
 		// checkFunctionsBlockStatement mirrors upstream's helper: walk the
