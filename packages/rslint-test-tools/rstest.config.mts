@@ -95,6 +95,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
     './tests/eslint-plugin-react/rules/no-danger.test.ts',
     './tests/eslint-plugin-react/rules/no-is-mounted.test.ts',
+    './tests/eslint-plugin-react/rules/no-string-refs.test.ts',
     './tests/eslint-plugin-react/rules/no-unescaped-entities.test.ts',
 
     // typescript-eslint
