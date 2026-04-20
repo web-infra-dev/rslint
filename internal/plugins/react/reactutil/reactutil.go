@@ -34,6 +34,29 @@ func GetReactPragma(settings map[string]interface{}) string {
 	return pragma
 }
 
+// DefaultReactFragment is the fallback fragment name for JSX shorthand
+// fragment diagnostics when `settings.react.fragment` is not configured,
+// matching eslint-plugin-react.
+const DefaultReactFragment = "Fragment"
+
+// GetReactFragmentPragma reads `settings.react.fragment` from the config
+// settings map. Returns DefaultReactFragment when the setting is absent,
+// not a string, or empty.
+func GetReactFragmentPragma(settings map[string]interface{}) string {
+	if settings == nil {
+		return DefaultReactFragment
+	}
+	reactSettings, ok := settings["react"].(map[string]interface{})
+	if !ok {
+		return DefaultReactFragment
+	}
+	v, ok := reactSettings["fragment"].(string)
+	if !ok || v == "" {
+		return DefaultReactFragment
+	}
+	return v
+}
+
 // GetReactCreateClass reads `settings.react.createClass` from the config
 // settings map. Returns DefaultReactCreateClass when the setting is absent,
 // not a string, or empty.
@@ -429,6 +452,66 @@ func GetJsxElementAttributes(element *ast.Node) []*ast.Node {
 		return nil
 	}
 	return list.Properties.Nodes
+}
+
+// GetJsxElementTypeString returns the jsx-ast-utils `elementType(node)`
+// equivalent — the dotted / namespaced display string of a JSX tag name as
+// an ESTree-compatible source caller would see it. `node` may be either a
+// JsxOpeningElement / JsxSelfClosingElement, or a raw tag-name node. Returns
+// "" for shapes that don't correspond to a legal React/JSX element type
+// (e.g. a computed member access), so callers can treat "" as "not a user
+// component".
+//
+// Supported tag shapes:
+//
+//   - `<Foo>` / `<foo>`       → "Foo" / "foo"
+//   - `<Foo.Bar.Baz>`         → "Foo.Bar.Baz" (PropertyAccessExpression chain)
+//   - `<this.Foo>`            → "this.Foo" (ThisKeyword base)
+//   - `<ns:Name>`             → "ns:Name" (JsxNamespacedName)
+//
+// This is AST-driven — interior whitespace or comments in unusual forms
+// (e.g. `<Foo . Bar />`) are normalized away, matching jsx-ast-utils.
+func GetJsxElementTypeString(node *ast.Node) string {
+	tagName := node
+	if node != nil {
+		if t := GetJsxTagName(node); t != nil {
+			tagName = t
+		}
+	}
+	return tagNameString(tagName)
+}
+
+func tagNameString(tagName *ast.Node) string {
+	if tagName == nil {
+		return ""
+	}
+	switch tagName.Kind {
+	case ast.KindIdentifier:
+		return tagName.AsIdentifier().Text
+	case ast.KindThisKeyword:
+		return "this"
+	case ast.KindJsxNamespacedName:
+		ns := tagName.AsJsxNamespacedName()
+		if ns.Namespace == nil || ns.Name() == nil {
+			return ""
+		}
+		if ns.Namespace.Kind != ast.KindIdentifier || ns.Name().Kind != ast.KindIdentifier {
+			return ""
+		}
+		return ns.Namespace.AsIdentifier().Text + ":" + ns.Name().AsIdentifier().Text
+	case ast.KindPropertyAccessExpression:
+		pa := tagName.AsPropertyAccessExpression()
+		base := tagNameString(pa.Expression)
+		if base == "" {
+			return ""
+		}
+		nameNode := pa.Name()
+		if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
+			return ""
+		}
+		return base + "." + nameNode.AsIdentifier().Text
+	}
+	return ""
 }
 
 // IsDOMComponent reports whether a JSX opening/self-closing element refers to

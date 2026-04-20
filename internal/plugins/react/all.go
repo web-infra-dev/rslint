@@ -7,10 +7,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_filename_extension"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_first_prop_new_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_bind"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_pascal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_multi_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
@@ -39,10 +41,12 @@ func GetAllRules() []rule.Rule {
 		jsx_equals_spacing.JsxEqualsSpacingRule,
 		jsx_filename_extension.JsxFilenameExtensionRule,
 		jsx_first_prop_new_line.JsxFirstPropNewLineRule,
+		jsx_key.JsxKeyRule,
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
 		jsx_no_bind.JsxNoBindRule,
 		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
 		jsx_no_undef.JsxNoUndefRule,
+		jsx_pascal_case.JsxPascalCaseRule,
 		jsx_props_no_multi_spaces.JsxPropsNoMultiSpacesRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
