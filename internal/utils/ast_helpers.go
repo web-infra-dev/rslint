@@ -114,6 +114,87 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 	return false
 }
 
+// CouldBeError reports whether a node could plausibly evaluate to an Error
+// object at runtime. Mirrors ESLint's `astUtils.couldBeError`, adapted to the
+// tsgo AST where AssignmentExpression / LogicalExpression / SequenceExpression
+// are all flattened into BinaryExpression and ChainExpression has no analog.
+//
+// Only parentheses are unwrapped — TS-only assertion wrappers (`x as T`,
+// `<T>x`, `x satisfies T`, `x!`) are NOT unwrapped, because ESLint's
+// `astUtils.couldBeError` does not list them and falls through to `false`.
+// Verified against ESLint core run on a `.ts` file via `@typescript-eslint/parser`:
+// `throw foo as Error;` and `throw foo!;` are both reported as "object".
+//
+// Used by rules whose ESLint counterparts call `astUtils.couldBeError`:
+// `no-throw-literal`, `prefer-promise-reject-errors`, etc.
+func CouldBeError(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier,
+		ast.KindCallExpression,
+		ast.KindNewExpression,
+		ast.KindPropertyAccessExpression,
+		ast.KindElementAccessExpression,
+		ast.KindTaggedTemplateExpression,
+		ast.KindYieldExpression,
+		ast.KindAwaitExpression:
+		return true
+
+	case ast.KindBinaryExpression:
+		bin := node.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		// `a, b, c` parses left-associatively in tsgo, so the rightmost
+		// expression is `bin.Right` of the outer BinaryExpression.
+		case ast.KindCommaToken:
+			return CouldBeError(bin.Right)
+		// `a = b` / `a &&= b` evaluate to the right operand.
+		case ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
+			return CouldBeError(bin.Right)
+		// `a ||= b` / `a ??= b` evaluate to either `a` or `b`.
+		case ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
+			return CouldBeError(bin.Left) || CouldBeError(bin.Right)
+		// `a && b` short-circuits to a falsy `a` (cannot be Error) or to `b`.
+		case ast.KindAmpersandAmpersandToken:
+			return CouldBeError(bin.Right)
+		// `a || b` / `a ?? b` evaluate to either operand.
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return CouldBeError(bin.Left) || CouldBeError(bin.Right)
+		default:
+			// Arithmetic / bitwise / comparison / compound-assign other than
+			// `=`, `&&=`, `||=`, `??=`: result is a primitive (or throws).
+			return false
+		}
+
+	case ast.KindConditionalExpression:
+		ce := node.AsConditionalExpression()
+		if ce == nil {
+			return false
+		}
+		return CouldBeError(ce.WhenTrue) || CouldBeError(ce.WhenFalse)
+	}
+
+	return false
+}
+
+// IsUndefinedIdentifier reports whether the node, after unwrapping parens, is
+// the literal identifier `undefined`. Purely lexical — does not detect `void 0`,
+// `undefined as any`, or a shadowed `undefined` binding, matching ESLint's
+// `node.argument.name === "undefined"` check (which only sees an Identifier
+// after parens are dropped at parse time, not after TS assertions).
+func IsUndefinedIdentifier(node *ast.Node) bool {
+	node = ast.SkipParentheses(node)
+	return node != nil && ast.IsIdentifier(node) && node.AsIdentifier().Text == "undefined"
+}
+
 // isReExportSpecifier checks if an ExportSpecifier is part of a re-export
 // declaration (export { ... } from 'mod').
 func isReExportSpecifier(exportSpec *ast.Node) bool {

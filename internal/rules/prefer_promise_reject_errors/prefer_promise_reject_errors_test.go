@@ -54,12 +54,6 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 			{Code: `class C { #reject; foo() { Promise.#reject(5); } }`},
 			{Code: `class C { #error; foo() { Promise.reject(this.#error); } }`},
 
-			// ---- TypeScript-only syntax should be transparent to couldBeError ----
-			{Code: `Promise.reject(foo as Error)`},
-			{Code: `Promise.reject(<Error>foo)`},
-			{Code: `Promise.reject(foo!)`},
-			{Code: `Promise.reject(foo satisfies Error)`},
-
 			// ---- ESLint requires params[1].type === "Identifier"; non-plain
 			// second-parameter shapes are not analyzed.
 			{Code: `new Promise((resolve, reject = foo) => reject(5))`},
@@ -86,6 +80,35 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
+			// ---- TS assertion wrappers are NOT transparent in upstream ESLint ----
+			// Verified: ESLint core run on a `.ts` file via `@typescript-eslint/parser`
+			// reports each of these — TSAsExpression / TSTypeAssertion /
+			// TSNonNullExpression / TSSatisfiesExpression are absent from
+			// `astUtils.couldBeError` and fall through to its default branch.
+			{
+				Code: `Promise.reject(foo as Error)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "rejectAnError", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `Promise.reject(<Error>foo)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "rejectAnError", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `Promise.reject(foo!)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "rejectAnError", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `Promise.reject(foo satisfies Error)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "rejectAnError", Line: 1, Column: 1},
+				},
+			},
 			{
 				Code: `Promise.reject(5)`,
 				Errors: []rule_tester.InvalidTestCaseError{

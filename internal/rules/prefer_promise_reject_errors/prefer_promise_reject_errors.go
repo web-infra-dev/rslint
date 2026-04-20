@@ -33,62 +33,6 @@ func parseOptions(options any) Options {
 	return opts
 }
 
-// couldBeError mirrors ESLint's astUtils.couldBeError, adapted to the tsgo AST
-// where AssignmentExpression / LogicalExpression / SequenceExpression are all
-// flattened into BinaryExpression and ChainExpression has no analog.
-func couldBeError(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	node = ast.SkipOuterExpressions(node, skipTransparent)
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindIdentifier,
-		ast.KindCallExpression,
-		ast.KindNewExpression,
-		ast.KindPropertyAccessExpression,
-		ast.KindElementAccessExpression,
-		ast.KindTaggedTemplateExpression,
-		ast.KindYieldExpression,
-		ast.KindAwaitExpression:
-		return true
-	case ast.KindBinaryExpression:
-		bin := node.AsBinaryExpression()
-		if bin == nil || bin.OperatorToken == nil {
-			return false
-		}
-		switch bin.OperatorToken.Kind {
-		case ast.KindCommaToken:
-			return couldBeError(bin.Right)
-		case ast.KindEqualsToken, ast.KindAmpersandAmpersandEqualsToken:
-			return couldBeError(bin.Right)
-		case ast.KindBarBarEqualsToken, ast.KindQuestionQuestionEqualsToken:
-			return couldBeError(bin.Left) || couldBeError(bin.Right)
-		case ast.KindAmpersandAmpersandToken:
-			return couldBeError(bin.Right)
-		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
-			return couldBeError(bin.Left) || couldBeError(bin.Right)
-		default:
-			return false
-		}
-	case ast.KindConditionalExpression:
-		ce := node.AsConditionalExpression()
-		if ce == nil {
-			return false
-		}
-		return couldBeError(ce.WhenTrue) || couldBeError(ce.WhenFalse)
-	default:
-		return false
-	}
-}
-
-func isUndefinedIdentifier(node *ast.Node) bool {
-	node = ast.SkipOuterExpressions(node, skipTransparent)
-	return node != nil && ast.IsIdentifier(node) && node.AsIdentifier().Text == "undefined"
-}
-
 func checkRejectCall(ctx rule.RuleContext, callExpression *ast.Node, allowEmptyReject bool) {
 	args := callExpression.Arguments()
 	if len(args) == 0 {
@@ -99,7 +43,7 @@ func checkRejectCall(ctx rule.RuleContext, callExpression *ast.Node, allowEmptyR
 		return
 	}
 	first := args[0]
-	if !couldBeError(first) || isUndefinedIdentifier(first) {
+	if !utils.CouldBeError(first) || utils.IsUndefinedIdentifier(first) {
 		ctx.ReportNode(callExpression, buildRejectAnErrorMessage())
 	}
 }

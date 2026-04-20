@@ -198,6 +198,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
+	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
@@ -665,6 +666,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
 	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
+	GlobalRuleRegistry.Register("no-throw-literal", no_throw_literal.NoThrowLiteralRule)
 	GlobalRuleRegistry.Register("no-useless-call", no_useless_call.NoUselessCallRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
 	GlobalRuleRegistry.Register("no-useless-rename", no_useless_rename.NoUselessRenameRule)
