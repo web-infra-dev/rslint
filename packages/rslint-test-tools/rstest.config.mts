@@ -92,6 +92,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-max-props-per-line.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-bind.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-comment-textnodes.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-duplicate-props.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
