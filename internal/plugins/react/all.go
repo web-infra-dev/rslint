@@ -13,6 +13,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
@@ -38,6 +39,7 @@ func GetAllRules() []rule.Rule {
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
+		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
 		no_is_mounted.NoIsMountedRule,
 		no_string_refs.NoStringRefsRule,
