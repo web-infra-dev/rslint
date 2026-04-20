@@ -214,3 +214,12 @@ xtest
 πfoo
 Дelta
 дelta
+extglob
+noglobstar
+lookarounds
+testcomponent
+Nent
+Éurströmming
+Søknad
+codepoint
+misalign
