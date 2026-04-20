@@ -1,0 +1,3990 @@
+// Rstest Snapshot v1
+
+exports[`no-implied-eval > invalid 1`] = `
+{
+  "code": "setTimeout("x = 1;");",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 2`] = `
+{
+  "code": "setTimeout("x = 1;", 100);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 3`] = `
+{
+  "code": "setInterval("x = 1;");",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 4`] = `
+{
+  "code": "execScript("x = 1;");",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 5`] = `
+{
+  "code": "const s = 'x=1'; setTimeout(s, 100);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 6`] = `
+{
+  "code": "setTimeout(String('x=1'), 100);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 7`] = `
+{
+  "code": "window.setTimeout('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 8`] = `
+{
+  "code": "window.setInterval('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 9`] = `
+{
+  "code": "window.execScript('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 10`] = `
+{
+  "code": "window['setTimeout']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 11`] = `
+{
+  "code": "window['setInterval']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 12`] = `
+{
+  "code": "window[\`setInterval\`]("foo")",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 13`] = `
+{
+  "code": "window['execScript']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 14`] = `
+{
+  "code": "window[\`execScript\`]("foo")",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 15`] = `
+{
+  "code": "window.window['setInterval']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 16`] = `
+{
+  "code": "window.window['execScript']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 17`] = `
+{
+  "code": "global.setTimeout('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 18`] = `
+{
+  "code": "global.setInterval('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 19`] = `
+{
+  "code": "global.execScript('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 20`] = `
+{
+  "code": "global['setTimeout']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 21`] = `
+{
+  "code": "global['setInterval']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 22`] = `
+{
+  "code": "global[\`setInterval\`]("foo")",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 23`] = `
+{
+  "code": "global['execScript']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 24`] = `
+{
+  "code": "global[\`execScript\`]("foo")",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 25`] = `
+{
+  "code": "global.global['setInterval']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 26`] = `
+{
+  "code": "global.global['execScript']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 27`] = `
+{
+  "code": "globalThis.setTimeout('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 28`] = `
+{
+  "code": "globalThis.setInterval('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 29`] = `
+{
+  "code": "globalThis.execScript('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 30`] = `
+{
+  "code": "setTimeout(\`foo\${bar}\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 31`] = `
+{
+  "code": "window.setTimeout(\`foo\${bar}\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 32`] = `
+{
+  "code": "window.window.setTimeout(\`foo\${bar}\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 33`] = `
+{
+  "code": "global.global.setTimeout(\`foo\${bar}\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 34`] = `
+{
+  "code": "setTimeout('foo' + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 35`] = `
+{
+  "code": "setTimeout(foo + 'bar')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 36`] = `
+{
+  "code": "setTimeout(\`foo\` + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 37`] = `
+{
+  "code": "setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 38`] = `
+{
+  "code": "window.setTimeout('foo' + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 39`] = `
+{
+  "code": "window.setTimeout(foo + 'bar')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 40`] = `
+{
+  "code": "window.setTimeout(\`foo\` + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 41`] = `
+{
+  "code": "window.setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 42`] = `
+{
+  "code": "window.window.setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 43`] = `
+{
+  "code": "global.setTimeout('foo' + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 44`] = `
+{
+  "code": "global.setTimeout(foo + 'bar')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 45`] = `
+{
+  "code": "global.setTimeout(\`foo\` + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 46`] = `
+{
+  "code": "global.setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 47`] = `
+{
+  "code": "global.global.setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 48`] = `
+{
+  "code": "globalThis.setTimeout('foo' + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 49`] = `
+{
+  "code": "setTimeout('foo' + (function() {
+   setTimeout(helper);
+   execScript('str');
+   return 'bar';
+})())",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 50`] = `
+{
+  "code": "window.setTimeout('foo' + (function() {
+   setTimeout(helper);
+   window.execScript('str');
+   return 'bar';
+})())",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 51`] = `
+{
+  "code": "global.setTimeout('foo' + (function() {
+   setTimeout(helper);
+   global.execScript('str');
+   return 'bar';
+})())",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 52`] = `
+{
+  "code": "window?.setTimeout('code', 0)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 53`] = `
+{
+  "code": "(window?.setTimeout)('code', 0)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 54`] = `
+{
+  "code": "window?.execScript('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 55`] = `
+{
+  "code": "(window?.execScript)('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 56`] = `
+{
+  "code": "self.setTimeout('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 57`] = `
+{
+  "code": "self.setInterval('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 58`] = `
+{
+  "code": "self.execScript('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 59`] = `
+{
+  "code": "self['setTimeout']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 60`] = `
+{
+  "code": "self['setInterval']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 61`] = `
+{
+  "code": "self[\`setInterval\`]("foo")",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 62`] = `
+{
+  "code": "self['execScript']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 63`] = `
+{
+  "code": "self[\`execScript\`]("foo")",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 64`] = `
+{
+  "code": "self.self['setInterval']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 65`] = `
+{
+  "code": "self.self['execScript']('foo')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 66`] = `
+{
+  "code": "self.setTimeout(\`foo\${bar}\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 67`] = `
+{
+  "code": "self.self.setTimeout(\`foo\${bar}\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 68`] = `
+{
+  "code": "self.setTimeout('foo' + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 69`] = `
+{
+  "code": "self.setTimeout(foo + 'bar')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 70`] = `
+{
+  "code": "self.setTimeout(\`foo\` + bar)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 71`] = `
+{
+  "code": "self.setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 72`] = `
+{
+  "code": "self.self.setTimeout(1 + ';' + 1)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 73`] = `
+{
+  "code": "self?.setTimeout('code', 0)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 74`] = `
+{
+  "code": "(self?.setTimeout)('code', 0)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 75`] = `
+{
+  "code": "self?.execScript('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 76`] = `
+{
+  "code": "(self?.execScript)('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 77`] = `
+{
+  "code": "(setTimeout)('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 78`] = `
+{
+  "code": "((setTimeout))('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 79`] = `
+{
+  "code": "(window).setTimeout('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 80`] = `
+{
+  "code": "setTimeout(('code'))",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 81`] = `
+{
+  "code": "setTimeout(\`code\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 82`] = `
+{
+  "code": "window.setTimeout(\`code\`)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 83`] = `
+{
+  "code": "setTimeout?.('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 84`] = `
+{
+  "code": "execScript?.('code')",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 85`] = `
+{
+  "code": "setTimeout('code' as any)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 86`] = `
+{
+  "code": "setTimeout('code'!)",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 87`] = `
+{
+  "code": "class A { x = setTimeout('code'); }",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 88`] = `
+{
+  "code": "class A { static { window.setTimeout('code'); } }",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 89`] = `
+{
+  "code": "(function() { setTimeout('code'); })()",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 90`] = `
+{
+  "code": "setTimeout('a');
+setInterval('b');
+execScript('c');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Do not use execScript().",
+      "messageId": "execScript",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 91`] = `
+{
+  "code": "const a = 'x'; const b = 'y'; setTimeout(a + b);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 92`] = `
+{
+  "code": "const a = 1; const b = 'y'; setTimeout(a + b);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 93`] = `
+{
+  "code": "const a = 'x'; const b = 'y'; const c = a + b; setTimeout(c);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 94`] = `
+{
+  "code": "const a = 'x'; const b = a; setTimeout(b);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 95`] = `
+{
+  "code": "let s = 'x'; setTimeout(s);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 96`] = `
+{
+  "code": "var s = 'x'; setTimeout(s);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 97`] = `
+{
+  "code": "setTimeout(true ? 'x' : 'y');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 98`] = `
+{
+  "code": "setTimeout(false ? 1 : 'y');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 99`] = `
+{
+  "code": "const flag = true; setTimeout(flag ? 'x' : 'y');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 100`] = `
+{
+  "code": "setTimeout('a' || 'b');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 101`] = `
+{
+  "code": "setTimeout('' || 'fallback');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 102`] = `
+{
+  "code": "setTimeout('a' && 'b');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 103`] = `
+{
+  "code": "setTimeout(null ?? 'x');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 104`] = `
+{
+  "code": "setTimeout(undefined ?? 'x');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 105`] = `
+{
+  "code": "setTimeout('a' ?? 'b');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 106`] = `
+{
+  "code": "setTimeout(typeof 'x');",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 107`] = `
+{
+  "code": "const n = 1; setTimeout(typeof n);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 108`] = `
+{
+  "code": "setTimeout(String(5));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 109`] = `
+{
+  "code": "setTimeout(String(undefined));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 110`] = `
+{
+  "code": "setTimeout(String(null));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 111`] = `
+{
+  "code": "setTimeout(String(true));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 112`] = `
+{
+  "code": "setTimeout(String());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 113`] = `
+{
+  "code": "setTimeout(String.raw\`x\`);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 114`] = `
+{
+  "code": "const y = 'z'; setTimeout(String.raw\`x\${y}\`);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 115`] = `
+{
+  "code": "const b = 'z'; setTimeout((true ? 'x' : 'y') + b);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 116`] = `
+{
+  "code": "const b = 'z'; setTimeout((true ? ('a' || 'c') : 'y') + b);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 117`] = `
+{
+  "code": "const o = { x: 'y' }; setTimeout(o.x);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 118`] = `
+{
+  "code": "const o = { x: 'y' }; setTimeout(o['x']);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 119`] = `
+{
+  "code": "let o = { x: 'y' }; setTimeout(o.x);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 120`] = `
+{
+  "code": "const o = { a: { b: { c: 'y' } } }; setTimeout(o.a.b.c);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 121`] = `
+{
+  "code": "setTimeout({ ['x']: 'y' }.x);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 122`] = `
+{
+  "code": "const x = 'y'; setTimeout({ x }.x);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 123`] = `
+{
+  "code": "setTimeout('x'.toString());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 124`] = `
+{
+  "code": "setTimeout('x'.toUpperCase());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 125`] = `
+{
+  "code": "setTimeout('x'.toLowerCase());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 126`] = `
+{
+  "code": "setTimeout(' x'.trim());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 127`] = `
+{
+  "code": "setTimeout(' x'.trimStart());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 128`] = `
+{
+  "code": "setTimeout('x '.trimEnd());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 129`] = `
+{
+  "code": "setTimeout('x'.concat('y'));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 130`] = `
+{
+  "code": "setTimeout('x'.slice(0));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 131`] = `
+{
+  "code": "setTimeout('xy'.substring(0, 1));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 132`] = `
+{
+  "code": "setTimeout('x'.padStart(3));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 133`] = `
+{
+  "code": "setTimeout('x'.padEnd(3));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 134`] = `
+{
+  "code": "setTimeout('x'.charAt(0));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 135`] = `
+{
+  "code": "setTimeout('x'.at(0));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 136`] = `
+{
+  "code": "setTimeout('x'.normalize());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 137`] = `
+{
+  "code": "setTimeout('x'.toUpperCase().toLowerCase());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 138`] = `
+{
+  "code": "const s = 'x'; setTimeout(s.toUpperCase());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 139`] = `
+{
+  "code": "const o = { x: 'y' }; setTimeout(o.x.toUpperCase());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 140`] = `
+{
+  "code": "setTimeout((1).toString());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 141`] = `
+{
+  "code": "setTimeout((1).toFixed(2));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 142`] = `
+{
+  "code": "setTimeout((1).toExponential());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 143`] = `
+{
+  "code": "setTimeout((1).toPrecision(3));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 144`] = `
+{
+  "code": "setTimeout([1, 2].toString());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 145`] = `
+{
+  "code": "setTimeout([].toString());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 146`] = `
+{
+  "code": "setTimeout([1, 2].join(','));",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 147`] = `
+{
+  "code": "setTimeout([1, 2].slice(0).toString());",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 148`] = `
+{
+  "code": "const o = { x: 'y' }; setTimeout(o.x!);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 149`] = `
+{
+  "code": "const key = 'x'; setTimeout({ [key]: 'y' }.x);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 150`] = `
+{
+  "code": "const key = 'x'; const o = { x: 'y' }; setTimeout(o[key]);",
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function instead of a string.",
+      "messageId": "impliedEval",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
