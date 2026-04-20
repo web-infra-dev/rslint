@@ -288,6 +288,7 @@ export default defineConfig({
     './tests/eslint/rules/no-bitwise.test.ts',
     './tests/eslint/rules/max-lines.test.ts',
     './tests/eslint/rules/no-label-var.test.ts',
+    './tests/eslint/rules/no-shadow.test.ts',
     './tests/eslint/rules/no-labels.test.ts',
     './tests/eslint/rules/no-lone-blocks.test.ts',
     './tests/eslint/rules/no-multi-str.test.ts',
