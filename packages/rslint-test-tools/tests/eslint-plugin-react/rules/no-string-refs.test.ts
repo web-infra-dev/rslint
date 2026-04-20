@@ -44,6 +44,13 @@ ruleTester.run('no-string-refs', {} as never, {
     { code: `<div ref />;` },
     // An identifier in a ref is fine (it's a variable, not a string).
     { code: `const myRef = () => {}; <div ref={myRef} />;` },
+    // TypeScript `as` / `!` / `satisfies` wrappers on the expression mean
+    // `expression.type !== 'Literal'` in upstream ESTree, so these are NOT
+    // reported. Locks alignment with eslint-plugin-react.
+    { code: `<div ref={'hello' as string} />;` },
+    { code: `<div ref={'hello'!} />;` },
+    { code: `<div ref={('hello' as string)} />;` },
+    { code: `<div ref={'hello' satisfies string} />;` },
   ],
   invalid: [
     // String literal directly.
@@ -138,17 +145,22 @@ ruleTester.run('no-string-refs', {} as never, {
         { message: 'Using string literals in ref attributes is deprecated.' },
       ],
     },
-    // TypeScript `as` cast must not hide the string literal.
-    {
-      code: `<div ref={'hello' as string} />;`,
-      errors: [
-        { message: 'Using string literals in ref attributes is deprecated.' },
-      ],
-    },
     // Paren-wrapped template literal with noTemplateLiterals: true.
     {
       code: `<div ref={(\`hello\`)} />;`,
       options: [{ noTemplateLiterals: true }],
+      errors: [
+        { message: 'Using string literals in ref attributes is deprecated.' },
+      ],
+    },
+    // Paren-wrapped object literal argument to createReactClass — ESTree
+    // flattens parens, tsgo preserves them. Regression case for GH-PR comment.
+    {
+      code: `
+        var Hello = createReactClass(({
+          render: function() { return <div ref="x" />; }
+        }));
+      `,
       errors: [
         { message: 'Using string literals in ref attributes is deprecated.' },
       ],

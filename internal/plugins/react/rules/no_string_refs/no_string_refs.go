@@ -71,11 +71,15 @@ var NoStringRefsRule = rule.Rule{
 					if expr == nil {
 						return
 					}
-					// Unwrap parens / `as` so `ref={('x')}` and `ref={'x' as string}` report.
+					// Unwrap parens so `ref={('x')}` reports (ESTree flattens
+					// parens; tsgo preserves them). We deliberately do NOT
+					// unwrap TypeScript wrappers such as AsExpression /
+					// NonNullExpression / SatisfiesExpression: eslint-plugin-react
+					// (under @typescript-eslint/parser) only matches when
+					// `expression.type === 'Literal'`, and those wrappers make
+					// the outer type something else, so upstream does not report
+					// `ref={'x' as string}` / `ref={'x'!}`. We align with that.
 					expr = ast.SkipParentheses(expr)
-					for expr.Kind == ast.KindAsExpression {
-						expr = ast.SkipParentheses(expr.AsAsExpression().Expression)
-					}
 					switch expr.Kind {
 					case ast.KindStringLiteral:
 						reportStringRef(node)

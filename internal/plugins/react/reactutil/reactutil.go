@@ -245,12 +245,21 @@ func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
 			if !seenEnclosingFunction {
 				continue
 			}
-			parent := p.Parent
+			// The ObjectLiteralExpression may be wrapped in one or more
+			// ParenthesizedExpressions before reaching the CallExpression
+			// (ESTree would flatten these; tsgo preserves them), e.g.
+			// `createReactClass(({...}))`. Walk up through paren wrappers
+			// to find the actual argument position.
+			arg := p
+			for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
+				arg = arg.Parent
+			}
+			parent := arg.Parent
 			if parent == nil || parent.Kind != ast.KindCallExpression {
 				continue
 			}
 			call := parent.AsCallExpression()
-			if !isObjectArgumentOf(call, p) {
+			if !isObjectArgumentOf(call, arg) {
 				continue
 			}
 			if IsCreateClassCall(call, pragma, createClass) {

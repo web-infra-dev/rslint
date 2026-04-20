@@ -133,6 +133,69 @@ var Hello = React.createClass({
 		// Non-string template expression with identifier — not flagged without
 		// noTemplateLiterals.
 		{Code: "<div ref={`hello${x}`} />;", Tsx: true},
+		// TypeScript `as` / `!` / `satisfies` wrap the literal in a non-Literal
+		// node; eslint-plugin-react checks `expression.type === 'Literal'` and
+		// therefore does NOT report these. Align with upstream.
+		{Code: `<div ref={'hello' as string} />;`, Tsx: true},
+		{Code: `<div ref={'hello'!} />;`, Tsx: true},
+		{Code: `<div ref={('hello' as string)} />;`, Tsx: true},
+		{Code: `<div ref={'hello' satisfies string} />;`, Tsx: true},
+		// Similarly, `this` wrapped in `as` / `!` means `node.object.type !==
+		// 'ThisExpression'` upstream, so `this.refs` access through the wrapper
+		// is NOT reported.
+		{
+			Code: `
+var Hello = createReactClass({
+  componentDidMount: function() { var c = (this as any).refs.foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+		},
+		{
+			Code: `
+var Hello = createReactClass({
+  componentDidMount: function() { var c = this!.refs.foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+		},
+		// Computed member access `this['refs']` has no property name (upstream
+		// checks `property.name`), so it is NOT reported.
+		{
+			Code: `
+var Hello = createReactClass({
+  componentDidMount: function() { var c = this['refs'].foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+		},
+		// extends via computed property `React['Component']` — upstream
+		// requires `superClass.property.name`, which is undefined for
+		// computed access, so this is NOT a React component.
+		{
+			Code: `
+class Hello extends React['Component'] {
+  componentDidMount() { var c = this.refs.foo; }
+}
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+		},
+		// Computed createClass access `React['createClass']({...})` — upstream
+		// requires `callee.property.name`, which is undefined here, so this
+		// is NOT an ES5 React component call.
+		{
+			Code: `
+var Hello = React['createClass']({
+  componentDidMount: function() { var c = this.refs.foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0", "createClass": "createClass"}},
+		},
 		// Nearest-class gate: a non-React inner class nested inside a React
 		// component should NOT make its methods "inside a component". The
 		// ES6 path is decided by the nearest enclosing class only.
@@ -401,21 +464,128 @@ var Hello = createReactClass({
 				{MessageId: "stringInRefDeprecated", Line: 3, Column: 36},
 			},
 		},
-		// `ref={'x' as string}` — the TS `as` cast must not hide the literal.
+		// Paren-wrapped object literal argument to createReactClass —
+		// ESTree would flatten the parens; tsgo preserves them. Regression
+		// case for GH-PR-comment #1.
 		{
 			Code: `
-var Hello = createReactClass({
-  render: function() { return <div ref={'hello' as string} />; }
-});
+var Hello = createReactClass(({
+  componentDidMount: function() { var c = this.refs.foo; }
+}));
 `,
-			Tsx: true,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 43},
+			},
+		},
+		// Double-paren-wrapped object literal argument.
+		{
+			Code: `
+var Hello = createReactClass(((({
+  render: function() { return <div ref="x" />; }
+}))));
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "stringInRefDeprecated", Line: 3, Column: 36},
 			},
 		},
-		// Pragma is not `React` by default → `Preact.Component` is not a
-		// component, so `this.refs` inside it should NOT fire. (Locks the
-		// pragma gate — compare with the matching invalid case above.)
-		// The symmetric invalid version uses `pragma=Preact`.
+		// ES6 `extends` with multiple parens around the whole heritage expr.
+		{
+			Code: `
+class Hello extends ((React.Component)) {
+  componentDidMount() { var c = this.refs.foo; }
+}
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 33},
+			},
+		},
+		// ES6 class with generic type argument in extends clause.
+		{
+			Code: `
+class Hello extends React.Component<{}> {
+  componentDidMount() { var c = this.refs.foo; }
+}
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 33},
+			},
+		},
+		// Optional-chain `this?.refs` — tsgo uses a flag, not a ChainExpression
+		// wrapper; ESLint's MemberExpression listener fires on the inner node.
+		{
+			Code: `
+var Hello = createReactClass({
+  componentDidMount: function() { var c = this?.refs.foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 43},
+			},
+		},
+		// ES5 method shorthand (`{ foo() {} }` rather than `{ foo: function(){} }`).
+		{
+			Code: `
+var Hello = createReactClass({
+  componentDidMount() { var c = this.refs.foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 33},
+			},
+		},
+		// ES5 getter — GetAccessorDeclaration is also a function-like node.
+		{
+			Code: `
+var Hello = createReactClass({
+  get foo() { return this.refs.x; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 22},
+			},
+		},
+		// ES5 computed key — still a method on the config object.
+		{
+			Code: `
+var Hello = createReactClass({
+  ['compDid' + 'Mount']: function() { var c = this.refs.foo; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 3, Column: 47},
+			},
+		},
+		// ES5 object with object-spread — this.refs inside a later method
+		// still counts as inside the component.
+		{
+			Code: `
+var base = {};
+var Hello = createReactClass({
+  ...base,
+  render: function() { var c = this.refs.foo; return null; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 5, Column: 32},
+			},
+		},
 	})
 }
