@@ -1,6 +1,6 @@
 # react/require-render-return
 
-Enforce ES5 or ES6 class for returning value in render function.
+Enforce that the render method of an ES5 or ES6 React component returns a value.
 
 When writing the `render` method in a component it is easy to forget to return
 the JSX content. This rule will warn if the `return` statement is missing.
