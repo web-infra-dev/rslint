@@ -22,6 +22,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
@@ -56,6 +57,7 @@ func GetAllRules() []rule.Rule {
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
 		no_string_refs.NoStringRefsRule,
+		no_typos.NoTyposRule,
 		no_unescaped_entities.NoUnescapedEntitiesRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		require_render_return.RequireRenderReturnRule,
