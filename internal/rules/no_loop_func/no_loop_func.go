@@ -19,6 +19,12 @@ func buildUnsafeRefsMessage(varNames string) rule.RuleMessage {
 type runState struct {
 	ctx          rule.RuleContext
 	skippedIIFEs map[*ast.Node]bool
+	// refIndex buckets every value-position identifier (and destructuring
+	// shorthand write target) in the source file by resolved symbol. Populated
+	// lazily on the first forEachReference call and reused for all subsequent
+	// lookups — amortizes what would otherwise be a full-file walk per symbol
+	// into a single pass per rule invocation.
+	refIndex map[*ast.Symbol][]*ast.Node
 }
 
 // getContainingLoopNode walks up from `node` and returns the nearest enclosing
@@ -457,43 +463,51 @@ func getDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
 	return nil
 }
 
-// forEachReference walks the source file and invokes `cb` for every identifier
-// node whose resolved symbol is `sym`. Walk stops early when `cb` returns true.
-// Shorthand property assignments inside destructuring patterns
-// (e.g. `({a} = obj)`) need special handling: the TypeChecker resolves the
-// key identifier to the property symbol, not the written-to variable symbol.
-func (s *runState) forEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
+// buildRefIndex performs a single pass over the source file and groups every
+// value-position identifier by its resolved symbol. ShorthandPropertyAssignment
+// inside destructuring needs special handling because TypeChecker resolves the
+// shorthand key to the property symbol, not the written-to variable symbol —
+// we store the name identifier keyed by the variable symbol instead.
+func (s *runState) buildRefIndex() {
+	if s.refIndex != nil {
+		return
+	}
+	s.refIndex = map[*ast.Symbol][]*ast.Node{}
 	tc := s.ctx.TypeChecker
-	var walk func(n *ast.Node) bool
-	walk = func(n *ast.Node) bool {
+	var walk func(n *ast.Node)
+	walk = func(n *ast.Node) {
 		if n == nil {
-			return false
+			return
 		}
 		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			if tc.GetSymbolAtLocation(n) == sym {
-				if cb(n) {
-					return true
-				}
+			if sym := tc.GetSymbolAtLocation(n); sym != nil {
+				s.refIndex[sym] = append(s.refIndex[sym], n)
 			}
 		} else if n.Kind == ast.KindShorthandPropertyAssignment && utils.IsInDestructuringAssignment(n) {
-			if tc.GetShorthandAssignmentValueSymbol(n) == sym {
-				nameNode := n.AsShorthandPropertyAssignment().Name()
-				if nameNode != nil && cb(nameNode) {
-					return true
+			if sym := tc.GetShorthandAssignmentValueSymbol(n); sym != nil {
+				if nameNode := n.AsShorthandPropertyAssignment().Name(); nameNode != nil {
+					s.refIndex[sym] = append(s.refIndex[sym], nameNode)
 				}
 			}
 		}
-		stop := false
 		n.ForEachChild(func(child *ast.Node) bool {
-			if walk(child) {
-				stop = true
-				return true
-			}
+			walk(child)
 			return false
 		})
-		return stop
 	}
 	walk(s.ctx.SourceFile.AsNode())
+}
+
+// forEachReference invokes `cb` for every identifier node resolving to `sym`,
+// in source order. Returns early when `cb` returns true. The underlying index
+// is built on first use via buildRefIndex so subsequent calls are O(refs).
+func (s *runState) forEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
+	s.buildRefIndex()
+	for _, node := range s.refIndex[sym] {
+		if cb(node) {
+			return
+		}
+	}
 }
 
 // checkForLoops processes a function-like node: if it is inside a loop and
