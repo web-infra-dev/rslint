@@ -77,6 +77,29 @@ func TestPreferPromiseRejectErrorsRule(t *testing.T) {
 			// ---- Reject method-like access (.call / .bind / .apply) is treated
 			// as a different operation by ESLint and is not flagged.
 			{Code: `new Promise((resolve, reject) => reject.call(null, new Error()))`},
+
+			// ---- TS assertion wrappers around the Promise constructor / executor
+			// / reject call are NOT recognized as "Promise constructor pattern" by
+			// upstream ESLint, because its identity / function-type checks all
+			// happen against the raw AST node. Verified empirically against
+			// ESLint core + @typescript-eslint/parser.
+			// (a) callee wrapped: not recognized as `new Promise(...)`.
+			{Code: `new (Promise as any)((resolve, reject) => reject(5))`},
+			{Code: `new (Promise!)((resolve, reject) => reject(5))`},
+			{Code: `new (<any>Promise)((resolve, reject) => reject(5))`},
+			// (b) executor wrapped: ESLint requires executor.type to be exactly
+			// FunctionExpression / ArrowFunctionExpression — assertion-wrapped fails.
+			{Code: `new Promise(((resolve: any, reject: any) => reject(5)) as any)`},
+			{Code: `new Promise(((resolve: any, reject: any) => reject(5))!)`},
+			// (c) reject call wrapped: callee identity check sees TSAsExpression /
+			// TSNonNullExpression instead of Identifier "reject".
+			{Code: `new Promise((resolve, reject) => (reject as any)(5))`},
+			{Code: `new Promise((resolve, reject) => reject!(5))`},
+			// (d) Member-access on `(Promise as any)` is not Promise.reject either.
+			{Code: `(Promise as any).reject(5)`},
+			// Parens-only controls: parens stay transparent, executor still analyzed.
+			{Code: `new Promise(((resolve, reject) => reject(new Error())))`},
+			{Code: `new Promise((resolve, reject) => (reject)(new Error()))`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{

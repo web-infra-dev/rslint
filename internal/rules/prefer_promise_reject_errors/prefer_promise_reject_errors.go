@@ -6,11 +6,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// skipTransparent unwraps parentheses, type assertions, non-null assertions,
-// and `satisfies` so that TypeScript-only syntax does not perturb the
-// AST-based shape checks ESLint performs at the source level.
-const skipTransparent = ast.OEKParentheses | ast.OEKAssertions
-
 func buildRejectAnErrorMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "rejectAnError",
@@ -59,10 +54,13 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 				}
 			},
 			ast.KindNewExpression: func(node *ast.Node) {
-				// ESTree drops parentheses, so ESLint's `node.callee.type === "Identifier"`
-				// already succeeds for `new (Promise)(...)`. tsgo retains parens (and TS
-				// assertions), so unwrap them here to keep behavior aligned.
-				callee := ast.SkipOuterExpressions(node.AsNewExpression().Expression, skipTransparent)
+				// ESTree drops parentheses at parse time, so ESLint's
+				// `node.callee.type === "Identifier"` succeeds for `new (Promise)(...)`.
+				// tsgo retains the ParenthesizedExpression wrapper — unwrap it here.
+				// TS assertion wrappers (`(Promise as any)`, `Promise!`, `<any>Promise`)
+				// are NOT unwrapped: ESLint's identifier check fails on them, so
+				// `new (Promise as any)(...)` is not recognized as a Promise constructor.
+				callee := ast.SkipParentheses(node.AsNewExpression().Expression)
 				if callee == nil || !ast.IsIdentifier(callee) || callee.AsIdentifier().Text != "Promise" {
 					return
 				}
@@ -70,7 +68,10 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 				if len(args) == 0 {
 					return
 				}
-				executor := ast.SkipOuterExpressions(args[0], skipTransparent)
+				// Same reasoning as the callee above: ESLint requires
+				// `executor.type === "FunctionExpression" || "ArrowFunctionExpression"`
+				// at the AST level — assertion-wrapped executors fail that check.
+				executor := ast.SkipParentheses(args[0])
 				if executor == nil || !ast.IsFunctionExpressionOrArrowFunction(executor) {
 					return
 				}
@@ -115,7 +116,11 @@ func findRejectReferences(ctx rule.RuleContext, executor *ast.Node, name string,
 			return
 		}
 		if ast.IsCallExpression(n) {
-			callee := ast.SkipOuterExpressions(n.AsCallExpression().Expression, skipTransparent)
+			// Parens are transparent in ESLint AST; TS assertions are not —
+			// `(reject as any)(5)` and `reject!(5)` are NOT flagged by upstream
+			// because their callee is TSAsExpression / TSNonNullExpression, not
+			// Identifier "reject".
+			callee := ast.SkipParentheses(n.AsCallExpression().Expression)
 			if callee != nil && ast.IsIdentifier(callee) && callee.AsIdentifier().Text == name {
 				if isExecutorParameterReference(ctx, callee, executor, name) {
 					visit(n)
