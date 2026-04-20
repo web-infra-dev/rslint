@@ -158,6 +158,7 @@ func TestHasSameTokens(t *testing.T) {
 		{"empty array space-padded", `[] === [ ]`, true},
 		{"empty array with comment", "[] === [/*c*/]", true},
 		{"empty array multiline", "[] === [\n]", true},
+		{"empty array differ arity", `[] === [a]`, false},
 		{"empty object space-padded", `({}) === ({ })`, true},
 		{"empty object with comment", "({}) === ({/*c*/})", true},
 
