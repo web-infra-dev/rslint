@@ -103,6 +103,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-children-prop.test.ts',
     './tests/eslint-plugin-react/rules/no-danger.test.ts',
     './tests/eslint-plugin-react/rules/no-danger-with-children.test.ts',
+    './tests/eslint-plugin-react/rules/no-deprecated.test.ts',
     './tests/eslint-plugin-react/rules/no-did-update-set-state.test.ts',
     './tests/eslint-plugin-react/rules/no-direct-mutation-state.test.ts',
     './tests/eslint-plugin-react/rules/no-find-dom-node.test.ts',

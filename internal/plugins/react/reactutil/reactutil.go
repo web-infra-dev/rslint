@@ -350,6 +350,35 @@ func isObjectArgumentOf(call *ast.CallExpression, obj *ast.Node) bool {
 	return false
 }
 
+// IsCreateReactClassObjectArg reports whether `obj` (an ObjectLiteralExpression)
+// is the FIRST argument of a `<createClass>(...)` / `<pragma>.<createClass>(...)`
+// call. Parens wrapping `obj` before it reaches the call argument position are
+// transparent — tsgo preserves them while ESTree flattens — so
+// `createReactClass(({...}))` still matches.
+//
+// Pass the empty string for pragma / createClass to fall back to
+// `DefaultReactPragma` / `DefaultReactCreateClass`. Returns false for any
+// non-ObjectLiteralExpression input, for objects in non-argument positions,
+// and for calls whose callee is not the configured createClass name.
+func IsCreateReactClassObjectArg(obj *ast.Node, pragma, createClass string) bool {
+	if obj == nil || obj.Kind != ast.KindObjectLiteralExpression {
+		return false
+	}
+	cur := obj
+	for cur.Parent != nil && cur.Parent.Kind == ast.KindParenthesizedExpression {
+		cur = cur.Parent
+	}
+	parent := cur.Parent
+	if parent == nil || parent.Kind != ast.KindCallExpression {
+		return false
+	}
+	call := parent.AsCallExpression()
+	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 || call.Arguments.Nodes[0] != cur {
+		return false
+	}
+	return IsCreateClassCall(call, pragma, createClass)
+}
+
 // GetEnclosingReactComponentOrStateless is GetEnclosingReactComponent extended
 // with eslint-plugin-react's `getParentStatelessComponent` fallback: when no
 // enclosing ES6 class / ES5 createReactClass component is found, the nearest
@@ -399,11 +428,13 @@ func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass s
 //
 //   - Wrapped in `<pragma>.memo(...)` / `<pragma>.forwardRef(...)` / bare
 //     `memo(...)` / bare `forwardRef(...)` — always a component.
+//
 //   - Allowed positions (VariableDeclarator, AssignmentExpression,
 //     PropertyAssignment, ReturnStatement, ExportAssignment, outer
 //     ArrowFunction body) gate everything else. A bare IIFE or any other
 //     CallExpression argument position is NOT allowed, matching upstream's
 //     `isInAllowedPositionForComponent` default-false branch.
+//
 //   - Within an allowed position, specific capitalization rules apply per
 //     upstream: VariableDeclarator/PropertyAssignment use the binding name;
 //     `Id = fn` assignments use the LHS Identifier; MemberExpression LHS

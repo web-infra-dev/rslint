@@ -462,7 +462,7 @@ func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
 		ast.KindObjectLiteralExpression: func(node *ast.Node) {
 			// Component defined via createReactClass({...}): inspect top-level
 			// properties for prop-declaration typos and lifecycle typos.
-			if !isCreateClassObjectArg(node, pragma, createClass) {
+			if !reactutil.IsCreateReactClassObjectArg(node, pragma, createClass) {
 				return
 			}
 			for _, prop := range node.AsObjectLiteralExpression().Properties.Nodes {
@@ -646,30 +646,6 @@ func enclosingClass(node *ast.Node) *ast.Node {
 		}
 	}
 	return nil
-}
-
-// isCreateClassObjectArg reports whether `obj` is the first argument of a
-// `<createClass>(...)` / `<pragma>.<createClass>(...)` call. ES5 component
-// detection hinges on this shape.
-func isCreateClassObjectArg(obj *ast.Node, pragma, createClass string) bool {
-	if obj == nil || obj.Kind != ast.KindObjectLiteralExpression {
-		return false
-	}
-	// Walk up through any parenthesized wrappers to find the call argument
-	// position — tsgo preserves parens that ESTree would flatten.
-	cur := obj
-	for cur.Parent != nil && cur.Parent.Kind == ast.KindParenthesizedExpression {
-		cur = cur.Parent
-	}
-	parent := cur.Parent
-	if parent == nil || parent.Kind != ast.KindCallExpression {
-		return false
-	}
-	call := parent.AsCallExpression()
-	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 || call.Arguments.Nodes[0] != cur {
-		return false
-	}
-	return reactutil.IsCreateClassCall(call, pragma, createClass)
 }
 
 // functionReturnsJSX reports whether the given function-like node contains a
