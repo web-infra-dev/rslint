@@ -485,54 +485,61 @@ func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 		return true
 	case ast.KindBinaryExpression:
 		bin := parent.AsBinaryExpression()
-		if bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken || bin.Right != fn {
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
+			// Named FE defers to its own Identifier (mirrors upstream's
+			// `if (node.id) return capitalized(node.id.name) ? node : undefined`).
+			if fn.Kind == ast.KindFunctionExpression {
+				name := fn.Name()
+				if name != nil && name.Kind == ast.KindIdentifier {
+					return isFirstLetterCapitalized(name.AsIdentifier().Text)
+				}
+			}
+			// Anonymous FE / Arrow: decide by LHS.
+			left := ast.SkipParentheses(bin.Left)
+			switch left.Kind {
+			case ast.KindIdentifier:
+				return isFirstLetterCapitalized(left.AsIdentifier().Text)
+			case ast.KindPropertyAccessExpression:
+				pa := left.AsPropertyAccessExpression()
+				obj := ast.SkipParentheses(pa.Expression)
+				name := pa.Name()
+				if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "module" &&
+					name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "exports" {
+					return true
+				}
+				if name != nil && name.Kind == ast.KindIdentifier {
+					return isFirstLetterCapitalized(name.AsIdentifier().Text)
+				}
+			}
 			return false
 		}
-		// Named FE defers to its own Identifier (mirrors upstream's
-		// `if (node.id) return capitalized(node.id.name) ? node : undefined`).
-		if fn.Kind == ast.KindFunctionExpression {
-			name := fn.Name()
-			if name != nil && name.Kind == ast.KindIdentifier {
-				return isFirstLetterCapitalized(name.AsIdentifier().Text)
-			}
-		}
-		// Anonymous FE / Arrow: decide by LHS.
-		left := ast.SkipParentheses(bin.Left)
-		switch left.Kind {
-		case ast.KindIdentifier:
-			return isFirstLetterCapitalized(left.AsIdentifier().Text)
-		case ast.KindPropertyAccessExpression:
-			pa := left.AsPropertyAccessExpression()
-			obj := ast.SkipParentheses(pa.Expression)
-			name := pa.Name()
-			if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "module" &&
-				name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "exports" {
-				return true
-			}
-			if name != nil && name.Kind == ast.KindIdentifier {
-				return isFirstLetterCapitalized(name.AsIdentifier().Text)
-			}
-		}
-		return false
+		// Non-assignment BinaryExpression (comma / etc.): fall through to the
+		// allowed-position fallback below. `isInAllowedPositionForComponent`
+		// already gated the comma-last position.
 	}
 
-	// ReturnStatement / outer-ArrowFunction body: no binding name available,
-	// fall back to node.id check (matches upstream's final `if (node.id)`).
+	// Allowed-position fallback (ReturnStatement, outer-ArrowFunction body,
+	// SequenceExpression-last operand, …). Upstream's `getStatelessComponent`
+	// returns the node here for anonymous FE / Arrow, and defers to the id
+	// check for a named FunctionExpression.
 	if fn.Kind == ast.KindFunctionExpression {
 		name := fn.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
 			return isFirstLetterCapitalized(name.AsIdentifier().Text)
 		}
 	}
-	return false
+	return true
 }
 
 // isInAllowedPositionForComponent mirrors eslint-plugin-react's
 // `utils.isInAllowedPositionForComponent`: only parent node kinds in the
 // allow-list may host a stateless functional component. Sequence expressions
-// (`a, b`) pass through when `fn` is the last operand.
+// (`a, b`) pass through when `fn` is the last operand. ParenthesizedExpression
+// wrappers (which ESTree flattens but tsgo preserves) are transparent so
+// `const Hello = (init(), arrow)` — whose comma Sequence sits inside parens —
+// still reaches the VariableDeclaration ancestor.
 func isInAllowedPositionForComponent(fn *ast.Node) bool {
-	parent := fn.Parent
+	parent := skipParenParents(fn)
 	if parent == nil {
 		return false
 	}
@@ -561,6 +568,16 @@ func isInAllowedPositionForComponent(fn *ast.Node) bool {
 		}
 	}
 	return false
+}
+
+// skipParenParents walks up through ParenthesizedExpression wrappers and
+// returns the first non-paren ancestor of `node`, or nil.
+func skipParenParents(node *ast.Node) *ast.Node {
+	p := node.Parent
+	for p != nil && p.Kind == ast.KindParenthesizedExpression {
+		p = p.Parent
+	}
+	return p
 }
 
 // isPragmaComponentWrapperCall reports whether `call` is a React

@@ -311,6 +311,67 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           return 42;
         };
       `, Tsx: true},
+
+		// ---- Edge: `delete this.state.x` — rule only fires on assignment /
+		// update expressions, not DeleteExpression (matches ESLint). ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            delete this.state.x;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: anonymous FE assigned to lowercase `obj.foo = ...` ----
+		{Code: `
+        obj.foo = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: returning an arrow (not JSX) — not a component ----
+		{Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return () => <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: assignment default in destructuring params (BinaryExpression
+		// shape is a BindingElement, not a real assignment) — not a mutation. ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount({ key = this.state.fallback } = {}) {
+            return key;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: `for (key in this.state) {...}` — reads, not a mutation ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            for (const k in this.state) { console.log(k); }
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: Inner component class's constructor mutation is exempt on
+		// Inner; outer Outer.foo() never sees the mutation on the walk path. ----
+		{Code: `
+        class Outer extends React.Component {
+          foo() {
+            class Inner extends React.Component {
+              constructor() {
+                super();
+                this.state = { inner: true };
+              }
+            }
+            return Inner;
+          }
+        }
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -1244,5 +1305,234 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 		// ---- Edge: lowercase-key with NO params — still excluded by the
 		// regular PropertyAssignment branch (lowercase key → not a component). ----
 		// Kept as a matching valid test above; not duplicated here.
+
+		// ---- Edge: 5-level deep chain `this.state.a.b.c.d = 1` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.a.b.c.d = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: prefix increment `++this.state.x` (mirror of prefix decrement) ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            ++this.state.counter;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 15},
+			},
+		},
+
+		// ---- Edge: postfix decrement `this.state.x--` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.counter--;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: bitwise compound assignment `|=` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.flags |= 0x1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: nullish coalescing assignment `??=` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.value ??= 0;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: exponentiation compound assignment `**=` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.power **= 2;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: chained assignment `this.state.a = this.state.b = 1` —
+		// two separate mutations, both should report. ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.a = this.state.b = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+				{MessageId: "noDirectMutation", Line: 4, Column: 28},
+			},
+		},
+
+		// ---- Edge: parenthesized `this` inside the chain: `(this).state.x = 1` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            (this).state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: mutation inside an arrow JSX-attribute callback ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          render() {
+            return <button onClick={() => { this.state.x = 1; }}/>;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 45},
+			},
+		},
+
+		// ---- Edge: mutation inside a template-literal expression position ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            tag` + "`${this.state.x = 1}`" + `;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 19},
+			},
+		},
+
+		// ---- Edge: JSX Fragment `<></>` as return — `isJSXOrNullExpression`
+		// must recognize KindJsxFragment. ----
+		{
+			Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return <></>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: named default-exported FD — `export default function Hello() {...}` ----
+		{
+			Code: `
+        export default function Hello() {
+          this.state.x = 1;
+          return <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: named `export const Hello = () => ...` ----
+		{
+			Code: `
+        export const Hello = () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: mutation in a stateless component nested inside another
+		// stateless component — the INNER one is the nearest component. ----
+		{
+			Code: `
+        function Outer() {
+          const Inner = () => {
+            this.state.x = 1;
+            return <span/>;
+          };
+          return <Inner/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: SequenceExpression-last stateless component —
+		// `const Hello = (init(), () => <div/>)` forms a SequenceExpression,
+		// the last operand is the arrow; allowed-position must pass through. ----
+		{
+			Code: `
+        const Hello = (init(), (props) => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
 	})
 }
