@@ -808,5 +808,20 @@ func TestNoDeprecatedRule(t *testing.T) {
 				Line:      1, Column: 1,
 			}},
 		},
+
+		// ---- Edge: destructuring from a non-`require` call whose first argument
+		// is a React module string — upstream `getReactModuleName` arm 1 matches
+		// any CallExpression (not just `require`) whose first arg equals a
+		// module key, so `var {createClass} = myFunc('react')` is reported too.
+		// Locks in ESLint parity against a tempting "require-only" narrowing. ----
+		{
+			Code: `var {createClass} = myFunc('react');`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "deprecated",
+				Message:   msg("React.createClass", "15.5.0", "the npm module create-react-class", ""),
+				Line:      1, Column: 6,
+			}},
+		},
 	})
 }
