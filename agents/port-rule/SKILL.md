@@ -135,10 +135,10 @@ Determine the mode based on the number of rules:
 Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
 
 1. **Phase 0: Branch Setup** - Create feature branch from main
-2. **Phase 1: Preparation** - Collect test cases and identify edge cases
-3. **Phase 2: Implementation** - Write Go rule, tests, and documentation
+2. **Phase 1: Preparation** - Collect test cases, walk Dimensions 1–4 edge cases (including the universal edge-shape checklist), and do an upstream semantic walk that enumerates each branch in the ESLint source
+3. **Phase 2: Implementation** - Before writing helpers, grep same-plugin neighbors and extract any near-duplicates to `<plugin>util/`. Then write Go rule, tests, and documentation (see the "Differences from ESLint" writing rules in PORT_RULE.md Phase 2 Step 3 — user-facing only, no implementation talk)
 4. **Phase 3: Integration** - Add JS tests and register rule
-5. **Phase 4: Verification** - Build binary and run all tests
+5. **Phase 4: Verification** - Build binary; run the rule's Go + JS tests; if a shared helper (`<plugin>util/`, `internal/utils/`) was added or modified, also rerun the whole plugin (or whole tree) test suite; then run the BLOCKING pre-commit gate: `pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && pnpm lint:go`
 6. **Phase 5: Submission** - Commit and create PR
 
 For each phase: mark its task as `in_progress` (via `TaskUpdate`) before starting, and `completed` after finishing. Update the text checklist as well.
@@ -149,10 +149,10 @@ Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
 
 1. **Phase 0: Branch Setup** - Create a single feature branch for the batch (once)
 2. **For each rule**, execute in order:
-   - **Phase 1: Preparation** - Collect test cases for this rule
-   - **Phase 2: Implementation** - Write Go rule, tests, and documentation
+   - **Phase 1: Preparation** - Collect test cases; walk Dimensions 1–4 edge cases; do an upstream semantic walk (enumerate branches in the ESLint source, add lock-in tests for branches upstream itself doesn't test)
+   - **Phase 2: Implementation** - grep same-plugin neighbors and extract near-duplicate helpers to `<plugin>util/` FIRST; then write Go rule, tests, and documentation (Differences section is user-facing only)
    - **Phase 3: Integration** - Add JS tests and register rule
-   - **Phase 4: Verification** - Build binary and run all tests
+   - **Phase 4: Verification** - Build binary; run Go + JS tests; if a shared helper was touched, rerun the plugin-wide (or repo-wide) test suite; then the BLOCKING pre-commit gate
    - **Commit** - Create an independent commit: `feat: port rule <rule-name>`
    - **Report** - Briefly report the result before moving to the next rule
 3. **Phase 5: Create PR** - One PR summarizing all ported rules (once), see [Phase 5 Details](#phase-5-commit--pr-details) below
