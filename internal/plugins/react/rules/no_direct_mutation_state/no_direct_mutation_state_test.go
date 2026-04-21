@@ -212,6 +212,17 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           this.state.x = 1;
         }
       `, Tsx: true},
+
+		// ---- Edge: lowercase variable beats named FE — `const outer = function Inner() {...}`
+		// matches ESLint's getStatelessComponent, which early-returns `undefined`
+		// when VariableDeclarator.id is lowercase; the FE's own capitalized name
+		// MUST NOT override that. ----
+		{Code: `
+        const outer = function Inner() {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -934,6 +945,80 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noDirectMutation", Line: 3, Column: 35},
+			},
+		},
+
+		// ---- Edge: capital variable + lowercase named FE — `const Outer = function inner() {...}`
+		// ESLint's VariableDeclarator branch decides by parent.id.name ("Outer"),
+		// NOT by the FE's own inner name — so this IS detected as a component. ----
+		{
+			Code: `
+        const Outer = function inner() {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: IIFE with a named capitalized FE — ESLint's fallback
+		// `if (node.id) return isFirstLetterCapitalized(node.id.name) ? node : undefined`
+		// treats it as a component. ----
+		{
+			Code: `
+        (function Hello() {
+          this.state.x = 1;
+          return <div/>;
+        })();
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with `cond && <div/>` (common conditional render) ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.visible && <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with `cond || <div/>` fallback pattern ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.fallback || <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with nullish coalescing `x ?? <div/>` ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.cached ?? <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
 			},
 		},
 	})

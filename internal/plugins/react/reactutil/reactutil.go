@@ -407,50 +407,56 @@ func IsStatelessReactComponent(fn *ast.Node) bool {
 }
 
 // functionAssociatedName picks the name that identifies a function-like node
-// for React component detection:
+// for React component detection, matching eslint-plugin-react's
+// getStatelessComponent priority:
 //
-//   - the function's own Identifier (FunctionDeclaration / named
-//     FunctionExpression)
-//   - otherwise the Identifier of the enclosing VariableDeclaration /
-//     PropertyAssignment
+//   - FunctionDeclaration — always the function's own Identifier (its name
+//     is the authoritative reference).
+//   - FunctionExpression / ArrowFunction — the enclosing
+//     VariableDeclaration / PropertyAssignment / `Identifier = fn`
+//     assignment's Identifier FIRST. Only when no such parent context yields
+//     a name do we fall back to a named FunctionExpression's own name. The
+//     parent-first ordering matches upstream's `getStatelessComponent`, which
+//     early-returns `undefined` when `parent.id.name` is lowercase — the
+//     parent decides component-ness, the function's own name does not
+//     override a lowercase parent.
 //
-// Returns "" when no usable Identifier is found (e.g. computed keys,
-// destructuring patterns, anonymous default exports).
+// Returns "" when no usable Identifier is found (computed keys, destructuring
+// patterns, anonymous default exports).
 func functionAssociatedName(fn *ast.Node) string {
-	switch fn.Kind {
-	case ast.KindFunctionDeclaration:
+	if fn.Kind == ast.KindFunctionDeclaration {
 		name := fn.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
 			return name.AsIdentifier().Text
 		}
-	case ast.KindFunctionExpression:
-		name := fn.Name()
-		if name != nil && name.Kind == ast.KindIdentifier && isFirstLetterCapitalized(name.AsIdentifier().Text) {
-			return name.AsIdentifier().Text
-		}
-	}
-	parent := fn.Parent
-	if parent == nil {
 		return ""
 	}
-	switch parent.Kind {
-	case ast.KindVariableDeclaration:
-		binding := parent.AsVariableDeclaration().Name()
-		if binding != nil && binding.Kind == ast.KindIdentifier {
-			return binding.AsIdentifier().Text
+	if parent := fn.Parent; parent != nil {
+		switch parent.Kind {
+		case ast.KindVariableDeclaration:
+			binding := parent.AsVariableDeclaration().Name()
+			if binding != nil && binding.Kind == ast.KindIdentifier {
+				return binding.AsIdentifier().Text
+			}
+		case ast.KindPropertyAssignment:
+			name := parent.AsPropertyAssignment().Name()
+			if name != nil && name.Kind == ast.KindIdentifier {
+				return name.AsIdentifier().Text
+			}
+		case ast.KindBinaryExpression:
+			bin := parent.AsBinaryExpression()
+			if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
+				left := ast.SkipParentheses(bin.Left)
+				if left.Kind == ast.KindIdentifier {
+					return left.AsIdentifier().Text
+				}
+			}
 		}
-	case ast.KindPropertyAssignment:
-		name := parent.AsPropertyAssignment().Name()
+	}
+	if fn.Kind == ast.KindFunctionExpression {
+		name := fn.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
 			return name.AsIdentifier().Text
-		}
-	case ast.KindBinaryExpression:
-		bin := parent.AsBinaryExpression()
-		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
-			left := ast.SkipParentheses(bin.Left)
-			if left.Kind == ast.KindIdentifier {
-				return left.AsIdentifier().Text
-			}
 		}
 	}
 	return ""
@@ -506,12 +512,17 @@ func functionReturnsJSXOrNull(fn *ast.Node) bool {
 	return found
 }
 
-// isJSXOrNullExpression reports whether `expr` is a JSX element, JSX fragment,
-// or the `null` literal — walking through ParenthesizedExpression,
-// ConditionalExpression branches, and comma-sequence (BinaryExpression with
-// `,`) right-most operands so `(<div/>)`, `cond ? <div/> : null`, and
-// `(side, <div/>)` all qualify (matches eslint-plugin-react's
-// jsxUtil.isReturningJSXOrNull).
+// isJSXOrNullExpression reports whether `expr` may evaluate to JSX or `null`
+// on at least one control-flow path — walking through:
+//
+//   - ParenthesizedExpression wrappers
+//   - ConditionalExpression (`cond ? a : b`) — either branch
+//   - Comma sequence (`a, b`) — right-most operand
+//   - Logical `&&` / `||` / `??` — either operand (common React patterns like
+//     `cond && <div/>` / `cond || <div/>` / `x ?? <div/>`)
+//
+// Approximates eslint-plugin-react's jsxUtil.isReturningJSXOrNull non-strict
+// mode — "some path returns JSX or null" is sufficient.
 func isJSXOrNullExpression(expr *ast.Node) bool {
 	expr = ast.SkipParentheses(expr)
 	switch expr.Kind {
@@ -524,8 +535,16 @@ func isJSXOrNullExpression(expr *ast.Node) bool {
 		return isJSXOrNullExpression(ce.WhenTrue) || isJSXOrNullExpression(ce.WhenFalse)
 	case ast.KindBinaryExpression:
 		bin := expr.AsBinaryExpression()
-		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindCommaToken {
+		if bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindCommaToken:
 			return isJSXOrNullExpression(bin.Right)
+		case ast.KindAmpersandAmpersandToken,
+			ast.KindBarBarToken,
+			ast.KindQuestionQuestionToken:
+			return isJSXOrNullExpression(bin.Left) || isJSXOrNullExpression(bin.Right)
 		}
 	}
 	return false
