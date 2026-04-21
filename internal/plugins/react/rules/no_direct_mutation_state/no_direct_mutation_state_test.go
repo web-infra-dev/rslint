@@ -472,6 +472,57 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           };
         }
       `, Tsx: true},
+
+		// ---- Edge: three-level return-nested in assignment with LOWERCASE
+		// outer LHS — upstream's branch 7 (ReturnStatement → functionExpr
+		// → AssignmentExpression) examines outer LHS, so lowercase `x`
+		// rejects classification. ----
+		{Code: `
+        x = function () {
+          return () => {
+            this.state.x = 1;
+            return <div/>;
+          };
+        };
+      `, Tsx: true},
+
+		// ---- Edge: three-level return-nested in Property with LOWERCASE
+		// outer key — upstream's branch 8 (ReturnStatement → functionExpr
+		// → Property) rejects. ----
+		{Code: `
+        const obj = {
+          helper: function () {
+            return () => {
+              this.state.x = 1;
+              return <div/>;
+            };
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: MemberExpression-style computed key (`{ [a.b]: fn }`)
+		// with a non-JSX, non-null return — upstream's branch 9 rejects. ----
+		{Code: `
+        const obj = {
+          [a.b]: () => {
+            this.state.x = 1;
+            return 42;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: anonymous arrow assigned to PropertyAssignment with
+		// Identifier CAPITAL key BUT returning null only — upstream's
+		// Property !id+!computed branch uses strict isReturningJSX and
+		// rejects null-only. ----
+		{Code: `
+        const obj = {
+          Hello: () => {
+            this.state.x = 1;
+            return null;
+          },
+        };
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -1730,6 +1781,77 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: three-level return-nested, capital outer LHS is a
+		// component per upstream's branch 7. ----
+		{
+			Code: `
+        Hello = function () {
+          return () => {
+            this.state.x = 1;
+            return <div/>;
+          };
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: three-level return-nested, capital outer Property key is
+		// a component per upstream's branch 8. ----
+		{
+			Code: `
+        const obj = {
+          Hello: function () {
+            return () => {
+              this.state.x = 1;
+              return <div/>;
+            };
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 5, Column: 15},
+			},
+		},
+
+		// ---- Edge: MemberExpression-style computed key with JSX return IS
+		// a component (upstream's branch 9 only rejects non-JSX non-null). ----
+		{
+			Code: `
+        const obj = {
+          [a.b]: () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: named FE in ReturnStatement with capitalized own id is
+		// a component (upstream's branch 7 first check: if node.id capital
+		// return node). ----
+		{
+			Code: `
+        x = function () {
+          return function Inner() {
+            this.state.x = 1;
+            return <div/>;
+          };
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
 			},
 		},
 	})
