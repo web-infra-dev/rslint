@@ -113,5 +113,5 @@ Examples of **correct** code for this rule, when `allowLeadingUnderscore` is
 
 ## Original Documentation
 
-- ESLint-plugin-react rule: <https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-pascal-case.md>
-- Source: <https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/jsx-pascal-case.js>
+- ESLint-plugin-react rule: [https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-pascal-case.md](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/jsx-pascal-case.md)
+- Source: [https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/jsx-pascal-case.js](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/lib/rules/jsx-pascal-case.js)

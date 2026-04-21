@@ -36,5 +36,5 @@ the parsed pattern would not map cleanly back to source positions.
 
 ## Original Documentation
 
-- ESLint rule: <https://eslint.org/docs/latest/rules/no-regex-spaces>
-- Source code: <https://github.com/eslint/eslint/blob/main/lib/rules/no-regex-spaces.js>
+- ESLint rule: [https://eslint.org/docs/latest/rules/no-regex-spaces](https://eslint.org/docs/latest/rules/no-regex-spaces)
+- Source code: [https://github.com/eslint/eslint/blob/main/lib/rules/no-regex-spaces.js](https://github.com/eslint/eslint/blob/main/lib/rules/no-regex-spaces.js)
