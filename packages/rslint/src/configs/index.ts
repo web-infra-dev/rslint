@@ -4,6 +4,7 @@ import { recommended as jsRecommended } from './javascript.js';
 import { recommended as reactRecommended } from './react.js';
 import { recommended as importRecommended } from './import.js';
 import { recommended as promiseRecommended } from './promise.js';
+import { recommended as jestRecommended } from './jest.js';
 
 interface PluginExport {
   configs: { recommended: RslintConfigEntry };
@@ -27,4 +28,8 @@ export const importPlugin: PluginExport = {
 
 export const promisePlugin: PluginExport = {
   configs: { recommended: promiseRecommended },
+};
+
+export const jestPlugin: PluginExport = {
+  configs: { recommended: jestRecommended },
 };
