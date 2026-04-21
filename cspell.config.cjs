@@ -19,6 +19,7 @@ module.exports = {
     './agents',
     'internal/linter/*_test.go',
     'internal/rules/valid_typeof/valid_typeof.md',
+    'internal/plugins/react/rules/no_typos/no_typos.md',
     'website/docs/en/rules/*/',
   ],
   dictionaries: ['dictionary'],

@@ -1,5 +1,3 @@
-<!-- cspell:disable — rule docs deliberately contain casing-typo identifiers (e.g. `componentwillMount`, `isrequired`) that the rule is designed to flag. -->
-
 # react/no-typos
 
 Disallow common typos in React component declarations.

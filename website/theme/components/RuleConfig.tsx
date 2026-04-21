@@ -1,22 +1,14 @@
 import React from 'react';
 import { CodeBlockRuntime } from '@rspress/core/theme';
+import { PLUGIN_REGISTRY } from '../plugin-registry';
 
-/**
- * Mapping from plugin group to the import name and preset used in rslint config.
- * Core eslint rules use `js`, everything else maps to its plugin export.
- */
-const GROUP_CONFIG: Record<string, { importName: string; preset: string }> = {
-  eslint: { importName: 'js', preset: 'js.configs.recommended' },
-  '@typescript-eslint': { importName: 'ts', preset: 'ts.configs.recommended' },
-  'eslint-plugin-import': {
-    importName: 'importPlugin',
-    preset: 'importPlugin.configs.recommended',
-  },
-  react: {
-    importName: 'reactPlugin',
-    preset: 'reactPlugin.configs.recommended',
-  },
-};
+const GROUP_CONFIG: Record<string, { importName: string; preset: string }> =
+  Object.fromEntries(
+    PLUGIN_REGISTRY.filter((p) => p.presetName).map((p) => [
+      p.group,
+      { importName: p.importName, preset: p.presetName! },
+    ]),
+  );
 
 /**
  * Displays a complete rslint configuration snippet that users can copy
