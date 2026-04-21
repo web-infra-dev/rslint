@@ -3,6 +3,7 @@ import { recommended as tsRecommended } from './typescript.js';
 import { recommended as jsRecommended } from './javascript.js';
 import { recommended as reactRecommended } from './react.js';
 import { recommended as importRecommended } from './import.js';
+import { recommended as promiseRecommended } from './promise.js';
 
 interface PluginExport {
   configs: { recommended: RslintConfigEntry };
@@ -22,4 +23,8 @@ export const reactPlugin: PluginExport = {
 
 export const importPlugin: PluginExport = {
   configs: { recommended: importRecommended },
+};
+
+export const promisePlugin: PluginExport = {
+  configs: { recommended: promiseRecommended },
 };
