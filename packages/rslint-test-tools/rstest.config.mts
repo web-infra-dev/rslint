@@ -107,6 +107,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-direct-mutation-state.test.ts',
     './tests/eslint-plugin-react/rules/no-find-dom-node.test.ts',
     './tests/eslint-plugin-react/rules/no-is-mounted.test.ts',
+    './tests/eslint-plugin-react/rules/no-render-return-value.test.ts',
     './tests/eslint-plugin-react/rules/no-string-refs.test.ts',
     './tests/eslint-plugin-react/rules/no-typos.test.ts',
     './tests/eslint-plugin-react/rules/no-unescaped-entities.test.ts',
