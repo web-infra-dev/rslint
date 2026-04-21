@@ -100,6 +100,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
+    './tests/eslint-plugin-react/rules/no-access-state-in-setstate.test.ts',
     './tests/eslint-plugin-react/rules/no-children-prop.test.ts',
     './tests/eslint-plugin-react/rules/no-danger.test.ts',
     './tests/eslint-plugin-react/rules/no-danger-with-children.test.ts',
