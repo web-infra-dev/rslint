@@ -23,7 +23,7 @@ const recommended: RslintConfigEntry = {
     'react/no-render-return-value': 'error',
     'react/no-string-refs': 'error',
     'react/no-unescaped-entities': 'error',
-    // 'react/no-unknown-property': 'error', // not implemented
+    'react/no-unknown-property': 'error',
     'react/no-unsafe': 'off',
     // 'react/prop-types': 'error', // not implemented
     'react/react-in-jsx-scope': 'error',
