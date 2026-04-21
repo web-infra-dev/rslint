@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_access_state_in_setstate"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
@@ -60,6 +61,7 @@ func GetAllRules() []rule.Rule {
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
+		no_access_state_in_setstate.NoAccessStateInSetstateRule,
 		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
 		no_danger_with_children.NoDangerWithChildrenRule,
