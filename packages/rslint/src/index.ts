@@ -17,6 +17,7 @@ export {
   reactPlugin,
   importPlugin,
   promisePlugin,
+  jestPlugin,
 } from './configs/index.js';
 
 // Export the main RSLintService class for direct usage
