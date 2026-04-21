@@ -110,6 +110,9 @@ nodesep
 nolint
 nonconstructor
 nonoctal
+noopener
+noopenernoreferrer
+noreferrer
 noregabi
 notcool
 notunique
@@ -126,6 +129,7 @@ Prag
 Prettier
 propertyassignment
 Ptrs
+quasis
 quxx
 qwer
 rankdir
@@ -137,6 +141,7 @@ Readonlys
 realpath
 recurser
 reducable
+Referer
 relint
 relinting
 relints

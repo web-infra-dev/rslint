@@ -94,6 +94,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-no-bind.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-comment-textnodes.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-duplicate-props.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-target-blank.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
