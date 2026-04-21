@@ -462,10 +462,61 @@ func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 		return false
 	}
 
+	// ESTree-style paren transparency for the wrapper-argument case: `React.memo((fn))`.
+	// fn's direct parent in tsgo is a ParenthesizedExpression, while ESTree
+	// flattens it so that upstream sees the outer CallExpression directly.
+	effectiveParent := parent
+	if effectiveParent.Kind == ast.KindParenthesizedExpression && effectiveParent.Parent != nil {
+		effectiveParent = effectiveParent.Parent
+	}
+
 	// memo / forwardRef wrapping takes precedence regardless of position —
 	// upstream checks pragmaComponentWrapper BEFORE allowed-position.
-	if parent.Kind == ast.KindCallExpression && isPragmaComponentWrapperCall(parent, fn, pragma) {
+	if effectiveParent.Kind == ast.KindCallExpression && isPragmaComponentWrapperCall(effectiveParent, fn, pragma) {
 		return true
+	}
+
+	// ExportDefault branch (upstream: strict isReturningJSX — null-only
+	// doesn't qualify).
+	if parent.Kind == ast.KindExportAssignment {
+		return functionReturnsJSX(fn)
+	}
+
+	// Strict-JSX rejection for positions that demand isReturningJSX (not
+	// just JSX-or-null): when parent is a ReturnStatement or the expression
+	// body of an enclosing arrow, upstream returns undefined immediately if
+	// the function does not strictly return JSX. `null`-only returns are
+	// excluded here.
+	if parent.Kind == ast.KindReturnStatement ||
+		(parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == fn) {
+		if !functionReturnsJSX(fn) {
+			return false
+		}
+	}
+
+	// Nested-arrow patterns — upstream examines the grandparent's
+	// AssignmentExpression LHS / Property key when the function's parent is
+	// an outer ArrowFunction that itself sits in one of these positions.
+	if parent.Kind == ast.KindArrowFunction && parent.AsArrowFunction().Body == fn {
+		grand := parent.Parent
+		if grand != nil {
+			switch grand.Kind {
+			case ast.KindBinaryExpression:
+				bin := grand.AsBinaryExpression()
+				if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == parent {
+					left := ast.SkipParentheses(bin.Left)
+					if left.Kind == ast.KindIdentifier {
+						return isFirstLetterCapitalized(left.AsIdentifier().Text)
+					}
+				}
+			case ast.KindPropertyAssignment:
+				name := grand.AsPropertyAssignment().Name()
+				if name != nil && name.Kind == ast.KindIdentifier {
+					return isFirstLetterCapitalized(name.AsIdentifier().Text)
+				}
+				return false
+			}
+		}
 	}
 
 	if !isInAllowedPositionForComponent(fn) {
@@ -501,8 +552,6 @@ func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 			return isFirstLetterCapitalized(name.AsIdentifier().Text)
 		}
 		return false
-	case ast.KindExportAssignment:
-		return true
 	case ast.KindBinaryExpression:
 		bin := parent.AsBinaryExpression()
 		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
@@ -612,7 +661,13 @@ func isPragmaComponentWrapperCall(call, fn *ast.Node, pragma string) bool {
 		return false
 	}
 	c := call.AsCallExpression()
-	if c.Arguments == nil || len(c.Arguments.Nodes) == 0 || c.Arguments.Nodes[0] != fn {
+	if c.Arguments == nil || len(c.Arguments.Nodes) == 0 {
+		return false
+	}
+	// Paren-transparent argument match: tsgo preserves ParenthesizedExpression
+	// wrappers that ESTree flattens, so `React.memo((fn))` surfaces the paren
+	// as the first argument rather than `fn` itself.
+	if ast.SkipParentheses(c.Arguments.Nodes[0]) != fn {
 		return false
 	}
 	callee := ast.SkipParentheses(c.Expression)
@@ -642,6 +697,20 @@ func isPragmaComponentWrapperCall(call, fn *ast.Node, pragma string) bool {
 // `null`. ConditionalExpression is traversed so `return cond ? <jsx/> : null`
 // qualifies.
 func functionReturnsJSXOrNull(fn *ast.Node) bool {
+	return functionReturnsJSXInternal(fn, true)
+}
+
+// functionReturnsJSX is the strict sibling of functionReturnsJSXOrNull:
+// a `null` return does NOT qualify on its own. Mirrors upstream's
+// jsxUtil.isReturningJSX (as opposed to isReturningJSXOrNull). Used by
+// branches of getStatelessComponent that specifically gate on strict JSX
+// (ExportDefault, inside-ReturnStatement / arrow-expression-body early
+// rejection, Property `method`-branch final check).
+func functionReturnsJSX(fn *ast.Node) bool {
+	return functionReturnsJSXInternal(fn, false)
+}
+
+func functionReturnsJSXInternal(fn *ast.Node, acceptNull bool) bool {
 	var body *ast.Node
 	switch fn.Kind {
 	case ast.KindFunctionDeclaration:
@@ -651,7 +720,7 @@ func functionReturnsJSXOrNull(fn *ast.Node) bool {
 	case ast.KindArrowFunction:
 		body = fn.AsArrowFunction().Body
 		if body != nil && body.Kind != ast.KindBlock {
-			return isJSXOrNullExpression(body)
+			return isJSXExpression(body, acceptNull)
 		}
 	case ast.KindMethodDeclaration:
 		body = fn.AsMethodDeclaration().Body
@@ -672,7 +741,7 @@ func functionReturnsJSXOrNull(fn *ast.Node) bool {
 		switch n.Kind {
 		case ast.KindReturnStatement:
 			rs := n.AsReturnStatement()
-			if rs.Expression != nil && isJSXOrNullExpression(rs.Expression) {
+			if rs.Expression != nil && isJSXExpression(rs.Expression, acceptNull) {
 				found = true
 				return true
 			}
@@ -692,27 +761,23 @@ func functionReturnsJSXOrNull(fn *ast.Node) bool {
 	return found
 }
 
-// isJSXOrNullExpression reports whether `expr` may evaluate to JSX or `null`
-// on at least one control-flow path — walking through:
-//
-//   - ParenthesizedExpression wrappers
-//   - ConditionalExpression (`cond ? a : b`) — either branch
-//   - Comma sequence (`a, b`) — right-most operand
-//   - Logical `&&` / `||` / `??` — either operand (common React patterns like
-//     `cond && <div/>` / `cond || <div/>` / `x ?? <div/>`)
-//
-// Approximates eslint-plugin-react's jsxUtil.isReturningJSXOrNull non-strict
-// mode — "some path returns JSX or null" is sufficient.
-func isJSXOrNullExpression(expr *ast.Node) bool {
+// isJSXExpression reports whether `expr` may evaluate to JSX (or to `null`
+// when `acceptNull` is true) on at least one control-flow path. Walks through
+// ParenthesizedExpression, ConditionalExpression (both branches),
+// comma-sequence right-most operands, and logical `&&` / `||` / `??`
+// operands (either side). Pass `acceptNull=true` for
+// `isReturningJSXOrNull`-style gates and `false` for the strict
+// `isReturningJSX` gates.
+func isJSXExpression(expr *ast.Node, acceptNull bool) bool {
 	expr = ast.SkipParentheses(expr)
 	switch expr.Kind {
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
 		return true
 	case ast.KindNullKeyword:
-		return true
+		return acceptNull
 	case ast.KindConditionalExpression:
 		ce := expr.AsConditionalExpression()
-		return isJSXOrNullExpression(ce.WhenTrue) || isJSXOrNullExpression(ce.WhenFalse)
+		return isJSXExpression(ce.WhenTrue, acceptNull) || isJSXExpression(ce.WhenFalse, acceptNull)
 	case ast.KindBinaryExpression:
 		bin := expr.AsBinaryExpression()
 		if bin.OperatorToken == nil {
@@ -720,11 +785,11 @@ func isJSXOrNullExpression(expr *ast.Node) bool {
 		}
 		switch bin.OperatorToken.Kind {
 		case ast.KindCommaToken:
-			return isJSXOrNullExpression(bin.Right)
+			return isJSXExpression(bin.Right, acceptNull)
 		case ast.KindAmpersandAmpersandToken,
 			ast.KindBarBarToken,
 			ast.KindQuestionQuestionToken:
-			return isJSXOrNullExpression(bin.Left) || isJSXOrNullExpression(bin.Right)
+			return isJSXExpression(bin.Left, acceptNull) || isJSXExpression(bin.Right, acceptNull)
 		}
 	}
 	return false

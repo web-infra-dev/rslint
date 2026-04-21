@@ -419,6 +419,59 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           },
         };
       `, Tsx: true},
+
+		// ---- Edge: `export default () => null` — upstream's ExportDefault
+		// branch uses the STRICT isReturningJSX which excludes null-only
+		// returns. Returning only null is therefore NOT a component. ----
+		{Code: `
+        export default () => {
+          this.state.x = 1;
+          return null;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: nested arrow whose outer-arrow body's parent is an
+		// AssignmentExpression with a LOWERCASE LHS — upstream requires
+		// capitalized outer LHS, so inner arrow is NOT a component. ----
+		{Code: `
+        x = () => () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: nested arrow whose outer-arrow body's parent is a
+		// PropertyAssignment with a LOWERCASE key — same logic. ----
+		{Code: `
+        const obj = {
+          helper: () => () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: `x = () => null` — null-only arrow whose parent is an
+		// ArrowFunction expression body. Upstream's strict isReturningJSX gate
+		// rejects null-only returns in this position. ----
+		{Code: `
+        x = () => () => {
+          this.state.x = 1;
+          return null;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: `function f() { return () => null; }` — inner arrow in
+		// ReturnStatement with null-only return. Upstream rejects via
+		// isReturningJSX strict gate. ----
+		{Code: `
+        function f() {
+          return () => {
+            this.state.x = 1;
+            return null;
+          };
+        }
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -1614,6 +1667,69 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: nested arrow with CAPITALIZED outer-assignment LHS —
+		// upstream examines `parent.parent.left` (the outer `Hello`)
+		// capitalization, not the inner arrow's. ----
+		{
+			Code: `
+        Hello = () => () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: nested arrow under a CAPITAL-keyed PropertyAssignment. ----
+		{
+			Code: `
+        const obj = {
+          Hello: () => () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: paren-wrapped fn argument `React.memo((fn))` — tsgo keeps
+		// the ParenthesizedExpression; the wrapper detection must be
+		// paren-transparent to match ESTree behavior. ----
+		{
+			Code: `
+        const Hello = React.memo((() => {
+          this.state.x = 1;
+          return <div/>;
+        }));
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `export default () => <div/>` strict gate still passes
+		// when the body returns real JSX (not just null). ----
+		{
+			Code: `
+        export default () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
 			},
 		},
 	})
