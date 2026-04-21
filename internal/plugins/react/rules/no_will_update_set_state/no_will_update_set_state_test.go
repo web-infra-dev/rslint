@@ -662,6 +662,35 @@ func TestNoWillUpdateSetStateRule(t *testing.T) {
 			},
 		},
 
+		// ---- Regression: disallow-in-func — setState in inner class's non-matching
+		// method must still report at OUTER componentWillUpdate ----
+		// Upstream's findLast returns false on a non-matching stopper (`render`)
+		// and keeps walking outward; reaches `componentWillUpdate` with depth=2,
+		// disallow-in-func bypasses the depth>1 gate, and reports on the outer
+		// method. Locks in the `continue`-past-non-matching-stopper behavior so
+		// a future "just return on first stopper" refactor can't silently flip it.
+		{
+			Code: `
+        class Outer extends React.Component {
+          componentWillUpdate() {
+            class Inner {
+              render() { this.setState({}); }
+            }
+            new Inner();
+          }
+        }
+      `,
+			Tsx:     true,
+			Options: []interface{}{"disallow-in-func"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noSetState",
+					Message:   "Do not use setState in componentWillUpdate",
+					Line:      5, Column: 26,
+				},
+			},
+		},
+
 		// ---- Edge: disallow-in-func — setState inside a nested arrow inside a nested function ----
 		{
 			Code: `
