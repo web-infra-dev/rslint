@@ -418,6 +418,26 @@ func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 	}
 	switch fn.Kind {
 	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		// A shorthand method / accessor in an ObjectLiteralExpression
+		// corresponds to ESTree's `Property { method | kind: 'get'|'set',
+		// key, value: FunctionExpression }`. Upstream's
+		// getStatelessComponent's Property branch classifies the inner FE as
+		// a component when the property key is a capitalized Identifier AND
+		// the function returns JSX. Setters never return a value so
+		// functionReturnsJSXOrNull naturally rejects them.
+		// Class-body occurrences have a ClassLike parent — NOT
+		// ObjectLiteralExpression — and are excluded so they continue to go
+		// through the ES6-class path.
+		parent := fn.Parent
+		if parent == nil || parent.Kind != ast.KindObjectLiteralExpression {
+			return false
+		}
+		name := fn.Name()
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		return isFirstLetterCapitalized(name.AsIdentifier().Text) && functionReturnsJSXOrNull(fn)
 	default:
 		return false
 	}
@@ -633,6 +653,12 @@ func functionReturnsJSXOrNull(fn *ast.Node) bool {
 		if body != nil && body.Kind != ast.KindBlock {
 			return isJSXOrNullExpression(body)
 		}
+	case ast.KindMethodDeclaration:
+		body = fn.AsMethodDeclaration().Body
+	case ast.KindGetAccessor:
+		body = fn.AsGetAccessorDeclaration().Body
+	case ast.KindSetAccessor:
+		body = fn.AsSetAccessorDeclaration().Body
 	}
 	if body == nil {
 		return false

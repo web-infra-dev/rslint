@@ -372,6 +372,53 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           }
         }
       `, Tsx: true},
+
+		// ---- Edge: class-body MethodDeclaration is NOT a stateless FE/Arrow
+		// (upstream's getStatelessComponent only accepts
+		// FunctionDeclaration / FunctionExpression / ArrowFunction). Mutations
+		// in a class method ALWAYS go through the ES6-class path, never the
+		// stateless fallback. A method with lowercase name + params on a
+		// non-component class is therefore NOT reported, matching ESLint. ----
+		{Code: `
+        class Helper {
+          handleClick(event) {
+            this.state.x = 1;
+            return <div/>;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: lowercase-keyed shorthand method is NOT a component
+		// (PropertyAssignment-style capitalization check). ----
+		{Code: `
+        const obj = {
+          hello() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: computed key on shorthand method (`[Hello]() {...}`) is
+		// NOT a component per upstream's `!node.parent.computed` guard. ----
+		{Code: `
+        const obj = {
+          ['Hello']() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: object-literal setter `set Hello(v) { ... }` doesn't
+		// return JSX (no return value), so never a component. ----
+		{Code: `
+        const obj = {
+          set Hello(v) {
+            this.state.x = v;
+          },
+        };
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -1532,6 +1579,41 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: object-literal shorthand method with capital key IS a
+		// component per upstream's Property branch
+		// (parent.method && !parent.computed && capitalized(key)). ----
+		{
+			Code: `
+        const obj = {
+          Hello() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: object-literal getter with capital key IS a component per
+		// upstream (`!node.id && !node.parent.computed`). ----
+		{
+			Code: `
+        const obj = {
+          get Hello() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
 			},
 		},
 	})
