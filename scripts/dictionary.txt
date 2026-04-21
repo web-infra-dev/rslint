@@ -235,3 +235,12 @@ Nent
 Søknad
 codepoint
 misalign
+Pipeable
+classnames
+componentwillmount
+componentwillreceiveprops
+componentwillupdate
+renderable
+Unparseable
+deprec
+segs
