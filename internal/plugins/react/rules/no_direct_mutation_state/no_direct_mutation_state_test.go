@@ -223,6 +223,56 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           return <div/>;
         };
       `, Tsx: true},
+
+		// ---- Edge: non-wrapper CallExpression parent (e.g. plain helper) — not a component ----
+		{Code: `
+        helper(function () {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `, Tsx: true},
+
+		// ---- Edge: lowercase property name in object literal — not a component ----
+		{Code: `
+        const obj = {
+          render: () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: IIFE (any name) is NOT in an allowed position for component
+		// per ESLint's isInAllowedPositionForComponent — CallExpression parent is
+		// rejected, so these must NOT be reported. ----
+		{Code: `
+        (function Hello() {
+          this.state.x = 1;
+          return <div/>;
+        })();
+      `, Tsx: true},
+		{Code: `
+        (() => {
+          this.state.x = 1;
+          return <div/>;
+        })();
+      `, Tsx: true},
+
+		// ---- Edge: obj.lowercase = fn — lowercase property name is NOT a component ----
+		{Code: `
+        obj.foo = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: plain helper callback (not memo/forwardRef) — not a component ----
+		{Code: `
+        setTimeout(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -964,22 +1014,6 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 			},
 		},
 
-		// ---- Edge: IIFE with a named capitalized FE — ESLint's fallback
-		// `if (node.id) return isFirstLetterCapitalized(node.id.name) ? node : undefined`
-		// treats it as a component. ----
-		{
-			Code: `
-        (function Hello() {
-          this.state.x = 1;
-          return <div/>;
-        })();
-      `,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noDirectMutation", Line: 3, Column: 11},
-			},
-		},
-
 		// ---- Edge: stateless component with `cond && <div/>` (common conditional render) ----
 		{
 			Code: `
@@ -1015,6 +1049,135 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           this.state.x = 1;
           return props.cached ?? <div/>;
         }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: React.memo wrapping an anonymous arrow ----
+		{
+			Code: `
+        const Hello = React.memo(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: bare `memo(...)` (destructured from React) ----
+		{
+			Code: `
+        export default memo(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: React.forwardRef wrapping an anonymous arrow ----
+		{
+			Code: `
+        const Hello = React.forwardRef((props, ref) => {
+          this.state.x = 1;
+          return <div ref={ref}/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: bare `forwardRef(...)` ----
+		{
+			Code: `
+        const Hello = forwardRef((props, ref) => {
+          this.state.x = 1;
+          return <div ref={ref}/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: pragma-qualified memo under `settings.react.pragma = "Preact"` ----
+		{
+			Code: `
+        const Hello = Preact.memo(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "Preact"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `export default function() {...}` (anonymous default-export FD) ----
+		{
+			Code: `
+        export default function () {
+          this.state.x = 1;
+          return <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `export default () => ...` (arrow default export) ----
+		{
+			Code: `
+        export default () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `module.exports = function() {...}` — blanket true per ESLint's
+		// isModuleExportsAssignment carve-out. ----
+		{
+			Code: `
+        module.exports = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `obj.Hello = function() {...}` — capitalized property name
+		// assignment on an arbitrary MemberExpression LHS is a component. ----
+		{
+			Code: `
+        obj.Hello = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
       `,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{

@@ -377,7 +377,7 @@ func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass s
 		return comp
 	}
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) && IsStatelessReactComponent(p) {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponent(p, pragma) {
 			return p
 		}
 	}
@@ -385,12 +385,34 @@ func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass s
 }
 
 // IsStatelessReactComponent reports whether `fn` (a FunctionLike) looks like a
-// React functional component — i.e. it has a capital-cased associated name
-// AND returns JSX or null on at least one path. Nested functions are not
-// considered when searching for returns.
+// React functional component. Mirrors eslint-plugin-react's
+// `getStatelessComponent` decision tree:
 //
-// See GetEnclosingReactComponentOrStateless for the priority rules.
-func IsStatelessReactComponent(fn *ast.Node) bool {
+//   - FunctionDeclaration — component iff returns JSX/null AND either:
+//     (a) its own Identifier is capitalized, OR
+//     (b) it is anonymous AND carries the `export default` modifier (ESLint's
+//     `!node.id || capitalized(node.id.name)` condition).
+//
+//   - FunctionExpression / ArrowFunction — component iff returns JSX/null AND
+//     either wrapped in a pragma component call OR in an "allowed position"
+//     AND the position-specific capitalization check passes:
+//
+//   - Wrapped in `<pragma>.memo(...)` / `<pragma>.forwardRef(...)` / bare
+//     `memo(...)` / bare `forwardRef(...)` — always a component.
+//   - Allowed positions (VariableDeclarator, AssignmentExpression,
+//     PropertyAssignment, ReturnStatement, ExportAssignment, outer
+//     ArrowFunction body) gate everything else. A bare IIFE or any other
+//     CallExpression argument position is NOT allowed, matching upstream's
+//     `isInAllowedPositionForComponent` default-false branch.
+//   - Within an allowed position, specific capitalization rules apply per
+//     upstream: VariableDeclarator/PropertyAssignment use the binding name;
+//     `Id = fn` assignments use the LHS Identifier; MemberExpression LHS
+//     uses the rightmost property name (with `module.exports = ...` as a
+//     special blanket-true case); a named FunctionExpression defers to its
+//     own Identifier.
+//
+// Pass the empty string for `pragma` to default to `DefaultReactPragma`.
+func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 	if fn == nil {
 		return false
 	}
@@ -399,67 +421,166 @@ func IsStatelessReactComponent(fn *ast.Node) bool {
 	default:
 		return false
 	}
-	name := functionAssociatedName(fn)
-	if name == "" || !isFirstLetterCapitalized(name) {
+	if !functionReturnsJSXOrNull(fn) {
 		return false
 	}
-	return functionReturnsJSXOrNull(fn)
-}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
 
-// functionAssociatedName picks the name that identifies a function-like node
-// for React component detection, matching eslint-plugin-react's
-// getStatelessComponent priority:
-//
-//   - FunctionDeclaration — always the function's own Identifier (its name
-//     is the authoritative reference).
-//   - FunctionExpression / ArrowFunction — the enclosing
-//     VariableDeclaration / PropertyAssignment / `Identifier = fn`
-//     assignment's Identifier FIRST. Only when no such parent context yields
-//     a name do we fall back to a named FunctionExpression's own name. The
-//     parent-first ordering matches upstream's `getStatelessComponent`, which
-//     early-returns `undefined` when `parent.id.name` is lowercase — the
-//     parent decides component-ness, the function's own name does not
-//     override a lowercase parent.
-//
-// Returns "" when no usable Identifier is found (computed keys, destructuring
-// patterns, anonymous default exports).
-func functionAssociatedName(fn *ast.Node) string {
 	if fn.Kind == ast.KindFunctionDeclaration {
 		name := fn.Name()
+		if name == nil {
+			// Anonymous FD is only legal as `export default function() {...}`.
+			return ast.GetCombinedModifierFlags(fn)&ast.ModifierFlagsDefault != 0
+		}
+		return name.Kind == ast.KindIdentifier && isFirstLetterCapitalized(name.AsIdentifier().Text)
+	}
+
+	parent := fn.Parent
+	if parent == nil {
+		return false
+	}
+
+	// memo / forwardRef wrapping takes precedence regardless of position —
+	// upstream checks pragmaComponentWrapper BEFORE allowed-position.
+	if parent.Kind == ast.KindCallExpression && isPragmaComponentWrapperCall(parent, fn, pragma) {
+		return true
+	}
+
+	if !isInAllowedPositionForComponent(fn) {
+		return false
+	}
+
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		binding := parent.AsVariableDeclaration().Name()
+		if binding != nil && binding.Kind == ast.KindIdentifier {
+			return isFirstLetterCapitalized(binding.AsIdentifier().Text)
+		}
+		return false
+	case ast.KindPropertyAssignment:
+		name := parent.AsPropertyAssignment().Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
-			return name.AsIdentifier().Text
+			return isFirstLetterCapitalized(name.AsIdentifier().Text)
 		}
-		return ""
-	}
-	if parent := fn.Parent; parent != nil {
-		switch parent.Kind {
-		case ast.KindVariableDeclaration:
-			binding := parent.AsVariableDeclaration().Name()
-			if binding != nil && binding.Kind == ast.KindIdentifier {
-				return binding.AsIdentifier().Text
-			}
-		case ast.KindPropertyAssignment:
-			name := parent.AsPropertyAssignment().Name()
+		return false
+	case ast.KindExportAssignment:
+		return true
+	case ast.KindBinaryExpression:
+		bin := parent.AsBinaryExpression()
+		if bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken || bin.Right != fn {
+			return false
+		}
+		// Named FE defers to its own Identifier (mirrors upstream's
+		// `if (node.id) return capitalized(node.id.name) ? node : undefined`).
+		if fn.Kind == ast.KindFunctionExpression {
+			name := fn.Name()
 			if name != nil && name.Kind == ast.KindIdentifier {
-				return name.AsIdentifier().Text
-			}
-		case ast.KindBinaryExpression:
-			bin := parent.AsBinaryExpression()
-			if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken && bin.Right == fn {
-				left := ast.SkipParentheses(bin.Left)
-				if left.Kind == ast.KindIdentifier {
-					return left.AsIdentifier().Text
-				}
+				return isFirstLetterCapitalized(name.AsIdentifier().Text)
 			}
 		}
+		// Anonymous FE / Arrow: decide by LHS.
+		left := ast.SkipParentheses(bin.Left)
+		switch left.Kind {
+		case ast.KindIdentifier:
+			return isFirstLetterCapitalized(left.AsIdentifier().Text)
+		case ast.KindPropertyAccessExpression:
+			pa := left.AsPropertyAccessExpression()
+			obj := ast.SkipParentheses(pa.Expression)
+			name := pa.Name()
+			if obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "module" &&
+				name != nil && name.Kind == ast.KindIdentifier && name.AsIdentifier().Text == "exports" {
+				return true
+			}
+			if name != nil && name.Kind == ast.KindIdentifier {
+				return isFirstLetterCapitalized(name.AsIdentifier().Text)
+			}
+		}
+		return false
 	}
+
+	// ReturnStatement / outer-ArrowFunction body: no binding name available,
+	// fall back to node.id check (matches upstream's final `if (node.id)`).
 	if fn.Kind == ast.KindFunctionExpression {
 		name := fn.Name()
 		if name != nil && name.Kind == ast.KindIdentifier {
-			return name.AsIdentifier().Text
+			return isFirstLetterCapitalized(name.AsIdentifier().Text)
 		}
 	}
-	return ""
+	return false
+}
+
+// isInAllowedPositionForComponent mirrors eslint-plugin-react's
+// `utils.isInAllowedPositionForComponent`: only parent node kinds in the
+// allow-list may host a stateless functional component. Sequence expressions
+// (`a, b`) pass through when `fn` is the last operand.
+func isInAllowedPositionForComponent(fn *ast.Node) bool {
+	parent := fn.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindVariableDeclaration,
+		ast.KindPropertyAssignment,
+		ast.KindReturnStatement,
+		ast.KindExportAssignment,
+		ast.KindArrowFunction:
+		return true
+	case ast.KindBinaryExpression:
+		bin := parent.AsBinaryExpression()
+		if bin.OperatorToken == nil {
+			return false
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindEqualsToken:
+			// AssignmentExpression — always allowed when `fn` is the RHS.
+			return bin.Right == fn
+		case ast.KindCommaToken:
+			// SequenceExpression — only the last operand inherits its parent's
+			// allowed-ness.
+			if bin.Right == fn {
+				return isInAllowedPositionForComponent(parent)
+			}
+		}
+	}
+	return false
+}
+
+// isPragmaComponentWrapperCall reports whether `call` is a React
+// component-wrapping call — `<pragma>.memo(fn)` / `<pragma>.forwardRef(fn)` /
+// bare `memo(fn)` / bare `forwardRef(fn)` — with `fn` as the first argument.
+// Pragma defaults to `DefaultReactPragma` when empty. Mirrors upstream's
+// default `wrapperFunctions` entries (`{property: 'memo', object: pragma}`,
+// `{property: 'forwardRef', object: pragma}`); the user-configurable
+// `settings.componentWrapperFunctions` is NOT honored.
+func isPragmaComponentWrapperCall(call, fn *ast.Node, pragma string) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	c := call.AsCallExpression()
+	if c.Arguments == nil || len(c.Arguments.Nodes) == 0 || c.Arguments.Nodes[0] != fn {
+		return false
+	}
+	callee := ast.SkipParentheses(c.Expression)
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		text := callee.AsIdentifier().Text
+		return text == "memo" || text == "forwardRef"
+	case ast.KindPropertyAccessExpression:
+		pa := callee.AsPropertyAccessExpression()
+		obj := ast.SkipParentheses(pa.Expression)
+		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
+			return false
+		}
+		name := pa.Name()
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		text := name.AsIdentifier().Text
+		return text == "memo" || text == "forwardRef"
+	}
+	return false
 }
 
 // functionReturnsJSXOrNull reports whether the function's body contains a
