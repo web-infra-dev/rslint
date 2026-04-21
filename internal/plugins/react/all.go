@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
@@ -63,6 +64,7 @@ func GetAllRules() []rule.Rule {
 		no_string_refs.NoStringRefsRule,
 		no_typos.NoTyposRule,
 		no_unescaped_entities.NoUnescapedEntitiesRule,
+		no_will_update_set_state.NoWillUpdateSetStateRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
