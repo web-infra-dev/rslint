@@ -73,6 +73,10 @@ func TestNoUnknownPropertyRule(t *testing.T) {
 
 		// ---- React-related attributes ----
 		{Code: `<div onPointerDown={this.onDown} onPointerUp={this.onUp} />`, Tsx: true},
+		// `onLostPointerCapture` / `onLostPointerCaptureCapture` both valid under
+		// default (>= 16.4) — locks down the reactOnProps list after upstream's
+		// duplicate `onLostPointerCapture` entry was deduplicated locally.
+		{Code: `<div onLostPointerCapture={a} onLostPointerCaptureCapture={b} />`, Tsx: true},
 		{Code: `<input type="checkbox" defaultChecked={this.state.checkbox} />`, Tsx: true},
 		{Code: `<div onTouchStart={this.startAnimation} onTouchEnd={this.stopAnimation} onTouchCancel={this.cancel} onTouchMove={this.move} onMouseMoveCapture={this.capture} onTouchCancelCapture={this.log} />`, Tsx: true},
 		{

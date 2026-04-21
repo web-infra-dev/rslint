@@ -323,7 +323,6 @@ var reactOnProps = []string{
 	"onGotPointerCapture",
 	"onGotPointerCaptureCapture",
 	"onLostPointerCapture",
-	"onLostPointerCapture",
 	"onLostPointerCaptureCapture",
 	"onPointerCancel",
 	"onPointerCancelCapture",
@@ -343,29 +342,46 @@ var reactOnProps = []string{
 	"onPointerUpCapture",
 }
 
-// getDOMPropertyNames returns the version-dependent set of recognized DOM
-// property names. Older React versions (< 16.1) recognize `allowTransparency`;
+// buildDOMPropertyLookup builds a lowercased-name → canonical-name map for
+// the version-dependent set of recognized DOM property names, used as the
+// case-insensitive fallback in getStandardName. Built once per rule run;
+// upstream's `names.find(e => e.toLowerCase() === name.toLowerCase())` returns
+// the first match, so entries inserted earlier take precedence (later
+// duplicates are skipped).
+//
+// Older React versions (< 16.1) recognize `allowTransparency`;
 // React >= 16.4 adds pointer-event handlers; React >= 19 adds `precedence`.
-func getDOMPropertyNames(settings map[string]interface{}) []string {
-	names := make([]string, 0, len(domPropertyNamesTwoWords)+len(domPropertyNamesOneWord)+len(reactOnProps)+2)
-	names = append(names, domPropertyNamesTwoWords...)
-	names = append(names, domPropertyNamesOneWord...)
-
-	// React < 16.1 still accepts `allowTransparency`; later versions drop it
-	// (see facebook/react#10823).
+func buildDOMPropertyLookup(settings map[string]interface{}) map[string]string {
+	// Upper bound: two full lists + optional extras.
+	m := make(map[string]string, len(domPropertyNamesTwoWords)+len(domPropertyNamesOneWord)+len(reactOnProps)+2)
+	add := func(name string) {
+		key := strings.ToLower(name)
+		if _, ok := m[key]; !ok {
+			m[key] = name
+		}
+	}
+	for _, n := range domPropertyNamesTwoWords {
+		add(n)
+	}
+	for _, n := range domPropertyNamesOneWord {
+		add(n)
+	}
+	// React < 16.1 still accepts `allowTransparency` (see facebook/react#10823).
 	if reactutil.ReactVersionLessThan(settings, 16, 1, 0) {
-		names = append(names, "allowTransparency")
-		return names
+		add("allowTransparency")
+		return m
 	}
 	// Pointer events arrived in React 16.4.
 	if !reactutil.ReactVersionLessThan(settings, 16, 4, 0) {
-		names = append(names, reactOnProps...)
+		for _, n := range reactOnProps {
+			add(n)
+		}
 		// `precedence` arrived in React 19 (stylesheet support).
 		if !reactutil.ReactVersionLessThan(settings, 19, 0, 0) {
-			names = append(names, "precedence")
+			add("precedence")
 		}
 	}
-	return names
+	return m
 }
 
 // normalizeAttributeCase returns the canonical casing for `name` when its
@@ -405,20 +421,17 @@ func hasUpperCaseCharacter(name string) bool {
 
 // getStandardName looks up `name` (case-insensitively, after the
 // DOM_ATTRIBUTE_NAMES / SVGDOM_ATTRIBUTE_NAMES direct-maps) in the known React
-// DOM property list. Returns the canonical property name or "" when no close
-// match exists.
-func getStandardName(name string, settings map[string]interface{}) string {
+// DOM property lookup map. Returns the canonical property name or "" when no
+// close match exists.
+func getStandardName(name string, domPropertyLookup map[string]string) string {
 	if v, ok := domAttributeNames[name]; ok {
 		return v
 	}
 	if v, ok := svgDomAttributeNames[name]; ok {
 		return v
 	}
-	lower := strings.ToLower(name)
-	for _, candidate := range getDOMPropertyNames(settings) {
-		if strings.ToLower(candidate) == lower {
-			return candidate
-		}
+	if v, ok := domPropertyLookup[strings.ToLower(name)]; ok {
+		return v
 	}
 	return ""
 }
@@ -546,6 +559,9 @@ func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
 			requireDataLowercase = v
 		}
 	}
+	// Precompute the version-dependent DOM property lookup map once per run;
+	// settings are static for the duration of a rule invocation.
+	domPropertyLookup := buildDOMPropertyLookup(ctx.Settings)
 
 	return rule.RuleListeners{
 		ast.KindJsxAttribute: func(node *ast.Node) {
@@ -607,7 +623,7 @@ func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
 				return
 			}
 
-			standardName := getStandardName(name, ctx.Settings)
+			standardName := getStandardName(name, domPropertyLookup)
 			if standardName != "" && standardName == name {
 				return
 			}
