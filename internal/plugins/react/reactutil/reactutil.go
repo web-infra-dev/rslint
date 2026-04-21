@@ -452,6 +452,22 @@ func IsStatelessReactComponent(fn *ast.Node, pragma string) bool {
 		return false
 	}
 
+	// Upstream's `isParentComponentNotStatelessComponent` carve-out: an
+	// object-literal property whose key is a lowercase Identifier AND whose
+	// function has at least one parameter is treated as an instance method,
+	// not a component. Typical render-style components in this shape have
+	// NO params (`render() { return <div/>; }`); a method that takes params
+	// (`handleClick(e) { return <div/>; }`) is an event handler / method
+	// that coincidentally returns JSX — ESLint exempts it.
+	if parent.Kind == ast.KindPropertyAssignment {
+		name := parent.AsPropertyAssignment().Name()
+		if name != nil && name.Kind == ast.KindIdentifier &&
+			!isFirstLetterCapitalized(name.AsIdentifier().Text) &&
+			len(fn.Parameters()) > 0 {
+			return false
+		}
+	}
+
 	switch parent.Kind {
 	case ast.KindVariableDeclaration:
 		binding := parent.AsVariableDeclaration().Name()

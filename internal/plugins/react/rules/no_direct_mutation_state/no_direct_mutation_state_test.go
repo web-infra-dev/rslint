@@ -273,6 +273,44 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           return <div/>;
         });
       `, Tsx: true},
+
+		// ---- Edge: object-literal method with lowercase key AND params —
+		// upstream's isParentComponentNotStatelessComponent carve-out treats
+		// it as an instance method (event handler / helper), NOT a stateless
+		// component. Must NOT be reported. ----
+		{Code: `
+        const obj = {
+          handleClick: function (event) {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+		{Code: `
+        const obj = {
+          handleClick: (event) => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: arrow used as Array.map callback — CallExpression parent,
+		// not a memo/forwardRef wrapper, not in allowed position. ----
+		{Code: `
+        arr.map((item) => {
+          this.state.x = 1;
+          return <div>{item}</div>;
+        });
+      `, Tsx: true},
+
+		// ---- Edge: capital-cased function not returning JSX — not a component ----
+		{Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return 42;
+        };
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -1184,5 +1222,27 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 				{MessageId: "noDirectMutation", Line: 3, Column: 11},
 			},
 		},
+
+		// ---- Edge: capitalized-key object-literal property with params is
+		// still a component — isParentComponentNotStatelessComponent requires
+		// BOTH lowercase key AND params. ----
+		{
+			Code: `
+        const obj = {
+          Hello: function (props) {
+            this.state.x = 1;
+            return <div>{props.name}</div>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: lowercase-key with NO params — still excluded by the
+		// regular PropertyAssignment branch (lowercase key → not a component). ----
+		// Kept as a matching valid test above; not duplicated here.
 	})
 }
