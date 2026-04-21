@@ -20,6 +20,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
@@ -59,6 +60,7 @@ func GetAllRules() []rule.Rule {
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
 		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
+		no_danger_with_children.NoDangerWithChildrenRule,
 		no_did_update_set_state.NoDidUpdateSetStateRule,
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
