@@ -79,7 +79,9 @@ ruleTester.run('no-this-in-sfc', {} as never, {
     },
     { code: `const Foo = (props) => <span>{props.foo}</span>` },
     { code: `const Foo = ({ foo }) => <span>{foo}</span>` },
-    { code: `const Foo = (props) => props.foo ? <span>{props.bar}</span> : null;` },
+    {
+      code: `const Foo = (props) => props.foo ? <span>{props.bar}</span> : null;`,
+    },
     { code: `const Foo = ({ foo, bar }) => foo ? <span>{bar}</span> : null;` },
     {
       code: `
