@@ -267,11 +267,11 @@ func JestVersionMajor(v string) int {
 		return fallback
 	}
 	major, _, _ := strings.Cut(s, ".")
-	if i := strings.IndexRune(major, 'x'); i >= 0 {
-		major = major[:i]
-	}
-	if i := strings.IndexRune(major, 'X'); i >= 0 {
-		major = major[:i]
+	firstNonDigit := strings.IndexFunc(major, func(r rune) bool {
+		return r < '0' || r > '9'
+	})
+	if firstNonDigit >= 0 {
+		major = major[:firstNonDigit]
 	}
 	n, err := strconv.Atoi(major)
 	if err != nil {

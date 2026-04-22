@@ -54,6 +54,25 @@ func memberChainString(entries []utils.ParsedJestFnMemberEntry) string {
 	return strings.Join(parts, ".")
 }
 
+// bracketStyleCalleeReplacement rewrites a dotted replacement callee for call sites that
+// used a string-literal property (e.g. jest['resetModules'] vs jest.resetModules).
+// It mirrors eslint-plugin-jest's two-segment case and extends it to longer chains:
+// "a.b.c" -> "a['b']['c']".
+func bracketStyleCalleeReplacement(replacement string) string {
+	segments := strings.Split(replacement, ".")
+	if len(segments) < 2 {
+		return replacement
+	}
+
+	var b strings.Builder
+	b.WriteString(segments[0])
+	for i := 1; i < len(segments); i++ {
+		fmt.Fprintf(&b, "['%s']", segments[i])
+	}
+
+	return b.String()
+}
+
 var NoDeprecatedFunctionsRule = rule.Rule{
 	Name: "jest/no-deprecated-functions",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -84,10 +103,7 @@ var NoDeprecatedFunctionsRule = rule.Rule{
 				last := entries[len(entries)-1]
 
 				if last.Node != nil && (last.Node.Kind == ast.KindStringLiteral || last.Node.Kind == ast.KindNoSubstitutionTemplateLiteral) {
-					repParts := strings.SplitN(replacement, ".", 2)
-					if len(repParts) == 2 {
-						replacementCallee = fmt.Sprintf("%s['%s']", repParts[0], repParts[1])
-					}
+					replacementCallee = bracketStyleCalleeReplacement(replacement)
 				}
 
 				ctx.ReportNodeWithFixes(
