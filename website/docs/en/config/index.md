@@ -121,6 +121,28 @@ For file exclusion patterns, negation, and `.gitignore` integration, see [Ignori
 
 For rule severity levels, option format, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
+### plugins
+
+- **Type:** `string[]`
+
+Plugin names that this entry activates. A plugin name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside `rules`.
+
+Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `promise`, `react`.
+
+ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are not part of any plugin and can be enabled directly in `rules` without listing anything here.
+
+```ts
+{
+  files: ['**/*.ts'],
+  plugins: ['@typescript-eslint'],
+  rules: {
+    '@typescript-eslint/no-explicit-any': 'error',
+  },
+}
+```
+
+Presets like `ts.configs.recommended` already include their own `plugins` entry, so you only need this field when configuring plugin rules outside a preset.
+
 ### languageOptions
 
 - **Type:** `object`

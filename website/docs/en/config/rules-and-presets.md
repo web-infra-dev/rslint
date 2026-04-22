@@ -56,11 +56,15 @@ rules: {
 
 Plugin names to enable. Available plugins:
 
-| Plugin                 | Rules Prefix           |
-| ---------------------- | ---------------------- |
-| `@typescript-eslint`   | `@typescript-eslint/*` |
-| `eslint-plugin-import` | `import/*`             |
-| `react`                | `react/*`              |
+| Plugin               | Rules Prefix           |
+| -------------------- | ---------------------- |
+| `@typescript-eslint` | `@typescript-eslint/*` |
+| `import`             | `import/*`             |
+| `jest`               | `jest/*`               |
+| `promise`            | `promise/*`            |
+| `react`              | `react/*`              |
+
+ESLint core rules (e.g. `no-unused-vars`, `prefer-const`, `no-var`) have no prefix and do not belong to any plugin — they can be enabled directly in `rules` without listing anything in `plugins`.
 
 :::tip
 When using JS/TS config with presets (e.g., `ts.configs.recommended`), plugins are declared within the preset — you don't need to specify them separately.
