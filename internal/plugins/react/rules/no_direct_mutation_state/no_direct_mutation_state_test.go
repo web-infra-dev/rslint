@@ -1,0 +1,1858 @@
+package no_direct_mutation_state
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestNoDirectMutationStateRule(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoDirectMutationStateRule, []rule_tester.ValidTestCase{
+		// ---- Upstream: createReactClass with no mutation ----
+		{Code: `
+        var Hello = createReactClass({
+          render: function() {
+            return <div>Hello {this.props.name}</div>;
+          }
+        });
+      `, Tsx: true},
+
+		// ---- Upstream: local object shaped like { state: {} } is not this.state ----
+		{Code: `
+        var Hello = createReactClass({
+          render: function() {
+            var obj = {state: {}};
+            obj.state.name = "foo";
+            return <div>Hello {obj.state.name}</div>;
+          }
+        });
+      `, Tsx: true},
+
+		// ---- Upstream: not a component at all ----
+		{Code: `
+        var Hello = "foo";
+        module.exports = {};
+      `, Tsx: true},
+
+		// ---- Upstream: non-component class (no extends) — mutation allowed ----
+		{Code: `
+        class Hello {
+          getFoo() {
+            this.state.foo = 'bar'
+            return this.state.foo;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Upstream: mutation inside constructor is exempt ----
+		{Code: `
+        class Hello extends React.Component {
+          constructor() {
+            this.state.foo = "bar"
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Upstream: numeric literal assignment in constructor is still exempt ----
+		{Code: `
+        class Hello extends React.Component {
+          constructor() {
+            this.state.foo = 1;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Upstream: nested non-mutating class inside a component constructor ----
+		{Code: `
+        class OneComponent extends Component {
+          constructor() {
+            super();
+            class AnotherComponent extends Component {
+              constructor() {
+                super();
+              }
+            }
+            this.state = {};
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: bracket access `this['state']` is not matched (ESLint checks Identifier .name only) ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this['state'].foo = 'bar';
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: receiver is not `this` ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            that.state.foo = 'bar';
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: a class that doesn't extend Component/PureComponent ----
+		{Code: `
+        class Hello extends SomethingElse {
+          componentDidMount() {
+            this.state.foo = 'bar';
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: destructuring assignment whose LHS is a pattern, not a member ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            const {x} = this.state;
+            ({x} = this.state);
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: inside constructor, outside any call: compound assignment is still exempt ----
+		{Code: `
+        class Hello extends React.Component {
+          constructor() {
+            this.state.count += 1;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: mutation sits in a non-function position of createReactClass — no component ----
+		{Code: `
+        var Hello = createReactClass({
+          foo: (this.state.bar = 1)
+        });
+      `, Tsx: true},
+
+		// ---- Edge: `super.state.foo = ...` — not `this`, not reported (matches ESLint `object.type === 'ThisExpression'`) ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            super.state.foo = "bar";
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: receiver is an identifier coincidentally named `state` ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            const state = { foo: 0 };
+            state.foo = 1;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: `this['state'].foo = x` — computed outer, not flagged (matches ESLint) ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this['state'].nested.foo = 1;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: React.PureComponent subclass is still a component ----
+		{Code: `
+        class Hello extends React.PureComponent {
+          constructor() {
+            super();
+            this.state = { foo: 'bar' };
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: pragma-qualified createClass via React settings ----
+		{
+			Code: `
+        var Hello = React.createClass({
+          render: function() {
+            return <div>Hello {this.props.name}</div>;
+          }
+        });
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"createClass": "createClass"}},
+		},
+
+		// ---- Edge: lowercase-named function is NOT a component (no capital letter) ----
+		{Code: `
+        function hello() {
+          this.state.x = 1;
+          return <div/>;
+        }
+      `, Tsx: true},
+
+		// ---- Edge: capital-named function that doesn't return JSX/null is NOT a component ----
+		{Code: `
+        function Hello() {
+          this.state.x = 1;
+          return "hi";
+        }
+      `, Tsx: true},
+
+		// ---- Edge: arrow with lowercase VariableDeclarator name is NOT a component ----
+		{Code: `
+        const hello = () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: bare function body (no enclosing component) ----
+		{Code: `
+        function foo() {
+          this.state.x = 1;
+        }
+      `, Tsx: true},
+
+		// ---- Edge: lowercase variable beats named FE — `const outer = function Inner() {...}`
+		// matches ESLint's getStatelessComponent, which early-returns `undefined`
+		// when VariableDeclarator.id is lowercase; the FE's own capitalized name
+		// MUST NOT override that. ----
+		{Code: `
+        const outer = function Inner() {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: non-wrapper CallExpression parent (e.g. plain helper) — not a component ----
+		{Code: `
+        helper(function () {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `, Tsx: true},
+
+		// ---- Edge: lowercase property name in object literal — not a component ----
+		{Code: `
+        const obj = {
+          render: () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: IIFE (any name) is NOT in an allowed position for component
+		// per ESLint's isInAllowedPositionForComponent — CallExpression parent is
+		// rejected, so these must NOT be reported. ----
+		{Code: `
+        (function Hello() {
+          this.state.x = 1;
+          return <div/>;
+        })();
+      `, Tsx: true},
+		{Code: `
+        (() => {
+          this.state.x = 1;
+          return <div/>;
+        })();
+      `, Tsx: true},
+
+		// ---- Edge: obj.lowercase = fn — lowercase property name is NOT a component ----
+		{Code: `
+        obj.foo = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: plain helper callback (not memo/forwardRef) — not a component ----
+		{Code: `
+        setTimeout(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `, Tsx: true},
+
+		// ---- Edge: object-literal method with lowercase key AND params —
+		// upstream's isParentComponentNotStatelessComponent carve-out treats
+		// it as an instance method (event handler / helper), NOT a stateless
+		// component. Must NOT be reported. ----
+		{Code: `
+        const obj = {
+          handleClick: function (event) {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+		{Code: `
+        const obj = {
+          handleClick: (event) => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: arrow used as Array.map callback — CallExpression parent,
+		// not a memo/forwardRef wrapper, not in allowed position. ----
+		{Code: `
+        arr.map((item) => {
+          this.state.x = 1;
+          return <div>{item}</div>;
+        });
+      `, Tsx: true},
+
+		// ---- Edge: capital-cased function not returning JSX — not a component ----
+		{Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return 42;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: `delete this.state.x` — rule only fires on assignment /
+		// update expressions, not DeleteExpression (matches ESLint). ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            delete this.state.x;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: anonymous FE assigned to lowercase `obj.foo = ...` ----
+		{Code: `
+        obj.foo = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: returning an arrow (not JSX) — not a component ----
+		{Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return () => <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: assignment default in destructuring params (BinaryExpression
+		// shape is a BindingElement, not a real assignment) — not a mutation. ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount({ key = this.state.fallback } = {}) {
+            return key;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: `for (key in this.state) {...}` — reads, not a mutation ----
+		{Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            for (const k in this.state) { console.log(k); }
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: Inner component class's constructor mutation is exempt on
+		// Inner; outer Outer.foo() never sees the mutation on the walk path. ----
+		{Code: `
+        class Outer extends React.Component {
+          foo() {
+            class Inner extends React.Component {
+              constructor() {
+                super();
+                this.state = { inner: true };
+              }
+            }
+            return Inner;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: class-body MethodDeclaration is NOT a stateless FE/Arrow
+		// (upstream's getStatelessComponent only accepts
+		// FunctionDeclaration / FunctionExpression / ArrowFunction). Mutations
+		// in a class method ALWAYS go through the ES6-class path, never the
+		// stateless fallback. A method with lowercase name + params on a
+		// non-component class is therefore NOT reported, matching ESLint. ----
+		{Code: `
+        class Helper {
+          handleClick(event) {
+            this.state.x = 1;
+            return <div/>;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Edge: lowercase-keyed shorthand method is NOT a component
+		// (PropertyAssignment-style capitalization check). ----
+		{Code: `
+        const obj = {
+          hello() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: computed key on shorthand method (`[Hello]() {...}`) is
+		// NOT a component per upstream's `!node.parent.computed` guard. ----
+		{Code: `
+        const obj = {
+          ['Hello']() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: object-literal setter `set Hello(v) { ... }` doesn't
+		// return JSX (no return value), so never a component. ----
+		{Code: `
+        const obj = {
+          set Hello(v) {
+            this.state.x = v;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: `export default () => null` — upstream's ExportDefault
+		// branch uses the STRICT isReturningJSX which excludes null-only
+		// returns. Returning only null is therefore NOT a component. ----
+		{Code: `
+        export default () => {
+          this.state.x = 1;
+          return null;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: nested arrow whose outer-arrow body's parent is an
+		// AssignmentExpression with a LOWERCASE LHS — upstream requires
+		// capitalized outer LHS, so inner arrow is NOT a component. ----
+		{Code: `
+        x = () => () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: nested arrow whose outer-arrow body's parent is a
+		// PropertyAssignment with a LOWERCASE key — same logic. ----
+		{Code: `
+        const obj = {
+          helper: () => () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: `x = () => null` — null-only arrow whose parent is an
+		// ArrowFunction expression body. Upstream's strict isReturningJSX gate
+		// rejects null-only returns in this position. ----
+		{Code: `
+        x = () => () => {
+          this.state.x = 1;
+          return null;
+        };
+      `, Tsx: true},
+
+		// ---- Edge: `function f() { return () => null; }` — inner arrow in
+		// ReturnStatement with null-only return. Upstream rejects via
+		// isReturningJSX strict gate. ----
+		{Code: `
+        function f() {
+          return () => {
+            this.state.x = 1;
+            return null;
+          };
+        }
+      `, Tsx: true},
+
+		// ---- Edge: three-level return-nested in assignment with LOWERCASE
+		// outer LHS — upstream's branch 7 (ReturnStatement → functionExpr
+		// → AssignmentExpression) examines outer LHS, so lowercase `x`
+		// rejects classification. ----
+		{Code: `
+        x = function () {
+          return () => {
+            this.state.x = 1;
+            return <div/>;
+          };
+        };
+      `, Tsx: true},
+
+		// ---- Edge: three-level return-nested in Property with LOWERCASE
+		// outer key — upstream's branch 8 (ReturnStatement → functionExpr
+		// → Property) rejects. ----
+		{Code: `
+        const obj = {
+          helper: function () {
+            return () => {
+              this.state.x = 1;
+              return <div/>;
+            };
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: MemberExpression-style computed key (`{ [a.b]: fn }`)
+		// with a non-JSX, non-null return — upstream's branch 9 rejects. ----
+		{Code: `
+        const obj = {
+          [a.b]: () => {
+            this.state.x = 1;
+            return 42;
+          },
+        };
+      `, Tsx: true},
+
+		// ---- Edge: anonymous arrow assigned to PropertyAssignment with
+		// Identifier CAPITAL key BUT returning null only — upstream's
+		// Property !id+!computed branch uses strict isReturningJSX and
+		// rejects null-only. ----
+		{Code: `
+        const obj = {
+          Hello: () => {
+            this.state.x = 1;
+            return null;
+          },
+        };
+      `, Tsx: true},
+	}, []rule_tester.InvalidTestCase{
+		// ---- Upstream: createReactClass — simple mutation ----
+		{
+			Code: `
+        var Hello = createReactClass({
+          render: function() {
+            this.state.foo = "bar"
+            return <div>Hello {this.props.name}</div>;
+          }
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: createReactClass — update expression ----
+		{
+			Code: `
+        var Hello = createReactClass({
+          render: function() {
+            this.state.foo++;
+            return <div>Hello {this.props.name}</div>;
+          }
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: createReactClass — nested property assignment ----
+		{
+			Code: `
+        var Hello = createReactClass({
+          render: function() {
+            this.state.person.name= "bar"
+            return <div>Hello {this.props.name}</div>;
+          }
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: createReactClass — deeper nested assignment ----
+		{
+			Code: `
+        var Hello = createReactClass({
+          render: function() {
+            this.state.person.name.first = "bar"
+            return <div>Hello</div>;
+          }
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: two mutations in the same render body ----
+		{
+			Code: `
+        var Hello = createReactClass({
+          render: function() {
+            this.state.person.name.first = "bar"
+            this.state.person.name.last = "baz"
+            return <div>Hello</div>;
+          }
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noDirectMutation",
+					Message:   "Do not mutate state directly. Use setState().",
+					Line:      4, Column: 13,
+				},
+				{
+					MessageId: "noDirectMutation",
+					Message:   "Do not mutate state directly. Use setState().",
+					Line:      5, Column: 13,
+				},
+			},
+		},
+
+		// ---- Upstream: mutation in a class method called from the constructor ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          constructor() {
+            someFn()
+          }
+          someFn() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 7, Column: 13},
+			},
+		},
+
+		// ---- Upstream: constructor body but wrapped in a nested CallExpression (arrow in async helper) ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          constructor(props) {
+            super(props)
+            doSomethingAsync(() => {
+              this.state = "bad";
+            });
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 6, Column: 15},
+			},
+		},
+
+		// ---- Upstream: componentWillMount ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentWillMount() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: componentDidMount ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: componentWillReceiveProps ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentWillReceiveProps() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: shouldComponentUpdate ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          shouldComponentUpdate() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: componentWillUpdate ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentWillUpdate() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: componentDidUpdate ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidUpdate() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Upstream: componentWillUnmount ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentWillUnmount() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: bare `class Hello extends Component` (unqualified) ----
+		{
+			Code: `
+        class Hello extends Component {
+          componentDidMount() {
+            this.state.foo = "bar"
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: compound assignment is still a mutation ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.count += 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: prefix decrement ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            --this.state.count;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 15},
+			},
+		},
+
+		// ---- Edge: mutation inside an ArrowFunction callback inside a class method is NOT in the constructor ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            setTimeout(() => { this.state.x = 1; });
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 32},
+			},
+		},
+
+		// ---- Edge: parenthesized LHS is unwrapped ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            (this.state.foo) = "bar";
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 14},
+			},
+		},
+
+		// ---- Edge: bracket access within the chain still traverses inward ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state['foo'] = "bar";
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: static method — ESLint flags (does not special-case `this` binding) ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          static foo() {
+            this.state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: class getter body ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          get foo() {
+            this.state.x = 1;
+            return 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: class setter body ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          set foo(_v) {
+            this.state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: arrow-function class property body (fires outside the constructor) ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          handleClick = () => {
+            this.state.x = 1;
+          };
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: class field initializer (PropertyDeclaration, not a Constructor) ----
+		// The mutation runs during construction semantically, but syntactically
+		// it is NOT inside a constructor MethodDefinition, so ESLint flags it
+		// (`inConstructor` never becomes true).
+		{
+			Code: `
+        class Hello extends React.Component {
+          foo = (this.state.x = 1);
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 18},
+			},
+		},
+
+		// ---- Edge: anonymous class expression component ----
+		{
+			Code: `
+        var Hello = class extends React.Component {
+          componentDidMount() {
+            this.state.x = 1;
+          }
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: IIFE inside constructor — nested CallExpression voids the exemption ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          constructor() {
+            super();
+            (() => { this.state.x = 1; })();
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 5, Column: 22},
+			},
+		},
+
+		// ---- Edge: object-literal method named `constructor` inside createReactClass
+		// is NOT the ES6 constructor — mutation is flagged. ----
+		{
+			Code: `
+        var Hello = createReactClass({
+          constructor: function() {
+            this.state.x = 1;
+          },
+          render: function() {
+            return <div/>;
+          }
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: mutation deep inside nested CallExpressions inside a method ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            foo(bar(baz(() => { this.state.x = 1; })));
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 33},
+			},
+		},
+
+		// ---- Edge: logical assignment ||= on this.state ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.x ||= 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: mutation inside a generator method ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          *step() {
+            this.state.x = 1;
+            yield 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: mutation inside async method ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          async load() {
+            await Promise.resolve();
+            this.state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 5, Column: 13},
+			},
+		},
+
+		// ---- Edge: computed-name class method ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          ['foo']() {
+            this.state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: private method ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          #foo() {
+            this.state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: pragma-qualified createReactClass via settings: `React.createClass({...})` ----
+		{
+			Code: `
+        var Hello = React.createClass({
+          render: function() {
+            this.state.x = 1;
+            return <div/>;
+          }
+        });
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"createClass": "createClass"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: React.PureComponent — a component, should be flagged ----
+		{
+			Code: `
+        class Hello extends React.PureComponent {
+          componentDidMount() {
+            this.state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: nested React component inside a non-component class method ----
+		{
+			Code: `
+        class Outer {
+          method() {
+            class Inner extends React.Component {
+              componentDidMount() {
+                this.state.x = 1;
+              }
+            }
+            return Inner;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 6, Column: 17},
+			},
+		},
+
+		// ---- Edge: two mutations across different lifecycle methods on same class ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.a = 1;
+          }
+          componentWillUnmount() {
+            this.state.b = 2;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+				{MessageId: "noDirectMutation", Line: 7, Column: 13},
+			},
+		},
+
+		// ---- Edge: mutation inside constructor wrapped in a PostfixUnary call — still flagged ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          constructor() {
+            super();
+            someHelper(() => { this.state.x++; });
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 5, Column: 32},
+			},
+		},
+
+		// ---- Edge: stateless FunctionDeclaration component (capital name + JSX return) ----
+		{
+			Code: `
+        function Hello() {
+          this.state.x = 1;
+          return <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless arrow assigned to capital-cased VariableDeclarator ----
+		{
+			Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless FunctionExpression assigned to capital-cased VariableDeclarator ----
+		{
+			Code: `
+        const Hello = function() {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless arrow with implicit JSX return body ----
+		{
+			Code: `
+        const Hello = () => (this.state.x = 1, <div/>);
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 2, Column: 30},
+			},
+		},
+
+		// ---- Edge: stateless component returning `null` on some branch ----
+		{
+			Code: `
+        function Hello() {
+          this.state.x = 1;
+          if (cond) return null;
+          return <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with ternary returning JSX-or-null ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.show ? <div/> : null;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component's inner arrow does NOT shadow — outer stateless wins ----
+		{
+			Code: `
+        function Hello() {
+          const onClick = () => { this.state.x = 1; };
+          onClick();
+          return <div onClick={onClick}/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 35},
+			},
+		},
+
+		// ---- Edge: capital variable + lowercase named FE — `const Outer = function inner() {...}`
+		// ESLint's VariableDeclarator branch decides by parent.id.name ("Outer"),
+		// NOT by the FE's own inner name — so this IS detected as a component. ----
+		{
+			Code: `
+        const Outer = function inner() {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with `cond && <div/>` (common conditional render) ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.visible && <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with `cond || <div/>` fallback pattern ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.fallback || <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: stateless component with nullish coalescing `x ?? <div/>` ----
+		{
+			Code: `
+        function Hello(props) {
+          this.state.x = 1;
+          return props.cached ?? <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: React.memo wrapping an anonymous arrow ----
+		{
+			Code: `
+        const Hello = React.memo(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: bare `memo(...)` (destructured from React) ----
+		{
+			Code: `
+        export default memo(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: React.forwardRef wrapping an anonymous arrow ----
+		{
+			Code: `
+        const Hello = React.forwardRef((props, ref) => {
+          this.state.x = 1;
+          return <div ref={ref}/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: bare `forwardRef(...)` ----
+		{
+			Code: `
+        const Hello = forwardRef((props, ref) => {
+          this.state.x = 1;
+          return <div ref={ref}/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: pragma-qualified memo under `settings.react.pragma = "Preact"` ----
+		{
+			Code: `
+        const Hello = Preact.memo(() => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"pragma": "Preact"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `export default function() {...}` (anonymous default-export FD) ----
+		{
+			Code: `
+        export default function () {
+          this.state.x = 1;
+          return <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `export default () => ...` (arrow default export) ----
+		{
+			Code: `
+        export default () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `module.exports = function() {...}` — blanket true per ESLint's
+		// isModuleExportsAssignment carve-out. ----
+		{
+			Code: `
+        module.exports = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `obj.Hello = function() {...}` — capitalized property name
+		// assignment on an arbitrary MemberExpression LHS is a component. ----
+		{
+			Code: `
+        obj.Hello = function () {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: capitalized-key object-literal property with params is
+		// still a component — isParentComponentNotStatelessComponent requires
+		// BOTH lowercase key AND params. ----
+		{
+			Code: `
+        const obj = {
+          Hello: function (props) {
+            this.state.x = 1;
+            return <div>{props.name}</div>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: lowercase-key with NO params — still excluded by the
+		// regular PropertyAssignment branch (lowercase key → not a component). ----
+		// Kept as a matching valid test above; not duplicated here.
+
+		// ---- Edge: 5-level deep chain `this.state.a.b.c.d = 1` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.a.b.c.d = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: prefix increment `++this.state.x` (mirror of prefix decrement) ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            ++this.state.counter;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 15},
+			},
+		},
+
+		// ---- Edge: postfix decrement `this.state.x--` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.counter--;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: bitwise compound assignment `|=` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.flags |= 0x1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: nullish coalescing assignment `??=` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.value ??= 0;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: exponentiation compound assignment `**=` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.power **= 2;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: chained assignment `this.state.a = this.state.b = 1` —
+		// two separate mutations, both should report. ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            this.state.a = this.state.b = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+				{MessageId: "noDirectMutation", Line: 4, Column: 28},
+			},
+		},
+
+		// ---- Edge: parenthesized `this` inside the chain: `(this).state.x = 1` ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            (this).state.x = 1;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: mutation inside an arrow JSX-attribute callback ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          render() {
+            return <button onClick={() => { this.state.x = 1; }}/>;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 45},
+			},
+		},
+
+		// ---- Edge: mutation inside a template-literal expression position ----
+		{
+			Code: `
+        class Hello extends React.Component {
+          componentDidMount() {
+            tag` + "`${this.state.x = 1}`" + `;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 19},
+			},
+		},
+
+		// ---- Edge: JSX Fragment `<></>` as return — `isJSXOrNullExpression`
+		// must recognize KindJsxFragment. ----
+		{
+			Code: `
+        const Hello = () => {
+          this.state.x = 1;
+          return <></>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: named default-exported FD — `export default function Hello() {...}` ----
+		{
+			Code: `
+        export default function Hello() {
+          this.state.x = 1;
+          return <div/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: named `export const Hello = () => ...` ----
+		{
+			Code: `
+        export const Hello = () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: mutation in a stateless component nested inside another
+		// stateless component — the INNER one is the nearest component. ----
+		{
+			Code: `
+        function Outer() {
+          const Inner = () => {
+            this.state.x = 1;
+            return <span/>;
+          };
+          return <Inner/>;
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: SequenceExpression-last stateless component —
+		// `const Hello = (init(), () => <div/>)` forms a SequenceExpression,
+		// the last operand is the arrow; allowed-position must pass through. ----
+		{
+			Code: `
+        const Hello = (init(), (props) => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: object-literal shorthand method with capital key IS a
+		// component per upstream's Property branch
+		// (parent.method && !parent.computed && capitalized(key)). ----
+		{
+			Code: `
+        const obj = {
+          Hello() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: object-literal getter with capital key IS a component per
+		// upstream (`!node.id && !node.parent.computed`). ----
+		{
+			Code: `
+        const obj = {
+          get Hello() {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: nested arrow with CAPITALIZED outer-assignment LHS —
+		// upstream examines `parent.parent.left` (the outer `Hello`)
+		// capitalization, not the inner arrow's. ----
+		{
+			Code: `
+        Hello = () => () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: nested arrow under a CAPITAL-keyed PropertyAssignment. ----
+		{
+			Code: `
+        const obj = {
+          Hello: () => () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: paren-wrapped fn argument `React.memo((fn))` — tsgo keeps
+		// the ParenthesizedExpression; the wrapper detection must be
+		// paren-transparent to match ESTree behavior. ----
+		{
+			Code: `
+        const Hello = React.memo((() => {
+          this.state.x = 1;
+          return <div/>;
+        }));
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: `export default () => <div/>` strict gate still passes
+		// when the body returns real JSX (not just null). ----
+		{
+			Code: `
+        export default () => {
+          this.state.x = 1;
+          return <div/>;
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+			},
+		},
+
+		// ---- Edge: three-level return-nested, capital outer LHS is a
+		// component per upstream's branch 7. ----
+		{
+			Code: `
+        Hello = function () {
+          return () => {
+            this.state.x = 1;
+            return <div/>;
+          };
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: three-level return-nested, capital outer Property key is
+		// a component per upstream's branch 8. ----
+		{
+			Code: `
+        const obj = {
+          Hello: function () {
+            return () => {
+              this.state.x = 1;
+              return <div/>;
+            };
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 5, Column: 15},
+			},
+		},
+
+		// ---- Edge: MemberExpression-style computed key with JSX return IS
+		// a component (upstream's branch 9 only rejects non-JSX non-null). ----
+		{
+			Code: `
+        const obj = {
+          [a.b]: () => {
+            this.state.x = 1;
+            return <div/>;
+          },
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Edge: named FE in ReturnStatement with capitalized own id is
+		// a component (upstream's branch 7 first check: if node.id capital
+		// return node). ----
+		{
+			Code: `
+        x = function () {
+          return function Inner() {
+            this.state.x = 1;
+            return <div/>;
+          };
+        };
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+	})
+}

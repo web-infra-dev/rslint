@@ -429,5 +429,21 @@ func TestNamingConventionRule(t *testing.T) {
 				{MessageId: "doesNotMatchFormat", Line: 2, Column: 10},
 			},
 		},
+
+		// requireDouble on a lone `_`: stripping `__` fails because only one
+		// underscore exists, so missingUnderscore fires.
+		{
+			Code: `const _ = 1;`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"selector":          "variable",
+					"format":            []interface{}{"camelCase"},
+					"leadingUnderscore": "requireDouble",
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "missingUnderscore", Line: 1, Column: 7},
+			},
+		},
 	})
 }

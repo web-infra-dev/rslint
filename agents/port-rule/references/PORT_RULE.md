@@ -20,7 +20,7 @@ When an upstream test case depends on one of these:
 - **Don't** list the gap under the rule's "Differences from ESLint" section — framework gaps apply to every rule, not yours.
 - **Do** mark the upstream case `skip: true` with an inline reason such as `// SKIP: rslint does not support ESLint's <concept>`.
 
-The rule doc's "Differences from ESLint" section is reserved for semantic differences of this specific rule — either intentional choices (Phase 1 Step 5.A) or tsgo/Go-semantic side effects (Phase 1 Step 5.B).
+The rule doc's "Differences from ESLint" section is reserved for semantic differences of this specific rule — either intentional choices (Phase 1 Step 6.A) or tsgo/Go-semantic side effects (Phase 1 Step 6.B).
 
 ---
 
@@ -137,7 +137,7 @@ Before starting, familiarize yourself with these key source locations:
 
 4. **Identify Edge Cases**:
 
-   Systematically enumerate edge cases across three dimensions:
+   Systematically enumerate edge cases across four dimensions.
 
    **Dimension 1: AST node types** — List every syntax construct the rule should handle:
    - All access patterns (e.g., `.prop`, `['prop']`, ``[`prop`]``)
@@ -158,7 +158,46 @@ Before starting, familiarize yourself with these key source locations:
    - Parenthesized expressions (multiple levels)
    - Multi-line code with varying whitespace
 
-5. **Document Divergence from ESLint**:
+   **Dimension 4: Universal edge shapes** — walk this checklist for EVERY port, regardless of what the rule does. Mark rows as N/A when genuinely irrelevant (and briefly note why), and add ≥1 dedicated test for each applicable row. Upstream's own test suite rarely covers all of these; they are the most common source of "looks aligned but silently drifts" regressions:
+   - **Receiver / expression wrappers on inputs the rule inspects**:
+     - `(X).y`, `((X)).y` — single and multi-level parenthesized receiver (tsgo preserves; ESTree flattens)
+     - `X!.y` — TS non-null assertion
+     - `(X as any).y`, `X satisfies T` — TS type-expression wrappers
+     - `X?.y`, `X?.()` — optional chain (tsgo: flag on `PropertyAccessExpression`/`CallExpression`; no `ChainExpression` wrapper)
+   - **Access / key forms**:
+     - Identifier key vs string-literal key (`"x": ...`) vs numeric-literal key (`0: ...`) vs `PrivateIdentifier` (`#x`) vs `ComputedPropertyName` (`[expr]: ...`) — state explicitly which forms the rule accepts and lock every other form as an un-matched case
+     - Element access `X['y']`, `X[`y`]`, `X[0]`, `X[Symbol.iterator]` when the rule handles dotted member access
+   - **Declaration / container forms** (when the rule targets functions or classes):
+     - Class declaration vs class expression (`class X extends Y` vs `const X = class extends Y`)
+     - Function declaration vs function expression vs arrow vs method vs class-field arrow (`componentDidMount = () => {}`)
+     - `async` / `generator` / `async generator` variants
+   - **Nesting / traversal boundaries**:
+     - Same-kind nesting where only the outer (or only the inner) should match — e.g. class-in-class, function-in-function. Verify the listener doesn't "bleed" past the boundary
+     - Rule-specific ancestor walks (`getThisContainer`, `FindEnclosingScope`, etc.) crossed with arrow bodies, method bodies, and class-static-block bodies
+   - **Graceful degradation**:
+     - `SpreadAssignment` inside an object literal, `RestElement` inside a binding pattern — must not crash and must not mask sibling-property checks
+     - Empty class body, empty function body, empty destructuring pattern, empty arguments list
+     - Overload signatures / `abstract` / `declare` members — body-absent forms
+
+5. **Upstream semantic walk**:
+
+   Migrating upstream's `valid`/`invalid` tests covers the main path, but nearly every ESLint rule has branches/OR conditions that are reachable but not tested upstream. Missing these is the #1 source of "passes all upstream tests, silently drifts in semantics" regressions.
+
+   Do this walk BEFORE moving to Phase 2:
+   1. Read the upstream rule source file end-to-end.
+   2. For each listener / visitor, enumerate every branch — in particular:
+      - Every `||` / `&&` in a gating `if`, including the ones whose second arm is reachable only by a specific input shape.
+      - Every `.some()` / `.find()` / `entries().some()` predicate — each `return moduleName;`-style early-exit is a distinct branch.
+      - Every fallback value (`X || defaultY`, `X ?? Y`) where `X` can realistically be undefined.
+   3. For each branch, write down a MINIMAL input code snippet that exercises it.
+   4. Add a Go test for every snippet, even if upstream never tests it. Typical examples that slip past upstream tests:
+      - Destructuring from a non-`require` call whose first arg happens to match a watched module (e.g. `var {X} = myFunc('react')`).
+      - Fallback `reactModuleName || pragma` when `reactModuleName` is falsy.
+      - A condition that becomes true only for a TS-only syntax form (non-null, `as`, `satisfies`).
+
+   These tests protect against future refactors silently flipping semantics. Put them in the Go test file with a comment referencing the upstream branch they lock in (`// Locks in upstream <function>() arm <N>: <what>`).
+
+6. **Document Divergence from ESLint**:
 
    Two classes of divergence may arise when porting. Both must be documented; they differ in _how_ and _where_.
 
@@ -201,7 +240,18 @@ Before starting, familiarize yourself with these key source locations:
 - Review AST node types in `shim/ast/shim.go`
 - See [AST_PATTERNS.md](../../AST_PATTERNS.md) for traversal patterns and examples
 
-**Check for reusable `internal/utils/` helpers** (FIRST): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
+**Check plugin-local helpers FIRST** (before touching `internal/utils/`): grep the same plugin's neighbor rules for near-duplicates of the helper you're about to write:
+
+```bash
+# For plugin rules:
+grep -rn "^func [a-z]" internal/plugins/<plugin>/rules/
+# For core rules:
+grep -rn "^func [a-z]" internal/rules/
+```
+
+If ≥1 rule in the same plugin already defines a near-equivalent helper, you MUST extract the shared helper to `internal/plugins/<plugin>/<plugin>util/` (or an existing shared package) BEFORE adding your new rule. No second copy. This is a hard rule — see _Helper Extraction_ below for the override criterion.
+
+**Check for reusable `internal/utils/` helpers** (SECOND): Before writing any helper function, grep `internal/utils/` for an existing one. Helpful prefixes to search:
 
 - `IsSpecific*`, `IsArgument*` — well-known API-call recognition (`Object.defineProperty`-style, member-access patterns, nth-argument-of)
 - `GetStatic*`, `Normalize*` — property-name / literal-value normalization (e.g. `GetStaticPropertyName`, `NormalizeNumericLiteral`, `NormalizeBigIntLiteral`)
@@ -213,7 +263,7 @@ Before starting, familiarize yourself with these key source locations:
 
 See [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
 
-**Check for reusable shim utilities** (SECOND): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
+**Check for reusable shim utilities** (THIRD): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
 
 - `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`, `GetSourceTextOfNodeFromSourceFile` (raw source text — useful when an AST node's `.Text` field has been normalized at parse time)
 - `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, `SkipParentheses`, `IsOptionalChain`, and other AST utilities
@@ -324,6 +374,8 @@ After Step 2 is done, review each helper for extraction to `internal/utils/`:
 
 **Keep local otherwise.** Predicates that encode a specific rule's definition (e.g. a `isDoubleLogicalNegating`-style helper that codifies "what counts as a double-negation coercion for THIS rule") stay with the rule — extracting would mislead future readers.
 
+**Hard override — duplicate-across-rules rule**: if the same helper (or a near-duplicate) already lives in ≥1 other rule within the same plugin, it MUST be extracted to `<plugin>util/`, even if the "plausibly needed by another rule" criterion above feels borderline. The fact that you're about to write the second copy is itself proof of reusability. Don't let the first duplicate bend your judgement.
+
 ### Step 3: Write Documentation
 
 **File**: `<rule_name>.md`
@@ -367,6 +419,13 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 ````
 
 **Options in examples**: when a code block demonstrates a specific option combination, precede the `javascript` block with a standalone `json` block containing the rule's config entry — shape: `{ "<rule-name>": ["error", { ...options... }] }`. Let prettier format it (single-line when short, multi-line when the options list grows). Keep the `javascript` block pure source code (no annotations). Do **not** wrap the config entry in a `"rules": { ... }` object (redundant here) and do **not** copy upstream linter directives such as `/* eslint <rule>: [...] */` into the examples.
+
+**Writing a "Differences from ESLint" section** (when the rule has one):
+
+- The audience is the **rule user**, not the porter. Describe what they will observe, not why.
+- Each bullet states a concrete input pattern and the observable difference ("rslint reports X on this code; ESLint does not", "positions differ by N columns", "message text differs", etc.). Keep each bullet to ≤2 lines.
+- **Do NOT** mention implementation details: `getText`, `SkipParentheses`, `AST shape`, `ESTree vs tsgo`, "we chose to…" — those belong in source-code comments, not the rule doc.
+- If you can't explain the divergence in terms of observable input-vs-output behavior without reaching for mechanism, the divergence is probably a bug, not a documented difference. Reconsider.
 
 ### Step 4: Write Go Tests
 
@@ -488,7 +547,21 @@ Follow this **strict order** — each step depends on the previous one:
 
    ```bash
    go test -count=1 ./internal/rules/<rule_name>
+   # or, for plugin rules:
+   go test -count=1 ./internal/plugins/<plugin>/rules/<rule_name>
    ```
+
+   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also rerun every rule that consumes it. When in doubt about the blast radius, rerun the whole plugin or the whole tree:
+
+   ```bash
+   # When you extracted a helper to or modified <plugin>util/:
+   go test -count=1 ./internal/plugins/<plugin>/...
+
+   # When you touched internal/utils/ (cross-plugin shared):
+   go test -count=1 ./internal/...
+   ```
+
+   Extracting / renaming a helper is a silent-regression hotspot; running the narrower `./rules/<rule_name>` in isolation is not enough.
 
 3. **Build binary** (REQUIRED before JS tests — they spawn the binary via IPC):
 
@@ -527,7 +600,7 @@ Follow this **strict order** — each step depends on the previous one:
 
 6. **Contract Alignment Checklist (Go ↔ ESLint)**:
 
-   Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 5.B); contract differences are not.
+   Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 6.B); contract differences are not.
 
    Before claiming the port is aligned, confirm every row. Missing any row means the claim is premature:
    - [ ] **Full ESLint test migration** — every `valid` / `invalid` case from the upstream unit-test file has a corresponding Go case (or a `Skip: true` with a `// SKIP: <reason>` comment).
@@ -537,18 +610,23 @@ Follow this **strict order** — each step depends on the previous one:
    - [ ] **Options combination matrix** — for every boolean option, include at least one test where it is `true` and one where it is `false`. Triggering combinations (e.g. rule behaves differently when two options are both on) get dedicated cases.
    - [ ] **Three-way equivalence classes** (if the rule compares names / keys) — static / private / dynamic keys form separate equivalence classes; test at least one cross-class negative (e.g. `'#a'` string vs `#a` private identifier should NOT pair up).
 
-7. **Project-wide Checks**:
+7. **Pre-commit gate** (BLOCKING — must all pass before Phase 5):
 
    ```bash
-   # Type check and lint
+   # Type check and lint (JS/TS side)
    pnpm typecheck && pnpm lint
 
    # Spell check (catches typos in comments and strings)
    pnpm -w run check-spell
 
-   # Format and Go lint checks (REQUIRED before commit)
+   # Format and Go lint checks
    pnpm format:check && pnpm lint:go
    ```
+
+   These are BLOCKING. If any fails, fix before moving on — **do not** commit, push, or open a PR with any of them red.
+   - **Unknown-word failures from `check-spell`**: add the word to `scripts/dictionary.txt` (repo convention for ESLint-ecosystem identifiers that aren't real English). Use the original case.
+   - **Format failures**: auto-fix (`pnpm format && pnpm format:go`); never silence.
+   - **Lint failures**: fix the code. Don't bypass with `//nolint`, `// eslint-disable`, or equivalent, unless the exception is already justified by an in-file comment pattern this repo uses.
 
    **If checks fail**, run these to auto-fix:
 
@@ -596,9 +674,9 @@ Follow this **strict order** — each step depends on the previous one:
 
    | Category                            | What it means                                                                                                                                                                                   | Action                                                                                                                        |
    | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-   | **(a) Language-natural divergence** | tsgo AST or Go-semantic effect we don't actively choose (see Phase 1 Step 5.B — e.g. `NumericLiteral` parse-time normalization, normalized string cooked values).                               | Document under the rule's `.md` "Differences from ESLint" (or in [AST_PATTERNS.md](../../AST_PATTERNS.md) if general). Leave. |
+   | **(a) Language-natural divergence** | tsgo AST or Go-semantic effect we don't actively choose (see Phase 1 Step 6.B — e.g. `NumericLiteral` parse-time normalization, normalized string cooked values).                               | Document under the rule's `.md` "Differences from ESLint" (or in [AST_PATTERNS.md](../../AST_PATTERNS.md) if general). Leave. |
    | **(b) Scan-scope divergence**       | The two tools see different file sets (e.g., rslint respects `.gitignore` by default; ESLint does not; tsconfig `include` excludes a dir). Not a rule issue.                                    | No action. Optionally note in the PR description if a reviewer might be confused.                                             |
-   | **(c) Genuine bug**                 | Neither (a) nor (b). Rule logic, message text, or position is actually wrong on our side (or, rarely, ESLint's — but we align to ESLint unless we have a standing Phase 1 Step 5.A divergence). | **Must fix** before merging. Re-run the diff until it clears or reduces to (a)/(b) only.                                      |
+   | **(c) Genuine bug**                 | Neither (a) nor (b). Rule logic, message text, or position is actually wrong on our side (or, rarely, ESLint's — but we align to ESLint unless we have a standing Phase 1 Step 6.A divergence). | **Must fix** before merging. Re-run the diff until it clears or reduces to (a)/(b) only.                                      |
 
 ---
 

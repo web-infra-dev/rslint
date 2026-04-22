@@ -72,4 +72,4 @@ var b = 2;
 
 ## Original Documentation
 
-- <https://eslint.org/docs/latest/rules/max-lines>
+- [https://eslint.org/docs/latest/rules/max-lines](https://eslint.org/docs/latest/rules/max-lines)

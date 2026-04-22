@@ -62,14 +62,41 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	allowedFiles := []string{}
+	var allowedFiles []string
+	seenAllowedFiles := make(map[string]struct{})
+
+	resolveRequestPath := func(filePath string) string {
+		if tspath.PathIsAbsolute(filePath) {
+			return tspath.NormalizePath(filePath)
+		}
+		return tspath.ResolvePath(currentDirectory, filePath)
+	}
+
+	addAllowedFile := func(filePath string) string {
+		normalizedPath := resolveRequestPath(filePath)
+		if _, exists := seenAllowedFiles[normalizedPath]; exists {
+			return normalizedPath
+		}
+		seenAllowedFiles[normalizedPath] = struct{}{}
+		allowedFiles = append(allowedFiles, normalizedPath)
+		return normalizedPath
+	}
+
+	if req.Files != nil {
+		allowedFiles = make([]string, 0, len(req.Files)+len(req.FileContents))
+		for _, filePath := range req.Files {
+			addAllowedFile(filePath)
+		}
+	}
 	// Apply file contents if provided
 	if len(req.FileContents) > 0 {
+		if allowedFiles == nil {
+			allowedFiles = make([]string, 0, len(req.FileContents))
+		}
 		fileContents := make(map[string]string, len(req.FileContents))
 		for k, v := range req.FileContents {
-			normalizePath := tspath.NormalizePath(k)
-			fileContents[normalizePath] = v
-			allowedFiles = append(allowedFiles, normalizePath)
+			normalizedPath := addAllowedFile(k)
+			fileContents[normalizedPath] = v
 		}
 		fs = utils.NewOverlayVFS(fs, fileContents)
 

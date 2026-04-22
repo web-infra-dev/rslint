@@ -86,4 +86,4 @@ Ignores shadowing for parameters declared inside a function type. Default:
 
 ## Original Documentation
 
-<https://eslint.org/docs/latest/rules/no-shadow>
+[https://eslint.org/docs/latest/rules/no-shadow](https://eslint.org/docs/latest/rules/no-shadow)

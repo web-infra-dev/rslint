@@ -72,4 +72,4 @@ new RegExp("[\\uD83D\\uDC4D]");  // surrogate pair in string literal
 
 ## Original Documentation
 
-- <https://eslint.org/docs/latest/rules/no-misleading-character-class>
+- [https://eslint.org/docs/latest/rules/no-misleading-character-class](https://eslint.org/docs/latest/rules/no-misleading-character-class)

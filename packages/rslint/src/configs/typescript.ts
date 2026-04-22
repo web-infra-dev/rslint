@@ -21,26 +21,26 @@ const recommended: RslintConfigEntry = {
     'no-class-assign': 'off',
     'no-const-assign': 'off',
     'no-dupe-args': 'off',
-    // 'no-dupe-class-members': 'off', // not implemented
+    'no-dupe-class-members': 'off',
     'no-dupe-keys': 'off',
     'no-func-assign': 'off',
     'no-import-assign': 'off',
-    // 'no-new-native-nonconstructor': 'off', // not implemented
-    // 'no-new-symbol': 'off', // not implemented (deprecated, use no-new-native-nonconstructor)
+    'no-new-native-nonconstructor': 'off',
+    'no-new-symbol': 'off',
     'no-obj-calls': 'off',
-    // 'no-redeclare': 'off', // not implemented
+    'no-redeclare': 'off',
     'no-setter-return': 'off',
     'no-this-before-super': 'off',
     'no-undef': 'off',
-    // 'no-unreachable': 'off', // not implemented
+    'no-unreachable': 'off',
     'no-unsafe-negation': 'off',
-    // 'no-with': 'off', // not implemented
+    'no-with': 'off',
 
     // TS-beneficial rules enabled by eslint-recommended override
     'no-var': 'error',
     'prefer-const': 'error',
     'prefer-rest-params': 'error',
-    // 'prefer-spread': 'error', // not implemented
+    'prefer-spread': 'error',
 
     // Remaining eslint:recommended rules (not turned off by TS)
     // 'no-control-regex': 'error', // not implemented
@@ -102,11 +102,11 @@ const recommended: RslintConfigEntry = {
     '@typescript-eslint/no-non-null-asserted-optional-chain': 'error',
     '@typescript-eslint/no-require-imports': 'error',
     '@typescript-eslint/no-this-alias': 'error',
-    // '@typescript-eslint/no-unnecessary-type-constraint': 'error', // not implemented
+    '@typescript-eslint/no-unnecessary-type-constraint': 'error',
     // '@typescript-eslint/no-unsafe-declaration-merging': 'error', // not implemented
     // '@typescript-eslint/no-unsafe-function-type': 'error', // not implemented
-    // 'no-unused-expressions': 'off', // not implemented
-    // '@typescript-eslint/no-unused-expressions': 'error', // not implemented
+    'no-unused-expressions': 'off',
+    '@typescript-eslint/no-unused-expressions': 'error',
     'no-unused-vars': 'off',
     // Differs from typescript-eslint recommended (which uses bare 'error').
     // Ignoring _-prefixed vars/args is a widely adopted community convention,

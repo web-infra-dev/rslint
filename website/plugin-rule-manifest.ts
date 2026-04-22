@@ -2,8 +2,9 @@ import type { RspressPlugin } from '@rspress/core';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { ts, js, reactPlugin, importPlugin } from '@rslint/core';
+import * as rslintCore from '@rslint/core';
 import type { RslintConfigEntry } from '@rslint/core';
+import { PLUGIN_REGISTRY } from './theme/plugin-registry';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.resolve(__dirname, 'generated/rule-manifest.json');
@@ -30,49 +31,30 @@ function groupToRouteSlug(group: string): string {
   return group.replace(/^@/, '');
 }
 
-/**
- * Return the fully-qualified rule name as used in rslint config.
- * Core ESLint rules have no prefix; plugin rules are prefixed with the group.
- * e.g. "no-console" for eslint, "@typescript-eslint/no-explicit-any" for TS plugin.
- */
+const PLUGINS = PLUGIN_REGISTRY.map((p) => {
+  const mod = (rslintCore as Record<string, unknown>)[p.importName] as
+    | { configs?: { recommended?: RslintConfigEntry } }
+    | undefined;
+  const config = mod?.configs?.recommended;
+  return {
+    prefix: p.prefix,
+    group: p.group,
+    presets: p.presetName && config ? [{ config, name: p.presetName }] : [],
+  };
+});
+
 function getFullRuleName(rule: RuleEntry): string {
   if (rule.group === 'eslint') return rule.name;
-  return `${rule.group}/${rule.name}`;
+  const entry = PLUGINS.find((e) => e.group === rule.group);
+  const prefix = entry?.prefix || rule.group;
+  return `${prefix}/${rule.name}`;
 }
 
-/** Each preset config paired with its full reference name (e.g. "ts.configs.recommended"). */
-const PRESETS: { config: RslintConfigEntry; name: string }[] = [
-  { config: ts.configs.recommended, name: 'ts.configs.recommended' },
-  { config: js.configs.recommended, name: 'js.configs.recommended' },
-  {
-    config: reactPlugin.configs.recommended,
-    name: 'reactPlugin.configs.recommended',
-  },
-  {
-    config: importPlugin.configs.recommended,
-    name: 'importPlugin.configs.recommended',
-  },
-];
-
-/**
- * Parse a fully-qualified rule key from a config into the (group, name)
- * pair used by the manifest.
- */
 function parseRuleKey(ruleKey: string): { group: string; name: string } {
-  if (ruleKey.startsWith('@typescript-eslint/')) {
-    return {
-      group: '@typescript-eslint',
-      name: ruleKey.slice('@typescript-eslint/'.length),
-    };
-  }
-  if (ruleKey.startsWith('react/')) {
-    return { group: 'react', name: ruleKey.slice('react/'.length) };
-  }
-  if (ruleKey.startsWith('import/')) {
-    return {
-      group: 'eslint-plugin-import',
-      name: ruleKey.slice('import/'.length),
-    };
+  for (const { prefix, group } of PLUGINS) {
+    if (prefix && ruleKey.startsWith(`${prefix}/`)) {
+      return { group, name: ruleKey.slice(prefix.length + 1) };
+    }
   }
   return { group: 'eslint', name: ruleKey };
 }
@@ -90,16 +72,18 @@ interface PresetInfo {
 function extractPresetRules(): Map<string, PresetInfo[]> {
   const result = new Map<string, PresetInfo[]>();
 
-  for (const { config, name: presetName } of PRESETS) {
-    if (!config.rules) continue;
-    for (const [ruleKey, value] of Object.entries(config.rules)) {
-      const severity = Array.isArray(value) ? value[0] : value;
-      if (severity === 'off') continue;
+  for (const { presets } of PLUGINS) {
+    for (const { config, name: presetName } of presets) {
+      if (!config.rules) continue;
+      for (const [ruleKey, value] of Object.entries(config.rules)) {
+        const severity = Array.isArray(value) ? value[0] : value;
+        if (severity === 'off') continue;
 
-      const { group, name } = parseRuleKey(ruleKey);
-      const manifestKey = `${group}:${name}`;
-      if (!result.has(manifestKey)) result.set(manifestKey, []);
-      result.get(manifestKey)!.push({ name: presetName, value: value! });
+        const { group, name } = parseRuleKey(ruleKey);
+        const manifestKey = `${group}:${name}`;
+        if (!result.has(manifestKey)) result.set(manifestKey, []);
+        result.get(manifestKey)!.push({ name: presetName, value: value! });
+      }
     }
   }
   return result;

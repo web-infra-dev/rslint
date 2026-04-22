@@ -7,22 +7,43 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_filename_extension"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_first_prop_new_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_bind"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_duplicate_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_target_blank"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_undef"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_pascal_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_props_no_multi_spaces"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_react"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_access_state_in_setstate"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_deprecated"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_update_set_state"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_this_in_sfc"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unknown_property"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/style_prop_object"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_comment_textnodes"
 )
 
 func GetAllRules() []rule.Rule {
@@ -33,20 +54,40 @@ func GetAllRules() []rule.Rule {
 		jsx_equals_spacing.JsxEqualsSpacingRule,
 		jsx_filename_extension.JsxFilenameExtensionRule,
 		jsx_first_prop_new_line.JsxFirstPropNewLineRule,
+		jsx_key.JsxKeyRule,
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
 		jsx_no_bind.JsxNoBindRule,
+		jsx_no_duplicate_props.JsxNoDuplicatePropsRule,
+		jsx_no_target_blank.JsxNoTargetBlankRule,
+		jsx_no_undef.JsxNoUndefRule,
+		jsx_pascal_case.JsxPascalCaseRule,
 		jsx_props_no_multi_spaces.JsxPropsNoMultiSpacesRule,
 		jsx_uses_react.JsxUsesReactRule,
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
+		no_access_state_in_setstate.NoAccessStateInSetstateRule,
+		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
+		no_danger_with_children.NoDangerWithChildrenRule,
+		no_deprecated.NoDeprecatedRule,
+		no_did_update_set_state.NoDidUpdateSetStateRule,
+		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
+		no_redundant_should_component_update.NoRedundantShouldComponentUpdateRule,
+		no_render_return_value.NoRenderReturnValueRule,
 		no_string_refs.NoStringRefsRule,
+		no_this_in_sfc.NoThisInSfcRule,
+		no_typos.NoTyposRule,
 		no_unescaped_entities.NoUnescapedEntitiesRule,
+		no_unknown_property.NoUnknownPropertyRule,
+		no_will_update_set_state.NoWillUpdateSetStateRule,
+		prefer_es6_class.PreferEs6ClassRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
+		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
+		jsx_no_comment_textnodes.JsxNoCommentTextnodesRule,
 	}
 }
