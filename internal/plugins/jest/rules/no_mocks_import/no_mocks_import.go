@@ -34,8 +34,12 @@ var NoMocksImportRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				arguments := node.Arguments()
+				callee := node.AsCallExpression().Expression.AsIdentifier()
+				if callee == nil || callee.Text != "require" {
+					return
+				}
 
+				arguments := node.Arguments()
 				if len(arguments) == 0 {
 					return
 				}
