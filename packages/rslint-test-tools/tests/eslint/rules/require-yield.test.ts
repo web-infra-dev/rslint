@@ -443,13 +443,16 @@ ruleTester.run('require-yield', {
     },
 
     // ---- Decorator scenarios ----
+    // GetFunctionHeadLoc mirrors typescript-eslint's getFunctionHeadLoc,
+    // which excludes leading decorators from the reported range, so the
+    // start column lands on the first token after the last decorator.
     {
       code: 'declare function dec(t: any, k: any, d: any): void;\nclass A { @dec *foo() { return 0; } }',
       errors: [
         {
           messageId: 'missingYield',
           line: 2,
-          column: 11,
+          column: 16,
           endLine: 2,
           endColumn: 20,
         },
@@ -461,7 +464,7 @@ ruleTester.run('require-yield', {
         {
           messageId: 'missingYield',
           line: 2,
-          column: 11,
+          column: 18,
           endLine: 2,
           endColumn: 22,
         },
@@ -473,7 +476,7 @@ ruleTester.run('require-yield', {
         {
           messageId: 'missingYield',
           line: 2,
-          column: 11,
+          column: 19,
           endLine: 2,
           endColumn: 23,
         },
@@ -485,7 +488,7 @@ ruleTester.run('require-yield', {
         {
           messageId: 'missingYield',
           line: 2,
-          column: 11,
+          column: 16,
           endLine: 2,
           endColumn: 34,
         },
@@ -497,7 +500,7 @@ ruleTester.run('require-yield', {
         {
           messageId: 'missingYield',
           line: 2,
-          column: 11,
+          column: 16,
           endLine: 2,
           endColumn: 26,
         },
@@ -521,7 +524,7 @@ ruleTester.run('require-yield', {
         {
           messageId: 'missingYield',
           line: 2,
-          column: 11,
+          column: 16,
           endLine: 2,
           endColumn: 31,
         },
@@ -532,7 +535,7 @@ ruleTester.run('require-yield', {
       errors: [
         {
           messageId: 'missingYield',
-          line: 3,
+          line: 4,
           column: 3,
           endLine: 4,
           endColumn: 7,

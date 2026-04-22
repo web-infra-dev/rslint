@@ -2104,3 +2104,69 @@ const f = (gotcha: ObjectWithCallback = { callback: () => {} }): void => {};
   "ruleCount": 1,
 }
 `;
+
+exports[`explicit-function-return-type > invalid 60`] = `
+{
+  "code": "
+declare function LifecycleHook(): any;
+class HookLifeCycle {
+  @LifecycleHook()
+  async didLoad() {
+    return;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 61`] = `
+{
+  "code": "
+declare function Bound(): any;
+class Foo {
+  @Bound()
+  foo = () => 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -195,10 +195,11 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		start := TrimNodeTextRange(sourceFile, node)
-		// Start scanning for the parameters `(` after the method name to avoid
-		// matching the `(` of a decorator factory call like `@dec()`.
-		searchFrom := node.Pos()
+		start := nodeStartSkippingDecorators(sourceFile, node)
+		// Start scanning for the parameters `(` after any decorator factory
+		// (e.g. `@dec()`) and after the method name. Nameless constructors
+		// fall back to the first token after the decorators.
+		searchFrom := start.Pos()
 		if name := node.Name(); name != nil {
 			searchFrom = name.End()
 		}
@@ -212,7 +213,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	case ast.KindArrowFunction:
 		if parent != nil && (parent.Kind == ast.KindPropertyDeclaration || parent.Kind == ast.KindPropertyAssignment) {
-			start := TrimNodeTextRange(sourceFile, parent)
+			start := nodeStartSkippingDecorators(sourceFile, parent)
 			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 				return start.WithEnd(parenPos)
 			}
@@ -229,7 +230,7 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 
 	case ast.KindFunctionExpression:
 		if parent != nil && (parent.Kind == ast.KindPropertyAssignment || parent.Kind == ast.KindPropertyDeclaration) {
-			start := TrimNodeTextRange(sourceFile, parent)
+			start := nodeStartSkippingDecorators(sourceFile, parent)
 			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
 				return start.WithEnd(parenPos)
 			}
@@ -259,6 +260,29 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 	}
 
 	return TrimNodeTextRange(sourceFile, node)
+}
+
+// nodeStartSkippingDecorators returns a TextRange whose start is the first
+// non-decorator token of the node. This matches ESLint's
+// getFunctionHeadLoc, which excludes leading decorators on MethodDefinition
+// and PropertyDefinition from the reported function head range.
+func nodeStartSkippingDecorators(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	fallback := TrimNodeTextRange(sourceFile, node)
+	mods := node.Modifiers()
+	if mods == nil || len(mods.Nodes) == 0 {
+		return fallback
+	}
+	var lastDecoratorEnd int
+	for _, mod := range mods.Nodes {
+		if mod.Kind == ast.KindDecorator && mod.End() > lastDecoratorEnd {
+			lastDecoratorEnd = mod.End()
+		}
+	}
+	if lastDecoratorEnd == 0 {
+		return fallback
+	}
+	tokenAfter := scanner.GetRangeOfTokenAtPosition(sourceFile, lastDecoratorEnd)
+	return core.NewTextRange(tokenAfter.Pos(), fallback.End())
 }
 
 // findOpenParenPos finds the position of the first '(' token in a function node.
