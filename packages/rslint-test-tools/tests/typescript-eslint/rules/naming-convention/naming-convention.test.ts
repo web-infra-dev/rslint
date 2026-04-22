@@ -2293,5 +2293,249 @@ ruleTester.run('naming-convention', {
         },
       ],
     },
+
+    // Regression: names that trim to empty string after stripping the leading
+    // underscore must be treated as valid. typescript-eslint short-circuits
+    // the format check when the processed name is empty
+    // (see naming-convention-utils/format.ts — every check accepts length 0).
+    {
+      code: 'const _ = 1;',
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: 'variable',
+        },
+      ],
+    },
+    {
+      code: 'const [_, setA] = [1, 2];',
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: 'variable',
+        },
+      ],
+    },
+    {
+      code: 'function f(_: number) {}',
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: 'parameter',
+        },
+      ],
+    },
+
+    // Regression: non-letter characters such as `$` (or digits when not in the
+    // leading position) should pass camelCase / PascalCase because JS
+    // `c === c.toLowerCase() && c === c.toUpperCase()` is true for them.
+    {
+      code: 'const $cache = 1; const $svg = 1; const x$y = 1;',
+      options: [
+        { format: ['camelCase'], selector: 'variable' },
+      ],
+    },
+    {
+      code: 'const $Root = 1;',
+      options: [
+        { format: ['PascalCase'], selector: 'variable' },
+      ],
+    },
+    {
+      code: 'class C { private $foo = 1; }',
+      options: [
+        { format: ['camelCase'], selector: 'property' },
+      ],
+    },
+
+    // Regression: strictCamelCase / strictPascalCase must accept `$` runs but
+    // still reject two consecutive uppercase *letters*.
+    {
+      code: 'const fooBar$Baz = 1;',
+      options: [
+        { format: ['strictCamelCase'], selector: 'variable' },
+      ],
+    },
+
+    // Regression: the real-world portal config (filter with match:false over a
+    // snake-camel mix regex) should not fire on `$`-prefixed variables, since
+    // the format check itself now accepts them.
+    {
+      code: 'const $cache = 1;',
+      options: [
+        {
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+          filter: {
+            regex:
+              '(^_?[a-z][a-z0-9]*([A-Z][a-z]?[a-z0-9]*)*_[a-z][a-z0-9]*([A-Z][a-z]?[a-z0-9]*)*$)',
+            match: false,
+          },
+          selector: 'variable',
+        },
+      ],
+    },
   ],
 });
+
+// Additional edge-case suite for empty-name short-circuit and `$`-neutral
+// character handling. Kept in a sibling describe via the `description` option
+// so the rule name passed to the rslint backend stays correct.
+ruleTester.run('naming-convention', {
+  invalid: [
+    // Underscore-only name with leadingUnderscore: 'require' cannot trim to
+    // empty *and* satisfy the underscore requirement at the same time.
+    // The require branch strips one `_`, leaving "", which counts as empty →
+    // format passes. But there is only one `_` to begin with so `require`
+    // sees it, strips it, and passes. That's the symmetric edge case: it's
+    // actually valid. Instead, verify `requireDouble` on a single `_` fails.
+    {
+      code: 'const _ = 1;',
+      errors: [{ messageId: 'missingUnderscore' }],
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'requireDouble',
+          selector: 'variable',
+        },
+      ],
+    },
+    // `_` with leadingUnderscore: 'forbid' must still report the underscore
+    // even though trimming would produce an empty name.
+    {
+      code: 'const _x = 1;',
+      errors: [{ messageId: 'unexpectedUnderscore' }],
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'forbid',
+          selector: 'variable',
+        },
+      ],
+    },
+    // `$` in the middle of a name must still fail strictPascalCase's
+    // consecutive-uppercase rule — only *letter* runs matter.
+    {
+      code: 'const FOOBar = 1;',
+      errors: [{ messageId: 'doesNotMatchFormat' }],
+      options: [
+        { format: ['StrictPascalCase'], selector: 'variable' },
+      ],
+    },
+    // snake_case rejects leading, trailing, and adjacent underscores.
+    {
+      code: 'const foo__bar = 1;',
+      errors: [{ messageId: 'doesNotMatchFormat' }],
+      options: [
+        { format: ['snake_case'], selector: 'variable' },
+      ],
+    },
+    {
+      code: 'const foo_ = 1;',
+      errors: [{ messageId: 'doesNotMatchFormat' }],
+      options: [
+        { format: ['snake_case'], selector: 'variable' },
+      ],
+    },
+    // UPPER_CASE: adjacent underscores rejected, but `$` is accepted.
+    {
+      code: 'const FOO__BAR = 1;',
+      errors: [{ messageId: 'doesNotMatchFormat' }],
+      options: [
+        { format: ['UPPER_CASE'], selector: 'variable' },
+      ],
+    },
+    // camelCase: `_` in the middle is still rejected even though `$` is fine.
+    {
+      code: 'const foo_bar = 1;',
+      errors: [{ messageId: 'doesNotMatchFormat' }],
+      options: [
+        { format: ['camelCase'], selector: 'variable' },
+      ],
+    },
+    // PascalCase: leading-lowercase is still rejected even though `$` leading
+    // would pass. Nested class method inherits the method rule.
+    {
+      code: 'class C { method foo() {} }'.replace('method ', ''),
+      errors: [{ messageId: 'doesNotMatchFormat' }],
+      options: [
+        { format: ['PascalCase'], selector: 'method' },
+      ],
+    },
+  ],
+  valid: [
+    // Empty trimmed name after a leadingUnderscore strip — camelCase.
+    {
+      code: 'const _ = 1;',
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allow',
+          selector: 'variable',
+        },
+      ],
+    },
+    // Double underscore that trims to empty via allowDouble.
+    {
+      code: 'const __ = 1;',
+      options: [
+        {
+          format: ['camelCase'],
+          leadingUnderscore: 'allowDouble',
+          selector: 'variable',
+        },
+      ],
+    },
+    // Empty trimmed name after prefix strip also passes.
+    {
+      code: 'const IS = 1;',
+      options: [
+        {
+          format: ['camelCase'],
+          prefix: ['IS'],
+          selector: 'variable',
+        },
+      ],
+    },
+    // `$` is accepted as a neutral character at any position for camelCase
+    // and PascalCase.
+    {
+      code: 'const $a = 1; const a$ = 1; const a$b = 1;',
+      options: [{ format: ['camelCase'], selector: 'variable' }],
+    },
+    {
+      code: 'const $A = 1; const A$ = 1; const A$B = 1;',
+      options: [{ format: ['PascalCase'], selector: 'variable' }],
+    },
+    // `$` in UPPER_CASE: uppercased equals itself, no `_` adjacency.
+    {
+      code: 'const FOO$BAR = 1;',
+      options: [{ format: ['UPPER_CASE'], selector: 'variable' }],
+    },
+    // Nested: object method whose filter excludes `$`-prefixed names, and the
+    // variable rule accepts `$`-prefixed.
+    {
+      code: `
+        const obj = { $fn() { return 1; } };
+        const $flag = true;
+      `,
+      options: [
+        { format: ['camelCase'], selector: 'variable' },
+        { format: ['camelCase'], selector: 'objectLiteralMethod' },
+      ],
+    },
+    // strictCamelCase with a `$` run between camel humps.
+    {
+      code: 'const foo$$Bar = 1;',
+      options: [{ format: ['strictCamelCase'], selector: 'variable' }],
+    },
+    // strictPascalCase with `$` after the first uppercase letter.
+    {
+      code: 'const F$ooBar = 1;',
+      options: [{ format: ['StrictPascalCase'], selector: 'variable' }],
+    },
+  ],
+}, { description: 'rslint edge cases' });
