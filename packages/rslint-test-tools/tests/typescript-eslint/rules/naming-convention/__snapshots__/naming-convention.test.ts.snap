@@ -2611,3 +2611,211 @@ exports[`naming-convention > invalid 39`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`naming-convention - rslint edge cases > invalid 1`] = `
+{
+  "code": "const _ = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`_\` must have two leading underscore(s).",
+      "messageId": "missingUnderscore",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 2`] = `
+{
+  "code": "const _x = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`_x\` must not have a leading underscore.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 3`] = `
+{
+  "code": "const FOOBar = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`FOOBar\` must match one of the following formats: StrictPascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 4`] = `
+{
+  "code": "const foo__bar = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`foo__bar\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 5`] = `
+{
+  "code": "const foo_ = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`foo_\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 6`] = `
+{
+  "code": "const FOO__BAR = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`FOO__BAR\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 7`] = `
+{
+  "code": "const foo_bar = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`foo_bar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention - rslint edge cases > invalid 8`] = `
+{
+  "code": "class C { foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Class Method name \`foo\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

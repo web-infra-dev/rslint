@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -293,56 +294,131 @@ type normalizedSelector struct {
 }
 
 // ---- Format checking functions ----
-// These use regex patterns matching the official typescript-eslint implementation,
-// with an additional consecutive-uppercase check for strict variants.
+// These port typescript-eslint's character-based implementation (derived from
+// tslint-consistent-codestyle), NOT a regex. The difference is load-bearing:
+//   - empty strings are considered valid for every format (supports names that
+//     trim down to "" after leadingUnderscore: "allow", e.g. a lone `_`)
+//   - characters that are neither upper nor lowercase letters (e.g. `$`, digits)
+//     are treated neutrally and pass both camelCase and PascalCase first-char
+//     checks, matching JS `c === c.toLowerCase() && c === c.toUpperCase()`.
+// See: https://github.com/typescript-eslint/typescript-eslint/blob/v6.21.0/packages/eslint-plugin/src/rules/naming-convention-utils/format.ts
 
-var (
-	reCamelCase    = regexp.MustCompile(`^[a-z][\da-zA-Z]*$`)
-	rePascalCase   = regexp.MustCompile(`^[A-Z][\da-zA-Z]*$`)
-	reUpperCase    = regexp.MustCompile(`^[A-Z][\dA-Z_]*$`)
-	reSnakeCase  = regexp.MustCompile(`^[a-z][\da-z_]*$`)
-)
-
-func checkCamelCase(name string) bool {
-	return reCamelCase.MatchString(name)
+func firstRune(name string) rune {
+	for _, r := range name {
+		return r
+	}
+	return 0
 }
 
-func checkStrictCamelCase(name string) bool {
-	if !reCamelCase.MatchString(name) {
-		return false
-	}
-	return !hasConsecutiveUppercase(name, 0)
+func isUppercaseRune(r rune) bool {
+	return r == unicode.ToUpper(r) && r != unicode.ToLower(r)
+}
+
+// Matches JS `name[0] === name[0].toUpperCase()`: returns true for uppercase
+// letters AND for characters with no case distinction (e.g. `$`, digits).
+func firstIsUpper(name string) bool {
+	r := firstRune(name)
+	return r == unicode.ToUpper(r)
+}
+
+// Matches JS `name[0] === name[0].toLowerCase()`: symmetric to firstIsUpper.
+func firstIsLower(name string) bool {
+	r := firstRune(name)
+	return r == unicode.ToLower(r)
 }
 
 func checkPascalCase(name string) bool {
-	return rePascalCase.MatchString(name)
+	if len(name) == 0 {
+		return true
+	}
+	return firstIsUpper(name) && !strings.Contains(name, "_")
 }
 
 func checkStrictPascalCase(name string) bool {
-	if !rePascalCase.MatchString(name) {
+	if len(name) == 0 {
+		return true
+	}
+	return firstIsUpper(name) && hasStrictCamelHumps(name, true)
+}
+
+func checkCamelCase(name string) bool {
+	if len(name) == 0 {
+		return true
+	}
+	return firstIsLower(name) && !strings.Contains(name, "_")
+}
+
+func checkStrictCamelCase(name string) bool {
+	if len(name) == 0 {
+		return true
+	}
+	return firstIsLower(name) && hasStrictCamelHumps(name, false)
+}
+
+// hasStrictCamelHumps ports the typescript-eslint algorithm: no leading `_`,
+// no internal `_`, and no two consecutive uppercase letters (case-distinct
+// runs must alternate). `isUpper` tracks whether the *next* run is expected
+// to be uppercase; on a mismatch we flip, on a match of two uppercase runs
+// we reject.
+func hasStrictCamelHumps(name string, isUpper bool) bool {
+	runes := []rune(name)
+	if len(runes) == 0 {
+		return true
+	}
+	if runes[0] == '_' {
 		return false
 	}
-	// Skip the first character for PascalCase consecutive check
-	return !hasConsecutiveUppercase(name, 1)
+	for i := 1; i < len(runes); i++ {
+		if runes[i] == '_' {
+			return false
+		}
+		charIsUpper := isUppercaseRune(runes[i])
+		if isUpper == charIsUpper {
+			if isUpper {
+				return false
+			}
+		} else {
+			isUpper = !isUpper
+		}
+	}
+	return true
 }
 
 func checkSnakeCase(name string) bool {
-	return reSnakeCase.MatchString(name)
+	if len(name) == 0 {
+		return true
+	}
+	return name == strings.ToLower(name) && validateSnakeUnderscores(name)
 }
 
 func checkUpperCase(name string) bool {
-	return reUpperCase.MatchString(name)
+	if len(name) == 0 {
+		return true
+	}
+	return name == strings.ToUpper(name) && validateSnakeUnderscores(name)
 }
 
-// hasConsecutiveUppercase checks if there are two or more consecutive uppercase
-// ASCII letters starting from the given index.
-func hasConsecutiveUppercase(name string, startIdx int) bool {
-	for i := startIdx; i < len(name)-1; i++ {
-		if name[i] >= 'A' && name[i] <= 'Z' && name[i+1] >= 'A' && name[i+1] <= 'Z' {
-			return true
+// validateSnakeUnderscores rejects leading `_`, adjacent `__`, and trailing `_`.
+func validateSnakeUnderscores(name string) bool {
+	runes := []rune(name)
+	if len(runes) == 0 {
+		return true
+	}
+	if runes[0] == '_' {
+		return false
+	}
+	wasUnderscore := false
+	for i := 1; i < len(runes); i++ {
+		if runes[i] == '_' {
+			if wasUnderscore {
+				return false
+			}
+			wasUnderscore = true
+		} else {
+			wasUnderscore = false
 		}
 	}
-	return false
+	return !wasUnderscore
 }
 
 func checkFormat(name string, format predefinedFormat) bool {
