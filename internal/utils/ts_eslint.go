@@ -196,9 +196,10 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
 		start := nodeStartSkippingDecorators(sourceFile, node)
-		// Start scanning for the parameters `(` after the method name to avoid
-		// matching the `(` of a decorator factory call like `@dec()`.
-		searchFrom := node.Pos()
+		// Start scanning for the parameters `(` after any decorator factory
+		// (e.g. `@dec()`) and after the method name. Nameless constructors
+		// fall back to the first token after the decorators.
+		searchFrom := start.Pos()
 		if name := node.Name(); name != nil {
 			searchFrom = name.End()
 		}
