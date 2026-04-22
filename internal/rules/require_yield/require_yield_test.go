@@ -328,39 +328,42 @@ func TestRequireYieldRule(t *testing.T) {
 			},
 
 			// ---- Decorator scenarios ----
+			// GetFunctionHeadLoc mirrors typescript-eslint's getFunctionHeadLoc
+			// which excludes leading decorators from the reported range, so the
+			// start column lands on the first token after the last decorator.
 			// Single method decorator (no args)
 			{
 				Code: "declare function dec(t: any, k: any, d: any): void;\nclass A { @dec *foo() { return 0; } }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 2, Column: 11, EndLine: 2, EndColumn: 20},
+					{MessageId: "missingYield", Line: 2, Column: 16, EndLine: 2, EndColumn: 20},
 				},
 			},
 			// Decorator factory (with args) — stress test for findOpenParenPos
 			{
 				Code: "declare function dec(): (t: any, k: any, d: any) => void;\nclass A { @dec() *foo() { return 0; } }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 2, Column: 11, EndLine: 2, EndColumn: 22},
+					{MessageId: "missingYield", Line: 2, Column: 18, EndLine: 2, EndColumn: 22},
 				},
 			},
 			// Multiple method decorators
 			{
 				Code: "declare function d1(t: any, k: any, d: any): void; declare function d2(t: any, k: any, d: any): void;\nclass A { @d1 @d2 *foo() { return 0; } }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 2, Column: 11, EndLine: 2, EndColumn: 23},
+					{MessageId: "missingYield", Line: 2, Column: 19, EndLine: 2, EndColumn: 23},
 				},
 			},
 			// Decorator + TS modifiers
 			{
 				Code: "declare function dec(t: any, k: any, d: any): void;\nclass A { @dec public static *foo() { return 0; } }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 2, Column: 11, EndLine: 2, EndColumn: 34},
+					{MessageId: "missingYield", Line: 2, Column: 16, EndLine: 2, EndColumn: 34},
 				},
 			},
 			// Decorator + async generator
 			{
 				Code: "declare function dec(t: any, k: any, d: any): void;\nclass A { @dec async *foo() { return 0; } }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 2, Column: 11, EndLine: 2, EndColumn: 26},
+					{MessageId: "missingYield", Line: 2, Column: 16, EndLine: 2, EndColumn: 26},
 				},
 			},
 			// Class-level decorator (shouldn't affect method position)
@@ -374,14 +377,14 @@ func TestRequireYieldRule(t *testing.T) {
 			{
 				Code: "declare function dec(t: any, k: any): void;\nclass A { @dec foo = function*() { return 0; }; }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 2, Column: 11, EndLine: 2, EndColumn: 31},
+					{MessageId: "missingYield", Line: 2, Column: 16, EndLine: 2, EndColumn: 31},
 				},
 			},
 			// Multi-line decorator
 			{
 				Code: "declare function dec(t: any, k: any, d: any): void;\nclass A {\n  @dec\n  *foo() { return 0; }\n}",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "missingYield", Line: 3, Column: 3, EndLine: 4, EndColumn: 7},
+					{MessageId: "missingYield", Line: 4, Column: 3, EndLine: 4, EndColumn: 7},
 				},
 			},
 
