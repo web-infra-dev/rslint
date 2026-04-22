@@ -29,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_this_in_sfc"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unknown_property"
@@ -74,6 +75,7 @@ func GetAllRules() []rule.Rule {
 		no_is_mounted.NoIsMountedRule,
 		no_render_return_value.NoRenderReturnValueRule,
 		no_string_refs.NoStringRefsRule,
+		no_this_in_sfc.NoThisInSfcRule,
 		no_typos.NoTyposRule,
 		no_unescaped_entities.NoUnescapedEntitiesRule,
 		no_unknown_property.NoUnknownPropertyRule,

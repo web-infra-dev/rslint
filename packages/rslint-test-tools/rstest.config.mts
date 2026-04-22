@@ -111,6 +111,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-is-mounted.test.ts',
     './tests/eslint-plugin-react/rules/no-render-return-value.test.ts',
     './tests/eslint-plugin-react/rules/no-string-refs.test.ts',
+    './tests/eslint-plugin-react/rules/no-this-in-sfc.test.ts',
     './tests/eslint-plugin-react/rules/no-typos.test.ts',
     './tests/eslint-plugin-react/rules/no-unescaped-entities.test.ts',
     './tests/eslint-plugin-react/rules/no-unknown-property.test.ts',
