@@ -41,8 +41,17 @@ func getParentStatelessComponent(node *ast.Node, pragma string) *ast.Node {
 //   - `{ Foo: () => {} }`    → ArrowFunction as the initializer of a PropertyAssignment
 //
 // All three correspond to upstream's "Property" filter and must skip reporting.
+//
+// ParenthesizedExpression wrappers between a FunctionExpression / ArrowFunction
+// and its PropertyAssignment owner are transparent — tsgo preserves them while
+// ESTree flattens them — so `{ Foo: (function() {...}) }` still hits the
+// carve-out. MethodDeclaration cannot be paren-wrapped (illegal syntax), so
+// the walk only matters for the FE/Arrow path.
 func isPropertyOwnedSFC(component *ast.Node) bool {
 	parent := component.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
 	if parent == nil {
 		return false
 	}

@@ -225,6 +225,28 @@ func TestNoThisInSfcRule(t *testing.T) {
         };
       `, Tsx: true},
 
+		// ---- Edge: PropertyAssignment value wrapped in parens — tsgo preserves
+		// ParenthesizedExpression so the FE's direct parent is the paren wrapper,
+		// not the PropertyAssignment. The "Property" carve-out must walk through
+		// paren wrappers, otherwise this case would falsely report. Locks in the
+		// paren-transparent owner detection in `isPropertyOwnedSFC`. ----
+		{Code: `
+        export const obj = {
+          Renderer: (function () {
+            return <div>{this.x}</div>;
+          }),
+        };
+      `, Tsx: true},
+
+		// ---- Edge: same as above but multi-level parens. ----
+		{Code: `
+        export const obj = {
+          Renderer: (((function () {
+            return <div>{this.x}</div>;
+          }))),
+        };
+      `, Tsx: true},
+
 		// ---- Boundary (TS-only): `(this as any).x` — receiver is TS as-expression.
 		// tsgo wraps in KindAsExpression; ESTree wraps in TSAsExpression; neither
 		// is a ThisKeyword/ThisExpression, so neither tool reports. Locked in. ----
