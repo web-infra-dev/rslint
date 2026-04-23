@@ -1,5 +1,6 @@
 packages:
   - 'packages/*'
+  - 'tests/bench-cli'
   - 'npm/rslint/*'
   - 'npm/tsgo/*'
   - 'website'

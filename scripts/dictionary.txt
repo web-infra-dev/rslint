@@ -11,6 +11,7 @@ assertee
 autofixers
 auvred
 bazz
+benchtime
 bigints
 binaryexpression
 bleh
@@ -26,6 +27,8 @@ co-locate
 colocate
 constantness
 corge
+codspeed
+CODSPEED
 cpuprof
 dagre
 dirxml
