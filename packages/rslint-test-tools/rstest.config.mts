@@ -344,6 +344,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
