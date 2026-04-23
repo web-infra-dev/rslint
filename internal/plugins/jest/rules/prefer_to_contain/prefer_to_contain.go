@@ -2,6 +2,7 @@ package prefer_to_contain
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -55,6 +56,10 @@ func getIncludesCalleeName(callee *ast.Node) (receiver *ast.Node, ok bool) {
 	case ast.KindElementAccessExpression:
 		el := callee.AsElementAccessExpression()
 		arg := ast.SkipParentheses(el.ArgumentExpression)
+		if arg == nil {
+			return nil, false
+		}
+
 		switch arg.Kind {
 		case ast.KindStringLiteral:
 			if arg.AsStringLiteral().Text != "includes" {
@@ -69,6 +74,7 @@ func getIncludesCalleeName(callee *ast.Node) (receiver *ast.Node, ok bool) {
 		}
 		return el.Expression, true
 	}
+
 	return nil, false
 }
 
@@ -98,7 +104,7 @@ var PreferToContainRule = rule.Rule{
 					return
 				}
 
-				if !slices.ContainsFunc(jestFnCall.Members, func(m string) bool {
+				if len(jestFnCall.Members) == 0 || !slices.ContainsFunc(jestFnCall.Members, func(m string) bool {
 					return jestUtils.EQUALITY_METHOD_NAMES[m]
 				}) {
 					return
@@ -164,10 +170,20 @@ var PreferToContainRule = rule.Rule{
 				receiverText := rslintUtils.TrimmedNodeText(sourceFile, receiver)
 				includesArgText := rslintUtils.TrimmedNodeText(sourceFile, includesArg)
 
-				chainReplacement := ".toContain"
-				if shouldNegate {
-					chainReplacement = ".not.toContain"
+				// Preserve non-`not` modifiers (e.g. `resolves`, `rejects`) so the
+				// asynchronous semantics of the original matcher chain are kept.
+				var chainParts []string
+				for _, modifier := range jestFnCall.Modifiers {
+					if modifier == "not" {
+						continue
+					}
+					chainParts = append(chainParts, modifier)
 				}
+				if shouldNegate {
+					chainParts = append(chainParts, "not")
+				}
+				chainParts = append(chainParts, "toContain")
+				chainReplacement := "." + strings.Join(chainParts, ".")
 
 				reportNode := node
 				if n := len(jestFnCall.MemberEntries); n > 0 {
