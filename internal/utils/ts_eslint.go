@@ -1150,6 +1150,8 @@ func IsDeclarationIdentifier(node *ast.Node) bool {
 		return parent.AsImportEqualsDeclaration().Name() == node
 	case ast.KindEnumMember:
 		return parent.AsEnumMember().Name() == node
+	case ast.KindTypeParameter:
+		return parent.AsTypeParameter().Name() == node
 	}
 	return false
 }
@@ -1188,6 +1190,8 @@ func GetDeclarationIdentifier(decl *ast.Node) *ast.Node {
 		return decl.AsParameterDeclaration().Name()
 	case ast.KindBindingElement:
 		return decl.AsBindingElement().Name()
+	case ast.KindTypeParameter:
+		return decl.AsTypeParameter().Name()
 	}
 	return nil
 }

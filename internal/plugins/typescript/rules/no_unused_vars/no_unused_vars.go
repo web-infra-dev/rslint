@@ -1629,6 +1629,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	isTypeOrImportDeclaration := definition != nil && (definition.Kind == ast.KindInterfaceDeclaration ||
 		definition.Kind == ast.KindTypeAliasDeclaration ||
 		definition.Kind == ast.KindEnumDeclaration ||
+		definition.Kind == ast.KindTypeParameter ||
 		definition.Kind == ast.KindImportSpecifier ||
 		definition.Kind == ast.KindImportClause ||
 		definition.Kind == ast.KindNamespaceImport ||
@@ -2054,6 +2055,36 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				nameNode := importEquals.Name()
+				if nameNode == nil || !ast.IsIdentifier(nameNode) {
+					return
+				}
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, ac)
+			},
+
+			ast.KindTypeParameter: func(node *ast.Node) {
+				// Generic type parameter declarations: `<T>`, `<T = unknown>`, `<T extends U>`.
+				// Skip nodes that syntactically share KindTypeParameter in tsgo but aren't
+				// parameter declarations: `infer T`, mapped-type `[P in K]`, JSDoc @template.
+				parent := node.Parent
+				if parent != nil {
+					switch parent.Kind {
+					case ast.KindInferType, ast.KindMappedType, ast.KindJSDocTemplateTag:
+						return
+					}
+				}
+				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
+					return
+				}
+				typeParam := node.AsTypeParameter()
+				if typeParam == nil {
+					return
+				}
+				nameNode := typeParam.Name()
 				if nameNode == nil || !ast.IsIdentifier(nameNode) {
 					return
 				}
