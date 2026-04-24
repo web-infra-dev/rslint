@@ -315,6 +315,7 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 			var childVisitor ast.Visitor
 			var patternVisitor func(node *ast.Node)
 			patternVisitor = func(node *ast.Node) {
+				runListeners(rule.WildcardTokenKind, node)
 				runListeners(node.Kind, node)
 				kind := rule.ListenerOnAllowPattern(node.Kind)
 				runListeners(kind, node)
@@ -338,8 +339,10 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 
 				runListeners(rule.ListenerOnExit(kind), node)
 				runListeners(rule.ListenerOnExit(node.Kind), node)
+				runListeners(rule.WildcardExitTokenKind, node)
 			}
 			childVisitor = func(node *ast.Node) bool {
+				runListeners(rule.WildcardTokenKind, node)
 				runListeners(node.Kind, node)
 
 				switch node.Kind {
@@ -360,10 +363,11 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 				}
 
 				runListeners(rule.ListenerOnExit(node.Kind), node)
+				runListeners(rule.WildcardExitTokenKind, node)
 
 				return false
 			}
-			file.Node.ForEachChild(childVisitor)
+			patternVisitor(&file.Node)
 			clear(registeredListeners)
 		}
 		done()
