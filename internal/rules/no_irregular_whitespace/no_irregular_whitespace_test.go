@@ -693,6 +693,30 @@ func TestNoIrregularWhitespace(t *testing.T) {
 					{MessageId: "noIrregularWhitespace", Line: 1, Column: 10, EndLine: 1, EndColumn: 11},
 				},
 			},
+
+			// ---- Extra: multi-byte chars before irregular WS — UTF-16 column verification ----
+			// CJK char (U+4E2D, 3 bytes UTF-8, 1 UTF-16 code unit)
+			{
+				Code: "var \u4e2d\u00A0= 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noIrregularWhitespace", Line: 1, Column: 6, EndLine: 1, EndColumn: 7},
+				},
+			},
+			// Emoji (U+1F600, 4 bytes UTF-8, 2 UTF-16 code units / surrogate pair)
+			// Use comment context because tsgo doesn't support emoji in identifiers
+			{
+				Code: "// \U0001F600\u00A0",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noIrregularWhitespace", Line: 1, Column: 6, EndLine: 1, EndColumn: 7},
+				},
+			},
+			// Two CJK chars then irregular WS
+			{
+				Code: "var \u4e2d\u6587\u3000= 1;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noIrregularWhitespace", Line: 1, Column: 7, EndLine: 1, EndColumn: 8},
+				},
+			},
 		},
 	)
 }

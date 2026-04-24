@@ -23,7 +23,7 @@ The following characters are considered irregular whitespace:
 Examples of **incorrect** code for this rule:
 
 ```javascript
-var any = 'thing';
+var any\u00A0= 'thing';
 ```
 
 Examples of **correct** code for this rule:
