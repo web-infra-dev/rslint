@@ -28,6 +28,16 @@ interface Foo {}
 const x: Foo = {};
 `,
 		},
+		// Global object method call — no local variable involved
+		{Code: `Object.hasOwnProperty.call(a);`},
+		// Function using arguments keyword — no forward reference
+		{
+			Code: `
+function a() {
+  alert(arguments);
+}
+`,
+		},
 		// Variable declared before use
 		{
 			Code: `
@@ -98,7 +108,9 @@ new A();
 var a = 0, b = a;
 `,
 		},
-		// var _a = { a: 0, b: _a } = {} as any; — skipped, complex destructuring assignment target
+		// Destructuring with sequential defaults (b uses a, which is already bound)
+		{Code: `var { a = 0, b = a } = {} as any;`},
+		{Code: `var [a = 0, b = a] = {} as any;`},
 		// Self-referencing function
 		{
 			Code: `
@@ -134,6 +146,15 @@ for (a of a) {}
 a();
 {
   function a() {}
+}
+`,
+		},
+		// a() is in outer scope; block-scoped let function expression doesn't conflict
+		{
+			Code: `
+a();
+{
+  let a = function () {};
 }
 `,
 		},
@@ -237,13 +258,38 @@ const Foo = {
 `,
 			Options: map[string]interface{}{"ignoreTypeReferences": true},
 		},
-		// Interface with same name as later variable
+		// Interface with same name as later variable (issue #435)
 		{
 			Code: `
 interface Foo {
   bar: string;
 }
 const bar = 'blah';
+`,
+		},
+		// Interface members do not conflict with later let/export/namespace (issue #141)
+		{
+			Code: `
+interface ITest {
+  first: boolean;
+  second: string;
+  third: boolean;
+}
+let first = () => console.log('first');
+export let second = () => console.log('second');
+export namespace Third {
+  export let third = () => console.log('third');
+}
+`,
+		},
+		// typeof on parameter member (issue #550)
+		{
+			Code: `
+function test(file: Blob) {
+  const slice: typeof file.slice =
+    file.slice || (file as any).webkitSlice || (file as any).mozSlice;
+  return slice;
+}
 `,
 		},
 		// Enums with enums: false
@@ -296,6 +342,43 @@ enum Foo { BAR }
 `,
 			Options: map[string]interface{}{"allowNamedExports": true},
 		},
+		{
+			Code: `
+export { a, b };
+let a: any, b: any;
+`,
+			Options: map[string]interface{}{"allowNamedExports": true},
+		},
+		{
+			Code: `
+export { a };
+var a: any;
+`,
+			Options: map[string]interface{}{"allowNamedExports": true},
+		},
+		{
+			Code: `
+export { f };
+function f() {}
+`,
+			Options: map[string]interface{}{"allowNamedExports": true},
+		},
+		{
+			Code: `
+export { C };
+class C {}
+`,
+			Options: map[string]interface{}{"allowNamedExports": true},
+		},
+		{
+			Code: `
+export { Foo };
+namespace Foo {
+  export let bar = () => console.log('bar');
+}
+`,
+			Options: map[string]interface{}{"allowNamedExports": true},
+		},
 		// Decorators
 		{
 			Code: `
@@ -335,10 +418,37 @@ const obj = {
 `,
 			Options: map[string]interface{}{"ignoreTypeReferences": false},
 		},
+		// Nested object with as — ignoreTypeReferences: false (no forward ref, still valid)
+		{
+			Code: `
+const obj = {
+  foo: {
+    foo: 'foo',
+  } as {
+    [key in 'foo' | 'bar']: key;
+  },
+};
+`,
+			Options: map[string]interface{}{"ignoreTypeReferences": false},
+		},
 		// Namespace alias
 		{
 			Code: `
 namespace A.X.Y {}
+import Z = A.X.Y;
+const X = 23;
+`,
+		},
+		// Extended namespace alias (non-dotted form)
+		{
+			Code: `
+namespace A {
+  export namespace X {
+    export namespace Y {
+      export const foo = 40;
+    }
+  }
+}
 import Z = A.X.Y;
 const X = 23;
 `,
@@ -756,6 +866,38 @@ enum Foo { FOO }
 			Code: `
 export { a };
 const a = 1;
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUseBeforeDefine", Line: 2, Column: 10},
+			},
+		},
+		// Empty object options — same as default
+		{
+			Code: `
+export { a };
+const a = 1;
+`,
+			Options: map[string]interface{}{},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUseBeforeDefine", Line: 2, Column: 10},
+			},
+		},
+		// "nofunc" string option — allowNamedExports still defaults to false
+		{
+			Code: `
+export { a };
+const a = 1;
+`,
+			Options: "nofunc",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noUseBeforeDefine", Line: 2, Column: 10},
+			},
+		},
+		// export var before define
+		{
+			Code: `
+export { a };
+var a: any;
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noUseBeforeDefine", Line: 2, Column: 10},
