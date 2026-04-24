@@ -174,8 +174,11 @@ var StylePropObjectRule = rule.Rule{
 							continue
 						}
 						// For shorthand { style }, resolve the value symbol to the variable declaration.
-						// TypeChecker is nil for gap files — skip the check in that case
-						// rather than panicking.
+						// TypeChecker is nil on gap files (files not in typeInfoFiles);
+						// skip the check instead of panicking. utils.GetDeclaration
+						// already nil-guards, but GetShorthandAssignmentValueSymbol
+						// is a direct checker method with no wrapper, so the guard
+						// lives here.
 						if ctx.TypeChecker == nil {
 							return
 						}
