@@ -1,0 +1,1276 @@
+// Rstest Snapshot v1
+
+exports[`no-magic-numbers > invalid 1`] = `
+{
+  "code": "type Foo = 1;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 2`] = `
+{
+  "code": "type Foo = -1;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 3`] = `
+{
+  "code": "type Foo = 1 | 2 | 3;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 4`] = `
+{
+  "code": "type Foo = 1 | -1;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 5`] = `
+{
+  "code": "
+interface Foo {
+  bar: 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 6`] = `
+{
+  "code": "
+enum foo {
+  SECOND = 1000,
+  NUM = '0123456789',
+  NEG = -1,
+  POS = +1,
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1000.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 10,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  readonly A = 1;
+  readonly B = 2;
+  public static readonly C = 3;
+  static readonly D = 4;
+  readonly E = -5;
+  readonly F = +6;
+  private readonly G = 100n;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 30,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 4.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: -5.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 7,
+        },
+        "start": {
+          "column": 16,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 6.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 8,
+        },
+        "start": {
+          "column": 17,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 100n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 9,
+        },
+        "start": {
+          "column": 24,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 8`] = `
+{
+  "code": "type Foo = Bar[0];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 9`] = `
+{
+  "code": "type Foo = Bar[-1];",
+  "diagnostics": [
+    {
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 10`] = `
+{
+  "code": "type Foo = Bar[0xab];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 0xab.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 11`] = `
+{
+  "code": "type Foo = Bar[5.6e1];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 5.6e1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 12`] = `
+{
+  "code": "type Foo = Bar[10n];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 10n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 13`] = `
+{
+  "code": "type Foo = Bar[1 | -2];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 14`] = `
+{
+  "code": "type Foo = Bar[1 & -2];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 15`] = `
+{
+  "code": "type Foo = Bar[1 & number];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 16`] = `
+{
+  "code": "type Foo = Bar[((1 & -2) | 3) | 4];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 4.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 17`] = `
+{
+  "code": "type Foo = Parameters<Bar>[2];",
+  "diagnostics": [
+    {
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 18`] = `
+{
+  "code": "
+type Others = [['a'], ['b']];
+
+type Foo = {
+  [K in keyof Others[0]]: Others[K];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 19`] = `
+{
+  "code": "
+type Other = {
+  [0]: 3;
+};
+
+type Foo = {
+  [K in keyof Other]: \`\${K & number}\`;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 20`] = `
+{
+  "code": "
+type Foo = {
+  [K in 0 | 1 | 2]: 0;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+    {
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 21`] = `
+{
+  "code": "type Foo = 1;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 22`] = `
+{
+  "code": "type Foo = -2;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 23`] = `
+{
+  "code": "type Foo = 3n;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 3n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 24`] = `
+{
+  "code": "type Foo = -4n;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -4n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 25`] = `
+{
+  "code": "type Foo = 5.6;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 5.6.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 26`] = `
+{
+  "code": "type Foo = -7.8;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -7.8.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 27`] = `
+{
+  "code": "type Foo = 0x0a;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 0x0a.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 28`] = `
+{
+  "code": "type Foo = -0xbc;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -0xbc.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 29`] = `
+{
+  "code": "type Foo = 1e2;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1e2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 30`] = `
+{
+  "code": "type Foo = -3e4;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -3e4.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 31`] = `
+{
+  "code": "type Foo = 5e-6;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 5e-6.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 32`] = `
+{
+  "code": "type Foo = -7e-8;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -7e-8.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 33`] = `
+{
+  "code": "type Foo = 1.1e2;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 1.1e2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 34`] = `
+{
+  "code": "type Foo = -3.1e4;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -3.1e4.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 35`] = `
+{
+  "code": "type Foo = 5.1e-6;",
+  "diagnostics": [
+    {
+      "message": "No magic number: 5.1e-6.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 36`] = `
+{
+  "code": "type Foo = -7.1e-8;",
+  "diagnostics": [
+    {
+      "message": "No magic number: -7.1e-8.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
