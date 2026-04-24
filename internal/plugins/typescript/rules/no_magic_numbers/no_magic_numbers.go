@@ -77,7 +77,6 @@ func parseOptions(rawOpts any) options {
 }
 
 // normalizeIgnoreFloat converts a float64 ignore value to a canonical string key.
-// Sign is preserved: -2 → "-2", 2 → "2".
 func normalizeIgnoreFloat(v float64) string {
 	return strconv.FormatFloat(v, 'f', -1, 64)
 }
@@ -125,15 +124,36 @@ func parseRawNumericValue(raw string) (float64, bool) {
 	return f, true
 }
 
+// skipParensUp walks from a node's parent upward through ParenthesizedExpression
+// nodes and returns the first non-parenthesized ancestor.
+// ESTree has no ParenthesizedExpression nodes; tsgo does. This bridges the gap.
+func skipParensUp(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedExpression {
+		node = node.Parent
+	}
+	return node
+}
+
+// findUnaryParent checks if the numeric literal's effective parent (after skipping
+// parentheses) is a PrefixUnaryExpression with +/-. Returns the PrefixUnaryExpression
+// node and operator kind, or nil if not found.
+func findUnaryParent(node *ast.Node) (*ast.Node, ast.Kind) {
+	p := skipParensUp(node.Parent)
+	if p != nil && p.Kind == ast.KindPrefixUnaryExpression {
+		pref := p.AsPrefixUnaryExpression()
+		if pref.Operator == ast.KindMinusToken || pref.Operator == ast.KindPlusToken {
+			return p, pref.Operator
+		}
+	}
+	return nil, 0
+}
+
 // normalizeLiteralValue returns a canonical string key for a numeric or bigint literal,
-// handling unary minus/plus prefix.
+// handling unary minus/plus prefix (through parentheses).
 func normalizeLiteralValue(node *ast.Node, raw string, isBigInt bool) string {
 	negate := false
-	if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
-		pref := node.Parent.AsPrefixUnaryExpression()
-		if pref.Operator == ast.KindMinusToken {
-			negate = true
-		}
+	if unary, op := findUnaryParent(node); unary != nil && op == ast.KindMinusToken {
+		negate = true
 	}
 	if isBigInt {
 		text := strings.TrimSuffix(raw, "n")
@@ -150,7 +170,6 @@ func normalizeLiteralValue(node *ast.Node, raw string, isBigInt bool) string {
 		}
 		return "bigint:" + n.String()
 	}
-	// Numeric literal
 	f, ok := parseRawNumericValue(raw)
 	if !ok {
 		return raw
@@ -177,26 +196,18 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 
-		// Types allowed when detectObjects is false.
-		// In ESLint: ObjectExpression, Property, AssignmentExpression (but NOT assignment to an identifier)
-		// When detectObjects is true, none of these are allowed.
-
 		handleNumericNode := func(node *ast.Node, isBigInt bool) {
 			raw := utils.TrimmedNodeText(ctx.SourceFile, node)
 
 			// --- TS-specific checks (from @typescript-eslint extension) ---
-			// These are checked first and may short-circuit with their own reporting.
-			// isAllowed: true = skip, false = report as TS violation, nil = fall through to base logic
 			var isAllowed *bool
 			trueVal := true
 			falseVal := false
 
-			// Check if the value is in the ignore list (sign-aware)
 			if opts.ignore[normalizeLiteralValue(node, raw, isBigInt)] {
 				isAllowed = &trueVal
 			}
 
-			// Check TS enum member
 			if isAllowed == nil && isParentTSEnumDeclaration(node) {
 				if opts.ignoreEnums {
 					isAllowed = &trueVal
@@ -205,7 +216,6 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Check TS numeric literal type
 			if isAllowed == nil && isTSNumericLiteralType(node) {
 				if opts.ignoreNumericLiteralTypes {
 					isAllowed = &trueVal
@@ -214,7 +224,6 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Check TS type index
 			if isAllowed == nil && isAncestorTSIndexedAccessType(node) {
 				if opts.ignoreTypeIndexes {
 					isAllowed = &trueVal
@@ -223,7 +232,6 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Check readonly class property
 			if isAllowed == nil && isParentTSReadonlyPropertyDefinition(node) {
 				if opts.ignoreReadonlyClassProperties {
 					isAllowed = &trueVal
@@ -240,12 +248,9 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 				// Report as TS violation: only prepend '-' for negative numbers (not '+')
 				reportNode := node
 				reportRaw := raw
-				if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
-					pref := node.Parent.AsPrefixUnaryExpression()
-					if pref.Operator == ast.KindMinusToken {
-						reportNode = node.Parent
-						reportRaw = "-" + raw
-					}
+				if unary, op := findUnaryParent(node); unary != nil && op == ast.KindMinusToken {
+					reportNode = unary
+					reportRaw = "-" + raw
 				}
 				ctx.ReportNode(reportNode, rule.RuleMessage{
 					Id:          noMagicMessage.Id,
@@ -255,7 +260,6 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 			}
 
 			// --- Core ESLint base rule logic ---
-			// Determine fullNumberNode and raw (handling unary +/-)
 			fullNumberNode := node
 			fullRaw := raw
 			var numericValue float64
@@ -271,22 +275,21 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 				numericValue, _ = parseRawNumericValue(raw)
 			}
 
-			if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
-				pref := node.Parent.AsPrefixUnaryExpression()
-				if pref.Operator == ast.KindMinusToken || pref.Operator == ast.KindPlusToken {
-					fullNumberNode = node.Parent
-					fullRaw = utils.TrimmedNodeText(ctx.SourceFile, node.Parent)
-					if pref.Operator == ast.KindMinusToken {
-						if isBigInt {
-							bigintValue = new(big.Int).Neg(bigintValue)
-						} else {
-							numericValue = -numericValue
-						}
+			// Detect unary +/- parent (through parentheses)
+			if unary, op := findUnaryParent(node); unary != nil {
+				fullNumberNode = unary
+				fullRaw = utils.TrimmedNodeText(ctx.SourceFile, unary)
+				if op == ast.KindMinusToken {
+					if isBigInt {
+						bigintValue = new(big.Int).Neg(bigintValue)
+					} else {
+						numericValue = -numericValue
 					}
 				}
 			}
 
-			parent := fullNumberNode.Parent
+			// Resolve logical parent, skipping parenthesized expressions
+			parent := skipParensUp(fullNumberNode.Parent)
 			if parent == nil {
 				return
 			}
@@ -303,25 +306,24 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 			}
 
 			// Always allow parseInt radix and JSX numbers
-			if isParseIntRadix(fullNumberNode) || isJSXNumber(fullNumberNode) {
+			if isParseIntRadix(fullNumberNode, parent) || isJSXNumber(parent) {
 				return
 			}
 
 			// Check optional ignore conditions
-			if opts.ignoreDefaultValues && isDefaultValue(fullNumberNode) {
+			if opts.ignoreDefaultValues && isDefaultValue(fullNumberNode, parent) {
 				return
 			}
-			if opts.ignoreClassFieldInitialValues && isClassFieldInitialValue(fullNumberNode) {
+			if opts.ignoreClassFieldInitialValues && isClassFieldInitialValue(fullNumberNode, parent) {
 				return
 			}
-			if opts.ignoreArrayIndexes && isArrayIndex(fullNumberNode, numericValue, bigintValue, isBigInt) {
+			if opts.ignoreArrayIndexes && isArrayIndex(fullNumberNode, parent, numericValue, bigintValue, isBigInt) {
 				return
 			}
 
 			// Report
 			if parent.Kind == ast.KindVariableDeclaration {
 				if opts.enforceConst {
-					// Check if the variable declaration list uses 'const'
 					declList := parent.Parent
 					if declList != nil && declList.Kind == ast.KindVariableDeclarationList && !ast.IsVarConst(declList) {
 						ctx.ReportNode(fullNumberNode, useConstMessage)
@@ -347,8 +349,6 @@ var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 })
 
 // isOkParent checks if the parent node type is one that allows numbers without reporting.
-// When detectObjects is false (default), numbers in object literals, property assignments,
-// and assignment expressions (to non-identifiers) are allowed.
 func isOkParent(parent *ast.Node, detectObjects bool) bool {
 	if detectObjects {
 		return false
@@ -359,27 +359,20 @@ func isOkParent(parent *ast.Node, detectObjects bool) bool {
 	case ast.KindPropertyAssignment:
 		return true
 	case ast.KindShorthandPropertyAssignment:
-		// ShorthandPropertyAssignment with ObjectAssignmentInitializer means this number is a
-		// destructuring default (e.g. {one = 1} = {}), not a property value. Don't suppress.
 		spa := parent.AsShorthandPropertyAssignment()
 		if spa.ObjectAssignmentInitializer != nil {
 			return false
 		}
 		return true
 	case ast.KindComputedPropertyName:
-		// In ESTree, computed property keys like {[42]: true} have Property as parent (okType).
-		// In tsgo, they have ComputedPropertyName as parent. Check if the grandparent is a
-		// property assignment in an object literal (not a class field).
 		gp := parent.Parent
 		if gp != nil && (gp.Kind == ast.KindPropertyAssignment || gp.Kind == ast.KindShorthandPropertyAssignment) {
 			return true
 		}
 		return false
 	case ast.KindBinaryExpression:
-		// AssignmentExpression in ESTree maps to BinaryExpression with assignment operator in tsgo
 		op := parent.AsBinaryExpression().OperatorToken.Kind
 		if isAssignmentOperator(op) {
-			// If assigning to an identifier, it's NOT ok (magic number in identifier assignment)
 			left := parent.AsBinaryExpression().Left
 			if left != nil && ast.SkipParentheses(left).Kind == ast.KindIdentifier {
 				return false
@@ -390,7 +383,6 @@ func isOkParent(parent *ast.Node, detectObjects bool) bool {
 	return false
 }
 
-// isAssignmentOperator returns true for = and compound assignment operators.
 func isAssignmentOperator(kind ast.Kind) bool {
 	switch kind {
 	case ast.KindEqualsToken,
@@ -415,46 +407,42 @@ func isAssignmentOperator(kind ast.Kind) bool {
 }
 
 // getLiteralParent returns the "logical parent" of a numeric literal node,
-// skipping any unary +/- prefix to get the containing statement/expression.
+// skipping ParenthesizedExpression and unary +/- prefix.
 func getLiteralParent(node *ast.Node) *ast.Node {
-	if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
-		pref := node.Parent.AsPrefixUnaryExpression()
+	p := skipParensUp(node.Parent)
+	if p != nil && p.Kind == ast.KindPrefixUnaryExpression {
+		pref := p.AsPrefixUnaryExpression()
 		if pref.Operator == ast.KindMinusToken || pref.Operator == ast.KindPlusToken {
-			return node.Parent.Parent
+			return skipParensUp(p.Parent)
 		}
 	}
-	return node.Parent
+	return p
 }
 
-// isParentTSEnumDeclaration checks if the numeric literal is inside a TS enum member.
 func isParentTSEnumDeclaration(node *ast.Node) bool {
 	parent := getLiteralParent(node)
 	return parent != nil && parent.Kind == ast.KindEnumMember
 }
 
-// isTSNumericLiteralType checks if the numeric literal is used as a TypeScript numeric literal type.
-// Returns true for patterns like `type Foo = 1`, `type Foo = 1 | 2 | 3`.
 func isTSNumericLiteralType(node *ast.Node) bool {
-	// For negative numbers, step up past the unary minus
+	// For negative numbers, step up past parentheses and unary minus
 	current := node
-	if current.Parent != nil && current.Parent.Kind == ast.KindPrefixUnaryExpression {
-		pref := current.Parent.AsPrefixUnaryExpression()
+	p := skipParensUp(current.Parent)
+	if p != nil && p.Kind == ast.KindPrefixUnaryExpression {
+		pref := p.AsPrefixUnaryExpression()
 		if pref.Operator == ast.KindMinusToken {
-			current = current.Parent
+			current = p
 		}
 	}
 
-	// Parent must be a LiteralType
 	if current.Parent == nil || current.Parent.Kind != ast.KindLiteralType {
 		return false
 	}
 
-	// Check if grandparent is TypeAliasDeclaration
 	gp := current.Parent.Parent
 	if gp == nil {
 		return false
 	}
-	// Skip parenthesized types
 	for gp != nil && gp.Kind == ast.KindParenthesizedType {
 		gp = gp.Parent
 	}
@@ -462,10 +450,8 @@ func isTSNumericLiteralType(node *ast.Node) bool {
 		return true
 	}
 
-	// Check if grandparent is UnionType whose ancestor is TypeAliasDeclaration
 	if gp != nil && gp.Kind == ast.KindUnionType {
 		ancestor := gp.Parent
-		// Walk up through nested union types and parenthesized types
 		for ancestor != nil && (ancestor.Kind == ast.KindUnionType || ancestor.Kind == ast.KindParenthesizedType) {
 			ancestor = ancestor.Parent
 		}
@@ -475,7 +461,6 @@ func isTSNumericLiteralType(node *ast.Node) bool {
 	return false
 }
 
-// isParentTSReadonlyPropertyDefinition checks if the numeric literal is inside a readonly class property.
 func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 	parent := getLiteralParent(node)
 	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
@@ -484,12 +469,9 @@ func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 	return ast.HasSyntacticModifier(parent, ast.ModifierFlagsReadonly)
 }
 
-// isAncestorTSIndexedAccessType checks if the numeric literal is part of a type indexed access (e.g. Bar[0]).
 func isAncestorTSIndexedAccessType(node *ast.Node) bool {
-	// Get the logical parent (skip unary +/-)
 	ancestor := getLiteralParent(node)
 
-	// Walk up through union types, intersection types, and parenthesized types
 	for ancestor != nil && ancestor.Parent != nil &&
 		(ancestor.Parent.Kind == ast.KindUnionType ||
 			ancestor.Parent.Kind == ast.KindIntersectionType ||
@@ -501,54 +483,47 @@ func isAncestorTSIndexedAccessType(node *ast.Node) bool {
 }
 
 // isDefaultValue checks if the fullNumberNode is a default value assignment.
-// In tsgo, default values appear as initializers in BindingElement, Parameter,
-// or as BinaryExpression(=) inside destructuring assignments.
-func isDefaultValue(fullNumberNode *ast.Node) bool {
-	parent := fullNumberNode.Parent
+// parent is the already-resolved logical parent (parens skipped).
+func isDefaultValue(fullNumberNode *ast.Node, parent *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	// Parameter default: function(param = 123)
 	if parent.Kind == ast.KindParameter {
-		return parent.AsParameterDeclaration().Initializer == fullNumberNode
+		init := parent.AsParameterDeclaration().Initializer
+		return init != nil && ast.SkipParentheses(init) == fullNumberNode
 	}
-	// Binding element default: const { param = 123 } = obj; const [a = 1] = arr;
 	if parent.Kind == ast.KindBindingElement {
-		return parent.AsBindingElement().Initializer == fullNumberNode
+		init := parent.AsBindingElement().Initializer
+		return init != nil && ast.SkipParentheses(init) == fullNumberNode
 	}
-	// Shorthand property destructuring default: ({one = 1} = {})
-	// In tsgo, this is a ShorthandPropertyAssignment with ObjectAssignmentInitializer
 	if parent.Kind == ast.KindShorthandPropertyAssignment {
 		spa := parent.AsShorthandPropertyAssignment()
-		return spa.ObjectAssignmentInitializer == fullNumberNode
+		return spa.ObjectAssignmentInitializer != nil &&
+			ast.SkipParentheses(spa.ObjectAssignmentInitializer) == fullNumberNode
 	}
-	// Destructuring assignment default: [one = 1, two = 2] = arr
-	// In tsgo, this is a BinaryExpression with = operator where the right operand is the default value
 	if parent.Kind == ast.KindBinaryExpression {
 		binExpr := parent.AsBinaryExpression()
-		if binExpr.OperatorToken.Kind == ast.KindEqualsToken && binExpr.Right == fullNumberNode {
-			// Check if this assignment is inside an array/object destructuring context
-			// (the BinaryExpression's parent should be an array/object literal that's the left side of a destructuring assignment)
+		if binExpr.OperatorToken.Kind == ast.KindEqualsToken && ast.SkipParentheses(binExpr.Right) == fullNumberNode {
 			return isInsideDestructuringAssignment(parent)
 		}
 	}
 	return false
 }
 
-// isInsideDestructuringAssignment checks if a node is part of a destructuring assignment pattern.
 func isInsideDestructuringAssignment(node *ast.Node) bool {
 	parent := node.Parent
 	for parent != nil {
 		switch parent.Kind {
 		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
-			// Continue walking up
 			parent = parent.Parent
 			continue
 		case ast.KindSpreadElement, ast.KindPropertyAssignment, ast.KindShorthandPropertyAssignment:
 			parent = parent.Parent
 			continue
+		case ast.KindParenthesizedExpression:
+			parent = parent.Parent
+			continue
 		case ast.KindBinaryExpression:
-			// Check if this is a destructuring assignment (e.g., [...] = ...)
 			binExpr := parent.AsBinaryExpression()
 			if binExpr.OperatorToken.Kind == ast.KindEqualsToken {
 				left := binExpr.Left
@@ -565,41 +540,38 @@ func isInsideDestructuringAssignment(node *ast.Node) bool {
 }
 
 // isClassFieldInitialValue checks if the fullNumberNode is the direct initializer
-// of a class field (PropertyDeclaration), not a computed key.
-func isClassFieldInitialValue(fullNumberNode *ast.Node) bool {
-	parent := fullNumberNode.Parent
+// of a class field. parent is the already-resolved logical parent (parens skipped).
+func isClassFieldInitialValue(fullNumberNode *ast.Node, parent *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
 		return false
 	}
-	return parent.AsPropertyDeclaration().Initializer == fullNumberNode
+	init := parent.AsPropertyDeclaration().Initializer
+	return init != nil && ast.SkipParentheses(init) == fullNumberNode
 }
 
-// isParseIntRadix checks if the fullNumberNode is used as the radix argument in parseInt() or Number.parseInt().
-func isParseIntRadix(fullNumberNode *ast.Node) bool {
-	parent := fullNumberNode.Parent
+// isParseIntRadix checks if the fullNumberNode is used as the radix argument in
+// parseInt() or Number.parseInt(). parent is the already-resolved logical parent.
+func isParseIntRadix(fullNumberNode *ast.Node, parent *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return false
 	}
 	call := parent.AsCallExpression()
 	args := call.Arguments.Nodes
-	if len(args) < 2 || args[1] != fullNumberNode {
+	if len(args) < 2 || ast.SkipParentheses(args[1]) != fullNumberNode {
 		return false
 	}
 	callee := ast.SkipParentheses(call.Expression)
 	if callee == nil {
 		return false
 	}
-	// Check for parseInt(y, 10) or parseInt?.(y, 10)
 	if callee.Kind == ast.KindIdentifier && callee.AsIdentifier().Text == "parseInt" {
 		return true
 	}
-	// Check for Number.parseInt(y, 10) or Number?.parseInt(y, 10)
 	return utils.IsSpecificMemberAccess(call.Expression, "Number", "parseInt")
 }
 
-// isJSXNumber checks if the fullNumberNode is a direct child of a JSX node.
-func isJSXNumber(fullNumberNode *ast.Node) bool {
-	parent := fullNumberNode.Parent
+// isJSXNumber checks if the parent is a JSX node.
+func isJSXNumber(parent *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
@@ -612,14 +584,14 @@ func isJSXNumber(fullNumberNode *ast.Node) bool {
 	return false
 }
 
-// isArrayIndex checks if the fullNumberNode is used as a valid array index in an element access expression.
-func isArrayIndex(fullNumberNode *ast.Node, numericValue float64, bigintValue *big.Int, isBigInt bool) bool {
-	parent := fullNumberNode.Parent
+// isArrayIndex checks if the fullNumberNode is used as a valid array index.
+// parent is the already-resolved logical parent (parens skipped).
+func isArrayIndex(fullNumberNode *ast.Node, parent *ast.Node, numericValue float64, bigintValue *big.Int, isBigInt bool) bool {
 	if parent == nil || parent.Kind != ast.KindElementAccessExpression {
 		return false
 	}
 	elemAccess := parent.AsElementAccessExpression()
-	if elemAccess.ArgumentExpression != fullNumberNode {
+	if ast.SkipParentheses(elemAccess.ArgumentExpression) != fullNumberNode {
 		return false
 	}
 
@@ -627,7 +599,6 @@ func isArrayIndex(fullNumberNode *ast.Node, numericValue float64, bigintValue *b
 		if bigintValue == nil {
 			return false
 		}
-		// BigInt must be >= 0 and < maxArrayLength
 		if bigintValue.Sign() < 0 {
 			return false
 		}
@@ -635,14 +606,12 @@ func isArrayIndex(fullNumberNode *ast.Node, numericValue float64, bigintValue *b
 		return bigintValue.Cmp(maxIdx) < 0
 	}
 
-	// Numeric value must be a non-negative integer < maxArrayLength
 	if !isIntegerValue(numericValue) {
 		return false
 	}
 	return numericValue >= 0 && numericValue < maxArrayLength
 }
 
-// isIntegerValue checks if a float64 is an integer value.
 func isIntegerValue(v float64) bool {
 	if math.IsInf(v, 0) || math.IsNaN(v) {
 		return false

@@ -74,11 +74,6 @@ type Foo = Bar[1 | -2];
 type Foo = Parameters<Bar>[2];
 ```
 
-## Differences from ESLint
-
-- The `ignoreNumericLiteralTypes` option only ignores numeric literals in type alias declarations (`type Foo = 1`), not in all type positions. For example, numeric literals in interface property types (`interface Foo { bar: 1 }`) or type literal properties (`type Foo = { bar: 42 }`) are still reported, even with `ignoreNumericLiteralTypes: true`.
-- In tsgo, numeric literal text is normalized at parse time (e.g., `0xFF` becomes `255`). The reported `raw` value uses the original source text from the file, preserving hex/octal/binary/scientific notation. However, the `ignore` option comparison uses the numeric value, so `ignore: [0xFF]` and `ignore: [255]` are equivalent.
-
 ## Original Documentation
 
 [ESLint - no-magic-numbers](https://eslint.org/docs/latest/rules/no-magic-numbers)

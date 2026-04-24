@@ -206,6 +206,49 @@ type Foo = {
 
 		// ---- JSON path options test (array-wrapped, matches multi-element config shape) ----
 		{Code: `type Foo = Bar[0];`, Options: []interface{}{map[string]interface{}{"ignoreTypeIndexes": true}}},
+
+		// ---- Binary / octal literal array indexes (upstream core) ----
+		{Code: `foo[0b110]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+		{Code: `foo[0o71]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+
+		// ---- ParenthesizedExpression (tsgo-specific, ESTree has no paren nodes) ----
+		{Code: `const X = (42);`},
+		{Code: `const X = ((42));`},
+		{Code: `var x = { foo: (42) };`},
+		{Code: `obj.prop = (1);`},
+		{Code: `parseInt(y, (10));`},
+		{Code: `foo[(0)]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+		{Code: `enum E { A = (42) }`, Options: map[string]interface{}{"ignoreEnums": true}},
+		{Code: `class C { readonly x = (42); }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+		{Code: `class C { foo = (2); }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": true}},
+		{Code: `const func = (param = (123)) => {}`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `var a = <input maxLength={(10)} />;`, FileName: "test.tsx"},
+		{Code: `const X = -(42);`, Options: map[string]interface{}{"ignore": []interface{}{float64(-42)}}},
+
+		// ---- Edge cases: tsgo AST shapes ----
+		{Code: `type Nested = ('' | ('' | (1)));`, Options: map[string]interface{}{"ignoreNumericLiteralTypes": true}},
+		{Code: `type Foo = Bar[((((1))))];`, Options: map[string]interface{}{"ignoreTypeIndexes": true}},
+		{Code: `enum E { A = 1 << 0, B = 1 << 1 }`, Options: map[string]interface{}{"ignoreEnums": true, "ignore": []interface{}{float64(0), float64(1)}}},
+		{Code: `class C { protected readonly x = 42; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+		{Code: `foo?.bar?.[0]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+		{Code: `var x = { foo: 42 };`},
+		{Code: `var colors = {}; colors.RED = 2;`},
+		{Code: `const { a: { b = 1 } } = obj;`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `class C { foo = -42; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": true}},
+		{Code: `class C { readonly x = 100n; }`, Options: map[string]interface{}{"ignoreReadonlyClassProperties": true}},
+		{Code: `var x = {[42]: true}`},
+		{Code: `var one; ({one = 1} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `var a, b; ({a = 1, b = 2} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+		{Code: `var x; ({a: x = 42} = {})`, Options: map[string]interface{}{"ignoreDefaultValues": true}},
+
+		// ---- Upstream semantic lock-in ----
+		{Code: `var stats = {avg: 42};`},
+		{Code: `({key: 90, another: 10})`},
+		{Code: `colors.RED = 2;`},
+		{Code: `const DAY = 86400;`},
+		{Code: `var HOUR = 3600;`},
+		{Code: `foo[0xABn]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
+		{Code: `foo[5.0000000000000001]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Core ESLint: enforceConst ----
 		{
@@ -653,5 +696,90 @@ type Foo = {
 			Options: map[string]interface{}{"ignore": []interface{}{7.1e-8}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -7.1e-8.", Line: 1, Column: 12}},
 		},
+
+		// ---- ParenthesizedExpression invalid ----
+		{
+			Code:   `function f() { return -(1); }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic"}},
+		},
+		{
+			Code:   `a = (1);`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}},
+		},
+
+		// ---- Edge case invalid: type literal property (NOT type alias) ----
+		{
+			Code:    `type Foo = { bar: 42 };`,
+			Options: map[string]interface{}{"ignoreNumericLiteralTypes": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42.", Line: 1, Column: 19}},
+		},
+		{
+			Code:    `type Foo = { bar: 2 | 3 };`,
+			Options: map[string]interface{}{"ignoreNumericLiteralTypes": true},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 19},
+				{MessageId: "noMagic", Message: "No magic number: 3.", Line: 1, Column: 23},
+			},
+		},
+		// ---- Edge case invalid: class computed key vs initializer ----
+		{
+			Code:    `class C { 2; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 11}},
+		},
+		{
+			Code:    `class C { [2]; }`,
+			Options: map[string]interface{}{"ignoreClassFieldInitialValues": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 12}},
+		},
+		// ---- Edge case invalid: object destructuring default ----
+		{
+			Code:    `var one; ({one = 1} = {})`,
+			Options: map[string]interface{}{"ignoreDefaultValues": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}},
+		},
+		{
+			Code:    `var x; ({a: x = 42} = {})`,
+			Options: map[string]interface{}{"ignoreDefaultValues": false},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42."}},
+		},
+
+		// ---- Upstream core invalid: array index variants ----
+		{Code: `foo[-0.1]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -0.1."}}},
+		{Code: `foo[-0b110]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -0b110."}}},
+		{Code: `foo[-0o71]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -0o71."}}},
+		{Code: `foo[-0x12]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -0x12."}}},
+		{Code: `foo[0.12e1]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 0.12e1."}}},
+		{Code: `foo[1.678e2]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1.678e2."}}},
+		{Code: `foo[100.9]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 100.9."}}},
+		{Code: `foo[1e300]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1e300."}}},
+		{Code: `foo[1e310]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1e310."}}},
+		{Code: `foo[-1e310]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1e310."}}},
+		{Code: `foo[-0x12n]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -0x12n."}}},
+		{Code: `foo[- -1n]`, Options: map[string]interface{}{"ignoreArrayIndexes": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: -1n."}}},
+
+		// ---- Upstream core invalid: default values ----
+		{Code: `const { param = 123 } = sourceObject;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 123."}}},
+		{Code: `const { param = 123 } = sourceObject;`, Options: map[string]interface{}{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 123."}}},
+		{Code: `const [one = 1, two = 2] = []`, Options: map[string]interface{}{"ignoreDefaultValues": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}, {MessageId: "noMagic", Message: "No magic number: 2."}}},
+		{Code: `var one, two; [one = 1, two = 2] = []`, Options: map[string]interface{}{"ignoreDefaultValues": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}, {MessageId: "noMagic", Message: "No magic number: 2."}}},
+
+		// ---- Upstream core invalid: class field variants ----
+		{Code: `class C { static foo = 2; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 24}}},
+		{Code: `class C { #foo = 2; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 18}}},
+		{Code: `class C { static #foo = 2; }`, Options: map[string]interface{}{"ignoreClassFieldInitialValues": false}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 25}}},
+		{Code: `class C { foo = 2; }`, Options: map[string]interface{}{}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 2.", Line: 1, Column: 17}}},
+
+		// ---- Upstream core invalid: hex in expressions ----
+		{Code: `console.log(0x1A + 0x02);`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 0x1A."}, {MessageId: "noMagic", Message: "No magic number: 0x02."}}},
+
+		// ---- Upstream core invalid: misc ----
+		{Code: `var colors = {}; colors.RED = 2; colors.YELLOW = 3; colors.BLUE = 4 + 5;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 4."}, {MessageId: "noMagic", Message: "No magic number: 5."}}},
+		{Code: `var a = <div arrayProp={[1,2,3]}></div>;`, FileName: "test.tsx", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}, {MessageId: "noMagic", Message: "No magic number: 2."}, {MessageId: "noMagic", Message: "No magic number: 3."}}},
+
+		// ---- Upstream semantic lock-in invalid ----
+		{Code: `var stats = {avg: 42};`, Options: map[string]interface{}{"detectObjects": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 42."}}},
+		{Code: `min = 1;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 1."}}},
+		{Code: `function f() { return 60; }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noMagic", Message: "No magic number: 60."}}},
 	})
 }
