@@ -253,7 +253,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
     // './tests/typescript-eslint/rules/prefer-enum-initializers.test.ts',
     // './tests/typescript-eslint/rules/prefer-find.test.ts',
-    // './tests/typescript-eslint/rules/prefer-for-of.test.ts',
+    './tests/typescript-eslint/rules/prefer-for-of.test.ts',
     // './tests/typescript-eslint/rules/prefer-function-type.test.ts',
     './tests/typescript-eslint/rules/prefer-includes.test.ts',
     './tests/typescript-eslint/rules/prefer-literal-enum-member.test.ts',

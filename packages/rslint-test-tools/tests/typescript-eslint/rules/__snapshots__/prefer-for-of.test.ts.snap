@@ -1,0 +1,544 @@
+// Rstest Snapshot v1
+
+exports[`prefer-for-of > invalid 1`] = `
+{
+  "code": "
+for (var a = 0; a < obj.arr.length; a++) {
+  console.log(obj.arr[a]);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 2`] = `
+{
+  "code": "
+for (var b = 0; b < arr.length; b++) console.log(arr[b]);
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 3`] = `
+{
+  "code": "
+for (let a = 0; a < arr.length; a++) {
+  console.log(arr[a]);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 4`] = `
+{
+  "code": "
+for (var b = 0; b < arr.length; b++) console?.log(arr[b]);
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 5`] = `
+{
+  "code": "
+for (let a = 0; a < arr.length; a++) {
+  console?.log(arr[a]);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 6`] = `
+{
+  "code": "
+for (let a = 0; a < arr.length; ++a) {
+  arr[a].whatever();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 7`] = `
+{
+  "code": "
+for (let x = 0; x < arr.length; x++) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 8`] = `
+{
+  "code": "
+for (let x = 0; x < arr.length; x += 1) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 9`] = `
+{
+  "code": "
+for (let x = 0; x < arr.length; x = x + 1) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 10`] = `
+{
+  "code": "
+for (let x = 0; x < arr.length; x = 1 + x) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 11`] = `
+{
+  "code": "
+for (let shadow = 0; shadow < arr.length; shadow++) {
+  for (let shadow = 0; shadow < arr.length; shadow++) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 12`] = `
+{
+  "code": "
+for (let i = 0; i < arr.length; i++) {
+  obj[arr[i]] = 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 13`] = `
+{
+  "code": "
+for (let i = 0; i < arr.length; i++) {
+  delete obj[arr[i]];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 14`] = `
+{
+  "code": "
+for (let i = 0; i < arr.length; i++) {
+  [obj[arr[i]]] = [1];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 15`] = `
+{
+  "code": "
+for (let i = 0; i < arr.length; i++) {
+  [...obj[arr[i]]] = [1];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 16`] = `
+{
+  "code": "
+for (let i = 0; i < arr.length; i++) {
+  ({ foo: obj[arr[i]] } = { foo: 1 });
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 17`] = `
+{
+  "code": "
+for (let i = 0; i < this.item.length; ++i) {
+  this.item[i];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-for-of > invalid 18`] = `
+{
+  "code": "
+for (let i = 0; i < this.array.length; ++i) {
+  yield this.array[i];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`for-of\` loop instead of a \`for\` loop with this simple iteration.",
+      "messageId": "preferForOf",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-for-of",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
