@@ -160,6 +160,7 @@ import (
 	core_no_implied_eval "github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_iterator"
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
@@ -613,6 +614,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-implied-eval", core_no_implied_eval.NoImpliedEvalRule)
 	GlobalRuleRegistry.Register("no-import-assign", no_import_assign.NoImportAssignRule)
 	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
+	GlobalRuleRegistry.Register("no-irregular-whitespace", no_irregular_whitespace.NoIrregularWhitespaceRule)
 	GlobalRuleRegistry.Register("no-lone-blocks", no_lone_blocks.NoLoneBlocksRule)
 	GlobalRuleRegistry.Register("no-loop-func", no_loop_func.NoLoopFuncRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
