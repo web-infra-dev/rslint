@@ -345,13 +345,21 @@ func IsRestParameterDeclaration(decl *ast.Declaration) bool {
 	return ast.IsParameter(decl) && decl.AsParameterDeclaration().DotDotDotToken != nil
 }
 
-/**
- * Gets the declaration for the given variable
- */
+// GetDeclaration returns the first declaration of the symbol at `node`.
+//
+// Returns nil when `typeChecker` is nil. Rules with optional type info
+// (those that do not set `RequiresTypeInfo: true`) are scheduled with a
+// nil TypeChecker on "gap files" — files in the program but not in
+// `typeInfoFiles` (see internal/linter/linter.go). Rather than requiring
+// every caller to nil-guard manually, this helper degrades gracefully:
+// no checker → no declaration → caller falls back to structural checks.
 func GetDeclaration(
 	typeChecker *checker.Checker,
 	node *ast.Node,
 ) *ast.Declaration {
+	if typeChecker == nil {
+		return nil
+	}
 	symbol := typeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return nil
