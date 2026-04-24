@@ -7,12 +7,9 @@ import (
 )
 
 var PreferForOfRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-for-of",
+	Name:             "prefer-for-of",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		if ctx.TypeChecker == nil {
-			return rule.RuleListeners{}
-		}
-
 		return rule.RuleListeners{
 			ast.KindForStatement: func(node *ast.Node) {
 				forStmt := node.AsForStatement()
