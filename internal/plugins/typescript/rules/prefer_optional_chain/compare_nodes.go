@@ -66,7 +66,13 @@ func compareNodesUncached(nodeA *ast.Node, nodeB *ast.Node) NodeComparisonResult
 
 		exprResult := compareNodesUncached(propA.Expression, propB.Expression)
 		if exprResult != NodeComparisonEqual {
-			return exprResult
+			// Names match but expressions differ (e.g., foo.x vs foo.y.x).
+			// Don't propagate Subset — matching terminal names doesn't mean
+			// one is a prefix of the other. Use isChainPrefix for a proper check.
+			if isChainPrefix(a, b) {
+				return NodeComparisonSubset
+			}
+			return NodeComparisonInvalid
 		}
 		return NodeComparisonEqual
 
