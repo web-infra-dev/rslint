@@ -86,65 +86,57 @@ var gapFileFixtureSources = map[string]string{
 // targeted test: any new rule that forgets to nil-guard TypeChecker use will
 // be caught here without the rule author having to remember to add a test.
 //
-// To verify the sweep is real, a probe rule confirms that the gap-file path
-// is actually being exercised (i.e. TypeChecker is in fact nil for each
-// listener invocation), guarding against future linter changes that might
-// silently skip gap files.
+// A probe rule is attached alongside the sweep so every listener invocation
+// is observed under the exact same run — it verifies that the harness really
+// did hand the rules a nil TypeChecker, guarding against future linter
+// changes that might silently skip gap files.
 func TestGapFile_OptionalTypeCheckerRules_DoNotPanic(t *testing.T) {
 	RegisterAllRules()
 
-	program, paths := createGapFileProgram(t, gapFileFixtureSources)
+	program := createGapFileProgram(t, gapFileFixtureSources)
 
-	// Empty typeInfoFiles → every fixture file is a gap file, so every rule
-	// on every file receives a nil TypeChecker.
-	gap := map[string]struct{}{}
+	// Empty (but non-nil) typeInfoFiles → every fixture file is treated as
+	// a gap file by RunLinterInProgram, so every rule on every file
+	// receives a nil TypeChecker. The parameter name mirrors the linter's
+	// API so the intent reads the same on both sides.
+	typeInfoFiles := map[string]struct{}{}
 
-	configured := collectNonTypeAwareRules(t)
-	if len(configured) == 0 {
+	sweep := collectNonTypeAwareRules(t)
+	if len(sweep) == 0 {
 		t.Fatal("expected at least one non-type-aware rule; registry looks empty")
 	}
+
+	var sawNilChecker, sawAnyListener bool
+	probe := linter.ConfiguredRule{
+		Name:     "gap-probe",
+		Severity: rule.SeverityWarning,
+		Run: func(ctx rule.RuleContext) rule.RuleListeners {
+			return rule.RuleListeners{
+				ast.KindIdentifier: func(n *ast.Node) {
+					sawAnyListener = true
+					if ctx.TypeChecker == nil {
+						sawNilChecker = true
+					}
+				},
+			}
+		},
+	}
+	configured := append(sweep, probe)
 
 	linter.RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []linter.ConfiguredRule { return configured },
 		false,
 		func(d rule.RuleDiagnostic) {},
-		gap,
+		typeInfoFiles,
 		nil,
 	)
 
-	// Verify the harness really did pass nil TypeChecker. A listener needs
-	// to fire at least once for this to be meaningful, so we attach an
-	// Identifier listener (every fixture has many of those).
-	var sawNilChecker, sawAnyListener bool
-	linter.RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
-		func(sf *ast.SourceFile) []linter.ConfiguredRule {
-			return []linter.ConfiguredRule{{
-				Name:     "gap-probe",
-				Severity: rule.SeverityWarning,
-				Run: func(ctx rule.RuleContext) rule.RuleListeners {
-					return rule.RuleListeners{
-						ast.KindIdentifier: func(n *ast.Node) {
-							sawAnyListener = true
-							if ctx.TypeChecker == nil {
-								sawNilChecker = true
-							}
-						},
-					}
-				},
-			}}
-		},
-		false,
-		func(d rule.RuleDiagnostic) {},
-		gap,
-		nil,
-	)
 	if !sawAnyListener {
 		t.Fatal("probe listener never fired; test fixture is not being traversed")
 	}
 	if !sawNilChecker {
 		t.Fatal("expected gap files to yield a nil TypeChecker on every listener call; the regression path is not being exercised")
 	}
-	_ = paths
 }
 
 // collectNonTypeAwareRules returns a ConfiguredRule for every registered rule
@@ -161,9 +153,8 @@ func collectNonTypeAwareRules(t *testing.T) []linter.ConfiguredRule {
 		}
 		ruleImpl := impl
 		out = append(out, linter.ConfiguredRule{
-			Name:             name,
-			Severity:         rule.SeverityWarning,
-			RequiresTypeInfo: false,
+			Name:     name,
+			Severity: rule.SeverityWarning,
 			Run: func(ctx rule.RuleContext) rule.RuleListeners {
 				return ruleImpl.Run(ctx, nil)
 			},
@@ -172,14 +163,15 @@ func collectNonTypeAwareRules(t *testing.T) []linter.ConfiguredRule {
 	return out
 }
 
-// createGapFileProgram mirrors internal/linter.createTestProgramWithFiles
-// but is duplicated here to keep this package free of test-only exports
-// from internal/linter.
-func createGapFileProgram(t *testing.T, sourceFiles map[string]string) (*compiler.Program, map[string]string) {
+// createGapFileProgram builds a tsgo program from an in-memory source map.
+// Root file names are passed explicitly because, in local experiments, a
+// tsconfig-driven include glob did not reliably pick up .tsx files across
+// the setups this test needs — a missed .tsx file would silently neuter the
+// sweep (no JSX listener fired → no regression coverage).
+func createGapFileProgram(t *testing.T, sourceFiles map[string]string) *compiler.Program {
 	t.Helper()
 	tmpDir := t.TempDir()
 
-	paths := make(map[string]string, len(sourceFiles))
 	rootFiles := make([]string, 0, len(sourceFiles))
 	for name, content := range sourceFiles {
 		p := filepath.Join(tmpDir, name)
@@ -189,24 +181,15 @@ func createGapFileProgram(t *testing.T, sourceFiles map[string]string) (*compile
 		if err := os.WriteFile(p, []byte(content), 0644); err != nil {
 			t.Fatalf("write %s: %v", name, err)
 		}
-		paths[name] = tspath.NormalizePath(p)
-		rootFiles = append(rootFiles, paths[name])
+		rootFiles = append(rootFiles, tspath.NormalizePath(p))
 	}
 
-	// Build a program from explicit root file names rather than a tsconfig
-	// include glob — tsgo's tsconfig-include resolution does not pick up
-	// .tsx files across all configurations, which would silently defeat the
-	// point of this test (no JSX file → no JSX listener fired → no
-	// regression coverage).
 	compilerOptions := &core.CompilerOptions{
 		Jsx:             core.JsxEmitPreserve,
 		Target:          core.ScriptTargetESNext,
 		Module:          core.ModuleKindCommonJS,
 		ESModuleInterop: core.TSTrue,
-		Strict:          core.TSFalse,
-		AllowJs:         core.TSFalse,
 		SkipLibCheck:    core.TSTrue,
-		Lib:             []string{"lib.es2020.full.d.ts", "lib.dom.d.ts"},
 	}
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -215,5 +198,5 @@ func createGapFileProgram(t *testing.T, sourceFiles map[string]string) (*compile
 	if err != nil {
 		t.Fatalf("create program: %v", err)
 	}
-	return program, paths
+	return program
 }
