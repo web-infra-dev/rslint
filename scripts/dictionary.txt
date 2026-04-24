@@ -62,6 +62,7 @@ fround
 fsys
 funcw
 gcflags
+GDSFP
 getsp
 github
 gnored
@@ -250,6 +251,7 @@ componentwillupdate
 renderable
 Unparseable
 deprec
+destructures
 segs
 setstate
 Setstate
