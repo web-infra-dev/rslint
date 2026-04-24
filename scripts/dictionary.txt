@@ -122,6 +122,7 @@ notcool
 notunique
 nsec
 nullary
+NOTX
 Nullishness
 objectbindingpattern
 objectliteralexpression

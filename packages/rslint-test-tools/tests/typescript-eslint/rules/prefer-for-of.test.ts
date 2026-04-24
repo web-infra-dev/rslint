@@ -1,7 +1,5 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 
-
-
 const ruleTester = new RuleTester();
 
 ruleTester.run('prefer-for-of', {
