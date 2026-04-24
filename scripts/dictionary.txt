@@ -11,6 +11,7 @@ assertee
 autofixers
 auvred
 bazz
+Bbar
 benchtime
 bigints
 binaryexpression
@@ -19,6 +20,7 @@ bmatcuk
 bodyless
 cachedvfs
 callees
+Cbar
 catchable
 clazz
 clientrc
