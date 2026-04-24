@@ -44,6 +44,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_comment_textnodes"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_script_url"
 )
 
 func GetAllRules() []rule.Rule {
@@ -89,5 +90,6 @@ func GetAllRules() []rule.Rule {
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
 		jsx_no_comment_textnodes.JsxNoCommentTextnodesRule,
+		jsx_no_script_url.JsxNoScriptUrlRule,
 	}
 }
