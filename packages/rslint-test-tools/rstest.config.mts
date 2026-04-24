@@ -252,7 +252,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/only-throw-error.test.ts',
     './tests/typescript-eslint/rules/parameter-properties.test.ts',
     './tests/typescript-eslint/rules/prefer-as-const.test.ts',
-    // './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
+    './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
     // './tests/typescript-eslint/rules/prefer-enum-initializers.test.ts',
     // './tests/typescript-eslint/rules/prefer-find.test.ts',
     './tests/typescript-eslint/rules/prefer-for-of.test.ts',

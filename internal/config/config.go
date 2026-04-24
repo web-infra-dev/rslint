@@ -87,10 +87,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/only_throw_error"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/parameter_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_as_const"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_destructuring"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_for_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_includes"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_literal_enum_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_namespace_keyword"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_for_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_optional_chain"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly"
@@ -162,8 +163,8 @@ import (
 	core_no_implied_eval "github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
-	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
+	"github.com/web-infra-dev/rslint/internal/rules/no_irregular_whitespace"
 	"github.com/web-infra-dev/rslint/internal/rules/no_iterator"
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_labels"
@@ -197,6 +198,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
+	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
@@ -204,13 +206,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
-	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
-	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
@@ -535,6 +536,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/only-throw-error", only_throw_error.OnlyThrowErrorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/parameter-properties", parameter_properties.ParameterPropertiesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-destructuring", prefer_destructuring.PreferDestructuringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-includes", prefer_includes.PreferIncludesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-literal-enum-member", prefer_literal_enum_member.PreferLiteralEnumMemberRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-namespace-keyword", prefer_namespace_keyword.PreferNamespaceKeywordRule)

@@ -692,6 +692,96 @@ func IsHigherPrecedenceThanAwait(node *ast.Node) bool {
 	return nodePrecedence > awaitPrecedence
 }
 
+// EslintLikePrecedence returns a numeric precedence matching ESLint's
+// astUtils.getPrecedence so behavior parity holds for tsgo nodes that ESLint
+// classifies (e.g. ArrowFunction = 1, ConditionalExpression = 3). Returns -1
+// for TypeScript-only kinds (AsExpression, etc.) so the caller wraps them in
+// parentheses defensively, matching ESLint's behavior on unknown node types.
+func EslintLikePrecedence(node *ast.Node) int {
+	if node == nil {
+		return -1
+	}
+	switch node.Kind {
+	case ast.KindArrowFunction:
+		return 1
+	case ast.KindYieldExpression:
+		return 1
+	case ast.KindConditionalExpression:
+		return 3
+	case ast.KindBinaryExpression:
+		bin := node.AsBinaryExpression()
+		if bin.OperatorToken == nil {
+			return -1
+		}
+		op := bin.OperatorToken.Kind
+		if op == ast.KindCommaToken {
+			return 0
+		}
+		if ast.IsAssignmentOperator(op) {
+			return 1
+		}
+		switch op {
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return 4
+		case ast.KindAmpersandAmpersandToken:
+			return 5
+		case ast.KindBarToken:
+			return 6
+		case ast.KindCaretToken:
+			return 7
+		case ast.KindAmpersandToken:
+			return 8
+		case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
+			ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+			return 9
+		case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
+			ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
+			ast.KindInKeyword, ast.KindInstanceOfKeyword:
+			return 10
+		case ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+			ast.KindGreaterThanGreaterThanGreaterThanToken:
+			return 11
+		case ast.KindPlusToken, ast.KindMinusToken:
+			return 12
+		case ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken:
+			return 13
+		case ast.KindAsteriskAsteriskToken:
+			return 15
+		}
+		return 20
+	case ast.KindPrefixUnaryExpression:
+		op := node.AsPrefixUnaryExpression().Operator
+		if op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
+			return 17
+		}
+		return 16
+	case ast.KindPostfixUnaryExpression:
+		return 17
+	case ast.KindAwaitExpression, ast.KindDeleteExpression,
+		ast.KindVoidExpression, ast.KindTypeOfExpression:
+		return 16
+	case ast.KindCallExpression:
+		return 18
+	case ast.KindNewExpression:
+		return 19
+	case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword,
+		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword,
+		ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTemplateExpression, ast.KindArrayLiteralExpression,
+		ast.KindObjectLiteralExpression, ast.KindFunctionExpression,
+		ast.KindClassExpression, ast.KindParenthesizedExpression,
+		ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
+		ast.KindTaggedTemplateExpression, ast.KindSpreadElement,
+		ast.KindMetaProperty:
+		return 20
+	}
+	// TypeScript-specific (AsExpression, SatisfiesExpression,
+	// TypeAssertionExpression, ...) and any other kind ESLint does not
+	// classify: return -1 to force wrapping for safety.
+	return -1
+}
+
 func IsStrongPrecedenceNode(innerNode *ast.Node) bool {
 	return ast.IsLiteralKind(innerNode.Kind) ||
 		ast.IsBooleanLiteral(innerNode) ||
