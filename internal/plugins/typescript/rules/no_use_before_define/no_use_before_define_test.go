@@ -258,7 +258,7 @@ const Foo = {
 `,
 			Options: map[string]interface{}{"ignoreTypeReferences": true},
 		},
-		// Interface with same name as later variable (issue #435)
+		// Interface with same name as later variable
 		{
 			Code: `
 interface Foo {
@@ -267,7 +267,7 @@ interface Foo {
 const bar = 'blah';
 `,
 		},
-		// Interface members do not conflict with later let/export/namespace (issue #141)
+		// Interface members do not conflict with later let/export/namespace
 		{
 			Code: `
 interface ITest {
@@ -282,7 +282,7 @@ export namespace Third {
 }
 `,
 		},
-		// typeof on parameter member (issue #550)
+		// typeof on parameter member
 		{
 			Code: `
 function test(file: Blob) {
