@@ -119,10 +119,33 @@ func isArgumentOfWellKnownMutationFunction(node *ast.Node, ctx *rule.RuleContext
 	return true
 }
 
+// isWrappedInTypeAssertion checks whether a node is wrapped in a type assertion
+// (e.g. `as any`, `<any>`, or `!`) before reaching the actual write position.
+// When a developer writes `(ns.prop as any) = value`, the `as any` is an intentional
+// type-level escape hatch; ESLint does not flag such cases, so we skip them too.
+func isWrappedInTypeAssertion(node *ast.Node) bool {
+	current := node.Parent
+	for current != nil {
+		switch current.Kind {
+		case ast.KindParenthesizedExpression:
+			current = current.Parent
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression:
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
 // isMemberExpressionWrite checks if a member expression (PropertyAccess or ElementAccess)
 // is a write target: assignment left side, update expression operand, delete operand,
 // or for-in/of initializer.
 func isMemberExpressionWrite(memberExpr *ast.Node) bool {
+	// Type assertion wrappers (as any, <any>, !) indicate intentional bypass — skip.
+	if isWrappedInTypeAssertion(memberExpr) {
+		return false
+	}
 	if utils.IsWriteReference(memberExpr) {
 		return true
 	}
