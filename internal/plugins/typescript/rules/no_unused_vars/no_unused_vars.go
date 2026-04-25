@@ -1300,6 +1300,69 @@ func removeSpecifierWithComma(file *ast.SourceFile, specNode *ast.Node) rule.Rul
 	return rule.RuleFixRemoveRange(specNode.Loc.WithPos(textStart).WithEnd(end))
 }
 
+// isPropertyNameLikePosition reports whether an identifier appears in a syntactic
+// position where it names a property/label/attribute rather than referring to a
+// declared value or type. Such identifiers must NOT be added to `unresolvedRefs`
+// even when the type checker fails to resolve them — otherwise the name-based
+// fallback in processVariable will mistake them for usages of an unrelated
+// same-named local variable (e.g. `obj.name` polluting the lookup of an unused
+// local `const name`). See gap-rules report Cases 3/4/5 for `name`,
+// `deployConfigSource`, `isTikTokBiz` on `any`-typed receivers.
+func isPropertyNameLikePosition(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		// `obj.name` — node is the `.name` part on the right.
+		pae := parent.AsPropertyAccessExpression()
+		return pae != nil && pae.Name() == node
+	case ast.KindQualifiedName:
+		// `Foo.Bar` in type position — node is the `.Bar` part on the right.
+		qn := parent.AsQualifiedName()
+		return qn != nil && qn.Right == node
+	case ast.KindPropertyAssignment:
+		// `{ name: value }` in object literal — node is the property key.
+		pa := parent.AsPropertyAssignment()
+		return pa != nil && pa.Name() == node
+	case ast.KindBindingElement:
+		// `const { name: alias } = obj` — node is the source property name.
+		// The destination `alias` is a declaration name (handled separately).
+		be := parent.AsBindingElement()
+		return be != nil && be.PropertyName != nil && be.PropertyName == node
+	case ast.KindImportSpecifier:
+		// `import { name as alias } from 'mod'` — node is the source export
+		// name (PropertyName), which references the module's exported binding,
+		// not any in-scope variable. When the module is unresolvable the symbol
+		// lookup fails and would otherwise pollute unresolvedRefs[name].
+		is := parent.AsImportSpecifier()
+		return is != nil && is.PropertyName != nil && is.PropertyName == node
+	case ast.KindExportSpecifier:
+		// `export { name as alias } from 'mod'` (or non-from form) — node is
+		// the source binding name on the LHS of `as`. Same rationale as
+		// ImportSpecifier above.
+		es := parent.AsExportSpecifier()
+		return es != nil && es.PropertyName != nil && es.PropertyName == node
+	case ast.KindJsxAttribute:
+		// `<X name="..." />` — node is the attribute name.
+		attr := parent.AsJsxAttribute()
+		return attr != nil && attr.Name() == node
+	case ast.KindLabeledStatement:
+		// `name: while(...)` — label declaration, not a value reference.
+		ls := parent.AsLabeledStatement()
+		return ls != nil && ls.Label == node
+	case ast.KindBreakStatement, ast.KindContinueStatement:
+		// `break name` / `continue name` — label reference (separate namespace).
+		return true
+	case ast.KindMetaProperty:
+		// `new.target` / `import.meta` — node is the keyword.name.
+		mp := parent.AsMetaProperty()
+		return mp != nil && mp.Name() == node
+	}
+	return false
+}
+
 // collectSymbolUsages walks the entire source file AST and collects:
 //   - usages: maps each symbol to its usage reference nodes (read references)
 //   - writeRefs: maps each symbol to its write-only reference nodes (assignments)
@@ -1347,9 +1410,19 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 				if resolved != sym {
 					usages[resolved] = append(usages[resolved], node)
 				}
-			} else {
-				// Symbol not resolved (e.g., empty namespace references).
-				// Track by name for fallback matching in processVariable.
+			} else if !isPropertyNameLikePosition(node) {
+				// TypeChecker is the source of truth; this branch is only a
+				// narrow fallback for residual cases where GetSymbolAtLocation
+				// returns nil but the identifier IS a value/type reference
+				// (e.g., empty namespaces — see TestNoUnusedVarsPatterns'
+				// `namespace _Foo {} export const x = _Foo;` invalid case,
+				// which still depends on the name-based lookup).
+				//
+				// Identifiers in pure property/label/attribute positions can
+				// never refer to a top-level declared symbol, so excluding
+				// them here prevents `obj.name` (any-typed) from polluting
+				// the lookup of an unused local `name`. See gap-rules report
+				// Cases 3/4/5.
 				idText := node.AsIdentifier().Text
 				unresolvedRefs[idText] = append(unresolvedRefs[idText], node)
 			}

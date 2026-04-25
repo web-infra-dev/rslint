@@ -395,6 +395,173 @@ class Foo {
 			Code:   `const { foo, ...rest } = { foo: 1, bar: 2 }; console.log(rest);`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 9}},
 		},
+
+		// ====================================================================
+		// Real-world regression cases from the portal lint-migration gap doc
+		// (@typescript-eslint/no-unused-vars). Each case is a minimal slice of a
+		// production file where rslint previously diverged from ESLint. They
+		// guard against:
+		//   (a) the name-fallback bucket being polluted by same-named property
+		//       accesses on `any` / unresolvable types — gap doc Cases 3/4/5;
+		//   (b) ImportSpecifier / ExportSpecifier `PropertyName` from
+		//       unresolvable modules causing the same pollution.
+		// Configs mirror what the portal subspaces actually use.
+		// ====================================================================
+
+		// Case 1 (agents-server): `_tail` is a renamed property in object
+		// destructuring with rest sibling. Under that subspace's effective
+		// config (no varsIgnorePattern), argsIgnorePattern does NOT apply to
+		// a `const` destructuring → ESLint reports `_tail`.
+		{
+			Code: `function f(params: any) {
+  if (params.head !== undefined && params.tail !== undefined) {
+    const { tail: _tail, ...rest } = params;
+    return rest;
+  }
+  return params;
+}
+export { f };`,
+			Options: map[string]interface{}{
+				"args":              "none",
+				"argsIgnorePattern": "^_",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 3, Column: 19},
+			},
+		},
+
+		// Case 2 (operator-toolkit): unused type parameter `T` on an exported
+		// interface (does not match `^_|React`).
+		{
+			Code: `export interface RpcResponse<T = unknown> {
+  code?: number;
+  message?: string;
+}`,
+			Options: map[string]interface{}{
+				"args":                           "none",
+				"varsIgnorePattern":              "^_|React",
+				"argsIgnorePattern":              "^_",
+				"destructuredArrayIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern":      "^_",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 1, Column: 30},
+			},
+		},
+
+		// Case 3 (server/.../trigger.ts:723): object destructuring; `name` is
+		// unused, siblings are used. Includes the polluting `obj.name` accesses
+		// on an `any`-typed receiver that previously masked the report.
+		{
+			Code: `interface Trigger { id: string; projectId: string; name: string; rule: string; type: string; }
+declare const externalAny: any;
+export function pollute(triggers: Trigger[]): void {
+  console.log(externalAny.name, externalAny.name);
+  for (const trigger of triggers) {
+    const { id, projectId, name, rule, type } = trigger;
+    console.log(id, projectId, rule, type);
+  }
+}`,
+			Options: map[string]interface{}{
+				"args":                           "none",
+				"varsIgnorePattern":              "^_|React",
+				"argsIgnorePattern":              "^_",
+				"destructuredArrayIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern":      "^_",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 6, Column: 28},
+			},
+		},
+
+		// Case 4 (server/.../goofyDeployChannelNode.ts:92): destructured
+		// `deployConfigSource` shadowed by many polluting `obj.deployConfigSource`
+		// accesses elsewhere in the file. Same root cause as Case 3.
+		{
+			Code: `type Meta = { id: string; region: string; appName: string; vRegion: string; deployConfigSource: string };
+export function process(item: any) {
+  const getMetaInfo = (i: any): Meta => i as Meta;
+  const { id, region, appName, vRegion, deployConfigSource } = getMetaInfo(item);
+  console.log(id, region, appName, vRegion);
+}`,
+			Options: map[string]interface{}{
+				"args":                           "none",
+				"varsIgnorePattern":              "^_|React",
+				"argsIgnorePattern":              "^_",
+				"destructuredArrayIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern":      "^_",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 4, Column: 41},
+			},
+		},
+
+		// Case 5 (server/.../scm-params.ts:93): `const isTikTokBiz =
+		// project.features?.isTikTokBiz` — the same-named PropertyAccess on
+		// `any`-resolved features previously fell through to unresolvedRefs and
+		// falsely "used" the const.
+		{
+			Code: `declare const project: any;
+export function getCfg(): boolean {
+  const isTikTokBiz = project.features?.isTikTokBiz ?? true;
+  return true;
+}`,
+			Options: map[string]interface{}{
+				"args":                           "none",
+				"varsIgnorePattern":              "^_|React",
+				"argsIgnorePattern":              "^_",
+				"destructuredArrayIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern":      "^_",
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 3, Column: 9},
+			},
+		},
+
+		// Edge A: ImportSpecifier.PropertyName from an unresolvable module.
+		// The `name` on the LHS of `as` references the module's exported
+		// binding which is nil when the module cannot be resolved. It must
+		// NOT be added to unresolvedRefs to falsely "use" the local `name`.
+		{
+			Code: `import { name as alias } from './does-not-exist';
+function foo(): number {
+  const name = 1;
+  return alias as unknown as number;
+}
+export { foo };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 3, Column: 9},
+			},
+		},
+
+		// Edge B: ExportSpecifier.PropertyName in a re-export from an
+		// unresolvable module. Same fallback-pollution pattern as Edge A.
+		{
+			Code: `export { name as renamed } from './does-not-exist';
+function foo(): number {
+  const name = 1;
+  return 0;
+}
+export { foo };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 3, Column: 9},
+			},
+		},
+
+		// Edge C: enum member name with a same-named unused local.
+		// EnumMember.Name is a declaration name (handled by isDeclarationName);
+		// this guards against future regressions in that classification.
+		{
+			Code: `export enum E { name = 1 }
+function foo(): number {
+  const name = 1;
+  return E.name;
+}
+export { foo };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedVar", Line: 3, Column: 9},
+			},
+		},
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
