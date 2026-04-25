@@ -257,3 +257,6 @@ destructures
 segs
 setstate
 Setstate
+middot
+xlink
+nend
