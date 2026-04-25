@@ -117,6 +117,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-this-in-sfc.test.ts',
     './tests/eslint-plugin-react/rules/no-typos.test.ts',
     './tests/eslint-plugin-react/rules/no-unescaped-entities.test.ts',
+    './tests/eslint-plugin-react/rules/no-unused-class-component-methods.test.ts',
     './tests/eslint-plugin-react/rules/no-unused-state.test.ts',
     './tests/eslint-plugin-react/rules/no-unknown-property.test.ts',
     './tests/eslint-plugin-react/rules/no-will-update-set-state.test.ts',
