@@ -213,6 +213,50 @@ func isComponentName(name string) bool {
 	return name == "Component" || name == "PureComponent"
 }
 
+// ExtendsReactPureComponent reports whether `classNode` (a ClassDeclaration
+// or ClassExpression) has an `extends` clause referencing `PureComponent` —
+// either as a bare identifier or qualified by the configured pragma (e.g.
+// `React.PureComponent`). Parentheses are skipped. Pass the empty string for
+// pragma to default to `DefaultReactPragma`.
+//
+// Mirrors eslint-plugin-react's `componentUtil.isPureComponent`, which uses
+// the regex `/^(<pragma>\.)?PureComponent$/` over the rendered extends-clause
+// text. Plain `Component` does NOT match (use ExtendsReactComponent for the
+// broader detection).
+func ExtendsReactPureComponent(classNode *ast.Node, pragma string) bool {
+	if classNode == nil {
+		return false
+	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	heritage := ast.GetClassExtendsHeritageElement(classNode)
+	if heritage == nil {
+		return false
+	}
+	hc := heritage.AsExpressionWithTypeArguments()
+	if hc == nil || hc.Expression == nil {
+		return false
+	}
+	expr := ast.SkipParentheses(hc.Expression)
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return expr.AsIdentifier().Text == "PureComponent"
+	case ast.KindPropertyAccessExpression:
+		pa := expr.AsPropertyAccessExpression()
+		obj := ast.SkipParentheses(pa.Expression)
+		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
+			return false
+		}
+		name := pa.Name()
+		if name == nil || name.Kind != ast.KindIdentifier {
+			return false
+		}
+		return name.AsIdentifier().Text == "PureComponent"
+	}
+	return false
+}
+
 // GetJsxTagBaseIdentifier returns the leftmost Identifier of a JSX tag-name
 // node — i.e. the symbol a rule must resolve to classify the tag. Pass the
 // tag-name node obtained from `GetJsxTagName` (or directly from
