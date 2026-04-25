@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -56,16 +57,7 @@ var JsxWrapMultilinesRule = rule.Rule{
 			return startLine != endLine
 		}
 
-		isJSX := func(node *ast.Node) bool {
-			if node == nil {
-				return false
-			}
-			switch node.Kind {
-			case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
-				return true
-			}
-			return false
-		}
+		isJSX := reactutil.IsJsxLike
 
 		// Unwrap parenthesized expression to get the inner JSX node
 		unwrapParens := func(node *ast.Node) *ast.Node {

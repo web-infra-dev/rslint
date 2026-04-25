@@ -1291,3 +1291,22 @@ func ReadComponentsFromSettings(settings map[string]interface{}, key, attrField,
 	}
 	return out
 }
+
+// IsJsxElementLike reports whether node is a JsxElement or
+// JsxSelfClosingElement — the two tsgo kinds that correspond to ESTree's
+// single `JSXElement` type.
+func IsJsxElementLike(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return ast.IsJsxElement(node) || ast.IsJsxSelfClosingElement(node)
+}
+
+// IsJsxLike mirrors eslint-plugin-react's `jsxUtil.isJSX` — true for a JSX
+// element (either tag form) or a JSX fragment.
+func IsJsxLike(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return IsJsxElementLike(node) || ast.IsJsxFragment(node)
+}
