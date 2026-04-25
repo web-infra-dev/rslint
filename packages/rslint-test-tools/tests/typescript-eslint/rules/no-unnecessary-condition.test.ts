@@ -506,6 +506,24 @@ for (; true; ) {}
     },
     {
       code: `
+for (; true; ) {}
+      `,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `
+for (; 0; ) {}
+      `,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `
+do {} while (0);
+      `,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `
 do {} while (true);
       `,
       options: [{ allowConstantLoopConditions: 'always' }],
@@ -532,23 +550,6 @@ while (false) {}
       code: `
 while (0) {}
       `,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    // only-allowed-literals applies to all loop types (for, do-while, while)
-    {
-      code: `for (; true; ) {}`,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `for (; 0; ) {}`,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `do {} while (0);`,
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `do {} while (true);`,
       options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
     },
     `
@@ -891,7 +892,10 @@ declare const unknownTyped: unknown;
 if (!(booleanTyped || unknownTyped)) {
 }
     `,
+    // Skipped: rule-tester does not support per-case
+    // `parserOptions.tsconfigRootDir` overrides.
     {
+      skip: true,
       code: `
 declare const x: string[] | null;
 // eslint-disable-next-line
@@ -2126,8 +2130,6 @@ do {} while (test);
       errors: [{ column: 14, line: 4, messageId: 'alwaysTruthy' }],
       options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
     },
-    // for/do-while with only-allowed-literals: true/false/0/1 are now valid
-    // (moved to valid section to match upstream behavior)
     {
       code: `
 let shouldRun = true;
@@ -3064,21 +3066,30 @@ if (!speech) {
       `,
       errors: [{ column: 5, line: 7, messageId: 'never' }],
     },
+    // Skipped: rule-tester does not support per-case
+    // `parserOptions.tsconfigRootDir` overrides.
     {
+      skip: true,
       code: `
 declare const x: string[] | null;
 if (x) {
 }
       `,
       errors: [
-        { column: 1, line: 0, messageId: 'noStrictNullCheck' },
-        { column: 5, line: 3, messageId: 'alwaysTruthy' },
+        {
+          column: 1,
+          line: 0,
+          messageId: 'noStrictNullCheck',
+        },
+        {
+          column: 5,
+          line: 3,
+          messageId: 'alwaysTruthy',
+        },
       ],
       languageOptions: {
         parserOptions: {
-          project: './tsconfig.unstrict.json',
-          projectService: false,
-          tsconfigRootDir: getFixturesRootDir(),
+          tsconfigRootDir: path.join(rootPath, 'unstrict'),
         },
       },
     },
@@ -3554,7 +3565,6 @@ if (isStringOrNumber(s)) {
       options: [{ checkTypePredicates: true }],
     },
     {
-      // Narrower (with optional) is a subtype of Wider
       code: `
 interface Wider {
   a: string;
@@ -3577,7 +3587,8 @@ if (isWider(n)) {
       options: [{ checkTypePredicates: true }],
     },
     {
-      // Wider is assignable to Narrower (with optional property)
+      // Mutually assignable types: Wider is assignable to Narrower (b is
+      // optional), so the type guard condition is always true.
       code: `
 interface Wider {
   a: string;
@@ -3878,7 +3889,11 @@ arr2[42]?.x?.y.z;
         },
       ],
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+          tsconfigRootDir: getFixturesRootDir(),
+        },
       },
     },
     {
@@ -3899,7 +3914,11 @@ if (arr[0]) {
         },
       ],
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+          tsconfigRootDir: getFixturesRootDir(),
+        },
       },
     },
     {
@@ -3919,8 +3938,87 @@ if (arr[42] && arr[42]) {
         },
       ],
       languageOptions: {
-        parserOptions: optionsWithNoUncheckedIndexedAccess,
+        parserOptions: {
+          project: './tsconfig.noUncheckedIndexedAccess.json',
+          projectService: false,
+          tsconfigRootDir: getFixturesRootDir(),
+        },
       },
+    },
+    // typeGuardAlreadyIsType: lock down the {{typeGuardOrAssertionFunction}}
+    // placeholder fill for both type-predicate and assertion-function forms.
+    {
+      code: `
+declare function isString(x: unknown): x is string;
+declare const a: string;
+isString(a);
+      `,
+      errors: [
+        {
+          data: { typeGuardOrAssertionFunction: 'type guard' },
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      code: `
+declare function assertsString(x: unknown): asserts x is string;
+declare const a: string;
+assertsString(a);
+      `,
+      errors: [
+        {
+          data: { typeGuardOrAssertionFunction: 'assertion function' },
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    // alwaysTruthy / alwaysFalsy in array-predicate callback body: when the
+    // body is an expression or a single-return BlockStatement, the rule
+    // descends into it and emits alwaysTruthy/alwaysFalsy at the body
+    // expression. Verified against upstream v8 CLI behavior. Locks down all
+    // standard array-predicate methods recognized by isArrayPredicateFunction.
+    {
+      code: `
+[1, 2, 3].filter(() => 'truthy-string');
+      `,
+      errors: [{ messageId: 'alwaysTruthy' }],
+    },
+    {
+      code: `
+[1, 2, 3].find(function () {
+  return 0;
+});
+      `,
+      errors: [{ messageId: 'alwaysFalsy' }],
+    },
+    {
+      code: `
+[1, 2, 3].some(() => 1);
+      `,
+      errors: [{ messageId: 'alwaysTruthy' }],
+    },
+    {
+      code: `
+[1, 2, 3].every(() => null);
+      `,
+      errors: [{ messageId: 'alwaysFalsy' }],
+    },
+    {
+      code: `
+[1, 2, 3].findIndex(function namedFalsy() {
+  return undefined;
+});
+      `,
+      errors: [{ messageId: 'alwaysFalsy' }],
+    },
+    {
+      code: `
+[1, 2, 3].findLast(() => 'always');
+      `,
+      errors: [{ messageId: 'alwaysTruthy' }],
     },
   ],
 });

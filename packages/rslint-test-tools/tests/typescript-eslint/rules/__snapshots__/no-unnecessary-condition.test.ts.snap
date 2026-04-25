@@ -3825,51 +3825,6 @@ if (!speech) {
 exports[`no-unnecessary-condition > invalid 94`] = `
 {
   "code": "
-declare const x: string[] | null;
-if (x) {
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "messageId": "noStrictNullCheck",
-      "range": {
-        "end": {
-          "column": 1,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-condition",
-    },
-    {
-      "message": "Unnecessary conditional, value is always truthy.",
-      "messageId": "alwaysTruthy",
-      "range": {
-        "end": {
-          "column": 6,
-          "line": 3,
-        },
-        "start": {
-          "column": 5,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unnecessary-condition",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-unnecessary-condition > invalid 95`] = `
-{
-  "code": "
 interface Foo {
   test: string;
   [key: string]: [string] | undefined;
@@ -3902,7 +3857,7 @@ foo?.test?.length;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 96`] = `
+exports[`no-unnecessary-condition > invalid 95`] = `
 {
   "code": "
 function pick<Obj extends Record<string, 1 | 2 | 3>, Key extends keyof Obj>(
@@ -3941,7 +3896,7 @@ pick({ foo: 1, bar: 2 }, 'bar');
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 97`] = `
+exports[`no-unnecessary-condition > invalid 96`] = `
 {
   "code": "
 function getElem(dict: Record<string, { foo: string }>, key: string) {
@@ -3975,7 +3930,7 @@ function getElem(dict: Record<string, { foo: string }>, key: string) {
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 98`] = `
+exports[`no-unnecessary-condition > invalid 97`] = `
 {
   "code": "
 declare let foo: {};
@@ -4004,7 +3959,7 @@ foo ??= 1;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 99`] = `
+exports[`no-unnecessary-condition > invalid 98`] = `
 {
   "code": "
 declare let foo: number;
@@ -4033,7 +3988,7 @@ foo ??= 1;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 100`] = `
+exports[`no-unnecessary-condition > invalid 99`] = `
 {
   "code": "
 declare let foo: null;
@@ -4062,7 +4017,7 @@ foo ??= null;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 101`] = `
+exports[`no-unnecessary-condition > invalid 100`] = `
 {
   "code": "
 declare let foo: {};
@@ -4091,7 +4046,7 @@ foo ||= 1;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 102`] = `
+exports[`no-unnecessary-condition > invalid 101`] = `
 {
   "code": "
 declare let foo: null;
@@ -4120,7 +4075,7 @@ foo ||= null;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 103`] = `
+exports[`no-unnecessary-condition > invalid 102`] = `
 {
   "code": "
 declare let foo: {};
@@ -4149,7 +4104,7 @@ foo &&= 1;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 104`] = `
+exports[`no-unnecessary-condition > invalid 103`] = `
 {
   "code": "
 declare let foo: null;
@@ -4178,7 +4133,7 @@ foo &&= null;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 105`] = `
+exports[`no-unnecessary-condition > invalid 104`] = `
 {
   "code": "
 declare const foo: { bar: number };
@@ -4207,7 +4162,7 @@ foo.bar ??= 1;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 106`] = `
+exports[`no-unnecessary-condition > invalid 105`] = `
 {
   "code": "
 type Foo = { bar: () => number } | null;
@@ -4237,7 +4192,7 @@ foo?.bar()?.toExponential();
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 107`] = `
+exports[`no-unnecessary-condition > invalid 106`] = `
 {
   "code": "
 type Foo = { bar: null | { baz: () => { qux: number } } } | null;
@@ -4282,7 +4237,7 @@ foo?.bar?.baz()?.qux?.toExponential();
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 108`] = `
+exports[`no-unnecessary-condition > invalid 107`] = `
 {
   "code": "
 type Foo = (() => number) | null;
@@ -4312,7 +4267,7 @@ foo?.()?.toExponential();
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 109`] = `
+exports[`no-unnecessary-condition > invalid 108`] = `
 {
   "code": "
 type Foo = { [key: string]: () => number } | null;
@@ -4342,7 +4297,7 @@ foo?.['bar']()?.toExponential();
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 110`] = `
+exports[`no-unnecessary-condition > invalid 109`] = `
 {
   "code": "
 type Foo = { [key: string]: () => number } | null;
@@ -4372,7 +4327,7 @@ foo?.['bar']?.()?.toExponential();
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 111`] = `
+exports[`no-unnecessary-condition > invalid 110`] = `
 {
   "code": "
         const a = true;
@@ -4402,7 +4357,7 @@ exports[`no-unnecessary-condition > invalid 111`] = `
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 112`] = `
+exports[`no-unnecessary-condition > invalid 111`] = `
 {
   "code": "
 declare function assert(x: unknown): asserts x;
@@ -4431,7 +4386,7 @@ assert(true);
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 113`] = `
+exports[`no-unnecessary-condition > invalid 112`] = `
 {
   "code": "
 declare function assert(x: unknown): asserts x;
@@ -4460,7 +4415,7 @@ assert(false);
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 114`] = `
+exports[`no-unnecessary-condition > invalid 113`] = `
 {
   "code": "
 declare function assert(x: unknown, y: unknown): asserts x;
@@ -4490,7 +4445,7 @@ assert(true, Math.random() > 0.5);
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 115`] = `
+exports[`no-unnecessary-condition > invalid 114`] = `
 {
   "code": "
 declare function assert(x: unknown): asserts x;
@@ -4519,7 +4474,7 @@ assert({});
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 116`] = `
+exports[`no-unnecessary-condition > invalid 115`] = `
 {
   "code": "
 declare function assertsString(x: unknown): asserts x is string;
@@ -4549,7 +4504,7 @@ assertsString(a);
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 117`] = `
+exports[`no-unnecessary-condition > invalid 116`] = `
 {
   "code": "
 declare function isString(x: unknown): x is string;
@@ -4579,7 +4534,7 @@ isString(a);
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 118`] = `
+exports[`no-unnecessary-condition > invalid 117`] = `
 {
   "code": "
 declare function isString(x: unknown): x is string;
@@ -4609,7 +4564,7 @@ isString('fa' + 'lafel');
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 119`] = `
+exports[`no-unnecessary-condition > invalid 118`] = `
 {
   "code": "
 declare function isStringOrNumber(x: unknown): x is string | number;
@@ -4640,7 +4595,7 @@ if (isStringOrNumber(s)) {
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 120`] = `
+exports[`no-unnecessary-condition > invalid 119`] = `
 {
   "code": "
 interface Wider {
@@ -4678,7 +4633,7 @@ if (isWider(n)) {
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 121`] = `
+exports[`no-unnecessary-condition > invalid 120`] = `
 {
   "code": "
 interface Wider {
@@ -4716,7 +4671,7 @@ if (isNarrower(w)) {
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 122`] = `
+exports[`no-unnecessary-condition > invalid 121`] = `
 {
   "code": "
 declare const b1: "" & {};
@@ -4746,7 +4701,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 123`] = `
+exports[`no-unnecessary-condition > invalid 122`] = `
 {
   "code": "
 declare const b1: "" & { __brand: string };
@@ -4776,7 +4731,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 124`] = `
+exports[`no-unnecessary-condition > invalid 123`] = `
 {
   "code": "
 declare const b1: ("" | false) & { __brand: string };
@@ -4806,7 +4761,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 125`] = `
+exports[`no-unnecessary-condition > invalid 124`] = `
 {
   "code": "
 declare const b1: ((string & { __brandA: string }) | (number & { __brandB: string })) & "";
@@ -4836,7 +4791,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 126`] = `
+exports[`no-unnecessary-condition > invalid 125`] = `
 {
   "code": "
 declare const b1: ("foo" | "bar") & { __brand: string };
@@ -4866,7 +4821,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 127`] = `
+exports[`no-unnecessary-condition > invalid 126`] = `
 {
   "code": "
 declare const b1: (123 | true) & { __brand: string };
@@ -4896,7 +4851,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 128`] = `
+exports[`no-unnecessary-condition > invalid 127`] = `
 {
   "code": "
 declare const b1: (string | number) & ("foo" | 123) & { __brand: string };
@@ -4926,7 +4881,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 129`] = `
+exports[`no-unnecessary-condition > invalid 128`] = `
 {
   "code": "
 declare const b1: ((string & { __brandA: string }) | (number & { __brandB: string })) & "foo";
@@ -4956,7 +4911,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 130`] = `
+exports[`no-unnecessary-condition > invalid 129`] = `
 {
   "code": "
 declare const b1: ((string & { __brandA: string }) | (number & { __brandB: string })) & ("foo" | 123);
@@ -4986,7 +4941,7 @@ const t1 = b1 && b2;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 131`] = `
+exports[`no-unnecessary-condition > invalid 130`] = `
 {
   "code": "
 type A = {
@@ -5024,7 +4979,7 @@ a.a?.a?.a;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 132`] = `
+exports[`no-unnecessary-condition > invalid 131`] = `
 {
   "code": "
 interface T {
@@ -5101,7 +5056,7 @@ t.a?.a?.a?.value;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 133`] = `
+exports[`no-unnecessary-condition > invalid 132`] = `
 {
   "code": "
 declare const test: Array<{ a?: string }>;
@@ -5133,7 +5088,7 @@ if (test[0]?.a) {
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 134`] = `
+exports[`no-unnecessary-condition > invalid 133`] = `
 {
   "code": "
 declare const arr2: Array<{ x: { y: { z: object } } }>;
@@ -5177,7 +5132,7 @@ arr2[42]?.x?.y?.z;
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 135`] = `
+exports[`no-unnecessary-condition > invalid 134`] = `
 {
   "code": "
 declare const arr: string[];
@@ -5209,7 +5164,7 @@ if (arr[0]) {
 }
 `;
 
-exports[`no-unnecessary-condition > invalid 136`] = `
+exports[`no-unnecessary-condition > invalid 135`] = `
 {
   "code": "
 declare const arr: object[];
@@ -5229,6 +5184,238 @@ if (arr[42] && arr[42]) {
         "start": {
           "column": 16,
           "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 136`] = `
+{
+  "code": "
+declare function isString(x: unknown): x is string;
+declare const a: string;
+isString(a);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the type guard.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 137`] = `
+{
+  "code": "
+declare function assertsString(x: unknown): asserts x is string;
+declare const a: string;
+assertsString(a);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, expression already has the type being checked by the assertion function.",
+      "messageId": "typeGuardAlreadyIsType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 138`] = `
+{
+  "code": "
+[1, 2, 3].filter(() => 'truthy-string');
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 139`] = `
+{
+  "code": "
+[1, 2, 3].find(function () {
+  return 0;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 140`] = `
+{
+  "code": "
+[1, 2, 3].some(() => 1);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 141`] = `
+{
+  "code": "
+[1, 2, 3].every(() => null);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 142`] = `
+{
+  "code": "
+[1, 2, 3].findIndex(function namedFalsy() {
+  return undefined;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always falsy.",
+      "messageId": "alwaysFalsy",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-condition > invalid 143`] = `
+{
+  "code": "
+[1, 2, 3].findLast(() => 'always');
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary conditional, value is always truthy.",
+      "messageId": "alwaysTruthy",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 26,
+          "line": 2,
         },
       },
       "ruleName": "@typescript-eslint/no-unnecessary-condition",
