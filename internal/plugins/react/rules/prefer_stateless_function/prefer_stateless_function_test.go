@@ -1713,7 +1713,7 @@ func TestPreferStatelessFunctionRule(t *testing.T) {
 		// — upstream's VariableDeclarator listener returns early when
 		// `node.id.type !== 'ObjectPattern'`, so it does NOT flip useThis.
 		// The class has no other this-access, so the component is REPORTED.
-		// Rejects gemini-code-assist suggestion that would stricten this. ----
+		// Rejects gemini-code-assist suggestion that would tighten this. ----
 		{
 			Code: `
         class Foo extends React.Component {
