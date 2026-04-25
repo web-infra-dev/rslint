@@ -95,7 +95,6 @@ ldquo
 libsyncrpc
 lsquo
 lifecycles
-Lifecyle
 lintedfile
 llms
 LOGNAME

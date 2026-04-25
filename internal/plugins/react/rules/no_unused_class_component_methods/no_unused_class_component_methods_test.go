@@ -373,7 +373,7 @@ func TestNoUnusedClassComponentMethodsRule(t *testing.T) {
 
 		// ---- Upstream: every canonical lifecycle method ----
 		{Code: `
-        class ClassWithLifecyleTest extends React.Component {
+        class ClassWithLifecycleTest extends React.Component {
           constructor(props) {
             super(props);
           }
@@ -399,7 +399,7 @@ func TestNoUnusedClassComponentMethodsRule(t *testing.T) {
 
 		// ---- Upstream: every canonical ES5 lifecycle method on createReactClass ----
 		{Code: `
-        var ClassWithLifecyleTest = createReactClass({
+        var ClassWithLifecycleTest = createReactClass({
           mixins: [],
           constructor(props) {
           },
@@ -814,6 +814,59 @@ func TestNoUnusedClassComponentMethodsRule(t *testing.T) {
           static propTypes = {};
           render() { return <div />; }
         }
+      `, Tsx: true},
+
+		// ---- rslint: parenthesized assignment LHS `(this.foo) = 1` — must
+		// still be classified as a definition (ESTree flattens parens; tsgo
+		// preserves them, so isAssignmentTarget walks up paren wrappers).
+		// Here `foo` is defined this way AND read in render, so no report. ----
+		{Code: `
+        class Foo extends React.Component {
+          constructor(props) {
+            super(props);
+            (this.foo) = 1;
+          }
+          render() {
+            return <SomeComponent foo={this.foo} />;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- rslint: multi-level parenthesized LHS `((this.foo)) = 1` ----
+		{Code: `
+        class Foo extends React.Component {
+          constructor(props) {
+            super(props);
+            ((this.foo)) = 1;
+          }
+          render() {
+            return <SomeComponent foo={this.foo} />;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- rslint: parenthesized element-access LHS `(this['foo']) = 1` ----
+		{Code: `
+        class Foo extends React.Component {
+          constructor(props) {
+            super(props);
+            (this['foo']) = 1;
+          }
+          render() {
+            return <SomeComponent foo={this['foo']} />;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- rslint: class expression wrapped in parens `(class extends C {})`
+		// — the listener still fires by Kind, walker is unaffected. ----
+		{Code: `
+        const Made = (class extends React.Component {
+          handleClick() {}
+          render() {
+            return <button onClick={this.handleClick} />;
+          }
+        });
       `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: non-standard lifecycle method on class ----
@@ -1450,6 +1503,70 @@ func TestNoUnusedClassComponentMethodsRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unusedWithClass", Message: `Unused method or property "foo" of class "Foo"`, Line: 3, Column: 11},
+			},
+		},
+
+		// ---- rslint (negative lock-in): destructuring assignment form
+		// `({ foo } = this)` is NOT a `VariableDeclarator` — upstream's
+		// VariableDeclarator listener does not fire on it, so `foo` is NOT
+		// marked as used. Locks in parity with upstream. ----
+		{
+			Code: `
+        class Foo extends React.Component {
+          foo() {}
+          componentDidMount() {
+            let foo;
+            ({ foo } = this);
+          }
+          render() { return null; }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedWithClass", Message: `Unused method or property "foo" of class "Foo"`, Line: 3, Column: 11},
+			},
+		},
+
+		// ---- rslint (negative lock-in): TS parameter property is NOT
+		// recognized by upstream (no TSParameterProperty listener and no
+		// upstream test case). Locks in 1:1 alignment — `foo` declared via
+		// `constructor(private foo: string)` stays untracked, so a sibling
+		// declared method that's unused is still reported normally. ----
+		{
+			Code: `
+        class Foo extends React.Component {
+          handleClick() {}
+          constructor(private bar: string) {
+            super();
+          }
+          render() { return null; }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedWithClass", Message: `Unused method or property "handleClick" of class "Foo"`, Line: 3, Column: 11},
+			},
+		},
+
+		// ---- rslint (negative lock-in): `for (this.foo of arr)` LHS — the
+		// parent is ForOfStatement, not AssignmentExpression. Upstream's
+		// `node.parent.type === 'AssignmentExpression'` check is false, so
+		// `this.foo` is treated as a USE not a definition. Sibling unused
+		// method `bar` is the only report. ----
+		{
+			Code: `
+        class Foo extends React.Component {
+          foo: any
+          bar() {}
+          componentDidMount() {
+            for (this.foo of [1, 2, 3]) {}
+          }
+          render() { return null; }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedWithClass", Message: `Unused method or property "bar" of class "Foo"`, Line: 4, Column: 11},
 			},
 		},
 	})

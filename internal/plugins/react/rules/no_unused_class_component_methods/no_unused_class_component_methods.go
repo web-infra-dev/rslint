@@ -153,8 +153,19 @@ func (ci *classInfo) markUsed(name string) {
 // Mirrors upstream's `node.parent.type === 'AssignmentExpression' && node.parent.left === node`.
 // In tsgo, all assignments (`=`, `+=`, `-=`, …) collapse into BinaryExpression
 // with an assignment operator — we gate on that.
+//
+// Parenthesized LHS: ESTree flattens parens, so upstream sees `(this.foo) = 1`
+// as `AssignmentExpression(left: MemberExpression)` directly. tsgo preserves
+// the ParenthesizedExpression wrapper, so we must walk up through any number
+// of paren wrappers before checking the assignment shape — otherwise we'd
+// mis-classify `(this.foo) = 1` (a definition) as a use.
 func isAssignmentTarget(access *ast.Node) bool {
-	parent := access.Parent
+	cur := access
+	parent := cur.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		cur = parent
+		parent = parent.Parent
+	}
 	if parent == nil || parent.Kind != ast.KindBinaryExpression {
 		return false
 	}
@@ -162,7 +173,7 @@ func isAssignmentTarget(access *ast.Node) bool {
 	if bin.OperatorToken == nil || !ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
 		return false
 	}
-	return bin.Left == access
+	return bin.Left == cur
 }
 
 // walkExpressions recursively visits every descendant of `node`, invoking the
@@ -427,23 +438,18 @@ var NoUnusedClassComponentMethodsRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 
+		runOnClass := func(node *ast.Node) {
+			if !reactutil.ExtendsReactComponent(node, pragma) {
+				return
+			}
+			ci := newClassInfo(true, getClassName(node))
+			processES6Class(ci, node)
+			reportUnused(ctx, ci)
+		}
+
 		return rule.RuleListeners{
-			ast.KindClassDeclaration: func(node *ast.Node) {
-				if !reactutil.ExtendsReactComponent(node, pragma) {
-					return
-				}
-				ci := newClassInfo(true, getClassName(node))
-				processES6Class(ci, node)
-				reportUnused(ctx, ci)
-			},
-			ast.KindClassExpression: func(node *ast.Node) {
-				if !reactutil.ExtendsReactComponent(node, pragma) {
-					return
-				}
-				ci := newClassInfo(true, getClassName(node))
-				processES6Class(ci, node)
-				reportUnused(ctx, ci)
-			},
+			ast.KindClassDeclaration: runOnClass,
+			ast.KindClassExpression:  runOnClass,
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
 				if !reactutil.IsCreateClassCall(call, pragma, createClass) {
