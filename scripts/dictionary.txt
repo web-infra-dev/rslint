@@ -260,3 +260,8 @@ Setstate
 middot
 xlink
 nend
+disqualifier
+disqualifiers
+normalised
+recognised
+unaliased
