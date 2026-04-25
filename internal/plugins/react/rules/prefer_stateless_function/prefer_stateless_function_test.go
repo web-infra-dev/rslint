@@ -378,6 +378,33 @@ func TestPreferStatelessFunctionRule(t *testing.T) {
         }
       `, Tsx: true},
 
+		// ---- Locks in: scope-walk continues past unmatched FunctionLikes —
+		// upstream's `scope.upper` keeps walking outward when the current
+		// scope's `block.parent` is not `MethodDefinition` / `Property`.
+		// Here a non-render-returning inline `function()` lives inside an
+		// onClick JSX expression of render. The inner return must be
+		// attributed to the OUTER render (per upstream), flipping
+		// invalidReturn=true on the class → suppressed → valid.
+		// Rejects gemini-code-assist suggestion that would stop the walk
+		// at the inline function. ----
+		{Code: `
+        class Foo extends React.Component {
+          render() {
+            return <div onClick={function() { return undefined; }}>{this.props.foo}</div>;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Locks in same scope-walk continuation for ArrowFunction
+		// inside JSX expression. ----
+		{Code: `
+        class Foo extends React.Component {
+          render() {
+            return <div onClick={() => { return undefined; }}>{this.props.foo}</div>;
+          }
+        }
+      `, Tsx: true},
+
 		// ---- Edge: nested arrow inside method has its own JSX ref — useRef → valid ----
 		{Code: `
         class Foo extends React.Component {
@@ -1679,6 +1706,44 @@ func TestPreferStatelessFunctionRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "componentShouldBePure", Line: 2, Column: 24},
+			},
+		},
+
+		// ---- Locks in: `const x = this;` (Identifier id, NOT ObjectPattern)
+		// — upstream's VariableDeclarator listener returns early when
+		// `node.id.type !== 'ObjectPattern'`, so it does NOT flip useThis.
+		// The class has no other this-access, so the component is REPORTED.
+		// Rejects gemini-code-assist suggestion that would stricten this. ----
+		{
+			Code: `
+        class Foo extends React.Component {
+          render() {
+            const x = this;
+            return <div/>;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "componentShouldBePure", Line: 2, Column: 9},
+			},
+		},
+
+		// ---- Locks in: array-pattern destructure `const [x] = this;` —
+		// upstream returns early (id is ArrayPattern, not ObjectPattern). No
+		// useThis flip → component reported. ----
+		{
+			Code: `
+        class Foo extends React.Component {
+          render() {
+            const [x] = this;
+            return <div/>;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "componentShouldBePure", Line: 2, Column: 9},
 			},
 		},
 
