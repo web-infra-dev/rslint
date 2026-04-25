@@ -265,3 +265,6 @@ disqualifiers
 normalised
 recognised
 unaliased
+metacharacter
+nunc
+forcetypeassert
