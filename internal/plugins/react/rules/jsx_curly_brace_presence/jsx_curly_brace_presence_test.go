@@ -297,6 +297,32 @@ func TestJsxCurlyBracePresence(t *testing.T) {
 		// ---- script-like child: never-children leaves template literal alone ----
 		{Code: "<script>{`window.foo = \"bar\"`}</script>", Tsx: true},
 
+		// ---- Comment-detection regression (verified against upstream
+		// `eslint-plugin-react` + `@typescript-eslint/parser`). ----
+		//
+		// C) TemplateExpression with substitution containing a real
+		// comment in the `${…}` interpolation: never collapsed because
+		// templates with substitutions are out of scope for the unwrap
+		// path entirely.
+		{Code: "<App>{`a ${b /* real */ + c} d`}</App>", Tsx: true, Options: map[string]interface{}{"children": "never"}},
+
+		// D) Comment-like sequence inside a string within a `${…}`
+		// interpolation. Upstream doesn't treat string content as
+		// comments; rslint reaches the same observable result because
+		// the outer TemplateExpression is never collapsed regardless.
+		{Code: "<App>{`a ${'b /* string content */'} d`}</App>", Tsx: true, Options: map[string]interface{}{"children": "never"}},
+
+		// E) Real leading comment inside `{…}` — unwrap suppressed.
+		{Code: `<App>{/* real outer */ 'foo'}</App>`, Tsx: true, Options: map[string]interface{}{"children": "never"}},
+
+		// F) Real trailing comment inside `{…}` — unwrap suppressed.
+		{Code: `<App>{'foo' /* real trailing */}</App>`, Tsx: true, Options: map[string]interface{}{"children": "never"}},
+
+		// G) String literal whose cooked value contains `/*` — upstream's
+		// `containsMultilineComment(value)` check on the string-literal
+		// path bails out, matching rslint.
+		{Code: `<App>{'has /* in cooked */ value'}</App>`, Tsx: true, Options: map[string]interface{}{"children": "never"}},
+
 		// ---- tsgo-specific edge: comment AFTER inner expression
 		// (`{'foo' /* trailing */}`) must also suppress the fix. ----
 		{Code: `<App>{'foo' /* trailing */}</App>`, Tsx: true, Options: map[string]interface{}{"children": "never"}},
@@ -1012,6 +1038,29 @@ func TestJsxCurlyBracePresence(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "missingCurly", Message: "Need to wrap this literal in a JSX expression."},
 			},
+		},
+
+		// ---- Comment-detection regression suite (verified against
+		// upstream `eslint-plugin-react` + `@typescript-eslint/parser`
+		// during PR review — all positions and counts match). ----
+
+		// A) `/*` / `*/` inside a NoSubstitutionTemplateLiteral body is
+		// string content, NOT a comment — upstream and rslint both
+		// unwrap; the resulting JsxText preserves the raw chars.
+		{
+			Code:    "<App>{`tpl with /* fake comment */ inside`}</App>",
+			Tsx:     true,
+			Options: map[string]interface{}{"children": "never"},
+			Output:  []string{`<App>tpl with /* fake comment */ inside</App>`},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryCurly"}},
+		},
+		// B) Same in attribute position.
+		{
+			Code:    "<App prop={`abc`} />",
+			Tsx:     true,
+			Options: map[string]interface{}{"props": "never"},
+			Output:  []string{`<App prop="abc" />`},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unnecessaryCurly"}},
 		},
 	})
 }
