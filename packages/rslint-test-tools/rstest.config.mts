@@ -365,6 +365,7 @@ export default defineConfig({
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
 
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
   ],
