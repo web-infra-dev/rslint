@@ -246,13 +246,22 @@ func memberContentEnd(member *ast.Node) int {
 	return member.End()
 }
 
-// findFollowingSemicolonElement returns the SemicolonClassElement that
-// immediately follows `members[idx]`, if any.
-func findFollowingSemicolonElement(members []*ast.Node, idx int) *ast.Node {
-	if idx+1 < len(members) && members[idx+1] != nil && ast.IsSemicolonClassElement(members[idx+1]) {
-		return members[idx+1]
+// followingSemicolonElements returns the run of SemicolonClassElement nodes
+// that immediately follows `members[idx]` (ESTree omits these as they are
+// just stray `;` between members). Used to redirect the trailing comma to
+// the first `;` and clear the rest, so that
+// `class A { static a() {};; static b() {}; }` no longer leaves a stray
+// `;` in the rewritten object literal.
+func followingSemicolonElements(members []*ast.Node, idx int) []*ast.Node {
+	var out []*ast.Node
+	for j := idx + 1; j < len(members); j++ {
+		m := members[j]
+		if m == nil || !ast.IsSemicolonClassElement(m) {
+			break
+		}
+		out = append(out, m)
 	}
-	return nil
+	return out
 }
 
 // isExportDefault reports whether the class node is `export default class
@@ -262,15 +271,13 @@ func isExportDefault(node *ast.Node) bool {
 	return flags&ast.ModifierFlagsExport != 0 && flags&ast.ModifierFlagsDefault != 0
 }
 
-// linePosition returns the 1-based line number of `pos` in `text`.
-func linePosition(text string, pos int) int {
-	line := 1
-	for i := 0; i < pos && i < len(text); i++ {
-		if text[i] == '\n' {
-			line++
-		}
-	}
-	return line
+// sameLine reports whether `a` and `b` lie on the same source line. We use
+// the source file's pre-computed ECMA line map (binary search via
+// `scanner.ComputeLineOfPosition`) instead of scanning the source text.
+func sameLine(sf *ast.SourceFile, a, b int) bool {
+	lineStarts := sf.ECMALineMap()
+	return scanner.ComputeLineOfPosition(lineStarts, a) ==
+		scanner.ComputeLineOfPosition(lineStarts, b)
 }
 
 // trimmedTextBetween reports whether the source between `[start, end)` has
@@ -366,14 +373,9 @@ func buildFix(node *ast.Node, sf *ast.SourceFile) []rule.RuleFix {
 	// parent line && trimmed text between class end and brace > 0` arm.
 	if isClassExpr {
 		parent := node.Parent
-		bracePosLine := linePosition(text, bracePos)
-		var parentLine int
-		if parent != nil {
-			parentLine = linePosition(text, parent.Pos())
-		}
 		isReturnSpecial := parent != nil &&
 			parent.Kind == ast.KindReturnStatement &&
-			bracePosLine != parentLine &&
+			!sameLine(sf, parent.Pos(), bracePos) &&
 			trimmedTextBetween(text, classEnd, bracePos) != ""
 
 		if isReturnSpecial {
@@ -435,13 +437,22 @@ func buildFix(node *ast.Node, sf *ast.SourceFile) []rule.RuleFix {
 			}
 			continue
 		}
-		// Method / accessor / constructor: a separate SemicolonClassElement
-		// after the method, if any, holds the `;`. Replace just the `;`
-		// token (skip leading trivia so any comments between `}` and `;`
-		// are preserved, matching ESLint's `replaceText(token, ',')`).
-		if semi := findFollowingSemicolonElement(members, i); semi != nil {
-			semiStart := scanner.SkipTrivia(text, semi.Pos())
-			addFix(semiStart, semi.End(), ",")
+		// Method / accessor / constructor: SemicolonClassElement entries
+		// after the method (a stray `;` between members) carry the `;`.
+		// Replace the *first* `;` with `,` (matching upstream's
+		// `replaceText(token, ',')` — leading trivia / comments preserved)
+		// and erase the `;` character of any further consecutive `;`,
+		// preserving their trivia. This handles `static a() {};;` cleanly.
+		semis := followingSemicolonElements(members, i)
+		if len(semis) > 0 {
+			for k, semi := range semis {
+				semiStart := scanner.SkipTrivia(text, semi.Pos())
+				if k == 0 {
+					addFix(semiStart, semi.End(), ",")
+				} else {
+					addFix(semiStart, semi.End(), "")
+				}
+			}
 			continue
 		}
 		// No `;` follows — append `,` after the method body.

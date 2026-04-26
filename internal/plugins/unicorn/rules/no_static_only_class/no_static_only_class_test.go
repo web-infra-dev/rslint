@@ -606,6 +606,33 @@ func TestNoStaticOnlyClass(t *testing.T) {
 				}},
 			},
 
+			// Locks in: multiple consecutive `;` between methods. Each
+			// stray SemicolonClassElement is its own member in tsgo;
+			// upstream's ESTree absorbs them as filler and ESLint's fix
+			// only redirects the first to a comma. rslint extends the
+			// cleanup so that subsequent `;` characters are also erased
+			// (their trivia/comments preserved), keeping the rewritten
+			// output valid for `static a() {};; static b() {};` etc.
+			{
+				Code:   `class A { static a() {};; static b() {}; }`,
+				Output: []string{`const A = { a() {}, b() {}, };`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noStaticOnlyClass",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 8,
+				}},
+			},
+			// Locks in: trivia between consecutive `;` is preserved when
+			// each extra `;` token is erased (only the `;` char goes —
+			// the comment between `;` and `;` survives).
+			{
+				Code:   `class A { static a() {} /*A*/ ; /*B*/ ; /*C*/ }`,
+				Output: []string{`const A = { a() {} /*A*/ , /*B*/  /*C*/ };`},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "noStaticOnlyClass",
+					Line:      1, Column: 1, EndLine: 1, EndColumn: 8,
+				}},
+			},
+
 			// Locks in: TC39 `accessor` field. Autofix suppressed because
 			// `accessor` has no object-literal analog. See "Differences
 			// from ESLint".
