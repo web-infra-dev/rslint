@@ -362,6 +362,9 @@ export default defineConfig({
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
 
+    // eslint-plugin-unicorn
+    './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
+
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
   ],
 });

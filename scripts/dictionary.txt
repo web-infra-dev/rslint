@@ -270,3 +270,15 @@ nunc
 forcetypeassert
 Isnt
 deboucne
+extname
+splitwords
+behaviour
+extensionless
+uppercases
+trippable
+cand
+englishish
+HTTPSURL
+BARBAZ
+dedupe
+basenames

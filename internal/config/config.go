@@ -12,6 +12,7 @@ import (
 	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
+	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
@@ -373,6 +374,11 @@ var KnownPlugins = []PluginInfo{
 		DeclNames:   []string{"eslint-plugin-react-hooks", "react-hooks"},
 		getAllRules: func() []rule.Rule { return reactHooksPlugin.GetAllRules() },
 	},
+	{
+		RulePrefix:  "unicorn",
+		DeclNames:   []string{"eslint-plugin-unicorn", "unicorn"},
+		getAllRules: func() []rule.Rule { return unicornPlugin.GetAllRules() },
+	},
 }
 
 // pluginByDeclName is a lookup table built from KnownPlugins: declaration name → *PluginInfo.
@@ -443,6 +449,7 @@ func RegisterAllRules() {
 		registerAllReactHooksPluginRules()
 		registerAllJestPluginRules()
 		registerAllPromisePluginRules()
+		registerAllUnicornPluginRules()
 		registerAllCoreEslintRules()
 	})
 }
@@ -467,6 +474,12 @@ func registerAllJestPluginRules() {
 
 func registerAllPromisePluginRules() {
 	for _, rule := range promisePlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
+}
+
+func registerAllUnicornPluginRules() {
+	for _, rule := range unicornPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }
