@@ -8,7 +8,9 @@
         "project": ["./tsconfig.files.json", "./tsconfig.virtual.json"]
       }
     },
-    "rules": {},
+    "rules": {
+      "react-hooks/exhaustive-deps": "warn"
+    },
     "plugins": ["react-hooks"]
   }
 ]

@@ -9,19 +9,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-// hookNameTailRegex matches the suffix part of a hook identifier:
-// after the leading `use`, the next character must be uppercase Latin or a digit.
-// Mirrors upstream's `/^use[A-Z0-9]/`.
-var hookNameTailRegex = regexp.MustCompile(`^use[A-Z0-9]`)
-
-// pascalCaseRegex matches identifiers whose first character is an uppercase Latin letter.
-// Mirrors upstream's `/^[A-Z].*/` predicate (used both for component-name and
-// PascalCase namespace detection).
-var pascalCaseRegex = regexp.MustCompile(`^[A-Z]`)
 
 // flowSuppressionRegex matches `$FlowFixMe[react-rule-hook]` comments. Used to
 // gate `hasFlowSuppression`, which mirrors upstream's same-named helper —
@@ -29,108 +20,31 @@ var pascalCaseRegex = regexp.MustCompile(`^[A-Z]`)
 // suppression marker.
 var flowSuppressionRegex = regexp.MustCompile(`\$FlowFixMe\[react-rule-hook\]`)
 
-// isHookName reports whether `s` follows the React hook naming convention:
-// either the bare name `use` (the React `use(...)` hook) or `useFoo` / `use1`
-// (`use` followed by uppercase letter or digit).
-func isHookName(s string) bool {
-	return s == "use" || hookNameTailRegex.MatchString(s)
-}
+// Aliases over `react_hooksutil` so the call sites in this file stay terse
+// while every predicate's authoritative definition lives in the shared
+// package. See `react_hooksutil` package docs for semantics.
+var (
+	isHookCallee    = react_hooksutil.IsHookCallee
+	isUseIdentifier = react_hooksutil.IsUseIdentifier
+)
 
-// isComponentNameStr reports whether `s` looks like a React component name —
-// PascalCase. Upstream's `isComponentName` is identical.
-func isComponentNameStr(s string) bool {
-	if s == "" {
-		return false
-	}
-	return pascalCaseRegex.MatchString(s)
-}
-
-// isHookCallee mirrors upstream's `isHook(node)`: the callee is either an
-// Identifier whose name is a hook, or a non-computed member expression
-// `Namespace.useFoo` whose object is a PascalCase identifier and whose
-// property is itself a hook name.
-func isHookCallee(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	n := ast.SkipParentheses(node)
-	switch n.Kind {
-	case ast.KindIdentifier:
-		return isHookName(n.AsIdentifier().Text)
-	case ast.KindPropertyAccessExpression:
-		pae := n.AsPropertyAccessExpression()
-		prop := pae.Name()
-		if prop == nil || prop.Kind != ast.KindIdentifier {
-			return false
-		}
-		if !isHookName(prop.AsIdentifier().Text) {
-			return false
-		}
-		obj := ast.SkipParentheses(pae.Expression)
-		if obj == nil || obj.Kind != ast.KindIdentifier {
-			return false
-		}
-		return isComponentNameStr(obj.AsIdentifier().Text)
-	}
-	return false
-}
-
-// isReactFunction matches `<name>` (bare identifier) or `React.<name>`
-// (PropertyAccessExpression with object `React` and property `<name>`).
-// Mirrors upstream's `isReactFunction(node, functionName)`.
-func isReactFunction(node *ast.Node, name string) bool {
-	if node == nil {
-		return false
-	}
-	n := ast.SkipParentheses(node)
-	switch n.Kind {
-	case ast.KindIdentifier:
-		return n.AsIdentifier().Text == name
-	case ast.KindPropertyAccessExpression:
-		pae := n.AsPropertyAccessExpression()
-		obj := ast.SkipParentheses(pae.Expression)
-		prop := pae.Name()
-		if obj == nil || obj.Kind != ast.KindIdentifier {
-			return false
-		}
-		if prop == nil || prop.Kind != ast.KindIdentifier {
-			return false
-		}
-		return obj.AsIdentifier().Text == "React" && prop.AsIdentifier().Text == name
-	}
-	return false
-}
-
-// isUseIdentifier mirrors upstream's `isUseIdentifier(node)`: matches the
-// React `use(...)` hook callee — bare `use` or `React.use`.
-func isUseIdentifier(node *ast.Node) bool {
-	return isReactFunction(node, "use")
-}
-
-// stripReactNamespace returns `prop` for `React.prop` member expressions, or
-// the original node otherwise. Used when classifying a callee as an effect
-// hook regardless of whether the user qualified it with `React.`.
-func stripReactNamespace(node *ast.Node) *ast.Node {
-	if node == nil {
-		return node
-	}
-	n := ast.SkipParentheses(node)
-	if n.Kind == ast.KindPropertyAccessExpression {
-		pae := n.AsPropertyAccessExpression()
-		obj := ast.SkipParentheses(pae.Expression)
-		prop := pae.Name()
-		if obj != nil && obj.Kind == ast.KindIdentifier && obj.AsIdentifier().Text == "React" &&
-			prop != nil && prop.Kind == ast.KindIdentifier {
-			return prop
-		}
-	}
-	return n
-}
+// All AST predicates above (stripReactNamespace, isFunctionLikeContainer,
+// findEnclosingFunction, getFunctionBody, hasAsyncModifier, ...) live in
+// `react_hooksutil`. The aliases below keep the call sites unchanged
+// while removing the second copy.
+var (
+	stripReactNamespace     = react_hooksutil.StripReactNamespace
+	isFunctionLikeContainer = react_hooksutil.IsFunctionLikeContainer
+	findEnclosingFunction   = react_hooksutil.FindEnclosingFunction
+	getFunctionBody         = react_hooksutil.GetFunctionBody
+	hasAsyncModifier        = react_hooksutil.HasAsyncModifier
+)
 
 // isEffectCalleeName reports whether `node` (post-namespace-strip) names one
 // of the built-in effect hooks (`useEffect` / `useLayoutEffect` /
 // `useInsertionEffect`) or matches the user-configured `additionalEffectHooks`
-// regex from settings.
+// regex from settings. Specific to rules-of-hooks (the additional-effect-hooks
+// gate is exclusive to this rule), so it's not promoted to the shared util.
 func isEffectCalleeName(node *ast.Node, additional *regexp.Regexp) bool {
 	n := stripReactNamespace(node)
 	if n == nil || n.Kind != ast.KindIdentifier {
@@ -147,79 +61,9 @@ func isEffectCalleeName(node *ast.Node, additional *regexp.Regexp) bool {
 	return false
 }
 
-// isUseEffectEventCallee reports whether `node` is `useEffectEvent` or
-// `React.useEffectEvent`.
+// isUseEffectEventCallee delegates to the shared helper.
 func isUseEffectEventCallee(node *ast.Node) bool {
-	n := stripReactNamespace(node)
-	return n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == "useEffectEvent"
-}
-
-// isFunctionLikeContainer reports whether `node` is one of the function-like
-// kinds the upstream rule treats as a "code path" boundary — anywhere a hook
-// call's enclosing function is computed.
-func isFunctionLikeContainer(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return true
-	}
-	return false
-}
-
-// findEnclosingFunction walks up from `node` and returns the nearest
-// function-like ancestor, or nil when `node` is at top level (no enclosing
-// function).
-func findEnclosingFunction(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	p := node.Parent
-	for p != nil {
-		if isFunctionLikeContainer(p) {
-			return p
-		}
-		p = p.Parent
-	}
-	return nil
-}
-
-// getFunctionBody returns the body of a function-like node — Block for normal
-// functions, the BlockOrExpression body for arrow functions, or nil for
-// abstract/declared signatures with no body.
-func getFunctionBody(fn *ast.Node) *ast.Node {
-	if fn == nil {
-		return nil
-	}
-	switch fn.Kind {
-	case ast.KindFunctionDeclaration:
-		return fn.AsFunctionDeclaration().Body
-	case ast.KindFunctionExpression:
-		return fn.AsFunctionExpression().Body
-	case ast.KindArrowFunction:
-		return fn.AsArrowFunction().Body
-	case ast.KindMethodDeclaration:
-		return fn.AsMethodDeclaration().Body
-	case ast.KindGetAccessor:
-		return fn.AsGetAccessorDeclaration().Body
-	case ast.KindSetAccessor:
-		return fn.AsSetAccessorDeclaration().Body
-	case ast.KindConstructor:
-		return fn.AsConstructorDeclaration().Body
-	}
-	return nil
-}
-
-// hasAsyncModifier reports whether the function-like node carries the `async`
-// modifier. Upstream reads `codePathNode.async` directly; we use tsgo's
-// modifier-flag helper for the same effect.
-func hasAsyncModifier(fn *ast.Node) bool {
-	if fn == nil {
-		return false
-	}
-	return ast.HasSyntacticModifier(fn, ast.ModifierFlagsAsync)
+	return react_hooksutil.IsUseEffectEventCallee(node)
 }
 
 // isInsideTryCatchOfFunction reports whether `node` is inside a TryStatement
@@ -286,163 +130,15 @@ func isInsideLoopOfFunction(node *ast.Node, fn *ast.Node) bool {
 	return false
 }
 
-// getFunctionName mirrors upstream's `getFunctionName(node)`. Returns:
-//   - For named FunctionDeclaration / FunctionExpression: the `id` Identifier.
-//   - For MethodDeclaration / GetAccessor / SetAccessor inside an
-//     ObjectLiteralExpression: the method's own name (mirrors ESTree's
-//     `Property { method: true, value: FunctionExpression }` shape).
-//   - For ArrowFunction / anonymous FunctionExpression: the assignment
-//     target — VariableDeclaration name, BinaryExpression LHS, PropertyAssignment
-//     name, BindingElement name, or ShorthandPropertyAssignment name.
-//   - nil otherwise.
-//
-// MethodDeclaration / GetAccessor / SetAccessor inside a class body
-// intentionally returns nil so the class branch can take over and emit
-// classError. Upstream has the same effect because ESTree exposes the inner
-// FunctionExpression with no id, and getFunctionName falls through.
-func getFunctionName(fn *ast.Node) *ast.Node {
-	if fn == nil {
-		return nil
-	}
-	switch fn.Kind {
-	case ast.KindFunctionDeclaration:
-		return fn.Name()
-	case ast.KindFunctionExpression:
-		if name := fn.Name(); name != nil {
-			return name
-		}
-		// fall through to anonymous handling
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		if fn.Parent != nil && fn.Parent.Kind == ast.KindObjectLiteralExpression {
-			return fn.Name()
-		}
-		return nil
-	case ast.KindArrowFunction:
-		// fall through
-	default:
-		return nil
-	}
-	p := fn.Parent
-	if p == nil {
-		return nil
-	}
-	switch p.Kind {
-	case ast.KindVariableDeclaration:
-		vd := p.AsVariableDeclaration()
-		if vd.Initializer == fn {
-			return p.Name()
-		}
-	case ast.KindBinaryExpression:
-		be := p.AsBinaryExpression()
-		if be.OperatorToken != nil && be.OperatorToken.Kind == ast.KindEqualsToken && be.Right == fn {
-			return be.Left
-		}
-	case ast.KindPropertyAssignment:
-		pa := p.AsPropertyAssignment()
-		if pa.Initializer == fn {
-			return p.Name()
-		}
-	case ast.KindBindingElement:
-		be := p.AsBindingElement()
-		if be.Initializer == fn {
-			return p.Name()
-		}
-	case ast.KindShorthandPropertyAssignment:
-		spa := p.AsShorthandPropertyAssignment()
-		if spa.ObjectAssignmentInitializer == fn {
-			return p.Name()
-		}
-	case ast.KindParenthesizedExpression:
-		// `const x = (() => {})` — the paren-wrapped expression is the
-		// declarator's initializer. Recurse on the wrapper so the parent-shape
-		// switch above retries against the grandparent.
-		return getFunctionName(p)
-	}
-	return nil
-}
-
-// isForwardRefOrMemoCallback reports whether `fn` is the immediate argument
-// of a CallExpression whose callee is `forwardRef` / `memo` / `React.forwardRef`
-// / `React.memo`. Upstream's `isForwardRefCallback` and `isMemoCallback`
-// are unified here for brevity.
-func isForwardRefOrMemoCallback(fn *ast.Node, name string) bool {
-	if fn == nil || fn.Parent == nil {
-		return false
-	}
-	p := fn.Parent
-	if p.Kind != ast.KindCallExpression {
-		return false
-	}
-	callee := ast.SkipParentheses(p.AsCallExpression().Expression)
-	return isReactFunction(callee, name)
-}
-
-// classifyContainerName reports whether the function-like's resolved name
-// represents a component or a hook.
-func classifyContainerName(name *ast.Node) bool {
-	if name == nil {
-		return false
-	}
-	switch name.Kind {
-	case ast.KindIdentifier:
-		text := name.AsIdentifier().Text
-		return isComponentNameStr(text) || isHookName(text)
-	case ast.KindPropertyAccessExpression:
-		// `Namespace.useHook` style — defer to isHookCallee, which already
-		// enforces PascalCase namespace + hook-named property.
-		return isHookCallee(name)
-	}
-	return false
-}
-
-// isComponentOrHookFn reports whether the function-like itself is a React
-// component or hook (named appropriately, or an anonymous arg to forwardRef/memo).
-// Mirrors upstream's `isDirectlyInsideComponentOrHook` predicate at the function level.
-func isComponentOrHookFn(fn *ast.Node) bool {
-	name := getFunctionName(fn)
-	if name != nil {
-		return classifyContainerName(name)
-	}
-	return isForwardRefOrMemoCallback(fn, "forwardRef") || isForwardRefOrMemoCallback(fn, "memo")
-}
-
-// isInsideComponentOrHook walks up from `node` and returns true once any
-// ancestor function-like classifies as a component or hook. Mirrors
-// upstream's `isInsideComponentOrHook(node)`.
-func isInsideComponentOrHook(node *ast.Node) bool {
-	cur := node
-	for cur != nil {
-		if isFunctionLikeContainer(cur) && isComponentOrHookFn(cur) {
-			return true
-		}
-		cur = cur.Parent
-	}
-	return false
-}
-
-// isClassMember reports whether `fn` is a member of a class — either a
-// MethodDeclaration / GetAccessor / SetAccessor / Constructor whose direct
-// parent is a class, or an ArrowFunction / FunctionExpression that initializes
-// a class PropertyDeclaration (class-field arrow). Mirrors upstream's
-// MethodDefinition / ClassProperty / PropertyDefinition branch.
-func isClassMember(fn *ast.Node) bool {
-	if fn == nil || fn.Parent == nil {
-		return false
-	}
-	p := fn.Parent
-	switch fn.Kind {
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return p.Kind == ast.KindClassDeclaration || p.Kind == ast.KindClassExpression
-	case ast.KindArrowFunction, ast.KindFunctionExpression:
-		if p.Kind == ast.KindPropertyDeclaration {
-			gp := p.Parent
-			if gp != nil && (gp.Kind == ast.KindClassDeclaration || gp.Kind == ast.KindClassExpression) {
-				return true
-			}
-		}
-	}
-	return false
-}
+// All function-name / forwardRef / classifier predicates live in the
+// shared `react_hooksutil` package. The aliases below preserve the
+// existing call sites unchanged.
+var (
+	getFunctionName         = react_hooksutil.GetFunctionName
+	isComponentOrHookFn     = react_hooksutil.IsComponentOrHookFn
+	isInsideComponentOrHook    = react_hooksutil.IsInsideComponentOrHook
+	isClassMember              = react_hooksutil.IsClassMember
+)
 
 // isConditionalAncestor reports whether the position of `child` within `parent`
 // places it on a conditional execution path (only entered on certain
@@ -847,31 +543,9 @@ func isInsideEffectArgument(idNode *ast.Node, additional *regexp.Regexp) bool {
 	return false
 }
 
-// getAdditionalEffectHooks reads `settings['react-hooks'].additionalEffectHooks`
-// and compiles it as a regex. Returns nil when the setting is absent or
-// invalid — matching upstream's lenient behavior of silently ignoring
-// malformed regex strings.
+// getAdditionalEffectHooks delegates to the shared settings reader.
 func getAdditionalEffectHooks(settings map[string]interface{}) *regexp.Regexp {
-	if settings == nil {
-		return nil
-	}
-	raw, ok := settings["react-hooks"]
-	if !ok {
-		return nil
-	}
-	m, ok := raw.(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	pattern, ok := m["additionalEffectHooks"].(string)
-	if !ok || pattern == "" {
-		return nil
-	}
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return nil
-	}
-	return re
+	return react_hooksutil.AdditionalHooksFromSettings(settings, "additionalEffectHooks")
 }
 
 // eeRegistry tracks `const X = useEffectEvent(...)` declarations per enclosing
