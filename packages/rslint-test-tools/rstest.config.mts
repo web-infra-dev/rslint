@@ -128,6 +128,9 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/prefer-stateless-function.test.ts',
     './tests/eslint-plugin-react/rules/require-render-return.test.ts',
 
+    // eslint-plugin-react-hooks
+    './tests/eslint-plugin-react-hooks/rules/rules-of-hooks.test.ts',
+
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
