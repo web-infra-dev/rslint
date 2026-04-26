@@ -282,3 +282,15 @@ HTTPSURL
 BARBAZ
 dedupe
 basenames
+hooksutil
+dobedo
+bizz
+mousemove
+mousein
+Refy
+addl
+ctype
+fname
+preresolved
+vname
+useeffectevent

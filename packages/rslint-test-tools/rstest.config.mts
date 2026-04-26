@@ -130,6 +130,7 @@ export default defineConfig({
 
     // eslint-plugin-react-hooks
     './tests/eslint-plugin-react-hooks/rules/rules-of-hooks.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/exhaustive-deps.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
