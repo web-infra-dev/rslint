@@ -15,6 +15,7 @@ export {
   ts,
   js,
   reactPlugin,
+  reactHooksPlugin,
   importPlugin,
   promisePlugin,
   jestPlugin,
