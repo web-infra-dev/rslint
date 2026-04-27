@@ -296,3 +296,7 @@ vname
 useeffectevent
 tinyglobby
 fdir
+goroutines
+GOMAXPROCS
+fanout
+humanfs
