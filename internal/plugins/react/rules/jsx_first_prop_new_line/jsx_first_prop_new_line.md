@@ -1,4 +1,4 @@
-# react/jsx-first-prop-new-line
+# jsx-first-prop-new-line
 
 ## Rule Details
 

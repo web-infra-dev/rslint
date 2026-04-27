@@ -1,4 +1,4 @@
-# import/no-duplicates
+# no-duplicates
 
 ## Rule Details
 

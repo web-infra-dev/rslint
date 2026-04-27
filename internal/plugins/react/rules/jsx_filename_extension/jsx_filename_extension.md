@@ -1,4 +1,4 @@
-# react/jsx-filename-extension
+# jsx-filename-extension
 
 ## Rule Details
 

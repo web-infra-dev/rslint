@@ -1,4 +1,4 @@
-# react/no-unknown-property
+# no-unknown-property
 
 Disallow usage of unknown DOM property.
 

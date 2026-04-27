@@ -1,4 +1,4 @@
-# react/no-typos
+# no-typos
 
 Disallow common typos in React component declarations.
 

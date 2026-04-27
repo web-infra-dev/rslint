@@ -1,4 +1,4 @@
-# react-hooks/exhaustive-deps
+# exhaustive-deps
 
 ## Rule Details
 

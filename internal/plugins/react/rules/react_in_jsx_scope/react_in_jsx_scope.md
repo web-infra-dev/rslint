@@ -1,4 +1,4 @@
-# react/react-in-jsx-scope
+# react-in-jsx-scope
 
 ## Rule Details
 
