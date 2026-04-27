@@ -1,4 +1,4 @@
-# react/jsx-curly-brace-presence
+# jsx-curly-brace-presence
 
 ## Rule Details
 

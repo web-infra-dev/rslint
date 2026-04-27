@@ -1,4 +1,4 @@
-# react/style-prop-object
+# style-prop-object
 
 ## Rule Details
 

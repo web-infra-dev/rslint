@@ -1,4 +1,4 @@
-# react-hooks/rules-of-hooks
+# rules-of-hooks
 
 Enforce React's Rules of Hooks: hooks must only be called at the top level of
 React function components or custom Hooks, never inside loops, conditions,

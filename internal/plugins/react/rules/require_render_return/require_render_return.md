@@ -1,4 +1,4 @@
-# react/require-render-return
+# require-render-return
 
 Enforce that the render method of an ES5 or ES6 React component returns a value.
 

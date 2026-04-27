@@ -89,5 +89,5 @@ When `true`, additional `.`-separated parts of the basename are treated as part 
 
 ## Original Documentation
 
-- ESLint plugin documentation: <https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/filename-case.md>
-- Source code: <https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/filename-case.js>
+- [eslint-plugin-unicorn: filename-case](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/filename-case.md)
+- [Source code](https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/rules/filename-case.js)

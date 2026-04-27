@@ -1,4 +1,4 @@
-# react/jsx-no-script-url
+# jsx-no-script-url
 
 ## Rule Details
 

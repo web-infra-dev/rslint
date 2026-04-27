@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import * as rslintCore from '@rslint/core';
 import type { RslintConfigEntry } from '@rslint/core';
-import { PLUGIN_REGISTRY } from './theme/plugin-registry';
+import { PLUGIN_REGISTRY, groupToRouteSlug } from './theme/plugin-registry';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.resolve(__dirname, 'generated/rule-manifest.json');
@@ -21,14 +21,6 @@ interface RuleEntry {
   docPath: string | null;
   /** Presets that include this rule, with their configured values. */
   presets: { name: string; value: unknown }[];
-}
-
-/**
- * Convert a plugin group name to a URL-safe slug.
- * e.g. "@typescript-eslint" → "typescript-eslint"
- */
-function groupToRouteSlug(group: string): string {
-  return group.replace(/^@/, '');
 }
 
 const PLUGINS = PLUGIN_REGISTRY.map((p) => {
@@ -101,14 +93,16 @@ function loadManifest(): RuleEntry[] {
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8'));
   const rules: RuleEntry[] = manifest.rules;
 
-  // Enrich with preset data (level + configured value)
+  // Attach the list of presets that enable each rule, with the raw
+  // configured value (severity string or [severity, options] tuple).
   const presetMap = extractPresetRules();
   for (const rule of rules) {
     const key = `${rule.group}:${rule.name}`;
     rule.presets = presetMap.get(key) || [];
   }
 
-  // Write enriched manifest back for React components
+  // Persist the enriched manifest so runtime consumers (e.g. the rules
+  // explorer in RuleStates/rule.tsx) can read presets directly.
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');
 
   return rules;
@@ -116,7 +110,9 @@ function loadManifest(): RuleEntry[] {
 
 /**
  * Transform a rule's source .md into a .mdx string that imports and renders
- * the <RuleConfig> component right after the first heading.
+ * the <RuleConfig> component right after the first heading. When the rule
+ * is enabled by one or more presets, a markdown table summarizing each
+ * preset and its configured value is inserted before <RuleConfig>.
  *
  * Input (source .md):
  *   # no-console
@@ -130,7 +126,11 @@ function loadManifest(): RuleEntry[] {
  *
  *   ## Configuration
  *
- *   <RuleConfig name="no-console" group="eslint" presets={["recommended"]} />
+ *   | Preset                   | Configured Value |
+ *   | ------------------------ | ---------------- |
+ *   | ✅ js.configs.recommended | `"error"`        |
+ *
+ *   <RuleConfig name="no-console" group="eslint" />
  *
  *   ## Rule Details
  *   ...
@@ -270,11 +270,16 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
 }
 
 /**
- * Rspress plugin that generates rule documentation pages from Go source:
+ * Rspress plugin that generates rule documentation pages from Go source.
+ * Inside the `config` hook (run before Rspress resolves the route tree)
+ * it:
  *
  * 1. Runs scripts/gen-rule-manifest.js to produce generated/rule-manifest.json
- * 2. Writes .mdx files + _meta.json into docs/en/rules/<group>/ in beforeBuild,
- *    so Rspress auto-sidebar handles /rules/ the same way as /guide/ and /config/
+ *    and reads it back, enriching each entry with preset information.
+ * 2. Writes .mdx files + _meta.json into docs/en/rules/<slug>/, so the
+ *    Rspress auto-sidebar handles /rules/ the same way as /guide/ and
+ *    /config/. Each <slug> is derived from `rule.group` via
+ *    {@link groupToRouteSlug}.
  *
  * Each generated .mdx imports <RuleConfig> via the @/ alias to render a
  * copyable configuration snippet for the rule.

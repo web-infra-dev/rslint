@@ -1,4 +1,4 @@
-# react/button-has-type
+# button-has-type
 
 ## Rule Details
 
