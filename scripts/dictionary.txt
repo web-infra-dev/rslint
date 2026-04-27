@@ -294,3 +294,5 @@ fname
 preresolved
 vname
 useeffectevent
+tinyglobby
+fdir

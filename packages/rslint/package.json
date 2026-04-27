@@ -80,6 +80,7 @@
     "@rslint/win32-x64": "workspace:*"
   },
   "dependencies": {
-    "picomatch": "4.0.4"
+    "picomatch": "4.0.4",
+    "tinyglobby": "0.2.15"
   }
 }
