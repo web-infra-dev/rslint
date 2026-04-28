@@ -1,4 +1,4 @@
-# react/no-redundant-should-component-update
+# no-redundant-should-component-update
 
 ## Rule Details
 

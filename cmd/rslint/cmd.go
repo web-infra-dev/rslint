@@ -672,15 +672,56 @@ func runCMD() int {
 			// the .gitignore scan. This is safe because isDirPathBlocked is
 			// the same function used by the linter — blocked dirs' files
 			// are never linted, so their .gitignore patterns are irrelevant.
-			for configDir, entries := range configMap {
-				configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-				gitGlobs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores)
-				if len(gitGlobs) > 0 {
-					configMap[configDir] = append(
-						rslintconfig.RslintConfig{{Ignores: gitGlobs}},
-						entries...,
-					)
+			//
+			// Concurrency:
+			//   - When singleThreaded is set, both stages run sequentially in
+			//     the main goroutine (no goroutines spawned at all).
+			//   - Otherwise, gitignore reads run in parallel across configs
+			//     (independent FS reads via cachedvfs, which is concurrent-
+			//     safe). createProgramsForConfig still runs serially in the
+			//     main goroutine — typescript-go's API is invoked one config
+			//     at a time. The two stages overlap: gitignore goroutines
+			//     run alongside the createPrograms loop.
+			//
+			// configMap is NOT mutated by gitignore goroutines; results are
+			// collected via channel and merged in the main goroutine after
+			// the createPrograms loop, so the createPrograms loop sees the
+			// pre-augmentation entries (createProgramsForConfig only reads
+			// languageOptions.parserOptions.project — Ignores entries are
+			// no-ops for it; verified in LoadTsConfigsFromRslintConfig).
+			type giResult struct {
+				configDir string
+				globs     []string
+			}
+			var (
+				giResults chan giResult
+				giWG      sync.WaitGroup
+			)
+			if singleThreaded {
+				// Inline serial gitignore reads.
+				giResults = nil
+				for configDir, entries := range configMap {
+					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+					globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores)
+					if len(globs) > 0 {
+						configMap[configDir] = append(
+							rslintconfig.RslintConfig{{Ignores: globs}},
+							configMap[configDir]...,
+						)
+					}
 				}
+			} else {
+				giResults = make(chan giResult, len(configMap))
+				for configDir, entries := range configMap {
+					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+					giWG.Add(1)
+					go func(dir string, ignores []string) {
+						defer giWG.Done()
+						globs := rslintconfig.ReadGitignoreAsGlobs(dir, fs, ignores)
+						giResults <- giResult{configDir: dir, globs: globs}
+					}(configDir, configIgnores)
+				}
+				go func() { giWG.Wait(); close(giResults) }()
 			}
 
 			seenTsConfigs := make(map[string]struct{})
@@ -695,22 +736,36 @@ func runCMD() int {
 				}
 				programs = append(programs, progs...)
 			}
+
+			// Drain gitignore results (parallel path only) and merge into
+			// configMap. Must complete before DiscoverGapFiles, which relies
+			// on the augmented configMap.
+			if giResults != nil {
+				for r := range giResults {
+					if len(r.globs) > 0 {
+						configMap[r.configDir] = append(
+							rslintconfig.RslintConfig{{Ignores: r.globs}},
+							configMap[r.configDir]...,
+						)
+					}
+				}
+			}
 		} else {
 			// Legacy single-config format
 			rslintConfig = payload.SingleConfig
 			currentDirectory = payload.SingleConfigDir
 
-			// Inject .gitignore patterns as global ignores.
-			configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
-			gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs, configIgnores)
-			if len(gitGlobs) > 0 {
-				rslintConfig = append(
-					rslintconfig.RslintConfig{{Ignores: gitGlobs}},
-					rslintConfig...,
-				)
-			}
-
-			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+			// Inject .gitignore patterns as global ignores. Run gitignore
+			// reading in parallel with createProgramsForConfig — they're
+			// independent (createProgramsForConfig only reads
+			// languageOptions.parserOptions.project, not Ignores).
+			var (
+				progs    []*compiler.Program
+				exitCode int
+			)
+			rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
+				rslintConfig, currentDirectory, fs, singleThreaded, nil,
+			)
 			if exitCode != 0 {
 				return exitCode
 			}
@@ -720,17 +775,15 @@ func runCMD() int {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
 		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
-		// Inject .gitignore patterns as global ignores.
-		configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
-		gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs, configIgnores)
-		if len(gitGlobs) > 0 {
-			rslintConfig = append(
-				rslintconfig.RslintConfig{{Ignores: gitGlobs}},
-				rslintConfig...,
-			)
-		}
-
-		progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+		// Inject .gitignore patterns as global ignores. Run gitignore reading
+		// in parallel with createProgramsForConfig (see comment above).
+		var (
+			progs    []*compiler.Program
+			exitCode int
+		)
+		rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
+			rslintConfig, currentDirectory, fs, singleThreaded, nil,
+		)
 		if exitCode != 0 {
 			return exitCode
 		}
@@ -785,9 +838,9 @@ func runCMD() int {
 
 		var gapFiles []string
 		if configMap != nil {
-			gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs)
+			gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded)
 		} else {
-			gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs)
+			gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded)
 		}
 
 		// CLI file args bypass config `files` patterns (ESLint behavior):

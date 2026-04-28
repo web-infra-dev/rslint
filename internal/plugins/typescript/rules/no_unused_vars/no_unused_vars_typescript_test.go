@@ -330,3 +330,166 @@ export type X = (typeof fooObj2)['x'];
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }
+
+func TestNoUnusedVarsTypeParameters(t *testing.T) {
+	validTestCases := []rule_tester.ValidTestCase{
+		// --- Type parameter USED in function return type ---
+		{Code: `export function fn<T>(x: T): T { return x; }`},
+		// --- Type parameter USED in parameter type ---
+		{Code: `export function fn<T>(x: T): void { console.log(x); }`},
+		// --- Type parameter USED in interface body ---
+		{Code: `export interface I<T> { value: T; }`},
+		// --- Type parameter USED in type alias body ---
+		{Code: `export type A<T> = T[];`},
+		// --- Type parameter USED in class member ---
+		{Code: `export class C<T> { x!: T; }`},
+		// --- Type parameter USED by another TP's constraint ---
+		{Code: `export function fn<T, U extends T>(x: T, y: U): void { console.log(x, y); }`},
+		// --- Type parameter USED by another TP's default ---
+		{Code: `export interface I<T, U = T> { x?: U; }`},
+		// --- Type parameter USED in conditional type ---
+		{Code: `export type IsString<T> = T extends string ? true : false;`},
+		// --- Type parameter USED in template literal type ---
+		{Code: `export type Greeting<T extends string> = ` + "`Hello ${T}`" + `;`},
+		// --- Type parameter USED in mapped type ---
+		{Code: `export type MyRecord<K extends string> = { [P in K]: number };`},
+		// --- infer type is not a declaration — P in mapped type not reported ---
+		{Code: `export type ElementOf<T> = T extends (infer U)[] ? U : never;`},
+		// --- arrow function type parameter ---
+		{Code: `export const fn = <T,>(x: T): T => x;`},
+		// --- method type parameter ---
+		{Code: `
+export class C {
+  fn<T>(x: T): T { return x; }
+}
+`},
+		// --- varsIgnorePattern applies to type parameters ---
+		{
+			Code:    `export interface I<_T> {}`,
+			Options: map[string]interface{}{"varsIgnorePattern": "^_"},
+		},
+		// --- call signature type parameter used ---
+		{Code: `
+export interface Factory {
+  <T>(x: T): T;
+}
+`},
+		// --- construct signature type parameter used ---
+		{Code: `
+export interface Constructable {
+  new <T>(x: T): T;
+}
+`},
+		// --- overloaded function with type parameter ---
+		{Code: `
+export function foo<T>(a: number): T;
+export function foo<T>(a: string): T;
+export function foo<T>(a: number | string): T { return a as unknown as T; }
+`},
+		// --- declare function type parameter (ambient) ---
+		{Code: `declare function fn<T>(x: T): T; export { fn };`},
+		// --- declare module type parameter skipped ---
+		{Code: `
+declare module 'foo' {
+  function bar<T>(x: T): T;
+}
+`},
+		// --- Type parameter used in typeof ---
+		{Code: `
+export function foo<T>(value: T): T { return value; }
+export type Foo<T> = typeof foo<T>;
+`},
+		// --- Type parameter used in spread parameter ---
+		{Code: `export type Fn<A extends unknown[]> = (...a: A) => unknown;`},
+		// --- Type parameter used in nested generic ---
+		{Code: `export type Wrapper<T> = Promise<Array<T>>;`},
+	}
+
+	invalidTestCases := []rule_tester.InvalidTestCase{
+		// --- Unused type parameter on interface ---
+		{
+			Code:   `export interface I<T> { x?: number; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+		},
+		// --- Unused type parameter with default ---
+		{
+			Code:   `export interface I<T = unknown> { x?: number; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+		},
+		// --- Unused type parameter with constraint ---
+		{
+			Code:   `export interface I<T extends string> { x?: number; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+		},
+		// --- Unused type parameter on type alias ---
+		{
+			Code:   `export type A<T> = string;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 15}},
+		},
+		// --- Unused type parameter on type alias with default ---
+		{
+			Code:   `export type A<T = unknown> = string;`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 15}},
+		},
+		// --- Unused type parameter on function ---
+		{
+			Code:   `export function fn<T>(): void {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+		},
+		// --- Unused type parameter on class ---
+		{
+			Code:   `export class C<T> {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 16}},
+		},
+		// --- Unused type parameter on class with default ---
+		{
+			Code:   `export class C<T = unknown> {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 16}},
+		},
+		// --- Multiple type params: only unused one reported ---
+		{
+			Code:   `export interface I<T, U> { x: T; }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 23}},
+		},
+		// --- CrossRef: T used by U's constraint, but U itself unused ---
+		{
+			Code:   `export interface I<T, U extends T> {}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 23}},
+		},
+		// --- Arrow function unused type parameter ---
+		{
+			Code:   `export const fn = <T,>(): void => {};`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 20}},
+		},
+		// --- Method unused type parameter ---
+		{
+			Code: `
+export class C {
+  fn<T>(): void {}
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 6}},
+		},
+		// --- Call signature unused type parameter ---
+		{
+			Code: `
+export interface Factory {
+  <T>(): void;
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 4}},
+		},
+		// --- Construct signature unused type parameter ---
+		{
+			Code: `
+export interface Constructable {
+  new <T>(): void;
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 8}},
+		},
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
+}
+

@@ -1,0 +1,24 @@
+name: Benchmarks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  benchmark-go:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/benchmark-go.yml
+
+  benchmark-cli:
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/benchmark-cli.yml

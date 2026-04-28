@@ -8,45 +8,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// extendsPureComponent reports whether `classNode`'s extends clause matches
-// upstream's `componentUtil.isPureComponent` regex
-// `/^(<pragma>\.)?PureComponent$/`. Distinct from
-// `reactutil.ExtendsReactComponent` (which also matches plain `Component`).
-//
-// Parens around the extends expression are skipped — matching ESLint's
-// behavior where `getText(node.superClass)` returns the bare member-expression
-// text (range excludes surrounding parens) and the regex still matches.
-func extendsPureComponent(classNode *ast.Node, pragma string) bool {
-	if classNode == nil {
-		return false
-	}
-	heritage := ast.GetClassExtendsHeritageElement(classNode)
-	if heritage == nil {
-		return false
-	}
-	hc := heritage.AsExpressionWithTypeArguments()
-	if hc == nil || hc.Expression == nil {
-		return false
-	}
-	expr := ast.SkipParentheses(hc.Expression)
-	switch expr.Kind {
-	case ast.KindIdentifier:
-		return expr.AsIdentifier().Text == "PureComponent"
-	case ast.KindPropertyAccessExpression:
-		pa := expr.AsPropertyAccessExpression()
-		obj := ast.SkipParentheses(pa.Expression)
-		if obj.Kind != ast.KindIdentifier || obj.AsIdentifier().Text != pragma {
-			return false
-		}
-		name := pa.Name()
-		if name == nil || name.Kind != ast.KindIdentifier {
-			return false
-		}
-		return name.AsIdentifier().Text == "PureComponent"
-	}
-	return false
-}
-
 // hasShouldComponentUpdate mirrors upstream's
 // `astUtil.getComponentProperties(node).some(p => getPropertyName(p) === 'shouldComponentUpdate')`.
 //
@@ -109,7 +70,7 @@ var NoRedundantShouldComponentUpdateRule = rule.Rule{
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 
 		check := func(node *ast.Node) {
-			if !extendsPureComponent(node, pragma) {
+			if !reactutil.ExtendsReactPureComponent(node, pragma) {
 				return
 			}
 			if !hasShouldComponentUpdate(node.Members()) {

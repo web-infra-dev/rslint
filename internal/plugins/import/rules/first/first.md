@@ -1,4 +1,4 @@
-# import/first
+# first
 
 ## Rule Details
 

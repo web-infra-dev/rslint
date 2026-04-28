@@ -196,7 +196,11 @@ func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern st
 	}
 
 	relativePattern := strings.TrimPrefix(resolvedPattern, searchRoot+"/")
-	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot}
+	// expandProjectGlob historically follows symlinks (e.g. tsconfig
+	// referenced via packages/*/tsconfig.json where packages may be
+	// symlinks in pnpm workspaces). It runs single-threaded under
+	// doublestar.GlobWalk, so the cycle dedupe is deterministic.
+	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot, followSymlinks: true}
 
 	matches := []string{}
 	err := doublestar.GlobWalk(fsys, relativePattern, func(path string, d fs.DirEntry) error {

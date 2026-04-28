@@ -82,8 +82,39 @@ func TestEdgeCases(t *testing.T) {
 				Options: map[string]interface{}{"typedefs": false, "ignoreTypeReferences": false},
 			},
 			{
+				Code:    `var x: Foo = {} as any; interface Foo {}`,
+				Options: map[string]interface{}{"typedefs": false},
+			},
+			{
 				Code:    `let myVar: MyString; type MyString = string;`,
 				Options: map[string]interface{}{"typedefs": false, "ignoreTypeReferences": false},
+			},
+
+			// ----- ignoreTypeReferences covers heritage in type-only positions -----
+			// Interface `extends` is a pure type position.
+			{Code: `interface A extends B {} interface B {}`},
+			{Code: `interface A extends B<C> {} interface B<T> { x: T; } interface C {}`},
+			{Code: `interface A extends ns.B {} namespace ns { export interface B {} }`},
+			{Code: `interface A extends ns.sub.B {} namespace ns { export namespace sub { export interface B {} } }`},
+			{Code: `interface A extends B, C {} interface B {} interface C {}`},
+			// Class `implements` is a pure type position (single and multiple, generic, qualified).
+			{Code: `class A implements B { x: number = 1; } interface B { x: number; }`},
+			{Code: `class A implements ns.B { x = 1; } namespace ns { export interface B { x: number; } }`},
+			{Code: `class A implements B, C { x = 1; y = 2; } interface B { x: number; } interface C { y: number; }`},
+			{Code: `class A implements B<number> { x!: number; } interface B<T> { x: T; }`},
+			// Class expression + implements.
+			{Code: `const Cls = class implements B { x = 1; }; interface B { x: number; }`},
+			// Class extends + implements in same declaration (class extends is NOT ignored,
+			// so put declaration first).
+			{Code: `class Base {} interface I {} class D extends Base implements I {}`},
+			// Heritage with type argument that itself references later type.
+			{Code: `interface A extends B<C> {} interface B<T> {} type C = number;`},
+			// Class implements where the implemented interface extends a later one.
+			{Code: `class A implements B { x = 1 } interface B extends C { x: number } interface C {}`},
+			// Explicit ignoreTypeReferences:false but still valid because B is defined before.
+			{
+				Code:    `interface B {} interface A extends B {}`,
+				Options: map[string]interface{}{"ignoreTypeReferences": false},
 			},
 
 			// ----- Optional chaining with declared variables -----
@@ -136,6 +167,23 @@ class A {
 			// ----- Type predicate (value is Type) -----
 			{Code: `type T = (value: unknown) => value is string;`},
 
+			// ----- JSX: implicit React reference should not trigger -----
+			{Code: `import * as React from 'react'; <div />;`, Tsx: true},
+			{Code: `import React from 'react'; <div />;`, Tsx: true},
+			{Code: `const React = require('react'); <div />;`, Tsx: true},
+			{Code: `import { h } from 'preact'; <div />;`, Tsx: true},
+
+			// ----- JSX: component defined before use -----
+			{Code: `const App = () => <div/>; <App />;`, Tsx: true},
+			{Code: `let Foo: any, Bar: any; <Foo><Bar /></Foo>;`, Tsx: true},
+			{Code: `function App() { return <div/> } <App />;`, Tsx: true},
+			// Function component used before define — valid with functions:false
+			{
+				Code:    `<App />; function App() { return <div/> }`,
+				Tsx:     true,
+				Options: map[string]interface{}{"functions": false},
+			},
+
 			// ----- Global augmentation -----
 			{Code: `
 (globalThis as any).foo = true;
@@ -159,6 +207,40 @@ declare global {
 				Code: `class C extends D {} class D {}`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noUseBeforeDefine", Line: 1, Column: 17},
+				},
+			},
+
+			// ----- Class extends is a VALUE reference — ignoreTypeReferences must not suppress it -----
+			{
+				Code:    `class C extends D {} class D {}`,
+				Options: map[string]interface{}{"ignoreTypeReferences": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 17},
+				},
+			},
+
+			// ----- Heritage in type-only position with ignoreTypeReferences:false must report -----
+			{
+				Code:    `interface A extends B {} interface B {}`,
+				Options: map[string]interface{}{"ignoreTypeReferences": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code:    `class A implements B { x: number = 1 } interface B { x: number }`,
+				Options: map[string]interface{}{"ignoreTypeReferences": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 20},
+				},
+			},
+			// Qualified-name heritage: both `ns` and `B` resolve to later declarations.
+			{
+				Code:    `interface A extends ns.B {} namespace ns { export interface B {} }`,
+				Options: map[string]interface{}{"ignoreTypeReferences": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 21},
+					{MessageId: "noUseBeforeDefine", Line: 1, Column: 24},
 				},
 			},
 
@@ -226,7 +308,48 @@ declare global {
 				},
 			},
 
-			// ----- export const / export function still reports with allowNamedExports -----
+			// ----- JSX: component used before define -----
+			{
+				Code: `<App />; const App = () => <div />;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+			{
+				Code: `function render() { return <Widget /> } const Widget = () => <span />;`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+			{
+				Code: `<Foo.Bar />; const Foo = { Bar: () => <div/> };`,
+				Tsx:  true,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+
+			// ----- export default still reports with allowNamedExports -----
+			{
+				Code:    `export default a; const a = 1;`,
+				Options: map[string]interface{}{"allowNamedExports": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+
+			// ----- same-scope TDZ: classes:false + functions:false still catches class declaration -----
+			{
+				Code:    `new A(); class A {}`,
+				Options: map[string]interface{}{"functions": false, "classes": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+
+			// ----- export const / export function / export class body still reports with allowNamedExports -----
 			{
 				Code:    `export const foo = a; const a = 1;`,
 				Options: map[string]interface{}{"allowNamedExports": true},
@@ -236,6 +359,13 @@ declare global {
 			},
 			{
 				Code:    `export function foo() { return a; } const a = 1;`,
+				Options: map[string]interface{}{"allowNamedExports": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noUseBeforeDefine"},
+				},
+			},
+			{
+				Code:    `export class C { foo() { return a; } } const a = 1;`,
 				Options: map[string]interface{}{"allowNamedExports": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noUseBeforeDefine"},

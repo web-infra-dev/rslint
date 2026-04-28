@@ -1,4 +1,4 @@
-# jest/prefer-strict-equal
+# prefer-strict-equal
 
 ## Rule Details
 

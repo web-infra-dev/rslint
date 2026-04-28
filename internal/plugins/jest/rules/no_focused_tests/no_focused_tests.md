@@ -1,4 +1,4 @@
-# jest/no-focused-tests
+# no-focused-tests
 
 ## Rule Details
 

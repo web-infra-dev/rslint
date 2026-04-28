@@ -45,6 +45,22 @@ func isNodeInsideReturnType(node *ast.Node) bool {
 	return ast.IsFunctionLike(node.Parent)
 }
 
+// Mirrors typescript-eslint `describeLiteralType`: error type with alias drives `errorTypeOverrides`; otherwise treat as plain `any`.
+func errorTypeAliasName(typePart typeFlagsWithNodeOrType) (string, bool) {
+	if typePart.t == nil || !utils.IsIntrinsicErrorType(typePart.t) {
+		return "", false
+	}
+	alias := checker.Type_alias(typePart.t)
+	if alias == nil {
+		return "", false
+	}
+	sym := alias.Symbol()
+	if sym == nil {
+		return "", false
+	}
+	return sym.Name, true
+}
+
 type typeFlagsWithNodeOrType struct {
 	flags checker.TypeFlags
 	// either node or t must be non-nil
@@ -77,15 +93,17 @@ func (t *typeFlagsWithNodeOrType) ToString(typeChecker *checker.Checker) string 
 			switch literal.Kind {
 			case ast.KindTemplateLiteralType, ast.KindNoSubstitutionTemplateLiteral:
 				return "template literal type"
-			case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral:
+			case ast.KindStringLiteral:
+				return fmt.Sprintf("%q", literal.Text())
+			case ast.KindNumericLiteral, ast.KindBigIntLiteral:
 				return literal.Text()
+			case ast.KindTrueKeyword:
+				return "true"
+			case ast.KindFalseKeyword:
+				return "false"
 			}
 		}
 		return "literal type"
-	}
-
-	if utils.IsTypeFlagSet(t.t, checker.TypeFlagsStringLiteral) {
-		return fmt.Sprintf("%q", typeChecker.TypeToString(t.t))
 	}
 
 	return typeChecker.TypeToString(t.t)
@@ -176,11 +194,10 @@ var NoRedundantTypeConstituentsRule = rule.CreateRule(rule.Rule{
 
 			switch typePart.flags {
 			case checker.TypeFlagsAny:
-				typeName := typePart.ToString(ctx.TypeChecker)
-				if typeName == "any" {
-					message = buildOverridesMessage(typeName, "intersection")
+				if aliasName, ok := errorTypeAliasName(typePart); ok {
+					message = buildErrorTypeOverridesMessage(aliasName, "intersection")
 				} else {
-					message = buildErrorTypeOverridesMessage(typeName, "intersection")
+					message = buildOverridesMessage("any", "intersection")
 				}
 			case checker.TypeFlagsNever:
 				message = buildOverridesMessage(typePart.ToString(ctx.TypeChecker), "intersection")
@@ -332,11 +349,10 @@ var NoRedundantTypeConstituentsRule = rule.CreateRule(rule.Rule{
 
 					switch typePart.flags {
 					case checker.TypeFlagsAny:
-						typeName := typePart.ToString(ctx.TypeChecker)
-						if typeName == "any" {
-							message = buildOverridesMessage(typeName, "union")
+						if aliasName, ok := errorTypeAliasName(typePart); ok {
+							message = buildErrorTypeOverridesMessage(aliasName, "union")
 						} else {
-							message = buildErrorTypeOverridesMessage(typeName, "union")
+							message = buildOverridesMessage("any", "union")
 						}
 					case checker.TypeFlagsUnknown:
 						message = buildOverridesMessage(typePart.ToString(ctx.TypeChecker), "union")

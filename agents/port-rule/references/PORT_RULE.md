@@ -335,7 +335,7 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests) and direct object format (`map[string]interface{}` from Go tests):
+ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
 
 ```go
 func parseOptions(options any) Options {
@@ -345,6 +345,20 @@ func parseOptions(options any) Options {
         // Parse options from optsMap...
     }
     return opts
+}
+```
+
+**Why this matters — the shape the CLI sends is different from Go tests.** `internal/config/config.go:414-420` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+
+**Anti-pattern — do not write this:**
+
+```go
+// ❌ WRONG — only matches when len(remaining) > 1 in config.go;
+//    misses every single-option config and every CLI invocation.
+if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
+    if optsJSON, err := json.Marshal(arr[0]); err == nil {
+        _ = json.Unmarshal(optsJSON, &opts)
+    }
 }
 ```
 
@@ -437,6 +451,10 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 - Invalid cases **MUST** include `Line` and `Column` assertions
 - Use `map[string]interface{}` to pass options in Go tests
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`
+
+**Options coverage — MUST exercise the JSON path.** Passing a typed struct directly (e.g. `Options: MyRuleOptions{CheckX: utils.Ref(true)}`) short-circuits the `options.(MyRuleOptions)` type assertion and never exercises `utils.GetOptionsMap` or JSON round-trip. CLI and JS configs always take the JSON path, so a struct-only suite leaves the CLI-facing wiring untested.
+
+For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is `map[string]interface{}{...}` (bare object — matches the single-option CLI shape) or `[]interface{}{map[string]interface{}{...}}` (array-wrapped — matches the multi-element / rule_tester shape). This catches bugs like missing `GetOptionsMap` integration, wrong JSON tag casing, and option-name typos that typed structs silently hide. See `no_floating_promises_test.go → TestNoFloatingPromisesOptionParsing` for a reference suite covering both shapes, nil options, empty arrays, malformed values, and nested specifier arrays.
 
 **Debug Flags**:
 

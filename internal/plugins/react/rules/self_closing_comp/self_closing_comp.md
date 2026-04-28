@@ -1,4 +1,4 @@
-# react/self-closing-comp
+# self-closing-comp
 
 ## Rule Details
 

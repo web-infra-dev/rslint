@@ -13,6 +13,9 @@
     },
     {
       "path": "./packages/vscode-extension"
+    },
+    {
+      "path": "./tests/bench-cli"
     }
   ]
 }

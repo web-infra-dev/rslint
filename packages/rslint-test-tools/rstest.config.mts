@@ -56,6 +56,7 @@ export default defineConfig({
     './tests/eslint/rules/no-global-assign.test.ts',
     './tests/eslint/rules/no-import-assign.test.ts',
     './tests/eslint/rules/no-inner-declarations.test.ts',
+    './tests/eslint/rules/no-irregular-whitespace.test.ts',
     './tests/eslint/rules/no-new.test.ts',
     './tests/eslint/rules/no-new-func.test.ts',
     './tests/eslint/rules/no-new-object.test.ts',
@@ -94,11 +95,14 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-no-bind.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-comment-textnodes.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-duplicate-props.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-leaked-render.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-no-script-url.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-target-blank.test.ts',
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-curly-brace-presence.test.ts',
     './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
     './tests/eslint-plugin-react/rules/no-access-state-in-setstate.test.ts',
     './tests/eslint-plugin-react/rules/no-children-prop.test.ts',
@@ -113,12 +117,20 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-render-return-value.test.ts',
     './tests/eslint-plugin-react/rules/no-string-refs.test.ts',
     './tests/eslint-plugin-react/rules/no-this-in-sfc.test.ts',
+    './tests/eslint-plugin-react/rules/no-unstable-nested-components.test.ts',
     './tests/eslint-plugin-react/rules/no-typos.test.ts',
     './tests/eslint-plugin-react/rules/no-unescaped-entities.test.ts',
+    './tests/eslint-plugin-react/rules/no-unused-class-component-methods.test.ts',
+    './tests/eslint-plugin-react/rules/no-unused-state.test.ts',
     './tests/eslint-plugin-react/rules/no-unknown-property.test.ts',
     './tests/eslint-plugin-react/rules/no-will-update-set-state.test.ts',
     './tests/eslint-plugin-react/rules/prefer-es6-class.test.ts',
+    './tests/eslint-plugin-react/rules/prefer-stateless-function.test.ts',
     './tests/eslint-plugin-react/rules/require-render-return.test.ts',
+
+    // eslint-plugin-react-hooks
+    './tests/eslint-plugin-react-hooks/rules/rules-of-hooks.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/exhaustive-deps.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
@@ -192,7 +204,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
     // './tests/typescript-eslint/rules/no-loop-func.test.ts',
     // './tests/typescript-eslint/rules/no-loss-of-precision.test.ts',
-    // './tests/typescript-eslint/rules/no-magic-numbers.test.ts',
+    './tests/typescript-eslint/rules/no-magic-numbers.test.ts',
     // './tests/typescript-eslint/rules/no-meaningless-void-operator.test.ts',
     './tests/typescript-eslint/rules/no-misused-new.test.ts',
     './tests/typescript-eslint/rules/no-misused-promises.test.ts',
@@ -250,10 +262,10 @@ export default defineConfig({
     './tests/typescript-eslint/rules/only-throw-error.test.ts',
     './tests/typescript-eslint/rules/parameter-properties.test.ts',
     './tests/typescript-eslint/rules/prefer-as-const.test.ts',
-    // './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
+    './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
     // './tests/typescript-eslint/rules/prefer-enum-initializers.test.ts',
     // './tests/typescript-eslint/rules/prefer-find.test.ts',
-    // './tests/typescript-eslint/rules/prefer-for-of.test.ts',
+    './tests/typescript-eslint/rules/prefer-for-of.test.ts',
     // './tests/typescript-eslint/rules/prefer-function-type.test.ts',
     './tests/typescript-eslint/rules/prefer-includes.test.ts',
     './tests/typescript-eslint/rules/prefer-literal-enum-member.test.ts',
@@ -350,6 +362,10 @@ export default defineConfig({
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
+
+    // eslint-plugin-unicorn
+    './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
 
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
   ],

@@ -494,12 +494,63 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 
 ### Concurrency Model
 
-Current concurrency is driven by ts-go `core.NewWorkGroup()`:
+The Go side has four parallelism points; each one honors `--singleThreaded`,
+which is the user-facing escape hatch for serial / reproducible execution.
 
-- `RunLinter()` queues work per Program
-- `--singleThreaded` disables work-group parallelism
-- file ownership filtering avoids duplicate work in multi-config mode
-- LSP uses a different orchestration model and keeps session access on its main dispatch loop
+1. **Linter work group** (`RunLinter()` via `core.NewWorkGroup`)
+   - Schedules per-Program lint work; runs rules in parallel within a Program.
+   - `--singleThreaded` collapses the work group to serial execution.
+
+2. **gitignore reading ‖ Program creation** (in `cmd/rslint/cmd.go`)
+   - `ReadGitignoreAsGlobs` walks `.gitignore` for each config; it is independent
+     of `createProgramsForConfig` (which only reads
+     `languageOptions.parserOptions.project`, never `Ignores`). The two are
+     dispatched as parallel goroutines per config.
+   - In multi-config mode, gitignore reads also fan out across configs in
+     parallel; `createProgramsForConfig` invocations run serially across configs
+     (typescript-go's API is invoked one config at a time).
+   - `--singleThreaded` runs both stages sequentially — no goroutines spawned.
+
+3. **Gap-file directory walker** (`internal/config/file_discovery.go`)
+   - `DiscoverGapFiles` uses a fixed-size worker pool (`walkPool`) that walks
+     the directory tree. Live goroutine count is capped at `workers`, not the
+     number of directories.
+   - Default `workers = max(2, GOMAXPROCS)`; `--singleThreaded` forces
+     `workers = 1`, which degenerates into a fully serial DFS-style traversal.
+   - The walker is built on a `vfsAdapter` with `followSymlinks = false`:
+     symlinked subdirectories are skipped. This matches ESLint v10's
+     flat-config file walker, which uses `@humanfs/node` and recurses only
+     when `Dirent.isDirectory()` is true (Node's `readdir({withFileTypes:
+true})` reports the dirent type without following symlinks, so
+     `Dirent.isDirectory()` is false for symlinks). The skip also eliminates
+     scheduling-dependent non-determinism that a parallel walker would
+     otherwise introduce.
+
+4. **Multi-config gap discovery** (`DiscoverGapFilesMultiConfig`)
+   - Iterates `configMap` serially, calling `DiscoverGapFiles` once per config.
+   - Each call is itself bounded by its own worker pool, so total live
+     goroutines remain bounded by `workers`, not `len(configMap) × workers`.
+
+Other invariants:
+
+- File-ownership filtering avoids duplicate work in multi-config mode.
+- LSP uses a different orchestration model and keeps session access on its
+  main dispatch loop.
+
+#### `--singleThreaded` semantics
+
+`--singleThreaded` is honored in every parallelism point above:
+
+| Point                          | Effect when set                                               |
+| ------------------------------ | ------------------------------------------------------------- |
+| Linter work group              | Collapsed to serial via `core.NewWorkGroup(true)`.            |
+| gitignore ‖ Program creation   | Both stages run sequentially in the main goroutine.           |
+| Multi-config gitignore fan-out | Replaced by a sequential for-loop.                            |
+| Gap-file walker workers        | Forced to 1 (single goroutine, no concurrency).               |
+| Multi-config gap discovery     | Already serial across configs; inner walker also forced to 1. |
+
+End result: with `--singleThreaded`, the Go side spawns no goroutines beyond
+those typescript-go itself creates for syntactic / semantic work.
 
 ## 10. Performance & Memory Considerations
 

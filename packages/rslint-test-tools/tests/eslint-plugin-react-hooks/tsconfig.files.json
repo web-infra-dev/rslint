@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "target": "esnext",
+    "module": "commonjs",
+    "strict": false,
+    "esModuleInterop": true,
+    "lib": ["es2015", "es2017", "esnext"],
+    "allowJs": true
+  },
+  "include": ["files/**/*"]
+}
