@@ -1,0 +1,1132 @@
+// Rstest Snapshot v1
+
+exports[`prefer-destructuring > invalid 1`] = `
+{
+  "code": "var foo: string = object.foo;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 2`] = `
+{
+  "code": "var foo: string = array[0];",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 3`] = `
+{
+  "code": "var foo: unknown = object.bar;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 4`] = `
+{
+  "code": "
+        let x: { [Symbol.iterator]: unknown };
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 5`] = `
+{
+  "code": "
+        let x: { [Symbol.iterator]: unknown };
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 6`] = `
+{
+  "code": "
+        let x: [1, 2, 3];
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 7`] = `
+{
+  "code": "
+        let x: [1, 2, 3];
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 8`] = `
+{
+  "code": "
+        function* it() {
+          yield 1;
+        }
+        let y = it()[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 9`] = `
+{
+  "code": "
+        function* it() {
+          yield 1;
+        }
+        y = it()[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 10`] = `
+{
+  "code": "
+        let x: any;
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 11`] = `
+{
+  "code": "
+        let x: any;
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 12`] = `
+{
+  "code": "
+        let x: string[] | { [Symbol.iterator]: unknown };
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 13`] = `
+{
+  "code": "
+        let x: string[] | { [Symbol.iterator]: unknown };
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 14`] = `
+{
+  "code": "
+        let x: object & unknown[];
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 15`] = `
+{
+  "code": "
+        let x: object & unknown[];
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use array destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 16`] = `
+{
+  "code": "
+        let x: { 0: string };
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 17`] = `
+{
+  "code": "
+        let x: { 0: string };
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 18`] = `
+{
+  "code": "
+        let x: { 0: string };
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 19`] = `
+{
+  "code": "
+        let x: { 0: string };
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 20`] = `
+{
+  "code": "
+        let x: Record<number, unknown>;
+        let i: number = 0;
+        y = x[i];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 21`] = `
+{
+  "code": "
+        let x: Record<number, unknown>;
+        let i: 0 = 0;
+        y = x[i];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 22`] = `
+{
+  "code": "
+        let x: Record<number, unknown>;
+        let i: 0 | 1 | 2 = 0;
+        y = x[i];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 23`] = `
+{
+  "code": "
+        let x: unknown[];
+        let i: number = 0;
+        y = x[i];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 24`] = `
+{
+  "code": "
+        let x: unknown[];
+        let i: 0 = 0;
+        y = x[i];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 25`] = `
+{
+  "code": "
+        let x: unknown[];
+        let i: 0 | 1 | 2 = 0;
+        y = x[i];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 26`] = `
+{
+  "code": "
+        let x: { 0: unknown } | unknown[];
+        let y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 27`] = `
+{
+  "code": "
+        let x: { 0: unknown } | unknown[];
+        y = x[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 28`] = `
+{
+  "code": "
+        let obj = { foo: 'bar' };
+        const foo = obj.foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        let obj = { foo: 'bar' };
+        const {foo} = obj;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 29`] = `
+{
+  "code": "
+        let obj = { foo: 'bar' };
+        var x: null = null;
+        const foo = (x, obj).foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        let obj = { foo: 'bar' };
+        var x: null = null;
+        const {foo} = (x, obj);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 30`] = `
+{
+  "code": "const call = (() => null).call;",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const {call} = () => null;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 31`] = `
+{
+  "code": "
+        const obj = { foo: 'bar' };
+        let a: any;
+        var foo = (a = obj).foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const obj = { foo: 'bar' };
+        let a: any;
+        var {foo} = a = obj;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 32`] = `
+{
+  "code": "
+        const obj = { asdf: { qwer: null } };
+        const qwer = obj.asdf.qwer;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const obj = { asdf: { qwer: null } };
+        const {qwer} = obj.asdf;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 33`] = `
+{
+  "code": "
+        const obj = { foo: 100 };
+        const /* comment */ foo = obj.foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const obj = { foo: 100 };
+        const /* comment */ {foo} = obj;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 34`] = `
+{
+  "code": "
+        let obj = { foo: 'bar' };
+        const x = obj.foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 35`] = `
+{
+  "code": "
+        let obj = { foo: 'bar' };
+        let x: unknown;
+        x = obj.foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 36`] = `
+{
+  "code": "
+        let obj: Record<string, unknown>;
+        let key = 'abc';
+        const x = obj[key];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-destructuring > invalid 37`] = `
+{
+  "code": "
+        let obj: Record<string, unknown>;
+        let key = 'abc';
+        let x: unknown;
+        x = obj[key];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use object destructuring.",
+      "messageId": "preferDestructuring",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-destructuring",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;

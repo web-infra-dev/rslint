@@ -206,6 +206,110 @@ function f<T extends Foo>(x: T) {
         },
       },
     },
+
+    // --- Non-identifier string keys (ESLint's ASCII-only regex filters out) ---
+    "a['with-dash'];",
+    "a['has space'];",
+    "a[''];",
+    "a['12valid'];",
+    "a['\\n'];",
+    "a['it\\'s'];",
+    { code: "a['$ok'];", options: [{ allowPattern: '^\\$' }] },
+
+    // --- Non-ASCII identifier-looking strings are not valid identifiers ---
+    "a['ñ'];",
+    "a['中文'];",
+    "a['café'];",
+
+    // --- Numeric / bigint literal keys are not string-literal-like ---
+    'a[0x1];',
+    'a[42];',
+    'a[42n];',
+
+    // --- allowPattern may cover null/true/false literal keys ---
+    {
+      code: "a['null'];",
+      options: [{ allowPattern: '^(null|true|false)$' }],
+    },
+    {
+      code: 'a[null];',
+      options: [{ allowPattern: '^null$' }],
+    },
+
+    // --- Private-identifier (#name) class field access is not a regular Identifier ---
+    `
+class X {
+  #priv = 1;
+  foo() { return this.#priv; }
+}
+    `,
+    {
+      code: `
+class X {
+  #priv = 1;
+  foo() { return this.#priv; }
+}
+      `,
+      options: [{ allowKeywords: false }],
+    },
+
+    // --- readonly / nullable-valued index signatures still count as string-like ---
+    {
+      code: `
+type RO = { readonly [k: string]: number };
+declare const m: RO;
+m['foo'];
+      `,
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+    },
+    {
+      code: `
+type M = { [k: string]: number | undefined };
+declare const m: M;
+m['foo'];
+      `,
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+    },
+
+    // --- Generic constraint carries the index signature ---
+    {
+      code: `
+function f<T extends { a: number; [k: string]: number }>(x: T) {
+  x['b'];
+}
+      `,
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+    },
+
+    // --- `this` access on a class with an index signature ---
+    {
+      code: `
+class X {
+  [k: string]: number;
+  foo() { return this['bar']; }
+}
+      `,
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+    },
+
+    // --- Decorator argument listener fires normally; allowPattern filters it ---
+    {
+      code: `
+declare function d(v: unknown): ClassDecorator;
+@d((undefined as any)['_ok_'])
+class C {}
+      `,
+      options: [{ allowPattern: '^_' }],
+    },
+
+    // --- `as Record<string, T>` cast exposes the index signature ---
+    {
+      code: `
+declare const x: unknown;
+(x as Record<string, number>)['foo'];
+      `,
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+    },
   ],
   invalid: [
     {
@@ -481,6 +585,162 @@ type Foo = {
 
 function f<T extends Foo>(x: T) {
   x.extraKey;
+}
+      `,
+    },
+    // Number-only index signature is NOT string-like — must still report.
+    {
+      code: `
+type NumMap = { [k: number]: number };
+declare const m: NumMap;
+m['foo'];
+      `,
+      errors: [{ messageId: 'useDot' }],
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+      output: `
+type NumMap = { [k: number]: number };
+declare const m: NumMap;
+m.foo;
+      `,
+    },
+    // Concrete named property still reported even if an index signature exists.
+    {
+      code: `
+interface WithIdx { bar: number; [k: string]: number }
+declare const m: WithIdx;
+m['bar'];
+      `,
+      errors: [{ messageId: 'useDot' }],
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+      output: `
+interface WithIdx { bar: number; [k: string]: number }
+declare const m: WithIdx;
+m.bar;
+      `,
+    },
+
+    // --- Unicode escape in string literal — `.Text` returns the unescaped
+    // value, which happens to be a plain identifier; autofix produces `.b`. ---
+    {
+      code: "a['\\u0062'];",
+      errors: [{ messageId: 'useDot' }],
+      output: 'a.b;',
+    },
+
+    // --- allowKeywords:false + dot access to null/true/false keyword literal ---
+    {
+      code: 'a.null;',
+      errors: [{ data: { key: 'null' }, messageId: 'useBrackets' }],
+      options: [{ allowKeywords: false }],
+      output: 'a["null"];',
+    },
+    {
+      code: 'a.true;',
+      errors: [{ data: { key: 'true' }, messageId: 'useBrackets' }],
+      options: [{ allowKeywords: false }],
+      output: 'a["true"];',
+    },
+    {
+      code: 'a.false;',
+      errors: [{ data: { key: 'false' }, messageId: 'useBrackets' }],
+      options: [{ allowKeywords: false }],
+      output: 'a["false"];',
+    },
+
+    // --- Assignment targets: simple / compound / update expressions ---
+    {
+      code: "a['foo'] = 1;",
+      errors: [{ data: { key: '"foo"' }, messageId: 'useDot' }],
+      output: 'a.foo = 1;',
+    },
+    {
+      code: "a['foo'] += 1;",
+      errors: [{ data: { key: '"foo"' }, messageId: 'useDot' }],
+      output: 'a.foo += 1;',
+    },
+    {
+      code: "a['foo']++;",
+      errors: [{ data: { key: '"foo"' }, messageId: 'useDot' }],
+      output: 'a.foo++;',
+    },
+
+    // --- `any`-typed bracket access still reported even with allowIndexSig ---
+    {
+      code: `
+declare const x: any;
+x['foo'];
+      `,
+      errors: [{ messageId: 'useDot' }],
+      options: [{ allowIndexSignaturePropertyAccess: true }],
+      output: `
+declare const x: any;
+x.foo;
+      `,
+    },
+
+    // --- `this['member']` on concrete class member ---
+    {
+      code: `
+class X {
+  a = 1;
+  foo() { return this['a']; }
+}
+      `,
+      errors: [{ messageId: 'useDot' }],
+      output: `
+class X {
+  a = 1;
+  foo() { return this.a; }
+}
+      `,
+    },
+
+    // --- `super['member']` access ---
+    {
+      code: `
+class B { foo = 1; }
+class X extends B {
+  bar() { return super['foo']; }
+}
+      `,
+      errors: [{ messageId: 'useDot' }],
+      output: `
+class B { foo = 1; }
+class X extends B {
+  bar() { return super.foo; }
+}
+      `,
+    },
+
+    // --- JSX expression container — listener fires inside JSX ---
+    {
+      code: `
+declare const p: { foo: string };
+const el = <div>{p['foo']}</div>;
+      `,
+      errors: [{ messageId: 'useDot' }],
+      languageOptions: {
+        parserOptions: { ecmaFeatures: { jsx: true } },
+      },
+      output: `
+declare const p: { foo: string };
+const el = <div>{p.foo}</div>;
+      `,
+    },
+
+    // --- Namespace / module declaration nesting ---
+    {
+      code: `
+namespace N {
+  declare const m: { foo: number };
+  m['foo'];
+}
+      `,
+      errors: [{ messageId: 'useDot' }],
+      output: `
+namespace N {
+  declare const m: { foo: number };
+  m.foo;
 }
       `,
     },

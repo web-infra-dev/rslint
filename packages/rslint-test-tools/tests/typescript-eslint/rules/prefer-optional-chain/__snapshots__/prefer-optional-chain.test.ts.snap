@@ -13747,7 +13747,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 44`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 22,
           "line": 1,
         },
       },
@@ -13774,7 +13774,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 45`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 45,
           "line": 1,
         },
       },
@@ -13816,7 +13816,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 46`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 37,
           "line": 1,
         },
       },
@@ -13858,7 +13858,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 47`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 17,
           "line": 1,
         },
       },
@@ -15017,7 +15017,7 @@ exports[`hand-crafted cases > prefer-optional-chain > invalid 83`] = `
           "line": 2,
         },
         "start": {
-          "column": 11,
+          "column": 48,
           "line": 2,
         },
       },

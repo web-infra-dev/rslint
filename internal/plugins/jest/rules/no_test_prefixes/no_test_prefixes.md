@@ -1,4 +1,4 @@
-# jest/no-test-prefixes
+# no-test-prefixes
 
 ## Rule Details
 

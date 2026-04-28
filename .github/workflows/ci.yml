@@ -319,6 +319,21 @@ jobs:
 
       - name: Run tests
         run: cargo test --verbose
+
+  benchmark-go:
+    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/benchmark-go.yml
+
+  benchmark-cli:
+    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/benchmark-cli.yml
+
   done:
     needs:
       - test-go

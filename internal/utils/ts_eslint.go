@@ -345,13 +345,23 @@ func IsRestParameterDeclaration(decl *ast.Declaration) bool {
 	return ast.IsParameter(decl) && decl.AsParameterDeclaration().DotDotDotToken != nil
 }
 
-/**
- * Gets the declaration for the given variable
- */
+// GetDeclaration returns the first declaration of the symbol at `node`.
+//
+// Returns nil when `typeChecker` or `node` is nil. Rules with optional
+// type info (those that do not set `RequiresTypeInfo: true`) are scheduled
+// with a nil TypeChecker on "gap files" — files in the program but not in
+// `typeInfoFiles` (see internal/linter/linter.go). Rather than requiring
+// every caller to nil-guard manually, this helper degrades gracefully:
+// no checker → no declaration → caller falls back to structural checks.
+// The `node == nil` guard mirrors the same convention already used by
+// `GetReferenceSymbol` in shadowing.go.
 func GetDeclaration(
 	typeChecker *checker.Checker,
 	node *ast.Node,
 ) *ast.Declaration {
+	if typeChecker == nil || node == nil {
+		return nil
+	}
 	symbol := typeChecker.GetSymbolAtLocation(node)
 	if symbol == nil {
 		return nil
@@ -680,6 +690,96 @@ func IsHigherPrecedenceThanAwait(node *ast.Node) bool {
 	nodePrecedence := ast.GetExpressionPrecedence(node)
 	awaitPrecedence := ast.GetOperatorPrecedence(ast.KindAwaitExpression, ast.KindUnknown, ast.OperatorPrecedenceFlagsNone)
 	return nodePrecedence > awaitPrecedence
+}
+
+// EslintLikePrecedence returns a numeric precedence matching ESLint's
+// astUtils.getPrecedence so behavior parity holds for tsgo nodes that ESLint
+// classifies (e.g. ArrowFunction = 1, ConditionalExpression = 3). Returns -1
+// for TypeScript-only kinds (AsExpression, etc.) so the caller wraps them in
+// parentheses defensively, matching ESLint's behavior on unknown node types.
+func EslintLikePrecedence(node *ast.Node) int {
+	if node == nil {
+		return -1
+	}
+	switch node.Kind {
+	case ast.KindArrowFunction:
+		return 1
+	case ast.KindYieldExpression:
+		return 1
+	case ast.KindConditionalExpression:
+		return 3
+	case ast.KindBinaryExpression:
+		bin := node.AsBinaryExpression()
+		if bin.OperatorToken == nil {
+			return -1
+		}
+		op := bin.OperatorToken.Kind
+		if op == ast.KindCommaToken {
+			return 0
+		}
+		if ast.IsAssignmentOperator(op) {
+			return 1
+		}
+		switch op {
+		case ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+			return 4
+		case ast.KindAmpersandAmpersandToken:
+			return 5
+		case ast.KindBarToken:
+			return 6
+		case ast.KindCaretToken:
+			return 7
+		case ast.KindAmpersandToken:
+			return 8
+		case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken,
+			ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
+			return 9
+		case ast.KindLessThanToken, ast.KindLessThanEqualsToken,
+			ast.KindGreaterThanToken, ast.KindGreaterThanEqualsToken,
+			ast.KindInKeyword, ast.KindInstanceOfKeyword:
+			return 10
+		case ast.KindLessThanLessThanToken, ast.KindGreaterThanGreaterThanToken,
+			ast.KindGreaterThanGreaterThanGreaterThanToken:
+			return 11
+		case ast.KindPlusToken, ast.KindMinusToken:
+			return 12
+		case ast.KindAsteriskToken, ast.KindSlashToken, ast.KindPercentToken:
+			return 13
+		case ast.KindAsteriskAsteriskToken:
+			return 15
+		}
+		return 20
+	case ast.KindPrefixUnaryExpression:
+		op := node.AsPrefixUnaryExpression().Operator
+		if op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken {
+			return 17
+		}
+		return 16
+	case ast.KindPostfixUnaryExpression:
+		return 17
+	case ast.KindAwaitExpression, ast.KindDeleteExpression,
+		ast.KindVoidExpression, ast.KindTypeOfExpression:
+		return 16
+	case ast.KindCallExpression:
+		return 18
+	case ast.KindNewExpression:
+		return 19
+	case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword,
+		ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword,
+		ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTemplateExpression, ast.KindArrayLiteralExpression,
+		ast.KindObjectLiteralExpression, ast.KindFunctionExpression,
+		ast.KindClassExpression, ast.KindParenthesizedExpression,
+		ast.KindPropertyAccessExpression, ast.KindElementAccessExpression,
+		ast.KindTaggedTemplateExpression, ast.KindSpreadElement,
+		ast.KindMetaProperty:
+		return 20
+	}
+	// TypeScript-specific (AsExpression, SatisfiesExpression,
+	// TypeAssertionExpression, ...) and any other kind ESLint does not
+	// classify: return -1 to force wrapping for safety.
+	return -1
 }
 
 func IsStrongPrecedenceNode(innerNode *ast.Node) bool {
@@ -1140,6 +1240,8 @@ func IsDeclarationIdentifier(node *ast.Node) bool {
 		return parent.AsImportEqualsDeclaration().Name() == node
 	case ast.KindEnumMember:
 		return parent.AsEnumMember().Name() == node
+	case ast.KindTypeParameter:
+		return parent.AsTypeParameter().Name() == node
 	}
 	return false
 }
@@ -1178,6 +1280,8 @@ func GetDeclarationIdentifier(decl *ast.Node) *ast.Node {
 		return decl.AsParameterDeclaration().Name()
 	case ast.KindBindingElement:
 		return decl.AsBindingElement().Name()
+	case ast.KindTypeParameter:
+		return decl.AsTypeParameter().Name()
 	}
 	return nil
 }

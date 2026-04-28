@@ -771,3 +771,713 @@ func TestNoUnnecessaryCondition(t *testing.T) {
 		},
 	})
 }
+
+// Alignment tests for patterns whose behavior changed between
+// typescript-eslint v6 and v8 (latest). Verified by running the latest
+// typescript-eslint release on the same snippets — the stricter behavior
+// below matches v8.
+
+// Pattern A: closure-captured `let` variable whose narrowing is preserved into
+// the closure by TypeScript's CFA. `(x || [])` LHS is always truthy when x was
+// narrowed to a non-nullable value before the closure was created.
+func TestAlign_PatternA_ClosureNarrowedLet(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare const map: Map<string, Set<number>>;
+declare function callback(opts: { onEvent: () => void }): void;
+
+function run(id: string) {
+  let taskSessionList = map.get(id);
+  if (!taskSessionList) {
+    taskSessionList = new Set<number>();
+    map.set(id, taskSessionList);
+  }
+  callback({
+    onEvent: () => {
+      const sessionInfo = [...(taskSessionList || [])].find((s) => s === 1);
+      return sessionInfo;
+    },
+  });
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysTruthy"},
+				},
+			},
+		},
+	)
+}
+
+// Pattern B: `?.` on index access.
+//   - When the value type is genuinely nullable (`T[] | undefined`), the chain
+//     is necessary — no report.
+//   - When a preceding `if (!map[k]) map[k] = []` guard persists narrowing,
+//     the value is non-nullable at the call site — report (matches latest).
+func TestAlign_PatternB_IndexAccessOptionalChain(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const scmProjectMap: Record<string, string[] | undefined>;
+scmProjectMap['x']?.push('entry');
+`},
+		},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+const scmProjectMap: Record<string, string[] | undefined> = {};
+function run(scmName: string, entry: string) {
+  if (!scmProjectMap[scmName]) {
+    scmProjectMap[scmName] = [];
+  }
+  scmProjectMap[scmName]?.push(entry);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "neverOptionalChain",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveOptionalChain",
+								Output: `
+const scmProjectMap: Record<string, string[] | undefined> = {};
+function run(scmName: string, entry: string) {
+  if (!scmProjectMap[scmName]) {
+    scmProjectMap[scmName] = [];
+  }
+  scmProjectMap[scmName].push(entry);
+}
+`,
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+}
+
+// Pattern C: optional property whose nullability comes from the object itself,
+// not from an intrinsic property type. `items` on `RegionConfig` is
+// optional — chain is necessary.
+func TestAlign_PatternC_OptionalPropChain(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+type Region = 'I18N' | 'US-TTP';
+interface RegionConfig {
+  items?: { id: string }[];
+}
+declare const privateContext: Record<Region, RegionConfig>;
+declare const regionSite: Region;
+function run() {
+  privateContext[regionSite].items?.push({ id: 'a' });
+}
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern E: nested optional chain where a middle `data?.` precedes a
+// non-optional property access. With `data: { x: T[] } | undefined`, the chain
+// is necessary — no report. v6.21.0 wrongly reported this; latest does not.
+// Source: gecko-channel.ts L131-132 — `pkgRes.data?.[0]?.response.data?.packageList[0]`.
+func TestAlign_PatternE_NestedOptionalChainOnNullableData(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+interface Pkg { id: string }
+interface Inner { data?: { packageList: Pkg[] } }
+interface Outer { response: Inner }
+declare const pkgRes: { data?: Outer[] };
+const offlineLastPkg = pkgRes.data?.[0]?.response.data?.packageList[0];
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern F: `obj && {...}` short-circuit where obj is optional. The
+// expression is necessary — no report. v6.21.0 wrongly reported "always truthy"
+// on `obj`; latest does not.
+// Source: ticketQuery.ts L48 — `ticketDetail.project && {...}`.
+func TestAlign_PatternF_OptionalObjectAndExpr(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+interface Project { id: string; monorepo?: number }
+interface TicketDetail { project?: Project }
+declare const ticketDetail: TicketDetail;
+const transformed = {
+  project: ticketDetail.project && {
+    id: ticketDetail.project.id,
+    monorepo: ticketDetail.project.monorepo?.toString(),
+  },
+};
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern G: ternary on closure-captured `let` whose value depends on prior
+// mutation across iterations. CFA cannot guarantee `hasFailed` stays false at
+// the use site, so the condition is necessary — no report.
+// Source: timer.ts L287 — `const finalStatus = hasFailed ? ... : ...`.
+func TestAlign_PatternG_LetMutatedTernary(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const items: { ok: boolean }[];
+function run() {
+  let hasFailed = false;
+  for (const it of items) {
+    if (!it.ok) hasFailed = true;
+  }
+  const finalStatus = hasFailed ? 'fail' : 'ok';
+  return finalStatus;
+}
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// --- gap-doc residual shapes (H-N) ---
+
+// Pattern H: destructure with `|| {}` default, then check for undefined.
+// `regionUnit` may itself be undefined; after `|| {}` destructure, the bound
+// names are *possibly* undefined when their props are optional, so `=== undefined`
+// is meaningful — not types-no-overlap.
+// Source: goofy-deploy/resources.ts L885-887.
+func TestAlign_PatternH_DestructureOrEmptyThenUndefinedCheck(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+interface RegionUnit {
+  isTikTokBiz?: boolean;
+  isForWeb?: boolean;
+  isInternalApp?: boolean;
+}
+declare const publicParams: { regionUnit?: RegionUnit };
+function run() {
+  const { isTikTokBiz, isForWeb, isInternalApp } = publicParams.regionUnit || {};
+  if (isInternalApp === undefined || isForWeb === undefined) {
+    return;
+  }
+  return [isTikTokBiz, isForWeb, isInternalApp];
+}
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern I: `.filter((c) => c.x?.some((s) => s.y === undefined))` where
+// `y` is genuinely possibly-undefined. types-no-overlap should NOT fire.
+// Source: project/accuracy/gecko.ts L139.
+func TestAlign_PatternI_OptionalSomeWithUndefinedCheck(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+interface Region { isInHouse?: boolean }
+interface Channel { regionList?: Region[] }
+declare const list: Channel[];
+const result = list.filter((c) => c.regionList?.some((s) => s.isInHouse === undefined));
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern J: `let hasFailed = false` mutated inside a closure passed to an
+// external async function. TypeScript CFA does NOT widen `hasFailed` back to
+// boolean — closure-mutated lets retain their initial-flow narrowing. Verified
+// against typescript-eslint v8 upstream (CLI run): always-truthy fires on the
+// `!hasFailed` reference. v6.21.0 missed it.
+// Source: project/infra-resource/gecko.ts L166-192, timer.ts L273-287.
+func TestAlign_PatternJ_ClosureMutatedLetStillNarrowed(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+declare function runner(onChange: (failed: boolean) => void): Promise<void>;
+async function run() {
+  let hasFailed = false;
+  await runner((failed) => {
+    hasFailed = failed;
+  });
+  if (!hasFailed) {
+    return 'ok';
+  }
+  return 'fail';
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysTruthy"},
+				},
+			},
+		},
+	)
+}
+
+// Pattern K: After `if (Mergeable || ...) return`, subsequent `!Mergeable` is
+// always-truthy because Mergeable was narrowed to false. v6.21.0 missed this;
+// latest reports.
+// Source: init-project/templateTestService.ts L870, L892.
+func TestAlign_PatternK_NarrowedBooleanAlwaysTruthy(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+type Reason = 'review_not_passed' | 'checks_failed' | 'conflict' | 'merge_queue_required';
+interface Mergeability { Mergeable: boolean; Reason: Reason }
+declare const mergeability: Mergeability;
+function run(): string {
+  if (mergeability.Mergeable || mergeability.Reason === 'merge_queue_required') {
+    return 'ready';
+  }
+  if (!mergeability.Mergeable && mergeability.Reason === 'review_not_passed') {
+    return 'skipped';
+  }
+  if (
+    !mergeability.Mergeable &&
+    (mergeability.Reason === 'checks_failed' || mergeability.Reason === 'conflict')
+  ) {
+    return 'failed';
+  }
+  return 'pending';
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysTruthy"},
+					{MessageId: "alwaysTruthy"},
+				},
+			},
+		},
+	)
+}
+
+// Pattern L: `userMap[k] = [...(userMap[k] || []), item]` where value is
+// `T[] | undefined` — `|| []` LHS is necessary.
+// Source: infra/issue/openApi.ts L122.
+func TestAlign_PatternL_RecordValueOrEmptyArray(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const userMap: Record<string, { id: string }[] | undefined>;
+declare const assignee: string;
+declare const item: { id: string };
+userMap[assignee] = [...(userMap[assignee] || []), item];
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern M: `if (!map[k]) map[k] = []` in if-branch only (no else), then
+// `map[k]?.push(...)`. After narrowing, `?.` is unnecessary.
+// Source: infra/codebase/repo-emo.ts L115-122.
+func TestAlign_PatternM_IndexNarrowedThenOptionalChain(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+const projectScmMap: Record<string, string[] | undefined> = {};
+const scmProjectMap: Record<string, string[] | undefined> = {};
+function run(scmName: string, entry: string) {
+  if (!projectScmMap[entry]) {
+    projectScmMap[entry] = [];
+  }
+  if (!scmProjectMap[scmName]) {
+    scmProjectMap[scmName] = [];
+  }
+  scmProjectMap[scmName]?.push(entry);
+  projectScmMap[entry]?.push(scmName);
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "neverOptionalChain",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveOptionalChain",
+								Output: `
+const projectScmMap: Record<string, string[] | undefined> = {};
+const scmProjectMap: Record<string, string[] | undefined> = {};
+function run(scmName: string, entry: string) {
+  if (!projectScmMap[entry]) {
+    projectScmMap[entry] = [];
+  }
+  if (!scmProjectMap[scmName]) {
+    scmProjectMap[scmName] = [];
+  }
+  scmProjectMap[scmName].push(entry);
+  projectScmMap[entry]?.push(scmName);
+}
+`,
+							},
+						},
+					},
+					{
+						MessageId: "neverOptionalChain",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveOptionalChain",
+								Output: `
+const projectScmMap: Record<string, string[] | undefined> = {};
+const scmProjectMap: Record<string, string[] | undefined> = {};
+function run(scmName: string, entry: string) {
+  if (!projectScmMap[entry]) {
+    projectScmMap[entry] = [];
+  }
+  if (!scmProjectMap[scmName]) {
+    scmProjectMap[scmName] = [];
+  }
+  scmProjectMap[scmName]?.push(entry);
+  projectScmMap[entry].push(scmName);
+}
+`,
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+}
+
+// Pattern N: chained `?.` callee on an indexed array element with non-nullable
+// element type, e.g. `arr[i]?.field` after a pre-emptive bounds check (no-op).
+// Without `noUncheckedIndexedAccess`, the chain is unnecessary.
+func TestAlign_PatternN_ArrayIndexAccessOptionalChain(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const arr: { id: string }[];
+const first = arr[0]?.id;
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// --- Reverse cases for A-G: each pattern's other side ---
+
+// Pattern A reverse: closure-captured `let` that is genuinely possibly-undefined
+// (no narrowing precedes the closure). `(x || [])` LHS is necessary.
+func TestAlign_PatternA_Reverse_ClosureGenuinelyNullable(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const map: Map<string, Set<number>>;
+declare function callback(opts: { onEvent: () => void }): void;
+function run(id: string) {
+  let taskSessionList = map.get(id);
+  callback({
+    onEvent: () => {
+      const sessionInfo = [...(taskSessionList || [])].find((s) => s === 1);
+      return sessionInfo;
+    },
+  });
+}
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern B reverse: index access into Record with `T[] | undefined` value with
+// no preceding narrowing. `?.push` is necessary.
+func TestAlign_PatternB_Reverse_NoNarrowing(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+declare const scmProjectMap: Record<string, string[] | undefined>;
+function run(scmName: string, entry: string) {
+  scmProjectMap[scmName]?.push(entry);
+}
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern C reverse: non-optional property — `?.push` is unnecessary.
+func TestAlign_PatternC_Reverse_NonOptionalProp(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+type Region = 'I18N' | 'US-TTP';
+interface RegionConfig {
+  items: { id: string }[];
+}
+declare const privateContext: Record<Region, RegionConfig>;
+declare const regionSite: Region;
+function run() {
+  privateContext[regionSite].items?.push({ id: 'a' });
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "neverOptionalChain",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveOptionalChain",
+								Output: `
+type Region = 'I18N' | 'US-TTP';
+interface RegionConfig {
+  items: { id: string }[];
+}
+declare const privateContext: Record<Region, RegionConfig>;
+declare const regionSite: Region;
+function run() {
+  privateContext[regionSite].items.push({ id: 'a' });
+}
+`,
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+}
+
+// Pattern E reverse: standalone non-chained `data?.field` where `data` is
+// non-nullable — `?.` is unnecessary. (When the chain originates from a
+// nullable value, every subsequent `?.` is necessary because the entire chain
+// can short-circuit to undefined; this is the upstream behavior.)
+func TestAlign_PatternE_Reverse_DataNonNullable(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+interface Pkg { id: string }
+interface Inner { data: { packageList: Pkg[] } }
+declare const inner: Inner;
+const pkg = inner.data?.packageList[0];
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "neverOptionalChain",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveOptionalChain",
+								Output: `
+interface Pkg { id: string }
+interface Inner { data: { packageList: Pkg[] } }
+declare const inner: Inner;
+const pkg = inner.data.packageList[0];
+`,
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+}
+
+// Pattern F reverse: `obj && {...}` where obj is non-nullable — always truthy.
+func TestAlign_PatternF_Reverse_NonOptionalObj(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+interface Project { id: string; monorepo?: number }
+interface TicketDetail { project: Project }
+declare const ticketDetail: TicketDetail;
+const transformed = {
+  project: ticketDetail.project && {
+    id: ticketDetail.project.id,
+  },
+};
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysTruthy"},
+				},
+			},
+		},
+	)
+}
+
+// Pattern G reverse: const-bound literal in ternary — always falsy.
+func TestAlign_PatternG_Reverse_ConstLiteralTernary(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+function run() {
+  const hasFailed = false;
+  const finalStatus = hasFailed ? 'fail' : 'ok';
+  return finalStatus;
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysFalsy"},
+				},
+			},
+		},
+	)
+}
+
+// Pattern D reverse: optional call where the function value is genuinely
+// possibly-undefined — chain is necessary.
+func TestAlign_PatternD_Reverse_OptionalCallNullable(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{
+			{Code: `
+type M = { a: number };
+declare const bizScenarioStatusMap: Record<string, ((map: M) => string) | undefined>;
+declare const bizScenario: string;
+declare const map: M;
+function run() {
+  return bizScenarioStatusMap[bizScenario]?.(map);
+}
+`},
+		},
+		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+// Pattern D: optional call on index-accessed function. With a non-nullable
+// value type (`Record<string, (m: M) => string>`), the `?.()` is unnecessary —
+// latest reports.
+func TestAlign_PatternD_OptionalCallOnIndex(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryConditionRule,
+		[]rule_tester.ValidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+type M = { a: number };
+declare const bizScenarioStatusMap: Record<string, (map: M) => string>;
+declare const bizScenario: string;
+declare const map: M;
+declare const statusMapHas: boolean;
+function run(): string | undefined {
+  if (!statusMapHas) return undefined;
+  const res = bizScenarioStatusMap[bizScenario]?.(map);
+  return res;
+}
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "neverOptionalChain",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{
+								MessageId: "suggestRemoveOptionalChain",
+								Output: `
+type M = { a: number };
+declare const bizScenarioStatusMap: Record<string, (map: M) => string>;
+declare const bizScenario: string;
+declare const map: M;
+declare const statusMapHas: boolean;
+function run(): string | undefined {
+  if (!statusMapHas) return undefined;
+  const res = bizScenarioStatusMap[bizScenario](map);
+  return res;
+}
+`,
+							},
+						},
+					},
+				},
+			},
+		},
+	)
+}
+
+// Lock down option parsing so it stays aligned with typescript-eslint v8.
+// Source: typescript-eslint main, no-unnecessary-condition.ts:
+//   defaultOptions = [{
+//     allowConstantLoopConditions: 'never',
+//     allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: false,
+//     checkTypePredicates: false,
+//   }]
+//   allowConstantLoopConditions accepts: true | false | 'always' | 'never' | 'only-allowed-literals'
+//   true  -> 'always', false -> 'never'.
+
+func TestParseOptions_Defaults(t *testing.T) {
+	opts := parseOptions(nil)
+	if opts.allowConstantLoopConditions != loopConditionNever {
+		t.Errorf("default allowConstantLoopConditions = %q, want 'never'", opts.allowConstantLoopConditions)
+	}
+	if opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing {
+		t.Errorf("default allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = true, want false")
+	}
+	if opts.checkTypePredicates {
+		t.Errorf("default checkTypePredicates = true, want false")
+	}
+}
+
+func TestParseOptions_DefaultsFromEmptyMap(t *testing.T) {
+	opts := parseOptions([]interface{}{map[string]interface{}{}})
+	if opts.allowConstantLoopConditions != loopConditionNever {
+		t.Errorf("got %q, want 'never'", opts.allowConstantLoopConditions)
+	}
+}
+
+func TestNormalizeAllowConstantLoopConditions(t *testing.T) {
+	cases := []struct {
+		in   interface{}
+		want allowConstantLoopConditionsOption
+	}{
+		{true, loopConditionAlways},
+		{false, loopConditionNever},
+		{"always", loopConditionAlways},
+		{"never", loopConditionNever},
+		{"only-allowed-literals", loopConditionOnlyAllowedLiteral},
+	}
+	for _, c := range cases {
+		got := normalizeAllowConstantLoopConditions(c.in)
+		if got != c.want {
+			t.Errorf("normalizeAllowConstantLoopConditions(%v) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestParseOptions_AllFieldsRoundTrip(t *testing.T) {
+	opts := parseOptions([]interface{}{map[string]interface{}{
+		"allowConstantLoopConditions":                            "only-allowed-literals",
+		"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing": true,
+		"checkTypePredicates":                                    true,
+	}})
+	if opts.allowConstantLoopConditions != loopConditionOnlyAllowedLiteral {
+		t.Errorf("allowConstantLoopConditions = %q, want 'only-allowed-literals'", opts.allowConstantLoopConditions)
+	}
+	if !opts.allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing {
+		t.Errorf("allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = false, want true")
+	}
+	if !opts.checkTypePredicates {
+		t.Errorf("checkTypePredicates = false, want true")
+	}
+}
+
+func TestParseOptions_LegacyBoolean(t *testing.T) {
+	// allowConstantLoopConditions: true (legacy) -> 'always'
+	opts := parseOptions([]interface{}{map[string]interface{}{
+		"allowConstantLoopConditions": true,
+	}})
+	if opts.allowConstantLoopConditions != loopConditionAlways {
+		t.Errorf("legacy true: got %q, want 'always'", opts.allowConstantLoopConditions)
+	}
+	// allowConstantLoopConditions: false (legacy) -> 'never'
+	opts = parseOptions([]interface{}{map[string]interface{}{
+		"allowConstantLoopConditions": false,
+	}})
+	if opts.allowConstantLoopConditions != loopConditionNever {
+		t.Errorf("legacy false: got %q, want 'never'", opts.allowConstantLoopConditions)
+	}
+}

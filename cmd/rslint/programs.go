@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -12,6 +13,67 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// parallelGitignoreAndPrograms runs ReadGitignoreAsGlobs and createProgramsForConfig
+// for a single rslint config (single-config and legacy JSON paths).
+//
+// When singleThreaded is true, both run sequentially in the calling goroutine
+// — honoring the user's --singleThreaded flag (no concurrency at all).
+// Otherwise the two are dispatched as parallel goroutines: they have no data
+// dependency, since createProgramsForConfig only reads
+// entry.LanguageOptions.ParserOptions.Project (see
+// LoadTsConfigsFromRslintConfig), never entry.Ignores. Calling it before vs.
+// after gitignore globs are prepended is equivalent for TS Program creation.
+//
+// The returned config is the gitignore-augmented config (gitignore globs
+// prepended when non-empty), suitable for downstream DiscoverGapFiles /
+// GetConfigForFile.
+//
+// Returns: (augmentedConfig, programs, exitCode). On non-zero exitCode,
+// augmentedConfig and programs may be nil/partial — caller should propagate
+// exitCode without using them.
+func parallelGitignoreAndPrograms(
+	rslintConfig rslintconfig.RslintConfig,
+	configDir string,
+	fsys vfs.FS,
+	singleThreaded bool,
+	seenTsConfigs map[string]struct{},
+) (rslintconfig.RslintConfig, []*compiler.Program, int) {
+	configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
+
+	var (
+		gitGlobs []string
+		progs    []*compiler.Program
+		exitCode int
+	)
+	if singleThreaded {
+		gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
+		progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs)
+	} else {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
+		}()
+		go func() {
+			defer wg.Done()
+			progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs)
+		}()
+		wg.Wait()
+	}
+
+	if exitCode != 0 {
+		return rslintConfig, nil, exitCode
+	}
+	if len(gitGlobs) > 0 {
+		rslintConfig = append(
+			rslintconfig.RslintConfig{{Ignores: gitGlobs}},
+			rslintConfig...,
+		)
+	}
+	return rslintConfig, progs, 0
+}
 
 // createProgramsForConfig creates TypeScript programs for a single config entry.
 // It handles tsconfig extraction, auto-detection, deduplication, and the no-tsconfig fallback.

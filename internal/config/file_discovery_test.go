@@ -3,15 +3,22 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"gotest.tools/v3/assert"
 )
+
+func strconvI(i int) string { return strconv.Itoa(i) }
 
 // setupDiscoveryFixture creates a temp dir with the given file paths and returns
 // the normalized configDir and a map of short name → normalized absolute path.
@@ -47,7 +54,7 @@ func TestDiscoverGapFiles_Basic(t *testing.T) {
 		paths["src/a.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil, "should not be nil when config has files")
 	assert.Equal(t, len(gapFiles), 1)
@@ -71,7 +78,7 @@ func TestDiscoverGapFiles_GlobalIgnoresExclude(t *testing.T) {
 		paths["src/a.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	// scripts/b.ts should be excluded by global ignores
 	assert.Assert(t, gapFiles != nil)
@@ -94,7 +101,7 @@ func TestDiscoverGapFiles_ProgramFilesSkipped(t *testing.T) {
 		paths["src/b.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 0)
@@ -119,7 +126,7 @@ func TestDiscoverGapFiles_GetConfigForFilePreFilter(t *testing.T) {
 		paths["src/a.ts"]: {},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	// test/b.ts matches **/*.ts but is excluded by entry-level ignores →
 	// GetConfigForFile returns nil → not a gap file
@@ -137,7 +144,7 @@ func TestDiscoverGapFiles_NoFilesField_ReturnsNil(t *testing.T) {
 		{Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	// Should return nil (backward compat signal)
 	assert.Assert(t, gapFiles == nil, "should return nil when no entry has files field")
@@ -158,7 +165,7 @@ func TestDiscoverGapFiles_AllowDirsScope(t *testing.T) {
 
 	// Only allow scripts/ directory
 	scriptsDir := tspath.NormalizePath(filepath.Join(configDir, "scripts"))
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, []string{scriptsDir})
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, []string{scriptsDir}, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 1)
@@ -180,7 +187,7 @@ func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	sort.Strings(gapFiles)
@@ -207,7 +214,7 @@ func TestDiscoverGapFiles_JsFilesNotDiscoveredWithoutPattern(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	// b.js should NOT be discovered because no entry has files: ['**/*.js']
@@ -229,7 +236,9 @@ func TestDiscoverGapFiles_AllowFilesScope(t *testing.T) {
 
 	// Only allow scripts/b.ts via allowFiles
 	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles,
-		[]string{paths["scripts/b.ts"]}, nil)
+		[]string{paths["scripts/b.ts"]}, nil,
+		false,
+	)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 1)
@@ -250,7 +259,7 @@ func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	// All files matching the pattern should be discovered (no extension filter)
@@ -276,7 +285,7 @@ func TestDiscoverGapFilesMultiConfig(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFilesMultiConfig(configMap, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFilesMultiConfig(configMap, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	assert.Equal(t, len(gapFiles), 2)
@@ -301,7 +310,7 @@ func TestDiscoverGapFiles_EmptyFilesArray(t *testing.T) {
 		{Files: []string{}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	// Empty files array has no patterns to match → same as no files field → nil (legacy mode)
 	assert.Assert(t, gapFiles == nil, "should return nil for empty files array")
@@ -319,7 +328,7 @@ func TestDiscoverGapFiles_FilesButNoRules(t *testing.T) {
 		{Files: []string{"**/*.ts"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	// GetConfigForFile returns non-nil (entry matched), so the file IS a gap file.
 	// The linter will subsequently skip it because it has no rules, but that's
@@ -344,7 +353,7 @@ func TestDiscoverGapFiles_DirIgnoreBlocksTraversal(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	// build/ entirely blocked — neither keep.ts nor other.ts discovered
@@ -378,7 +387,7 @@ func TestDiscoverGapFiles_FileIgnoreAllowsNegation(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 
@@ -413,7 +422,7 @@ func TestDiscoverGapFiles_WildcardMiddleDirIgnoreBlocks(t *testing.T) {
 	}
 
 	programFiles := map[string]struct{}{}
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	gapSet := make(map[string]struct{})
 	for _, f := range gapFiles {
@@ -444,7 +453,7 @@ func TestDiscoverGapFiles_CrossEntryDirIgnoreAndNegation(t *testing.T) {
 	}
 
 	programFiles := map[string]struct{}{}
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	for _, f := range gapFiles {
 		if f == paths["build/keep.ts"] || f == paths["build/other.ts"] {
@@ -467,7 +476,7 @@ func TestDiscoverGapFiles_DoubleStarDirIgnoreBlocksNested(t *testing.T) {
 
 	programFiles := map[string]struct{}{}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	for _, f := range gapFiles {
@@ -490,7 +499,7 @@ func TestDiscoverGapFiles_DefaultExcludesNodeModules(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	for _, f := range gapFiles {
@@ -518,7 +527,7 @@ func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
 	for _, f := range gapFiles {
@@ -535,17 +544,29 @@ func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
 // is the difference between <100ms and 7s.
 
 // spyFS wraps a vfs.FS and records which directories had their contents listed.
-// GetAccessibleEntries is called by vfsAdapter.ReadDir only when fs.WalkDir
-// actually enters a directory. If a directory is pruned (fs.SkipDir), this
-// method is never called for it.
+// GetAccessibleEntries is called by vfsAdapter.ReadDir only when the walker
+// actually enters a directory. If a directory is pruned, this method is
+// never called for it.
+//
+// DiscoverGapFiles walks concurrently, so the recorder needs a lock.
 type spyFS struct {
 	vfs.FS
+	mu           sync.Mutex
 	accessedDirs []string
 }
 
 func (s *spyFS) GetAccessibleEntries(path string) vfs.Entries {
+	s.mu.Lock()
 	s.accessedDirs = append(s.accessedDirs, path)
+	s.mu.Unlock()
 	return s.FS.GetAccessibleEntries(path)
+}
+
+func (s *spyFS) snapshotAccessedDirs() []string {
+	s.mu.Lock()
+	out := append([]string(nil), s.accessedDirs...)
+	s.mu.Unlock()
+	return out
 }
 
 func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
@@ -560,9 +581,9 @@ func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil)
+	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
-	for _, dir := range spy.accessedDirs {
+	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, "node_modules") {
 			t.Errorf("node_modules directory was entered during walk (GetAccessibleEntries called for %s)", dir)
 		}
@@ -580,9 +601,9 @@ func TestDiscoverGapFiles_PrunesGitDirAtWalkLevel(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil)
+	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
-	for _, dir := range spy.accessedDirs {
+	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, ".git") {
 			t.Errorf(".git directory was entered during walk (GetAccessibleEntries called for %s)", dir)
 		}
@@ -602,9 +623,9 @@ func TestDiscoverGapFiles_PrunesUserIgnoredDirAtWalkLevel(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil)
+	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
-	for _, dir := range spy.accessedDirs {
+	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, "vendor") {
 			t.Errorf("vendor directory was entered during walk (GetAccessibleEntries called for %s)", dir)
 		}
@@ -624,12 +645,12 @@ func TestDiscoverGapFiles_PrunesNestedIgnoredDirButEntersParent(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// build/ should be entered (not blocked)
 	buildEntered := false
 	outputEntered := false
-	for _, dir := range spy.accessedDirs {
+	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.HasSuffix(dir, "/build") || strings.HasSuffix(dir, "build") {
 			buildEntered = true
 		}
@@ -662,12 +683,12 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil)
+	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
 
 	// src/ and lib/ should be entered
 	srcEntered := false
 	libEntered := false
-	for _, dir := range spy.accessedDirs {
+	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.HasSuffix(dir, "/src") {
 			srcEntered = true
 		}
@@ -713,7 +734,7 @@ func e2eSetup(t *testing.T, files map[string]string, config RslintConfig, progra
 		programFiles = map[string]struct{}{}
 	}
 
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil, false)
 	return dir, gapFiles, config
 }
 
@@ -910,7 +931,7 @@ func TestE2E_ProgramFilesExcluded(t *testing.T) {
 		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
 	}
 
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil)
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil, false)
 	gapSet := toSet(gapFiles)
 
 	// index.ts in program → NOT a gap file
@@ -1026,7 +1047,7 @@ func TestE2E_AllowDirsWithConfigIgnores(t *testing.T) {
 
 	// Only allow packages/foo/
 	fooDir := tspath.NormalizePath(dir + "/packages/foo")
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, nil, []string{fooDir})
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, nil, []string{fooDir}, false)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/packages/foo/src/a.ts")], "packages/foo/src/a.ts should be discovered (in allowDirs)")
@@ -1058,7 +1079,7 @@ func TestE2E_AllowFilesWithGitignore(t *testing.T) {
 	distFile := tspath.NormalizePath(dir + "/dist/bundle.ts")
 
 	// Simulate lint-staged passing both files explicitly.
-	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, []string{srcFile, distFile}, nil)
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, []string{srcFile, distFile}, nil, false)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[srcFile], "src/index.ts should be discovered (explicit allowFile)")
@@ -1071,4 +1092,212 @@ func toSet(items []string) map[string]bool {
 		m[item] = true
 	}
 	return m
+}
+
+// --- Concurrency/correctness regressions ---
+
+// Symlinks are never followed in DiscoverGapFiles, so symlinked subtrees do
+// not contribute gap files even if their target would otherwise match the
+// `files` pattern. This guarantees output determinism regardless of how the
+// concurrent walker schedules sibling directories.
+func TestDiscoverGapFiles_SkipsSymlinkedDirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	configDir := tspath.NormalizePath(tmpDir)
+
+	realDir := filepath.Join(tmpDir, "real")
+	if err := os.MkdirAll(realDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "in_real.ts"), []byte("// in_real"), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	// Two symlinks to the same target — both must be skipped, regardless
+	// of which a concurrent walker would visit first.
+	if err := os.Symlink(realDir, filepath.Join(tmpDir, "link_a")); err != nil {
+		t.Fatalf("symlink a: %v", err)
+	}
+	if err := os.Symlink(realDir, filepath.Join(tmpDir, "link_b")); err != nil {
+		t.Fatalf("symlink b: %v", err)
+	}
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	}
+
+	for _, single := range []bool{false, true} {
+		gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(),
+			map[string]struct{}{}, nil, nil, single)
+		assert.Equal(t, len(gapFiles), 1, "singleThreaded=%v: only the real path should produce a gap file", single)
+		realPath := tspath.NormalizePath(filepath.Join(realDir, "in_real.ts"))
+		assert.Equal(t, gapFiles[0], realPath, "singleThreaded=%v: gap file should be the canonical realpath", single)
+	}
+}
+
+// singleThreaded=true and singleThreaded=false must produce the same gap-file
+// set. The concurrent walker is correctness-preserving; --singleThreaded is a
+// performance/debuggability knob, not a behavioral one.
+func TestDiscoverGapFiles_SingleThreadedEquivalence(t *testing.T) {
+	configDir, _ := setupDiscoveryFixture(t, []string{
+		"src/a.ts",
+		"src/nested/deep/b.ts",
+		"scripts/c.ts",
+		"scripts/sub/d.ts",
+		"tools/e.ts",
+		"tools/skip/f.ts",
+	})
+	config := RslintConfig{
+		{Ignores: []string{"**/skip/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	}
+
+	parallelGaps := DiscoverGapFiles(config, configDir, osvfs.FS(),
+		map[string]struct{}{}, nil, nil, false)
+	serialGaps := DiscoverGapFiles(config, configDir, osvfs.FS(),
+		map[string]struct{}{}, nil, nil, true)
+
+	// Both already sorted by DiscoverGapFiles; equality is exact.
+	assert.Equal(t, len(parallelGaps), len(serialGaps), "must produce same count")
+	for i := range parallelGaps {
+		assert.Equal(t, parallelGaps[i], serialGaps[i], "diverged at i=%d", i)
+	}
+}
+
+// allowFiles fast path must produce a deterministic, sorted result. The
+// implementation iterates a map, so without an explicit sort the output
+// order is randomized across runs.
+func TestDiscoverGapFiles_AllowFilesFastPathSorted(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"a.ts",
+		"b.ts",
+		"c.ts",
+		"d.ts",
+		"e.ts",
+	})
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	}
+	allow := []string{paths["e.ts"], paths["a.ts"], paths["c.ts"], paths["b.ts"], paths["d.ts"]}
+	expected := []string{paths["a.ts"], paths["b.ts"], paths["c.ts"], paths["d.ts"], paths["e.ts"]}
+	sort.Strings(expected)
+
+	// Run multiple times to give Go's randomized map iteration a chance to
+	// surface non-determinism if the sort is missing.
+	for i := range 8 {
+		got := DiscoverGapFiles(config, configDir, osvfs.FS(),
+			map[string]struct{}{}, allow, nil, false)
+		assert.Equal(t, len(got), len(expected), "run %d: count mismatch", i)
+		for j := range expected {
+			assert.Equal(t, got[j], expected[j], "run %d, idx %d: not in lexical order", i, j)
+		}
+	}
+}
+
+// walkPool must hold concurrent execution of `work` to at most `workers`
+// at any moment. Tested with an atomic counter inside the work function —
+// independent of process-wide goroutine count, so it is robust under
+// `go test -race`, varied GOMAXPROCS, and CI background noise.
+func TestWalkPool_BoundsConcurrency(t *testing.T) {
+	const (
+		workers   = 4
+		dirCount  = 200
+		hold      = 2 * time.Millisecond // make work observable
+		fanout    = 3
+		maxDepth  = 3 // 3^3 = 27 leaves per root × 200 roots ≈ thousands of jobs
+	)
+
+	pool := newWalkPool(workers)
+	// Seed with `dirCount` independent root jobs so the queue has enough
+	// fan-out to actually exercise concurrency.
+	roots := make([]string, dirCount)
+	for i := range roots {
+		roots[i] = "r/" + strconvI(i)
+	}
+	pool.submitMany(roots)
+
+	var (
+		active    atomic.Int32
+		maxActive atomic.Int32
+		jobsRun   atomic.Int32
+	)
+
+	work := func(dir string) []string {
+		cur := active.Add(1)
+		// Track high-water mark.
+		for {
+			old := maxActive.Load()
+			if cur <= old || maxActive.CompareAndSwap(old, cur) {
+				break
+			}
+		}
+		// Hold the slot briefly to let other workers pile up if they could.
+		time.Sleep(hold)
+		active.Add(-1)
+		jobsRun.Add(1)
+
+		// Fan out a few children up to maxDepth so the pool keeps having
+		// work to dispatch.
+		depth := strings.Count(dir, "/")
+		if depth >= maxDepth+1 { // r/<i> already has 1 slash
+			return nil
+		}
+		out := make([]string, fanout)
+		for k := range fanout {
+			out[k] = dir + "/" + strconvI(k)
+		}
+		return out
+	}
+
+	pool.run(work)
+
+	if got := maxActive.Load(); got > workers {
+		t.Fatalf("walkPool exceeded its concurrency cap: maxActive=%d > workers=%d", got, workers)
+	}
+	// Sanity: it actually did work.
+	if got := jobsRun.Load(); got < int32(dirCount) {
+		t.Fatalf("walkPool did not process all jobs: jobsRun=%d < dirCount=%d", got, dirCount)
+	}
+}
+
+// Verifies the workers==1 specialization in walkPool.run: the pool must
+// drive all work on the calling goroutine without spawning any helper.
+// We assert by checking the caller goroutine ID is the only one observed
+// inside the work function via runtime.Stack.
+func TestWalkPool_SingleWorkerNoGoroutine(t *testing.T) {
+	pool := newWalkPool(1)
+	pool.submitMany([]string{"a", "b", "c"})
+
+	caller := goroutineID()
+	seen := make(map[int]struct{})
+	work := func(dir string) []string {
+		seen[goroutineID()] = struct{}{}
+		return nil
+	}
+	pool.run(work)
+
+	if _, ok := seen[caller]; !ok {
+		t.Fatalf("work was not run on caller goroutine; seen=%v, caller=%d", seen, caller)
+	}
+	if len(seen) != 1 {
+		t.Fatalf("workers=1 must run all work on a single goroutine; observed %d goroutines: %v", len(seen), seen)
+	}
+}
+
+// goroutineID parses the current goroutine ID from runtime.Stack output.
+// Used only by tests to verify the workers==1 specialization.
+func goroutineID() int {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	// Format: "goroutine 12 [running]:"
+	s := string(buf[:n])
+	const prefix = "goroutine "
+	s = strings.TrimPrefix(s, prefix)
+	end := strings.IndexByte(s, ' ')
+	if end < 0 {
+		return -1
+	}
+	id, err := strconv.Atoi(s[:end])
+	if err != nil {
+		return -1
+	}
+	return id
 }

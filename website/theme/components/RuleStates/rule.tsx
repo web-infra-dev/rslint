@@ -12,6 +12,7 @@ import { CancelSymbol, TableSelector } from './table-selector';
 import { Badge, Heading, PresetBadge, Text } from './ui-utils';
 import { Button } from '@components/ui/button';
 import manifest from '@/generated/rule-manifest.json';
+import { groupToRouteSlug } from '@/theme/plugin-registry';
 
 // Type definitions
 type FailingCase = {
@@ -33,10 +34,6 @@ type RuleStateDescribe = {
   count: number;
   style: 'full' | 'partial-impl' | 'partial-test' | 'total';
 };
-
-function groupToRouteSlug(group: string): string {
-  return group.replace(/^@/, '');
-}
 
 function getRuleUrl(rule: Rule): { url: string; isInternal: boolean } {
   if (rule.docPath) {

@@ -2506,3 +2506,145 @@ export {};
   "ruleCount": 1,
 }
 `;
+
+exports[`no-unused-vars > invalid 77`] = `
+{
+  "code": "
+export interface RpcResponse<T = unknown> {
+  code?: number;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'T' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 78`] = `
+{
+  "code": "
+export type Alias<T = unknown> = string;
+      ",
+  "diagnostics": [
+    {
+      "message": "'T' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 79`] = `
+{
+  "code": "
+export function fn<T>(): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'T' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 80`] = `
+{
+  "code": "
+export class Cls<T = unknown> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'T' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 81`] = `
+{
+  "code": "
+export interface CrossRef<T, U extends T> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "'U' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,4 +1,4 @@
-# react/void-dom-elements-no-children
+# void-dom-elements-no-children
 
 ## Rule Details
 

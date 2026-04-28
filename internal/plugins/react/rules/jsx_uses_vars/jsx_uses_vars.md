@@ -1,4 +1,4 @@
-# react/jsx-uses-vars
+# jsx-uses-vars
 
 ## Rule Details
 
