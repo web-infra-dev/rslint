@@ -31,7 +31,7 @@ const style: RslintConfigEntry = {
   rules: {
     // 'jest/prefer-to-be': 'error', // not implemented
     'jest/prefer-to-contain': 'error',
-    // 'jest/prefer-to-have-length': 'error', // not implemented
+    'jest/prefer-to-have-length': 'error',
   },
 };
 
