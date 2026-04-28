@@ -50,6 +50,13 @@ ruleTester.run('no-deprecated-functions', {} as never, {
       'jest.resetModules',
     ),
     ...generateInvalidCases(24, 'jest.addMatchers', 'expect.extend'),
+    ...generateInvalidCases(21, 'require.requireMock', 'jest.requireMock'),
+    ...generateInvalidCases(21, 'require.requireActual', 'jest.requireActual'),
+    ...generateInvalidCases(
+      22,
+      'jest.runTimersToTime',
+      'jest.advanceTimersByTime',
+    ),
     ...generateInvalidCases(
       26,
       'jest.genMockFromModule',

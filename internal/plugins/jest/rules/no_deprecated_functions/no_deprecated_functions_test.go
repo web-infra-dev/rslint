@@ -58,6 +58,45 @@ func TestNoDeprecatedFunctionsRule(t *testing.T) {
 				Settings: jestSettings("24"),
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
 			},
+			// require.requireMock -> jest.requireMock (Jest 21)
+			{
+				Code:     `require.requireMock()`,
+				Output:   []string{`jest.requireMock()`},
+				Settings: jestSettings("21"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
+			{
+				Code:     `require['requireMock']()`,
+				Output:   []string{`jest['requireMock']()`},
+				Settings: jestSettings("21"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
+			// require.requireActual -> jest.requireActual (Jest 21)
+			{
+				Code:     `require.requireActual()`,
+				Output:   []string{`jest.requireActual()`},
+				Settings: jestSettings("21"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
+			{
+				Code:     `require['requireActual']()`,
+				Output:   []string{`jest['requireActual']()`},
+				Settings: jestSettings("21"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
+			// jest.runTimersToTime -> jest.advanceTimersByTime (Jest 22)
+			{
+				Code:     `jest.runTimersToTime()`,
+				Output:   []string{`jest.advanceTimersByTime()`},
+				Settings: jestSettings("22"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
+			{
+				Code:     `jest['runTimersToTime']()`,
+				Output:   []string{`jest['advanceTimersByTime']()`},
+				Settings: jestSettings("22"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
 			// jest.genMockFromModule -> jest.createMockFromModule (Jest 26)
 			{
 				Code:     `jest.genMockFromModule()`,

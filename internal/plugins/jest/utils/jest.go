@@ -293,8 +293,18 @@ func jestVersionFromSettings(settings map[string]interface{}) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	ver, ok := m["version"].(string)
-	if !ok {
+	var ver string
+	switch v := m["version"].(type) {
+	case string:
+		ver = v
+	case float64:
+		// JSON numbers decode into interface{} as float64; treat them as a major version.
+		ver = strconv.Itoa(int(v))
+	case int:
+		ver = strconv.Itoa(v)
+	case int64:
+		ver = strconv.FormatInt(v, 10)
+	default:
 		return "", false
 	}
 	ver = strings.TrimSpace(ver)
