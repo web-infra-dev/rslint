@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -19,6 +20,19 @@ func NewChainAnalyzer(ctx rule.RuleContext, opts PreferOptionalChainOptions) *Ch
 	return &ChainAnalyzer{
 		ctx:  ctx,
 		opts: opts,
+	}
+}
+
+// reportRangeWithFixesOrSuggestions reports a diagnostic at the given range,
+// using either fixes (auto-fix) or suggestions based on the useFix flag.
+func reportRangeWithFixesOrSuggestions(ctx rule.RuleContext, textRange core.TextRange, fix bool, msg rule.RuleMessage, suggestionMsg rule.RuleMessage, fixes ...rule.RuleFix) {
+	if fix {
+		ctx.ReportRangeWithFixes(textRange, msg, fixes...)
+	} else {
+		ctx.ReportRangeWithSuggestions(textRange, msg, rule.RuleSuggestion{
+			Message:  suggestionMsg,
+			FixesArr: fixes,
+		})
 	}
 }
 
@@ -197,12 +211,49 @@ func (ca *ChainAnalyzer) AnalyzeChain(
 		// truthiness when the optional chain returns undefined.
 		// e.g., `data && data.value !== null` → `data?.value !== null` changes
 		// from falsy to true when data is null/undefined.
+		complementaryMerged := false
 		if wouldChangeTruthiness(operands[chainStart:chainEnd], operator) {
-			i = originalChainEnd
-			continue
+			// Recovery: if the trimmed operand (just past chainEnd) forms a
+			// complementary pair with the last chain operand, merge them into
+			// loose equality (!= null / == null). Together they cover both null
+			// and undefined, making the transformation safe.
+			// E.g., `existing && existing.id !== null && existing.id !== undefined`
+			// → trim to [existing, existing.id !== null] (rejected)
+			// → merge to [existing, existing.id != null] (safe)
+			if chainEnd < len(operands) && chainEnd-chainStart >= 2 {
+				last := &operands[chainEnd-1]
+				next := operands[chainEnd]
+				if last.ComparedNode != nil && next.ComparedNode != nil &&
+					compareNodesUncached(last.ComparedNode, next.ComparedNode) == NodeComparisonEqual &&
+					isComplementaryGuard(*last, next) {
+					if operator == ast.KindAmpersandAmpersandToken {
+						last.ComparisonType = ComparisonNotEqualNullOrUndefined
+					} else {
+						last.ComparisonType = ComparisonEqualNullOrUndefined
+					}
+					last.UsesNull = true
+					last.IsYoda = false
+					last.IsTypeof = false
+					if !wouldChangeTruthiness(operands[chainStart:chainEnd], operator) {
+						complementaryMerged = true
+					}
+				}
+			}
+			if !complementaryMerged {
+				i = originalChainEnd
+				continue
+			}
 		}
 
-		if chainEnd < originalChainEnd {
+		// When a complementary pair was merged, the operand at chainEnd was
+		// consumed into the chain's last operand. Advance past it so it
+		// doesn't appear in the tail or output.
+		if complementaryMerged {
+			// The merged operand's range should be covered by the fix.
+			// Include it in the chain's report range by treating it as part
+			// of the chain for range calculation only.
+			ca.reportChainCoveringMerged(operands[chainStart:chainEnd], operands[chainEnd], operator, parentNode)
+		} else if chainEnd < originalChainEnd {
 			ca.reportChainWithTail(operands[chainStart:chainEnd], operands[chainEnd:originalChainEnd], operator, parentNode)
 		} else {
 			ca.reportChain(operands[chainStart:chainEnd], operator, parentNode)
@@ -276,7 +327,62 @@ func (ca *ChainAnalyzer) reportChain(
 		rule.RuleFixReplaceRange(reportRange, fixCode),
 	}
 
-	rule.ReportNodeWithFixesOrSuggestions(ca.ctx, reportNode, useFix, msg, sugMsg, fixes...)
+	reportRangeWithFixesOrSuggestions(ca.ctx, reportRange, useFix, msg, sugMsg, fixes...)
+}
+
+// reportChainCoveringMerged reports a chain where the last operand was merged
+// with a complementary strict-equality partner (mergedOp). The fix text covers
+// the chain operands, and the fix range extends to include the merged operand
+// so it is replaced along with the rest of the chain.
+func (ca *ChainAnalyzer) reportChainCoveringMerged(
+	operands []Operand,
+	mergedOp Operand,
+	operator ast.Kind,
+	parentNode *ast.Node,
+) {
+	if len(operands) < 2 {
+		return
+	}
+
+	if ca.shouldSkipForRequireNullish(operands) {
+		return
+	}
+	if ca.hasOnlyVacuousStrictGuards(operands[:len(operands)-1]) {
+		return
+	}
+
+	fixCode := ca.buildOptionalChainCode(operands, operator)
+	if fixCode == "" {
+		return
+	}
+	lastOperand := operands[len(operands)-1]
+	fixCode = wrapChainCode(fixCode, lastOperand)
+
+	firstNode := operands[0].Node
+	// The report/fix range must cover up to the merged operand's end.
+	reportNode := findBinaryExpressionCovering(parentNode, firstNode, mergedOp.Node)
+	if reportNode == nil {
+		reportNode = parentNode
+	}
+
+	startNode := firstNode
+	n := firstNode.Parent
+	for n != nil && n != reportNode.Parent {
+		if ast.IsParenthesizedExpression(n) {
+			startNode = n
+		}
+		n = n.Parent
+	}
+	reportRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(reportNode.End())
+
+	// Complementary-pair merges always produce a suggestion, not an auto-fix,
+	// because the output changes the comparison operator (!== to !=).
+	msg := buildPreferOptionalChainMessage()
+	sugMsg := buildOptionalChainSuggestMessage()
+	fixes := []rule.RuleFix{
+		rule.RuleFixReplaceRange(reportRange, fixCode),
+	}
+	reportRangeWithFixesOrSuggestions(ca.ctx, reportRange, false, msg, sugMsg, fixes...)
 }
 
 // reportChainWithTail reports a chain where the fix only covers the truncated
@@ -332,6 +438,8 @@ func (ca *ChainAnalyzer) reportChainWithTail(
 	}
 	// Fix range: from start to the last chain operand's end (tail preserved as-is).
 	fixRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(lastChainNode.End())
+	// Report range: from start to the end of the full expression (chain + tail).
+	reportRange := utils.TrimNodeTextRange(ca.ctx.SourceFile, startNode).WithEnd(reportNode.End())
 
 	// For truncated chains, force suggestion for && chains (matches TS-ESLint).
 	useFix := ca.shouldUseFix(chainOps)
@@ -346,7 +454,7 @@ func (ca *ChainAnalyzer) reportChainWithTail(
 		rule.RuleFixReplaceRange(fixRange, fixCode),
 	}
 
-	rule.ReportNodeWithFixesOrSuggestions(ca.ctx, reportNode, useFix, msg, sugMsg, fixes...)
+	reportRangeWithFixesOrSuggestions(ca.ctx, reportRange, useFix, msg, sugMsg, fixes...)
 }
 
 func (ca *ChainAnalyzer) shouldUseFix(operands []Operand) bool {

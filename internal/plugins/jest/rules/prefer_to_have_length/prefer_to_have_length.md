@@ -1,4 +1,4 @@
-# jest/prefer-to-have-length
+# prefer-to-have-length
 
 ## Rule Details
 

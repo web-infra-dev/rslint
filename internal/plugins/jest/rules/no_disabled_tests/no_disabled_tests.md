@@ -1,4 +1,4 @@
-# jest/no-disabled-tests
+# no-disabled-tests
 
 ## Rule Details
 

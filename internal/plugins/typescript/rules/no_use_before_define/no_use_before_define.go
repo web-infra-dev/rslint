@@ -147,16 +147,34 @@ func isExportedAliasName(node *ast.Node) bool {
 	return spec.PropertyName != nil && spec.Name() == node
 }
 
-// isTypeReference checks if the identifier is in a type-only context:
-// inside a TypeReference (e.g. `x: Foo`) or a typeof type query (e.g. `typeof Foo`).
+// isTypeReference reports whether the identifier sits in a type-only context.
+//
+// Composes tsgo helpers that mirror the TypeScript compiler:
+//   - IsPartOfTypeNode: covers TypeReference, QualifiedName chains in type
+//     nodes, and ExpressionWithTypeArguments in every heritage clause except
+//     a class's own `extends` (evaluated as a value at runtime).
+//   - IsPartOfTypeQuery: covers identifiers inside `typeof T`.
+//
+// IsPartOfTypeNode only walks up through the RIGHT side of property access
+// chains, so the leftmost identifier of a qualified heritage target (e.g. the
+// `ns` in `extends ns.B`) is not caught. The final block handles that by
+// walking up through PropertyAccessExpression to its enclosing
+// ExpressionWithTypeArguments and reusing
+// IsExpressionWithTypeArgumentsInClassExtendsClause to exclude class extends.
 func isTypeReference(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
-	if node.Parent.Kind == ast.KindTypeReference {
+	if ast.IsPartOfTypeNode(node) || ast.IsPartOfTypeQuery(node) {
 		return true
 	}
-	return ast.IsPartOfTypeQuery(node)
+	current := node.Parent
+	for current != nil && current.Kind == ast.KindPropertyAccessExpression {
+		current = current.Parent
+	}
+	return current != nil &&
+		ast.IsExpressionWithTypeArguments(current) &&
+		!ast.IsExpressionWithTypeArgumentsInClassExtendsClause(current)
 }
 
 // isInFunctionTypeScope checks if the identifier is inside a function type

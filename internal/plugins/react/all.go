@@ -27,6 +27,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
@@ -36,6 +39,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unknown_property"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/react_in_jsx_scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/require_render_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/self_closing_comp"
@@ -43,7 +47,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
 
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_curly_brace_presence"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_comment_textnodes"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_leaked_render"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_script_url"
 )
 
 func GetAllRules() []rule.Rule {
@@ -74,6 +81,9 @@ func GetAllRules() []rule.Rule {
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
+		no_unstable_nested_components.NoUnstableNestedComponentsRule,
+		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
+		no_unused_state.NoUnusedStateRule,
 		no_redundant_should_component_update.NoRedundantShouldComponentUpdateRule,
 		no_render_return_value.NoRenderReturnValueRule,
 		no_string_refs.NoStringRefsRule,
@@ -83,11 +93,15 @@ func GetAllRules() []rule.Rule {
 		no_unknown_property.NoUnknownPropertyRule,
 		no_will_update_set_state.NoWillUpdateSetStateRule,
 		prefer_es6_class.PreferEs6ClassRule,
+		prefer_stateless_function.PreferStatelessFunctionRule,
 		react_in_jsx_scope.ReactInJsxScopeRule,
 		require_render_return.RequireRenderReturnRule,
 		self_closing_comp.SelfClosingCompRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
+		jsx_curly_brace_presence.JsxCurlyBracePresenceRule,
 		jsx_no_comment_textnodes.JsxNoCommentTextnodesRule,
+		jsx_no_leaked_render.JsxNoLeakedRenderRule,
+		jsx_no_script_url.JsxNoScriptUrlRule,
 	}
 }

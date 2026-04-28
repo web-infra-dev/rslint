@@ -458,6 +458,14 @@ func TestPreferOptionalChainRule(t *testing.T) {
 			Code:    "declare const foo: string | null;\n(foo || 'a' || {}).toString();",
 			Options: PreferOptionalChainOptions{RequireNullish: utils.Ref(true)},
 		},
+
+		// --- Diverging property access paths (same terminal name, different chains) ---
+		// foo.x and foo.y.x share the terminal name "x" but are different access paths
+		{Code: `foo.x && foo.y.x;`},
+		{Code: `!foo.x || !foo.y.x;`},
+		{Code: "declare const entry: {success: boolean; result?: {success: boolean}};\nentry.success && entry.result?.success;"},
+		// a.bar and a.baz.bar share terminal name "bar"
+		{Code: `a.bar && a.baz.bar;`},
 	}
 
 	// =====================================================================
@@ -1003,18 +1011,62 @@ func TestPreferOptionalChainRule(t *testing.T) {
 		},
 
 		// =================================================================
-		// Category 29: Unrelated prefix with chain
+		// Category 29: Unrelated prefix with chain (with Column assertions)
 		// =================================================================
 		{
 			Code:   "unrelated != null && foo != null && foo.bar != null;",
 			Output: []string{"unrelated != null && foo?.bar != null;"},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "preferOptionalChain"},
+				{MessageId: "preferOptionalChain", Column: 22},
 			},
 		},
 		{
 			Code:   "unrelated1 != null && unrelated2 != null && foo != null && foo.bar != null;",
 			Output: []string{"unrelated1 != null && unrelated2 != null && foo?.bar != null;"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferOptionalChain", Column: 45},
+			},
+		},
+
+		// =================================================================
+		// Category 31: Complementary strict-equality pair recovery
+		// =================================================================
+		// Truthy guard + complementary pair on deeper property → merge to != null
+		{
+			Code: "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting && existing.id !== null && existing.id !== undefined;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "preferOptionalChain",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "optionalChainSuggest",
+							Output:    "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting?.id != null;",
+						},
+					},
+				},
+			},
+		},
+		// Same pattern with || chain (DeMorgan)
+		{
+			Code: "declare const existing: {id: number | null | undefined} | null | undefined;\n!existing || existing.id === null || existing.id === undefined;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "preferOptionalChain",
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "optionalChainSuggest",
+							Output:    "declare const existing: {id: number | null | undefined} | null | undefined;\nexisting?.id == null;",
+						},
+					},
+				},
+			},
+		},
+		// Reversed order: !== undefined first, then !== null.
+		// !== undefined doesn't trigger wouldChangeTruthiness, so the chain
+		// proceeds as a normal chain-with-tail (no complementary merge needed).
+		{
+			Code:   "declare const data: {value: string | null | undefined} | null | undefined;\ndata && data.value !== undefined && data.value !== null;",
+			Output: []string{"declare const data: {value: string | null | undefined} | null | undefined;\ndata?.value !== undefined && data.value !== null;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferOptionalChain"},
 			},

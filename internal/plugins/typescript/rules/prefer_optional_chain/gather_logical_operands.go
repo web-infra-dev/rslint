@@ -56,6 +56,36 @@ func (a *OperandAnalyzer) GatherLogicalOperands(node *ast.Node) ([]Operand, ast.
 
 	operands := make([]Operand, 0, 4)
 	a.flattenLogicalOperands(node, operator, &operands)
+
+	// The last operand in the chain is not used as a guard — it's the
+	// chain target. Re-classify it without the falsy-literal restriction
+	// so that types like `boolean` (which contain `false`) can still
+	// appear as the final expression. Matches upstream's `areMoreOperands`
+	// guard that skips the falsy-literal check for the last operand.
+	if len(operands) >= 2 {
+		last := &operands[len(operands)-1]
+		if last.Validity == OperandInvalid {
+			raw := ast.SkipParentheses(last.Node)
+			if operator == ast.KindBarBarToken && ast.IsPrefixUnaryExpression(raw) {
+				prefix := raw.AsPrefixUnaryExpression()
+				if prefix.Operator == ast.KindExclamationToken {
+					inner := ast.SkipParentheses(prefix.Operand)
+					if isValidChainTarget(inner, true) && a.isValidBooleanCheckTypeNoFalsy(inner) {
+						last.ComparedNode = inner
+						last.ComparisonType = ComparisonNotBoolean
+						last.Validity = OperandValid
+					}
+				}
+			} else if operator == ast.KindAmpersandAmpersandToken && isValidChainTarget(raw, true) {
+				if a.isValidBooleanCheckTypeNoFalsy(raw) {
+					last.ComparedNode = raw
+					last.ComparisonType = ComparisonBoolean
+					last.Validity = OperandValid
+				}
+			}
+		}
+	}
+
 	return operands, operator
 }
 
@@ -278,7 +308,20 @@ func invertComparisonType(ct NullishComparisonType) NullishComparisonType {
 	return ct
 }
 
+// isValidBooleanCheckType checks if a node's type is valid for boolean
+// truthiness in optional chain detection. disallowFalsyLiteral controls
+// whether falsy literal types (false, 0, '', 0n) cause rejection — set to
+// true for guard operands, false for the last operand in a chain.
+// Matches upstream's `isValidFalseBooleanCheckType(node, disallowFalsyLiteral, ...)`.
 func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
+	return a.isValidBooleanCheckTypeImpl(node, true)
+}
+
+func (a *OperandAnalyzer) isValidBooleanCheckTypeNoFalsy(node *ast.Node) bool {
+	return a.isValidBooleanCheckTypeImpl(node, false)
+}
+
+func (a *OperandAnalyzer) isValidBooleanCheckTypeImpl(node *ast.Node, disallowFalsyLiteral bool) bool {
 	if a.ctx.TypeChecker == nil {
 		return true
 	}
@@ -288,32 +331,18 @@ func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
 		return true
 	}
 
-	// Check for falsy literal unions: if the type is a union containing a falsy
-	// literal (false, 0, '', 0n) alongside an object type, but NO null/undefined/void,
-	// then the truthiness check is being used as a type discriminator
-	// (e.g., `false | { a: string }`), not as a null guard.
-	// Don't suggest optional chaining in this case.
-	// Note: we require an object type in the union to distinguish discriminated unions
-	// (like `false | { a: string }`) from plain primitive types (like `boolean` = `true | false`).
 	parts := utils.UnionTypeParts(t)
-	if len(parts) > 1 {
-		hasFalsyLiteral := false
-		hasNullUndefined := false
-		hasObjectType := false
+
+	// When disallowFalsyLiteral is true, reject if any union constituent is
+	// a falsy literal (false, 0, '', 0n). The truthiness check is narrowing
+	// out a non-nullish falsy value, not guarding against null/undefined.
+	// E.g., `boolean` = `true | false` → has `false` literal → skip.
+	// Skipped for the last operand (chain target, not a guard).
+	if disallowFalsyLiteral {
 		for _, part := range parts {
-			pFlags := checker.Type_flags(part)
-			if pFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined|checker.TypeFlagsVoid) != 0 {
-				hasNullUndefined = true
-			}
-			if pFlags&checker.TypeFlagsObject != 0 {
-				hasObjectType = true
-			}
 			if isFalsyLiteralType(part) {
-				hasFalsyLiteral = true
+				return false
 			}
-		}
-		if hasFalsyLiteral && !hasNullUndefined && hasObjectType {
-			return false
 		}
 	}
 
@@ -348,7 +377,6 @@ func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
 			if constraint == nil {
 				continue
 			}
-			// Recurse into constraint
 			constraintValid := true
 			for _, cPart := range utils.UnionTypeParts(constraint) {
 				cFlags := checker.Type_flags(cPart)
@@ -366,8 +394,6 @@ func (a *OperandAnalyzer) isValidBooleanCheckType(node *ast.Node) bool {
 		}
 
 		if flags&checker.TypeFlagsObject != 0 {
-			// object types are always truthy (when not null/undefined),
-			// so boolean coercion is safe for null/undefined guards
 			continue
 		}
 

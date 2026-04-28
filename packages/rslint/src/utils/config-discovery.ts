@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import picomatch from 'picomatch';
+import { globSync as tinyglobbySync } from 'tinyglobby';
 import { type RslintConfigEntry } from '../define-config.ts';
 
 export const JS_CONFIG_FILES = [
@@ -9,8 +10,6 @@ export const JS_CONFIG_FILES = [
   'rslint.config.ts',
   'rslint.config.mts',
 ];
-
-const SCAN_EXCLUDE_DIRS = new Set(['node_modules', '.git']);
 
 export function findJSConfig(cwd: string): string | null {
   for (const name of JS_CONFIG_FILES) {
@@ -38,43 +37,21 @@ export function findJSConfigUp(startDir: string): string | null {
 /**
  * Recursively scan a directory for all rslint JS/TS config files.
  * Skips node_modules and .git directories (aligned with ESLint defaults).
- * Uses native fs.globSync when available (Node 22+, C++ impl), falls back
- * to hand-written recursive walk.
+ * Uses tinyglobby (fdir-backed) for fast directory traversal.
+ *
+ * tinyglobby returns POSIX-style paths even on Windows, so the result is
+ * normalized through path.normalize to match the native separator that
+ * findJSConfigUp / path.join produce. Without this, Map<configPath, ...>
+ * dedupe against findJSConfigUp results fails on Windows.
  */
 export function findJSConfigsInDir(startDir: string): string[] {
   const resolved = path.resolve(startDir);
-
-  // Node 22+ native globSync (C++ implementation, faster)
-  if (typeof fs.globSync === 'function') {
-    const pattern = '**/rslint.config.{js,mjs,ts,mts}';
-    return fs
-      .globSync(pattern, {
-        cwd: resolved,
-        exclude: (f: string) => SCAN_EXCLUDE_DIRS.has(path.basename(f)),
-      })
-      .map((p: string) => path.join(resolved, p));
-  }
-
-  // Fallback: recursive walk
-  const configs: string[] = [];
-  const walk = (dir: string): void => {
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const entry of entries) {
-      if (entry.isDirectory()) {
-        if (SCAN_EXCLUDE_DIRS.has(entry.name)) continue;
-        walk(path.join(dir, entry.name));
-      } else if (JS_CONFIG_FILES.includes(entry.name)) {
-        configs.push(path.join(dir, entry.name));
-      }
-    }
-  };
-  walk(resolved);
-  return configs;
+  return tinyglobbySync(['**/rslint.config.{js,mjs,ts,mts}'], {
+    cwd: resolved,
+    absolute: true,
+    dot: true,
+    ignore: ['**/node_modules/**', '**/.git/**'],
+  }).map((p) => path.normalize(p));
 }
 
 /**

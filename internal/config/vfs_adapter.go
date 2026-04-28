@@ -4,6 +4,7 @@ import (
 	"io"
 	"io/fs"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -11,20 +12,36 @@ import (
 )
 
 // vfsAdapter adapts a vfs.FS to a standard fs.FS rooted at a given directory,
-// used by fs.WalkDir in DiscoverGapFiles and doublestar.GlobWalk in
-// expandProjectGlob. It is NOT a general-purpose fs.FS implementation —
-// Open() always returns a directory handle (vfsDirFile) because both
-// callers only open directories (WalkDir by design, GlobWalk because
-// expandProjectGlob is only called when the pattern contains glob
-// meta characters).
+// used by the gap-file walker in DiscoverGapFiles and by doublestar.GlobWalk
+// in expandProjectGlob. It is NOT a general-purpose fs.FS implementation —
+// Open() always returns a directory handle (vfsDirFile) because both callers
+// only open directories.
 //
-// It tracks visited symlink targets to prevent infinite recursion caused by
-// symlink cycles, since the underlying VFS follows symlinks transparently
-// and doublestar cannot detect them through this adapter.
+// followSymlinks controls how directory symlinks are handled in ReadDir:
+//
+//   - false (default, used by DiscoverGapFiles): symlinked subdirectories are
+//     skipped entirely. This matches ESLint v10's flat-config file walker:
+//     it uses @humanfs/node, whose walk() recurses only when
+//     Dirent.isDirectory() is true — and Dirent.isDirectory() returns false
+//     for symbolic links because Node's readdir({withFileTypes: true})
+//     reports the dirent type without following links. The result for the
+//     gap-file walker is the same: symlinked directories are not entered,
+//     output is deterministic regardless of the concurrency model, and
+//     cycles cannot occur.
+//
+//   - true (used by expandProjectGlob): symlinks are followed, with cycle
+//     detection via visitedSymTargets. expandProjectGlob runs single-threaded
+//     under doublestar.GlobWalk, so the dedupe decision order is bounded by
+//     the FS layout (no goroutine scheduling concern).
+//
+// visitedSymTargets uses sync.Map so the followSymlinks=true path is also
+// safe under future concurrent callers, but it is currently exercised only
+// by the single-threaded loader.
 type vfsAdapter struct {
 	vfs               vfs.FS
 	root              string
-	visitedSymTargets map[string]struct{}
+	followSymlinks    bool
+	visitedSymTargets sync.Map
 }
 
 var _ fs.FS = (*vfsAdapter)(nil)
@@ -77,10 +94,6 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 		accessible := f.adapter.vfs.GetAccessibleEntries(f.path)
 		parentRealPath := f.adapter.vfs.Realpath(f.path)
 
-		if f.adapter.visitedSymTargets == nil {
-			f.adapter.visitedSymTargets = make(map[string]struct{})
-		}
-
 		f.entries = make([]fs.DirEntry, 0, len(accessible.Directories)+len(accessible.Files))
 
 		for _, dir := range accessible.Directories {
@@ -88,14 +101,21 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 			dirRealPath := f.adapter.vfs.Realpath(dirPath)
 
 			// A regular subdirectory's realpath equals parentRealPath + "/" + name.
-			// If it differs, the entry is a symlink. Track symlink targets to
-			// detect cycles: if the target was already visited, skip the entry.
+			// If it differs, the entry is a symlink.
 			expectedRealPath := parentRealPath + "/" + dir
-			if dirRealPath != expectedRealPath {
-				if _, seen := f.adapter.visitedSymTargets[dirRealPath]; seen {
+			isSymlink := dirRealPath != expectedRealPath
+
+			if isSymlink {
+				if !f.adapter.followSymlinks {
+					// Skip symlinks entirely. See the type doc on vfsAdapter
+					// for why this is the default for DiscoverGapFiles.
 					continue
 				}
-				f.adapter.visitedSymTargets[dirRealPath] = struct{}{}
+				// Cycle dedupe: LoadOrStore returns loaded=true on second
+				// encounter of the same realpath; skip in that case.
+				if _, loaded := f.adapter.visitedSymTargets.LoadOrStore(dirRealPath, struct{}{}); loaded {
+					continue
+				}
 			}
 
 			f.entries = append(f.entries, &vfsDirEntry{name: dir, isDir: true})

@@ -1,4 +1,4 @@
-# react/jsx-equals-spacing
+# jsx-equals-spacing
 
 ## Rule Details
 

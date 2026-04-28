@@ -1,4 +1,4 @@
-# jest/prefer-todo
+# prefer-todo
 
 ## Rule Details
 

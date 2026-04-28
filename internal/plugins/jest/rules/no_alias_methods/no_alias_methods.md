@@ -1,4 +1,4 @@
-# jest/no-alias-methods
+# no-alias-methods
 
 ## Rule Details
 

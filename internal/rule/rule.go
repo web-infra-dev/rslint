@@ -179,6 +179,18 @@ type RuleContext struct {
 	ReportNode                 func(node *ast.Node, msg RuleMessage)
 	ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
 	ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
+	// ReportNodeWithFixesAndSuggestions emits a single diagnostic carrying
+	// BOTH an autofix and one or more suggestions. Used by rules that follow
+	// upstream's "promote first suggestion to fix while keeping the
+	// suggestion" pattern (e.g., ESLint's
+	// `enableDangerousAutofixThisMayCauseInfiniteLoops` in
+	// react-hooks/exhaustive-deps).
+	ReportNodeWithFixesAndSuggestions func(node *ast.Node, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
+	// ReportRangeWithFixesAndSuggestions is the range-keyed twin of
+	// ReportNodeWithFixesAndSuggestions. Same semantics, anchors the
+	// diagnostic at an explicit TextRange instead of a node's trimmed
+	// range.
+	ReportRangeWithFixesAndSuggestions func(textRange core.TextRange, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
 }
 
 func ReportNodeWithFixesOrSuggestions(ctx RuleContext, node *ast.Node, fix bool, msg RuleMessage, suggestionMsg RuleMessage, fixes ...RuleFix) {
