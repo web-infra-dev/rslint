@@ -282,6 +282,20 @@ pleaseExpect([{a:1}]).toContain({a:1});
 					{MessageId: "useToContain", Line: 1, Column: 23},
 				},
 			},
+			{
+				Code:   `expect(a.includes(b)).resolves.toBe(true);`,
+				Output: []string{`expect(a).resolves.toContain(b);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToContain", Line: 1, Column: 32},
+				},
+			},
+			{
+				Code:   `expect(a.includes(b)).resolves.not.toBe(true);`,
+				Output: []string{`expect(a).resolves.not.toContain(b);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToContain", Line: 1, Column: 36},
+				},
+			},
 		},
 	)
 }
