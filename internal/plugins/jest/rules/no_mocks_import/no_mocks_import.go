@@ -24,6 +24,10 @@ func isMocksImportPath(path string) bool {
 	return slices.Contains(strings.Split(path, "/"), mocksDirName)
 }
 
+func isStringNode(node *ast.Node) bool {
+	return node.Kind == ast.KindStringLiteral || node.Kind == ast.KindNoSubstitutionTemplateLiteral
+}
+
 var NoMocksImportRule = rule.Rule{
 	Name: "jest/no-mocks-import",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -34,7 +38,12 @@ var NoMocksImportRule = rule.Rule{
 				}
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				callee := node.AsCallExpression().Expression.AsIdentifier()
+				callExpr := node.AsCallExpression().Expression
+				if callExpr.Kind != ast.KindIdentifier {
+					return
+				}
+
+				callee := callExpr.AsIdentifier()
 				if callee == nil || callee.Text != "require" {
 					return
 				}
@@ -45,7 +54,7 @@ var NoMocksImportRule = rule.Rule{
 				}
 
 				firstArg := arguments[0]
-				if firstArg != nil && ast.IsStringLiteral(firstArg) && isMocksImportPath(firstArg.Text()) {
+				if firstArg != nil && isStringNode(firstArg) && isMocksImportPath(firstArg.Text()) {
 					ctx.ReportNode(firstArg, buildNoManualImportErrorMessage())
 				}
 			},
