@@ -1,19 +1,17 @@
+import PresetTable, {
+  PresetImportSnippet,
+} from '@/theme/components/PresetTable.tsx';
+import PluginPrefixTable from '@/theme/components/PluginPrefixTable.tsx';
+
 # Rules & Presets
 
 ## Available Presets
 
-| Preset                             | Description                                               |                                                                 |
-| ---------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------- |
-| `ts.configs.recommended`           | TypeScript recommended rules (includes ESLint core rules) | [View rules →](/rules/?preset=ts.configs.recommended)           |
-| `js.configs.recommended`           | JavaScript recommended rules                              | [View rules →](/rules/?preset=js.configs.recommended)           |
-| `reactPlugin.configs.recommended`  | React rules                                               | [View rules →](/rules/?preset=reactPlugin.configs.recommended)  |
-| `importPlugin.configs.recommended` | Import/export rules                                       | [View rules →](/rules/?preset=importPlugin.configs.recommended) |
+<PresetTable />
 
 Import presets from `@rslint/core`:
 
-```ts
-import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
-```
+<PresetImportSnippet />
 
 ## rules
 
@@ -56,13 +54,7 @@ rules: {
 
 Plugin names to enable. Available plugins:
 
-| Plugin               | Rules Prefix           |
-| -------------------- | ---------------------- |
-| `@typescript-eslint` | `@typescript-eslint/*` |
-| `import`             | `import/*`             |
-| `jest`               | `jest/*`               |
-| `promise`            | `promise/*`            |
-| `react`              | `react/*`              |
+<PluginPrefixTable />
 
 ESLint core rules (e.g. `no-unused-vars`, `prefer-const`, `no-var`) have no prefix and do not belong to any plugin — they can be enabled directly in `rules` without listing anything in `plugins`.
 

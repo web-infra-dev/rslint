@@ -1,4 +1,4 @@
-# import/no-webpack-loader-syntax
+# no-webpack-loader-syntax
 
 ## Rule Details
 

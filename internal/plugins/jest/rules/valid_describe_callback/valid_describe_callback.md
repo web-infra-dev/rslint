@@ -1,4 +1,4 @@
-# jest/valid-describe-callback
+# valid-describe-callback
 
 ## Rule Details
 

@@ -1,4 +1,4 @@
-# react/jsx-wrap-multilines
+# jsx-wrap-multilines
 
 ## Rule Details
 

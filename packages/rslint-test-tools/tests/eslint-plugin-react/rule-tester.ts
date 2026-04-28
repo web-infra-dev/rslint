@@ -1,7 +1,57 @@
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import util from 'node:util';
 
 import { lint } from '@rslint/core';
+
+// Per-test rslint.json builder used to thread `settings` through to the
+// linter. The base rslint.json registered for the suite has `settings: {}`;
+// when a test case carries its own settings, we emit a temporary config
+// that merges the base with the test's settings and point `lint()` at it.
+//
+// rslint's LintOptions does NOT expose a runtime `settings` override (see
+// packages/rslint/dist/types.d.ts), so a config file is the only path. The
+// temp dir is cleaned on the same tick the lint() promise resolves.
+function buildConfigForSettings(
+  baseConfigPath: string,
+  settings: Record<string, unknown> | undefined,
+): { configPath: string; cleanup: () => void } {
+  if (!settings || Object.keys(settings).length === 0) {
+    return { configPath: baseConfigPath, cleanup: () => {} };
+  }
+  const base = JSON.parse(readFileSync(baseConfigPath, 'utf8'));
+  const merged = base.map((entry: any) => ({
+    ...entry,
+    settings: { ...(entry.settings ?? {}), ...settings },
+  }));
+  // Write the temp config into the SAME directory as the base config:
+  // the base entries reference `tsconfig.*.json` via relative paths
+  // that rslint resolves from the config file's location, so the temp
+  // config must sit next to the originals or those paths break.
+  const baseDir = path.dirname(baseConfigPath);
+  const cfg = path.join(
+    baseDir,
+    `rslint.test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
+  );
+  writeFileSync(cfg, JSON.stringify(merged), 'utf8');
+  // Suppress unused-import warnings for the temp-dir helpers — they are
+  // kept on the imports list to keep the surface stable for future edits
+  // that may need an out-of-tree config (e.g. one that doesn't share the
+  // base config's relative tsconfig references).
+  void mkdtempSync;
+  void tmpdir;
+  return {
+    configPath: cfg,
+    cleanup: () => {
+      try {
+        rmSync(cfg, { force: true });
+      } catch {
+        /* best-effort cleanup; never fail a test on rmdir */
+      }
+    },
+  };
+}
 
 // Port from 'eslint'
 export interface ValidTestCase {
@@ -81,6 +131,8 @@ export class RuleTester {
 
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
+          const settings =
+            typeof validCase === 'string' ? undefined : validCase.settings;
           const defaultFilename = 'src/virtual.tsx';
           const filename =
             typeof validCase === 'string'
@@ -88,16 +140,25 @@ export class RuleTester {
               : (validCase.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
 
-          const diags = await lint({
+          const { configPath, cleanup } = buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: {
-              [absoluteFilename]: code,
-            },
-            ruleOptions: {
-              [ruleName]: options,
-            },
-          });
+            settings,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: {
+                [absoluteFilename]: code,
+              },
+              ruleOptions: {
+                [ruleName]: options,
+              },
+            });
+          } finally {
+            cleanup();
+          }
 
           assert(
             diags.diagnostics?.length === 0,
@@ -115,7 +176,7 @@ export class RuleTester {
             assert.fail('Invalid cases must have at least one error');
           }
 
-          const { code, only = false, options = [] } = item;
+          const { code, only = false, options = [], settings } = item;
           if (hasOnly && !only) {
             continue;
           }
@@ -125,16 +186,25 @@ export class RuleTester {
               ? defaultFilename
               : (item.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
-          const diags = await lint({
+          const { configPath, cleanup } = buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: {
-              [absoluteFilename]: code,
-            },
-            ruleOptions: {
-              [ruleName]: options,
-            },
-          });
+            settings,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: {
+                [absoluteFilename]: code,
+              },
+              ruleOptions: {
+                [ruleName]: options,
+              },
+            });
+          } finally {
+            cleanup();
+          }
 
           if (typeof item.errors === 'number') {
             if (item.errors === 0) {

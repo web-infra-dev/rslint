@@ -1138,6 +1138,38 @@ export {};
       ],
       filename: 'foo.d.ts',
     },
+    {
+      code: `
+export interface RpcResponse<T = unknown> {
+  code?: number;
+}
+      `,
+      errors: [{ messageId: 'unusedVar' }],
+    },
+    {
+      code: `
+export type Alias<T = unknown> = string;
+      `,
+      errors: [{ messageId: 'unusedVar' }],
+    },
+    {
+      code: `
+export function fn<T>(): void {}
+      `,
+      errors: [{ messageId: 'unusedVar' }],
+    },
+    {
+      code: `
+export class Cls<T = unknown> {}
+      `,
+      errors: [{ messageId: 'unusedVar' }],
+    },
+    {
+      code: `
+export interface CrossRef<T, U extends T> {}
+      `,
+      errors: [{ messageId: 'unusedVar' }],
+    },
   ],
 
   valid: [
@@ -2488,6 +2520,43 @@ class Foo {}
 declare class Bar {}
       `,
       filename: 'foo.d.ts',
+    },
+    // Type parameters: used in the body counts as used
+    `
+export function used<T>(x: T): T {
+  return x;
+}
+    `,
+    `
+export interface UsedIface<T> {
+  value: T;
+}
+    `,
+    `
+export class UsedCls<T> {
+  x!: T;
+}
+    `,
+    // `infer T` is not a declaration — never reported
+    `
+export type ElementOf<T> = T extends (infer U)[] ? U : never;
+    `,
+    // Mapped type `[P in K]` is not a declaration — never reported
+    `
+export type MyRecord<K extends string> = { [P in K]: number };
+    `,
+    // Type parameter used only by another type parameter's default/constraint counts as used
+    `
+export interface DefaultUses<T, U = T> {
+  x?: U;
+}
+    `,
+    // varsIgnorePattern applies to type parameters
+    {
+      code: `
+export interface IgnoredByPattern<_T> {}
+      `,
+      options: [{ varsIgnorePattern: '^_' }],
     },
   ],
 });

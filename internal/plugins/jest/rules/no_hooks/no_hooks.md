@@ -1,4 +1,4 @@
-# jest/no-hooks
+# no-hooks
 
 ## Rule Details
 

@@ -68,6 +68,30 @@ func TestNoImportAssignRule(t *testing.T) {
 			{Code: `import * as mod from 'mod'; { let mod = 0; mod = 1 }`},
 			{Code: `import * as mod from 'mod'; { let mod = 0; mod.named = 1 }`},
 
+			// Type assertion wrappers — intentional bypass, not flagged (aligns with ESLint)
+			// PropertyAccess with various assertion styles
+			{Code: `import * as mod from 'mod'; (mod.named as any) = 0`},
+			{Code: `import * as mod from 'mod'; (mod.named as any) += 0`},
+			{Code: `import * as mod from 'mod'; (mod.named as any)++`},
+			{Code: `import * as mod from 'mod'; (<any>mod.named) = 0`},
+			{Code: `import * as mod from 'mod'; (mod.named!) = 0`},
+			// ElementAccess with type assertion
+			{Code: `import * as mod from 'mod'; (mod["named"] as any) = 0`},
+			// Nested parentheses around type assertion
+			{Code: `import * as mod from 'mod'; ((mod.named as any)) = 0`},
+			// Chained type assertions
+			{Code: `import * as mod from 'mod'; (mod.named as any as unknown) = 0`},
+			// delete with type assertion
+			{Code: `import * as mod from 'mod'; delete (mod.named as any)`},
+			// for-in/of with type assertion
+			{Code: `import * as mod from 'mod'; for ((mod.named as any) in foo);`},
+			{Code: `import * as mod from 'mod'; for ((mod.named as any) of foo);`},
+			// Destructuring with type assertion
+			{Code: `import * as mod from 'mod'; [(mod.named as any)] = foo`},
+			{Code: `import * as mod from 'mod'; ({ bar: (mod.named as any) } = foo)`},
+			// Mutation function with type assertion on the namespace
+			{Code: `import * as mod from 'mod'; Object.assign(mod as any, obj)`},
+
 			// Object/Reflect locally shadowed — mutation calls are safe
 			{Code: `import * as mod from 'mod'; { var Object; Object.assign(mod, obj); }`},
 			{Code: `import * as mod from 'mod'; var Object; Object.assign(mod, obj);`},

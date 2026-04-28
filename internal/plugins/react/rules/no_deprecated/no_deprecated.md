@@ -1,4 +1,4 @@
-# react/no-deprecated
+# no-deprecated
 
 ## Rule Details
 

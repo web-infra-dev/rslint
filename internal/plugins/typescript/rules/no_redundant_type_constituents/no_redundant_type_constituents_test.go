@@ -649,5 +649,190 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 				},
 			},
 		},
+		// Message-text assertions — pin exact output against typescript-eslint
+		// reference. These guard rendering of the {{literal}}/{{typeName}}
+		// substitutions (string-literal quoting, alias-name extraction, etc.).
+		{
+			Code: "type T = number | any;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "overrides",
+					Message:   "'any' overrides all other types in this union type.",
+					Column:    19,
+				},
+			},
+		},
+		{
+			Code: `
+        type B = any;
+        type T = B | number;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "overrides",
+					Message:   "'any' overrides all other types in this union type.",
+					Column:    18,
+				},
+			},
+		},
+		{
+			Code: "type ErrorTypes = NotKnown | 0;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorTypeOverrides",
+					Message:   "'NotKnown' is an 'error' type that acts as 'any' and overrides all other types in this union type.",
+					Column:    19,
+				},
+			},
+		},
+		{
+			Code: "type ErrorTypes = NotKnown & 0;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorTypeOverrides",
+					Message:   "'NotKnown' is an 'error' type that acts as 'any' and overrides all other types in this intersection type.",
+					Column:    19,
+				},
+			},
+		},
+		{
+			Code: "type T = number | unknown;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "overrides",
+					Message:   "'unknown' overrides all other types in this union type.",
+					Column:    19,
+				},
+			},
+		},
+		{
+			Code: "type T = number | never;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "overridden",
+					Message:   "'never' is overridden by other types in this union type.",
+					Column:    19,
+				},
+			},
+		},
+		{
+			Code: "type T = '' | string;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   `"" is overridden by string in this union type.`,
+					Column:    10,
+				},
+			},
+		},
+		{
+			Code: `
+        type B = 'b';
+        type T = B | string;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   `"b" is overridden by string in this union type.`,
+					Column:    18,
+				},
+			},
+		},
+		{
+			Code: "type T = 0n | bigint;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   "0n is overridden by bigint in this union type.",
+					Column:    10,
+				},
+			},
+		},
+		{
+			Code: "type T = -1n | bigint;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   "-1n is overridden by bigint in this union type.",
+					Column:    10,
+				},
+			},
+		},
+		{
+			Code: "type T = number | 0;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   "0 is overridden by number in this union type.",
+					Column:    19,
+				},
+			},
+		},
+		{
+			Code: "type T = '' & string;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "primitiveOverridden",
+					Message:   `string is overridden by the "" in this intersection type.`,
+					Column:    15,
+				},
+			},
+		},
+		{
+			Code: `
+        type B = '';
+        type T = B & string;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "primitiveOverridden",
+					Message:   `string is overridden by the "" in this intersection type.`,
+					Column:    22,
+				},
+			},
+		},
+		{
+			Code: `
+        type B = -1n;
+        type T = B | bigint;
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   "-1n is overridden by bigint in this union type.",
+					Column:    18,
+				},
+			},
+		},
+		{
+			Code: "type T = false | boolean;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   "false is overridden by boolean in this union type.",
+					Column:    10,
+				},
+			},
+		},
+		{
+			Code: "type T = true | boolean;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "literalOverridden",
+					Message:   "true is overridden by boolean in this union type.",
+					Column:    10,
+				},
+			},
+		},
+		{
+			Code: "type T = false & boolean;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "primitiveOverridden",
+					Message:   "boolean is overridden by the false in this intersection type.",
+					Column:    18,
+				},
+			},
+		},
 	})
 }

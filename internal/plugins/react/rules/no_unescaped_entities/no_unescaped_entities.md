@@ -1,4 +1,4 @@
-# react/no-unescaped-entities
+# no-unescaped-entities
 
 ## Rule Details
 
