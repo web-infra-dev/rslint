@@ -2,7 +2,9 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import {
   waitForDiagnostics,
+  waitForContentChange,
   findFixAllAction,
+  prewarmOnSaveFixAll,
   requestFixAll,
   withTmpFile,
   withOnSaveFixAll,
@@ -10,7 +12,15 @@ import {
 } from './fixall-helpers';
 
 suite('rslint fixAll - cascade (multi-pass)', function () {
-  this.timeout(90000);
+  this.timeout(120000);
+
+  // Prime the on-save fixAll pipeline once so the first real test below
+  // doesn't pay VS Code's codeActionsOnSave + LSP cold-start cost (~30s on
+  // Windows under load). See fixall-helpers.ts:prewarmOnSaveFixAll.
+  suiteSetup(async function () {
+    this.timeout(120000);
+    await prewarmOnSaveFixAll();
+  });
 
   test('ban-types triggers no-inferrable-types in second pass', async () => {
     const cascadeContent = [
@@ -63,19 +73,17 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
 
       await doc.save();
 
-      const startTime = Date.now();
-      while (
-        (doc.getText().includes(': String') ||
-          doc.getText().includes(': string')) &&
-        Date.now() - startTime < 30000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
-      const content = doc.getText();
-      assert.ok(
-        !content.includes(': String') && !content.includes(': string'),
-        `Single save should fix both cascade passes. Content: ${content}`,
+      // Event-driven wait: resolves the moment the on-save fixAll edit
+      // lands on the document, instead of polling on a 500ms interval.
+      // 60s budget gives Windows runners headroom even after pre-warm.
+      // The helper rejects with a descriptive timeout error including the
+      // last seen document content; let that propagate verbatim so the
+      // original stack survives.
+      await waitForContentChange(
+        doc,
+        (content) =>
+          !content.includes(': String') && !content.includes(': string'),
+        60000,
       );
     });
   });
