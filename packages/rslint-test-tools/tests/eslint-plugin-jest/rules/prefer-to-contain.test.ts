@@ -217,6 +217,6 @@ ruleTester.run('prefer-to-contain', {} as never, {
       code: 'expect(a.includes(b)).resolves.not.toBe(true);',
       output: 'expect(a).resolves.not.toContain(b);',
       errors: [{ messageId: 'useToContain', column: 36, line: 1 }],
-    }
+    },
   ],
 });
