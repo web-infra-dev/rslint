@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_hooks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_length"
@@ -19,6 +20,7 @@ func GetAllRules() []rule.Rule {
 		no_disabled_tests.NoDisabledTestsRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
+		no_mocks_import.NoMocksImportRule,
 		no_test_prefixes.NoTestPrefixesRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_have_length.PreferToHaveLengthRule,
