@@ -17,7 +17,7 @@ func check(node *ast.Node) bool {
 
 	nodeType := node.Type()
 	if nodeType != nil && ast.IsTypeReferenceNode(nodeType) {
-		typeName := nodeType.AsTypeReference().TypeName
+		typeName := nodeType.AsTypeReferenceNode().TypeName
 		if ast.IsIdentifier(typeName) {
 			return typeName.Text() == parentName.Text()
 		}

@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/vfsmatch"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -124,7 +125,7 @@ func createProgramsForConfig(
 		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
 		excludes := utils.DefaultExcludeDirNames
 		includes := []string{"**/*"}
-		rootFiles := vfs.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, nil)
+		rootFiles := vfsmatch.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, vfsmatch.UnlimitedDepth)
 		if len(rootFiles) > 0 {
 			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
 			if err != nil {

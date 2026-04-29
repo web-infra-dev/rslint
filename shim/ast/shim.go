@@ -9,6 +9,7 @@ import "github.com/microsoft/typescript-go/internal/diagnostics"
 import "github.com/microsoft/typescript-go/internal/tspath"
 import _ "unsafe"
 
+type AbstractKeyword = ast.AbstractKeyword
 type AccessExpression = ast.AccessExpression
 type AccessKind = ast.AccessKind
 const AccessKindRead = ast.AccessKindRead
@@ -16,34 +17,63 @@ const AccessKindReadWrite = ast.AccessKindReadWrite
 const AccessKindWrite = ast.AccessKindWrite
 type AccessorDeclaration = ast.AccessorDeclaration
 type AccessorDeclarationBase = ast.AccessorDeclarationBase
+type AccessorKeyword = ast.AccessorKeyword
+type AdditiveOperator = ast.AdditiveOperator
+type AdditiveOperatorOrHigher = ast.AdditiveOperatorOrHigher
 type AllAccessorDeclarations = ast.AllAccessorDeclarations
 type AnyImportOrRequireStatement = ast.AnyImportOrRequireStatement
 type AnyImportSyntax = ast.AnyImportSyntax
 type AnyValidImportOrReExport = ast.AnyValidImportOrReExport
 type ArgumentList = ast.ArgumentList
+type ArrayBindingElement = ast.ArrayBindingElement
+type ArrayDestructuringAssignment = ast.ArrayDestructuringAssignment
 type ArrayLiteralExpression = ast.ArrayLiteralExpression
+type ArrayLiteralExpressionNode = ast.ArrayLiteralExpressionNode
 type ArrayTypeNode = ast.ArrayTypeNode
+type ArrayTypeNodeNode = ast.ArrayTypeNodeNode
 type ArrowFunction = ast.ArrowFunction
+type ArrowFunctionNode = ast.ArrowFunctionNode
 type AsExpression = ast.AsExpression
+type AsExpressionNode = ast.AsExpressionNode
+type AssertKeyword = ast.AssertKeyword
+type AssertionExpression = ast.AssertionExpression
+type AssertsKeyword = ast.AssertsKeyword
+type AssignmentOperator = ast.AssignmentOperator
+type AssignmentOperatorOrHigher = ast.AssignmentOperatorOrHigher
+type AssignmentOperatorToken = ast.AssignmentOperatorToken
+type AsteriskToken = ast.AsteriskToken
+type AsyncKeyword = ast.AsyncKeyword
 type AwaitExpression = ast.AwaitExpression
+type AwaitExpressionNode = ast.AwaitExpressionNode
+type AwaitKeyword = ast.AwaitKeyword
 type BigIntLiteral = ast.BigIntLiteral
+type BigIntLiteralNode = ast.BigIntLiteralNode
 type BinaryExpression = ast.BinaryExpression
+type BinaryExpressionNode = ast.BinaryExpressionNode
+type BinaryOperator = ast.BinaryOperator
+type BinaryOperatorToken = ast.BinaryOperatorToken
 type BindingElement = ast.BindingElement
 type BindingElementList = ast.BindingElementList
 type BindingElementNode = ast.BindingElementNode
 type BindingName = ast.BindingName
 type BindingPattern = ast.BindingPattern
 type BindingPatternNode = ast.BindingPatternNode
+type BitwiseOperator = ast.BitwiseOperator
+type BitwiseOperatorOrHigher = ast.BitwiseOperatorOrHigher
 type Block = ast.Block
 type BlockNode = ast.BlockNode
 type BlockOrExpression = ast.BlockOrExpression
 type BodyBase = ast.BodyBase
+type BooleanLiteral = ast.BooleanLiteral
 type BreakOrContinueStatement = ast.BreakOrContinueStatement
 type BreakStatement = ast.BreakStatement
+type BreakStatementNode = ast.BreakStatementNode
 type CallExpression = ast.CallExpression
+type CallExpressionNode = ast.CallExpressionNode
 type CallLikeExpression = ast.CallLikeExpression
 type CallOrNewExpression = ast.CallOrNewExpression
 type CallSignatureDeclaration = ast.CallSignatureDeclaration
+type CallSignatureDeclarationNode = ast.CallSignatureDeclarationNode
 //go:linkname CanHaveDecorators github.com/microsoft/typescript-go/internal/ast.CanHaveDecorators
 func CanHaveDecorators(node *ast.Node) bool
 //go:linkname CanHaveIllegalDecorators github.com/microsoft/typescript-go/internal/ast.CanHaveIllegalDecorators
@@ -56,8 +86,8 @@ func CanHaveModifiers(node *ast.Node) bool
 func CanHaveSymbol(node *ast.Node) bool
 type CaseBlock = ast.CaseBlock
 type CaseBlockNode = ast.CaseBlockNode
-type CaseClauseNode = ast.CaseClauseNode
 type CaseClausesList = ast.CaseClausesList
+type CaseKeyword = ast.CaseKeyword
 type CaseOrDefaultClause = ast.CaseOrDefaultClause
 type CaseOrDefaultClauseNode = ast.CaseOrDefaultClauseNode
 type CatchClause = ast.CatchClause
@@ -95,56 +125,81 @@ type CheckJsDirective = ast.CheckJsDirective
 //go:linkname ChildIsDecorated github.com/microsoft/typescript-go/internal/ast.ChildIsDecorated
 func ChildIsDecorated(useLegacyDecorators bool, node *ast.Node, parent *ast.Node) bool
 type ClassDeclaration = ast.ClassDeclaration
+type ClassDeclarationNode = ast.ClassDeclarationNode
 type ClassElement = ast.ClassElement
 type ClassElementBase = ast.ClassElementBase
 type ClassElementList = ast.ClassElementList
 //go:linkname ClassElementOrClassElementParameterIsDecorated github.com/microsoft/typescript-go/internal/ast.ClassElementOrClassElementParameterIsDecorated
 func ClassElementOrClassElementParameterIsDecorated(useLegacyDecorators bool, node *ast.Node, parent *ast.Node) bool
 type ClassExpression = ast.ClassExpression
+type ClassExpressionNode = ast.ClassExpressionNode
 type ClassLikeBase = ast.ClassLikeBase
 type ClassLikeDeclaration = ast.ClassLikeDeclaration
 //go:linkname ClassOrConstructorParameterIsDecorated github.com/microsoft/typescript-go/internal/ast.ClassOrConstructorParameterIsDecorated
 func ClassOrConstructorParameterIsDecorated(useLegacyDecorators bool, node *ast.Node) bool
 type ClassStaticBlockDeclaration = ast.ClassStaticBlockDeclaration
+type ClassStaticBlockDeclarationNode = ast.ClassStaticBlockDeclarationNode
 //go:linkname ClimbPastPropertyAccess github.com/microsoft/typescript-go/internal/ast.ClimbPastPropertyAccess
 func ClimbPastPropertyAccess(node *ast.Node) *ast.Node
+type ColonToken = ast.ColonToken
 type CommentDirective = ast.CommentDirective
 type CommentDirectiveKind = ast.CommentDirectiveKind
 const CommentDirectiveKindExpectError = ast.CommentDirectiveKindExpectError
 const CommentDirectiveKindIgnore = ast.CommentDirectiveKindIgnore
 const CommentDirectiveKindUnknown = ast.CommentDirectiveKindUnknown
 type CommentRange = ast.CommentRange
-type CommonJSExport = ast.CommonJSExport
 //go:linkname CompareDiagnostics github.com/microsoft/typescript-go/internal/ast.CompareDiagnostics
 func CompareDiagnostics(d1 *ast.Diagnostic, d2 *ast.Diagnostic) int
 //go:linkname CompareNodePositions github.com/microsoft/typescript-go/internal/ast.CompareNodePositions
 func CompareNodePositions(n1 *ast.Node, n2 *ast.Node) int
+type CompositeBase = ast.CompositeBase
+type CompoundAssignmentOperator = ast.CompoundAssignmentOperator
 //go:linkname ComputePositionMap github.com/microsoft/typescript-go/internal/ast.ComputePositionMap
 func ComputePositionMap(text string) *ast.PositionMap
 type ComputedPropertyName = ast.ComputedPropertyName
+type ComputedPropertyNameNode = ast.ComputedPropertyNameNode
+type ConciseBody = ast.ConciseBody
 type ConditionalExpression = ast.ConditionalExpression
+type ConditionalExpressionNode = ast.ConditionalExpressionNode
 type ConditionalTypeNode = ast.ConditionalTypeNode
+type ConditionalTypeNodeNode = ast.ConditionalTypeNodeNode
+type ConstKeyword = ast.ConstKeyword
 type ConstructSignatureDeclaration = ast.ConstructSignatureDeclaration
+type ConstructSignatureDeclarationNode = ast.ConstructSignatureDeclarationNode
 type ConstructorDeclaration = ast.ConstructorDeclaration
 type ConstructorDeclarationNode = ast.ConstructorDeclarationNode
 type ConstructorTypeNode = ast.ConstructorTypeNode
+type ConstructorTypeNodeNode = ast.ConstructorTypeNodeNode
 //go:linkname ContainsObjectRestOrSpread github.com/microsoft/typescript-go/internal/ast.ContainsObjectRestOrSpread
 func ContainsObjectRestOrSpread(node *ast.Node) bool
 type ContinueStatement = ast.ContinueStatement
+type ContinueStatementNode = ast.ContinueStatementNode
 //go:linkname CreateModifiersFromModifierFlags github.com/microsoft/typescript-go/internal/ast.CreateModifiersFromModifierFlags
 func CreateModifiersFromModifierFlags(flags ast.ModifierFlags, createModifier func(kind ast.Kind) *ast.Node) []*ast.Node
 type DebuggerStatement = ast.DebuggerStatement
+type DebuggerStatementNode = ast.DebuggerStatementNode
 type Declaration = ast.Declaration
 type DeclarationBase = ast.DeclarationBase
 type DeclarationName = ast.DeclarationName
+type DeclareKeyword = ast.DeclareKeyword
 type Decorator = ast.Decorator
+type DecoratorNode = ast.DecoratorNode
+type DefaultKeyword = ast.DefaultKeyword
 type DeleteExpression = ast.DeleteExpression
+type DeleteExpressionNode = ast.DeleteExpressionNode
+type DestructuringAssignment = ast.DestructuringAssignment
 type Diagnostic = ast.Diagnostic
 type DiagnosticsCollection = ast.DiagnosticsCollection
 type DoStatement = ast.DoStatement
+type DoStatementNode = ast.DoStatementNode
+type DotDotDotToken = ast.DotDotDotToken
+type DotToken = ast.DotToken
 type ElementAccessExpression = ast.ElementAccessExpression
+type ElementAccessExpressionNode = ast.ElementAccessExpressionNode
 type ElementList = ast.ElementList
 type EmptyStatement = ast.EmptyStatement
+type EmptyStatementNode = ast.EmptyStatementNode
+type EndOfFile = ast.EndOfFile
 type EntityName = ast.EntityName
 //go:linkname EntityNameToString github.com/microsoft/typescript-go/internal/ast.EntityNameToString
 func EntityNameToString(name *ast.Node, getTextOfNode func(*ast.Node) string) string
@@ -157,22 +212,36 @@ type EnumMemberNode = ast.EnumMemberNode
 func EqualDiagnostics(d1 *ast.Diagnostic, d2 *ast.Diagnostic) bool
 //go:linkname EqualDiagnosticsNoRelatedInfo github.com/microsoft/typescript-go/internal/ast.EqualDiagnosticsNoRelatedInfo
 func EqualDiagnosticsNoRelatedInfo(d1 *ast.Diagnostic, d2 *ast.Diagnostic) bool
+type EqualityOperator = ast.EqualityOperator
+type EqualityOperatorOrHigher = ast.EqualityOperatorOrHigher
+type EqualsGreaterThanToken = ast.EqualsGreaterThanToken
+type EqualsToken = ast.EqualsToken
+//go:linkname EscapeAllInternalSymbolNames github.com/microsoft/typescript-go/internal/ast.EscapeAllInternalSymbolNames
+func EscapeAllInternalSymbolNames(name string) string
+type ExclamationToken = ast.ExclamationToken
+type ExponentiationOperator = ast.ExponentiationOperator
 type ExportAssignment = ast.ExportAssignment
-//go:linkname ExportAssignmentIsAlias github.com/microsoft/typescript-go/internal/ast.ExportAssignmentIsAlias
-func ExportAssignmentIsAlias(node *ast.Node) bool
+type ExportAssignmentNode = ast.ExportAssignmentNode
 type ExportDeclaration = ast.ExportDeclaration
+type ExportDeclarationNode = ast.ExportDeclarationNode
+type ExportKeyword = ast.ExportKeyword
 type ExportSpecifier = ast.ExportSpecifier
 type ExportSpecifierList = ast.ExportSpecifierList
 type ExportSpecifierNode = ast.ExportSpecifierNode
 type ExportableBase = ast.ExportableBase
 type Expression = ast.Expression
 type ExpressionBase = ast.ExpressionBase
+//go:linkname ExpressionIsAlias github.com/microsoft/typescript-go/internal/ast.ExpressionIsAlias
+func ExpressionIsAlias(node *ast.Node) bool
 type ExpressionStatement = ast.ExpressionStatement
+type ExpressionStatementNode = ast.ExpressionStatementNode
 type ExpressionWithTypeArguments = ast.ExpressionWithTypeArguments
 type ExpressionWithTypeArgumentsList = ast.ExpressionWithTypeArgumentsList
 type ExpressionWithTypeArgumentsNode = ast.ExpressionWithTypeArgumentsNode
 type ExternalModuleIndicatorOptions = ast.ExternalModuleIndicatorOptions
 type ExternalModuleReference = ast.ExternalModuleReference
+type ExternalModuleReferenceNode = ast.ExternalModuleReferenceNode
+type FalseLiteral = ast.FalseLiteral
 type FileReference = ast.FileReference
 //go:linkname FindAncestor github.com/microsoft/typescript-go/internal/ast.FindAncestor
 func FindAncestor(node *ast.Node, callback func(*ast.Node) bool) *ast.Node
@@ -217,11 +286,15 @@ func ForEachDynamicImportOrRequireCall(file *ast.SourceFile, includeTypeSpaceImp
 //go:linkname ForEachReturnStatement github.com/microsoft/typescript-go/internal/ast.ForEachReturnStatement
 func ForEachReturnStatement(body *ast.Node, visitor func(stmt *ast.Node) bool) bool
 type ForInOrOfStatement = ast.ForInOrOfStatement
+type ForInOrOfStatementNode = ast.ForInOrOfStatementNode
 type ForInitializer = ast.ForInitializer
 type ForStatement = ast.ForStatement
+type ForStatementNode = ast.ForStatementNode
+type FunctionBody = ast.FunctionBody
 type FunctionDeclaration = ast.FunctionDeclaration
 type FunctionDeclarationNode = ast.FunctionDeclarationNode
 type FunctionExpression = ast.FunctionExpression
+type FunctionExpressionNode = ast.FunctionExpressionNode
 type FunctionFlags = ast.FunctionFlags
 const FunctionFlagsAsync = ast.FunctionFlagsAsync
 const FunctionFlagsAsyncGenerator = ast.FunctionFlagsAsyncGenerator
@@ -233,7 +306,9 @@ type FunctionLikeDeclaration = ast.FunctionLikeDeclaration
 type FunctionLikeWithBodyBase = ast.FunctionLikeWithBodyBase
 type FunctionOrConstructorTypeNodeBase = ast.FunctionOrConstructorTypeNodeBase
 type FunctionTypeNode = ast.FunctionTypeNode
+type FunctionTypeNodeNode = ast.FunctionTypeNodeNode
 type GetAccessorDeclaration = ast.GetAccessorDeclaration
+type GetAccessorDeclarationNode = ast.GetAccessorDeclarationNode
 //go:linkname GetAllAccessorDeclarations github.com/microsoft/typescript-go/internal/ast.GetAllAccessorDeclarations
 func GetAllAccessorDeclarations(parentDeclarations []*ast.Node, accessor *ast.AccessorDeclaration) ast.AllAccessorDeclarations
 //go:linkname GetAllAccessorDeclarationsForDeclaration github.com/microsoft/typescript-go/internal/ast.GetAllAccessorDeclarationsForDeclaration
@@ -298,6 +373,8 @@ func GetFunctionFlags(node *ast.Node) ast.FunctionFlags
 func GetHeritageClause(node *ast.Node, kind ast.Kind) *ast.Node
 //go:linkname GetHeritageElements github.com/microsoft/typescript-go/internal/ast.GetHeritageElements
 func GetHeritageElements(node *ast.Node, kind ast.Kind) []*ast.Node
+//go:linkname GetHostSignatureFromJSDoc github.com/microsoft/typescript-go/internal/ast.GetHostSignatureFromJSDoc
+func GetHostSignatureFromJSDoc(node *ast.Node) *ast.Node
 //go:linkname GetImmediatelyInvokedFunctionExpression github.com/microsoft/typescript-go/internal/ast.GetImmediatelyInvokedFunctionExpression
 func GetImmediatelyInvokedFunctionExpression(fn *ast.Node) *ast.Node
 //go:linkname GetImplementsHeritageClauseElements github.com/microsoft/typescript-go/internal/ast.GetImplementsHeritageClauseElements
@@ -316,6 +393,10 @@ func GetInitializerOfBinaryExpression(expr *ast.BinaryExpression) *ast.Expressio
 func GetInvokedExpression(node *ast.Node) *ast.Node
 //go:linkname GetJSDocDeprecatedTag github.com/microsoft/typescript-go/internal/ast.GetJSDocDeprecatedTag
 func GetJSDocDeprecatedTag(node *ast.Node) *ast.Node
+//go:linkname GetJSDocHost github.com/microsoft/typescript-go/internal/ast.GetJSDocHost
+func GetJSDocHost(node *ast.Node) *ast.Node
+//go:linkname GetJSDocRoot github.com/microsoft/typescript-go/internal/ast.GetJSDocRoot
+func GetJSDocRoot(node *ast.Node) *ast.Node
 //go:linkname GetJSXImplicitImportBase github.com/microsoft/typescript-go/internal/ast.GetJSXImplicitImportBase
 func GetJSXImplicitImportBase(compilerOptions *core.CompilerOptions, file *ast.SourceFile) string
 //go:linkname GetJSXRuntimeImport github.com/microsoft/typescript-go/internal/ast.GetJSXRuntimeImport
@@ -332,6 +413,8 @@ func GetMeaningFromDeclaration(node *ast.Node) ast.SemanticMeaning
 func GetMembers(symbol *ast.Symbol) ast.SymbolTable
 //go:linkname GetModuleInstanceState github.com/microsoft/typescript-go/internal/ast.GetModuleInstanceState
 func GetModuleInstanceState(node *ast.Node) ast.ModuleInstanceState
+//go:linkname GetModuleSpecifierOfBareOrAccessedRequire github.com/microsoft/typescript-go/internal/ast.GetModuleSpecifierOfBareOrAccessedRequire
+func GetModuleSpecifierOfBareOrAccessedRequire(node *ast.Node) *ast.Node
 //go:linkname GetNameOfDeclaration github.com/microsoft/typescript-go/internal/ast.GetNameOfDeclaration
 func GetNameOfDeclaration(declaration *ast.Node) *ast.Node
 //go:linkname GetNamespaceDeclarationNode github.com/microsoft/typescript-go/internal/ast.GetNamespaceDeclarationNode
@@ -401,6 +484,8 @@ func HasDecorators(node *ast.Node) bool
 //go:linkname HasDynamicName github.com/microsoft/typescript-go/internal/ast.HasDynamicName
 func HasDynamicName(declaration *ast.Node) bool
 type HasFileName = ast.HasFileName
+//go:linkname HasInferredType github.com/microsoft/typescript-go/internal/ast.HasInferredType
+func HasInferredType(node *ast.Node) bool
 //go:linkname HasInitializer github.com/microsoft/typescript-go/internal/ast.HasInitializer
 func HasInitializer(node *ast.Node) bool
 //go:linkname HasModifier github.com/microsoft/typescript-go/internal/ast.HasModifier
@@ -423,6 +508,7 @@ type HeritageClauseNode = ast.HeritageClauseNode
 type Identifier = ast.Identifier
 type IdentifierNode = ast.IdentifierNode
 type IfStatement = ast.IfStatement
+type IfStatementNode = ast.IfStatementNode
 type ImportAttribute = ast.ImportAttribute
 type ImportAttributeList = ast.ImportAttributeList
 type ImportAttributeName = ast.ImportAttributeName
@@ -433,19 +519,31 @@ type ImportClause = ast.ImportClause
 type ImportClauseNode = ast.ImportClauseNode
 type ImportClauseOrBindingPattern = ast.ImportClauseOrBindingPattern
 type ImportDeclaration = ast.ImportDeclaration
+type ImportDeclarationNode = ast.ImportDeclarationNode
 type ImportEqualsDeclaration = ast.ImportEqualsDeclaration
+type ImportEqualsDeclarationNode = ast.ImportEqualsDeclarationNode
+type ImportExpression = ast.ImportExpression
 //go:linkname ImportFromModuleSpecifier github.com/microsoft/typescript-go/internal/ast.ImportFromModuleSpecifier
 func ImportFromModuleSpecifier(node *ast.Node) *ast.Node
+type ImportPhaseModifierSyntaxKind = ast.ImportPhaseModifierSyntaxKind
 type ImportSpecifier = ast.ImportSpecifier
 type ImportSpecifierList = ast.ImportSpecifierList
 type ImportSpecifierNode = ast.ImportSpecifierNode
 type ImportTypeNode = ast.ImportTypeNode
+type ImportTypeNodeNode = ast.ImportTypeNodeNode
+type InKeyword = ast.InKeyword
+type IncrementExpression = ast.IncrementExpression
 //go:linkname IndexOfNode github.com/microsoft/typescript-go/internal/ast.IndexOfNode
 func IndexOfNode(nodes []*ast.Node, node *ast.Node) int
 type IndexSignatureDeclaration = ast.IndexSignatureDeclaration
+type IndexSignatureDeclarationNode = ast.IndexSignatureDeclarationNode
 type IndexedAccessTypeNode = ast.IndexedAccessTypeNode
+type IndexedAccessTypeNodeNode = ast.IndexedAccessTypeNodeNode
 type InferTypeNode = ast.InferTypeNode
+type InferTypeNodeNode = ast.InferTypeNodeNode
 type InterfaceDeclaration = ast.InterfaceDeclaration
+type InterfaceDeclarationNode = ast.InterfaceDeclarationNode
+const InternalSymbolNameAssignmentDeclaration = ast.InternalSymbolNameAssignmentDeclaration
 const InternalSymbolNameCall = ast.InternalSymbolNameCall
 const InternalSymbolNameClass = ast.InternalSymbolNameClass
 const InternalSymbolNameComputed = ast.InternalSymbolNameComputed
@@ -467,10 +565,15 @@ const InternalSymbolNamePrefix = ast.InternalSymbolNamePrefix
 const InternalSymbolNameThis = ast.InternalSymbolNameThis
 const InternalSymbolNameType = ast.InternalSymbolNameType
 type IntersectionTypeNode = ast.IntersectionTypeNode
+type IntersectionTypeNodeNode = ast.IntersectionTypeNodeNode
 //go:linkname IsAccessExpression github.com/microsoft/typescript-go/internal/ast.IsAccessExpression
 func IsAccessExpression(node *ast.Node) bool
 //go:linkname IsAccessor github.com/microsoft/typescript-go/internal/ast.IsAccessor
 func IsAccessor(node *ast.Node) bool
+//go:linkname IsAdditiveOperator github.com/microsoft/typescript-go/internal/ast.IsAdditiveOperator
+func IsAdditiveOperator(kind ast.Kind) bool
+//go:linkname IsAdditiveOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsAdditiveOperatorOrHigher
+func IsAdditiveOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsAliasSymbolDeclaration github.com/microsoft/typescript-go/internal/ast.IsAliasSymbolDeclaration
 func IsAliasSymbolDeclaration(node *ast.Node) bool
 //go:linkname IsAmbientModule github.com/microsoft/typescript-go/internal/ast.IsAmbientModule
@@ -502,7 +605,9 @@ func IsAssertionExpression(node *ast.Node) bool
 //go:linkname IsAssignmentExpression github.com/microsoft/typescript-go/internal/ast.IsAssignmentExpression
 func IsAssignmentExpression(node *ast.Node, excludeCompoundAssignment bool) bool
 //go:linkname IsAssignmentOperator github.com/microsoft/typescript-go/internal/ast.IsAssignmentOperator
-func IsAssignmentOperator(token ast.Kind) bool
+func IsAssignmentOperator(kind ast.Kind) bool
+//go:linkname IsAssignmentOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsAssignmentOperatorOrHigher
+func IsAssignmentOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsAssignmentPattern github.com/microsoft/typescript-go/internal/ast.IsAssignmentPattern
 func IsAssignmentPattern(node *ast.Node) bool
 //go:linkname IsAssignmentTarget github.com/microsoft/typescript-go/internal/ast.IsAssignmentTarget
@@ -517,6 +622,8 @@ func IsAwaitExpression(node *ast.Node) bool
 func IsBigIntLiteral(node *ast.Node) bool
 //go:linkname IsBinaryExpression github.com/microsoft/typescript-go/internal/ast.IsBinaryExpression
 func IsBinaryExpression(node *ast.Node) bool
+//go:linkname IsBinaryOperator github.com/microsoft/typescript-go/internal/ast.IsBinaryOperator
+func IsBinaryOperator(kind ast.Kind) bool
 //go:linkname IsBindableObjectDefinePropertyCall github.com/microsoft/typescript-go/internal/ast.IsBindableObjectDefinePropertyCall
 func IsBindableObjectDefinePropertyCall(node *ast.Node) bool
 //go:linkname IsBindableStaticAccessExpression github.com/microsoft/typescript-go/internal/ast.IsBindableStaticAccessExpression
@@ -529,6 +636,10 @@ func IsBindableStaticNameExpression(node *ast.Node, excludeThisKeyword bool) boo
 func IsBindingElement(node *ast.Node) bool
 //go:linkname IsBindingPattern github.com/microsoft/typescript-go/internal/ast.IsBindingPattern
 func IsBindingPattern(node *ast.Node) bool
+//go:linkname IsBitwiseOperator github.com/microsoft/typescript-go/internal/ast.IsBitwiseOperator
+func IsBitwiseOperator(kind ast.Kind) bool
+//go:linkname IsBitwiseOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsBitwiseOperatorOrHigher
+func IsBitwiseOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsBlock github.com/microsoft/typescript-go/internal/ast.IsBlock
 func IsBlock(node *ast.Node) bool
 //go:linkname IsBlockOrCatchScoped github.com/microsoft/typescript-go/internal/ast.IsBlockOrCatchScoped
@@ -585,10 +696,10 @@ func IsClassStaticBlockDeclaration(node *ast.Node) bool
 func IsCommaExpression(node *ast.Node) bool
 //go:linkname IsCommaSequence github.com/microsoft/typescript-go/internal/ast.IsCommaSequence
 func IsCommaSequence(node *ast.Node) bool
-//go:linkname IsCommonJSExport github.com/microsoft/typescript-go/internal/ast.IsCommonJSExport
-func IsCommonJSExport(node *ast.Node) bool
 //go:linkname IsCompoundAssignment github.com/microsoft/typescript-go/internal/ast.IsCompoundAssignment
 func IsCompoundAssignment(token ast.Kind) bool
+//go:linkname IsCompoundAssignmentOperator github.com/microsoft/typescript-go/internal/ast.IsCompoundAssignmentOperator
+func IsCompoundAssignmentOperator(kind ast.Kind) bool
 //go:linkname IsComputedNonLiteralName github.com/microsoft/typescript-go/internal/ast.IsComputedNonLiteralName
 func IsComputedNonLiteralName(name *ast.Node) bool
 //go:linkname IsComputedPropertyName github.com/microsoft/typescript-go/internal/ast.IsComputedPropertyName
@@ -671,10 +782,18 @@ func IsEnumConst(node *ast.Node) bool
 func IsEnumDeclaration(node *ast.Node) bool
 //go:linkname IsEnumMember github.com/microsoft/typescript-go/internal/ast.IsEnumMember
 func IsEnumMember(node *ast.Node) bool
+//go:linkname IsEqualityOperator github.com/microsoft/typescript-go/internal/ast.IsEqualityOperator
+func IsEqualityOperator(kind ast.Kind) bool
+//go:linkname IsEqualityOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsEqualityOperatorOrHigher
+func IsEqualityOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsExclusivelyTypeOnlyImportOrExport github.com/microsoft/typescript-go/internal/ast.IsExclusivelyTypeOnlyImportOrExport
 func IsExclusivelyTypeOnlyImportOrExport(node *ast.Node) bool
 //go:linkname IsExpandoInitializer github.com/microsoft/typescript-go/internal/ast.IsExpandoInitializer
 func IsExpandoInitializer(initializer *ast.Node) bool
+//go:linkname IsExpandoPropertyDeclaration github.com/microsoft/typescript-go/internal/ast.IsExpandoPropertyDeclaration
+func IsExpandoPropertyDeclaration(node *ast.Node) bool
+//go:linkname IsExponentiationOperator github.com/microsoft/typescript-go/internal/ast.IsExponentiationOperator
+func IsExponentiationOperator(kind ast.Kind) bool
 //go:linkname IsExportAssignment github.com/microsoft/typescript-go/internal/ast.IsExportAssignment
 func IsExportAssignment(node *ast.Node) bool
 //go:linkname IsExportDeclaration github.com/microsoft/typescript-go/internal/ast.IsExportDeclaration
@@ -777,6 +896,8 @@ func IsImportNode(node *ast.Node) bool
 func IsImportOrExportSpecifier(node *ast.Node) bool
 //go:linkname IsImportOrImportEqualsDeclaration github.com/microsoft/typescript-go/internal/ast.IsImportOrImportEqualsDeclaration
 func IsImportOrImportEqualsDeclaration(node *ast.Node) bool
+//go:linkname IsImportPhaseModifierKind github.com/microsoft/typescript-go/internal/ast.IsImportPhaseModifierKind
+func IsImportPhaseModifierKind(kind ast.Kind) bool
 //go:linkname IsImportSpecifier github.com/microsoft/typescript-go/internal/ast.IsImportSpecifier
 func IsImportSpecifier(node *ast.Node) bool
 //go:linkname IsImportTypeNode github.com/microsoft/typescript-go/internal/ast.IsImportTypeNode
@@ -811,6 +932,8 @@ func IsInternalModuleImportEqualsDeclaration(node *ast.Node) bool
 func IsIntersectionTypeNode(node *ast.Node) bool
 //go:linkname IsIterationStatement github.com/microsoft/typescript-go/internal/ast.IsIterationStatement
 func IsIterationStatement(node *ast.Node, lookInLabeledStatements bool) bool
+//go:linkname IsJSDoc github.com/microsoft/typescript-go/internal/ast.IsJSDoc
+func IsJSDoc(node *ast.Node) bool
 //go:linkname IsJSDocAllType github.com/microsoft/typescript-go/internal/ast.IsJSDocAllType
 func IsJSDocAllType(node *ast.Node) bool
 //go:linkname IsJSDocAugmentsTag github.com/microsoft/typescript-go/internal/ast.IsJSDocAugmentsTag
@@ -839,6 +962,8 @@ func IsJSDocNameReference(node *ast.Node) bool
 func IsJSDocNameReferenceContext(node *ast.Node) bool
 //go:linkname IsJSDocNode github.com/microsoft/typescript-go/internal/ast.IsJSDocNode
 func IsJSDocNode(node *ast.Node) bool
+//go:linkname IsJSDocNodeKind github.com/microsoft/typescript-go/internal/ast.IsJSDocNodeKind
+func IsJSDocNodeKind(kind ast.Kind) bool
 //go:linkname IsJSDocNonNullableType github.com/microsoft/typescript-go/internal/ast.IsJSDocNonNullableType
 func IsJSDocNonNullableType(node *ast.Node) bool
 //go:linkname IsJSDocNullableType github.com/microsoft/typescript-go/internal/ast.IsJSDocNullableType
@@ -878,7 +1003,7 @@ func IsJSDocSingleCommentNodeList(nodeList *ast.NodeList) bool
 //go:linkname IsJSDocTag github.com/microsoft/typescript-go/internal/ast.IsJSDocTag
 func IsJSDocTag(node *ast.Node) bool
 //go:linkname IsJSDocTemplateTag github.com/microsoft/typescript-go/internal/ast.IsJSDocTemplateTag
-func IsJSDocTemplateTag(n *ast.Node) bool
+func IsJSDocTemplateTag(node *ast.Node) bool
 //go:linkname IsJSDocText github.com/microsoft/typescript-go/internal/ast.IsJSDocText
 func IsJSDocText(node *ast.Node) bool
 //go:linkname IsJSDocThisTag github.com/microsoft/typescript-go/internal/ast.IsJSDocThisTag
@@ -899,8 +1024,6 @@ func IsJSDocTypedefTag(node *ast.Node) bool
 func IsJSDocUnknownTag(node *ast.Node) bool
 //go:linkname IsJSDocVariadicType github.com/microsoft/typescript-go/internal/ast.IsJSDocVariadicType
 func IsJSDocVariadicType(node *ast.Node) bool
-//go:linkname IsJSExportAssignment github.com/microsoft/typescript-go/internal/ast.IsJSExportAssignment
-func IsJSExportAssignment(node *ast.Node) bool
 //go:linkname IsJSImportDeclaration github.com/microsoft/typescript-go/internal/ast.IsJSImportDeclaration
 func IsJSImportDeclaration(node *ast.Node) bool
 //go:linkname IsJSTypeAliasDeclaration github.com/microsoft/typescript-go/internal/ast.IsJSTypeAliasDeclaration
@@ -919,6 +1042,8 @@ func IsJsxCallLike(node *ast.Node) bool
 func IsJsxChild(node *ast.Node) bool
 //go:linkname IsJsxClosingElement github.com/microsoft/typescript-go/internal/ast.IsJsxClosingElement
 func IsJsxClosingElement(node *ast.Node) bool
+//go:linkname IsJsxClosingFragment github.com/microsoft/typescript-go/internal/ast.IsJsxClosingFragment
+func IsJsxClosingFragment(node *ast.Node) bool
 //go:linkname IsJsxElement github.com/microsoft/typescript-go/internal/ast.IsJsxElement
 func IsJsxElement(node *ast.Node) bool
 //go:linkname IsJsxExpression github.com/microsoft/typescript-go/internal/ast.IsJsxExpression
@@ -943,12 +1068,22 @@ func IsJsxSpreadAttribute(node *ast.Node) bool
 func IsJsxTagName(node *ast.Node) bool
 //go:linkname IsJsxText github.com/microsoft/typescript-go/internal/ast.IsJsxText
 func IsJsxText(node *ast.Node) bool
+//go:linkname IsJsxTokenKind github.com/microsoft/typescript-go/internal/ast.IsJsxTokenKind
+func IsJsxTokenKind(kind ast.Kind) bool
 //go:linkname IsJumpStatementTarget github.com/microsoft/typescript-go/internal/ast.IsJumpStatementTarget
 func IsJumpStatementTarget(node *ast.Node) bool
 //go:linkname IsKeyword github.com/microsoft/typescript-go/internal/ast.IsKeyword
 func IsKeyword(token ast.Kind) bool
+//go:linkname IsKeywordExpression github.com/microsoft/typescript-go/internal/ast.IsKeywordExpression
+func IsKeywordExpression(node *ast.Node) bool
+//go:linkname IsKeywordExpressionKind github.com/microsoft/typescript-go/internal/ast.IsKeywordExpressionKind
+func IsKeywordExpressionKind(kind ast.Kind) bool
 //go:linkname IsKeywordKind github.com/microsoft/typescript-go/internal/ast.IsKeywordKind
-func IsKeywordKind(token ast.Kind) bool
+func IsKeywordKind(kind ast.Kind) bool
+//go:linkname IsKeywordTypeKind github.com/microsoft/typescript-go/internal/ast.IsKeywordTypeKind
+func IsKeywordTypeKind(kind ast.Kind) bool
+//go:linkname IsKeywordTypeNode github.com/microsoft/typescript-go/internal/ast.IsKeywordTypeNode
+func IsKeywordTypeNode(node *ast.Node) bool
 //go:linkname IsLabelName github.com/microsoft/typescript-go/internal/ast.IsLabelName
 func IsLabelName(node *ast.Node) bool
 //go:linkname IsLabelOfLabeledStatement github.com/microsoft/typescript-go/internal/ast.IsLabelOfLabeledStatement
@@ -979,10 +1114,14 @@ func IsLocalsContainer(node *ast.Node) bool
 func IsLogicalBinaryOperator(token ast.Kind) bool
 //go:linkname IsLogicalExpression github.com/microsoft/typescript-go/internal/ast.IsLogicalExpression
 func IsLogicalExpression(node *ast.Node) bool
+//go:linkname IsLogicalOperator github.com/microsoft/typescript-go/internal/ast.IsLogicalOperator
+func IsLogicalOperator(kind ast.Kind) bool
+//go:linkname IsLogicalOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsLogicalOperatorOrHigher
+func IsLogicalOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsLogicalOrCoalescingAssignmentExpression github.com/microsoft/typescript-go/internal/ast.IsLogicalOrCoalescingAssignmentExpression
 func IsLogicalOrCoalescingAssignmentExpression(expr *ast.Node) bool
 //go:linkname IsLogicalOrCoalescingAssignmentOperator github.com/microsoft/typescript-go/internal/ast.IsLogicalOrCoalescingAssignmentOperator
-func IsLogicalOrCoalescingAssignmentOperator(token ast.Kind) bool
+func IsLogicalOrCoalescingAssignmentOperator(kind ast.Kind) bool
 //go:linkname IsLogicalOrCoalescingBinaryExpression github.com/microsoft/typescript-go/internal/ast.IsLogicalOrCoalescingBinaryExpression
 func IsLogicalOrCoalescingBinaryExpression(expr *ast.Node) bool
 //go:linkname IsLogicalOrCoalescingBinaryOperator github.com/microsoft/typescript-go/internal/ast.IsLogicalOrCoalescingBinaryOperator
@@ -1004,7 +1143,7 @@ func IsMissingDeclaration(node *ast.Node) bool
 //go:linkname IsModifier github.com/microsoft/typescript-go/internal/ast.IsModifier
 func IsModifier(node *ast.Node) bool
 //go:linkname IsModifierKind github.com/microsoft/typescript-go/internal/ast.IsModifierKind
-func IsModifierKind(token ast.Kind) bool
+func IsModifierKind(kind ast.Kind) bool
 //go:linkname IsModifierLike github.com/microsoft/typescript-go/internal/ast.IsModifierLike
 func IsModifierLike(node *ast.Node) bool
 //go:linkname IsModuleAugmentationExternal github.com/microsoft/typescript-go/internal/ast.IsModuleAugmentationExternal
@@ -1023,6 +1162,10 @@ func IsModuleIdentifier(node *ast.Node) bool
 func IsModuleOrEnumDeclaration(node *ast.Node) bool
 //go:linkname IsModuleWithStringLiteralName github.com/microsoft/typescript-go/internal/ast.IsModuleWithStringLiteralName
 func IsModuleWithStringLiteralName(node *ast.Node) bool
+//go:linkname IsMultiplicativeOperator github.com/microsoft/typescript-go/internal/ast.IsMultiplicativeOperator
+func IsMultiplicativeOperator(kind ast.Kind) bool
+//go:linkname IsMultiplicativeOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsMultiplicativeOperatorOrHigher
+func IsMultiplicativeOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsNamedExports github.com/microsoft/typescript-go/internal/ast.IsNamedExports
 func IsNamedExports(node *ast.Node) bool
 //go:linkname IsNamedImports github.com/microsoft/typescript-go/internal/ast.IsNamedImports
@@ -1085,8 +1228,8 @@ func IsOptionalTypeNode(node *ast.Node) bool
 func IsOuterExpression(node *ast.Expression, kinds ast.OuterExpressionKinds) bool
 //go:linkname IsOutermostOptionalChain github.com/microsoft/typescript-go/internal/ast.IsOutermostOptionalChain
 func IsOutermostOptionalChain(node *ast.Expression) bool
-//go:linkname IsParameter github.com/microsoft/typescript-go/internal/ast.IsParameter
-func IsParameter(node *ast.Node) bool
+//go:linkname IsParameterDeclaration github.com/microsoft/typescript-go/internal/ast.IsParameterDeclaration
+func IsParameterDeclaration(node *ast.Node) bool
 //go:linkname IsParameterLike github.com/microsoft/typescript-go/internal/ast.IsParameterLike
 func IsParameterLike(node *ast.Node) bool
 //go:linkname IsParameterPropertyDeclaration github.com/microsoft/typescript-go/internal/ast.IsParameterPropertyDeclaration
@@ -1115,10 +1258,16 @@ func IsPartiallyEmittedExpression(node *ast.Node) bool
 func IsPlainJSFile(file *ast.SourceFile, checkJs core.Tristate) bool
 //go:linkname IsPostfixUnaryExpression github.com/microsoft/typescript-go/internal/ast.IsPostfixUnaryExpression
 func IsPostfixUnaryExpression(node *ast.Node) bool
+//go:linkname IsPostfixUnaryOperator github.com/microsoft/typescript-go/internal/ast.IsPostfixUnaryOperator
+func IsPostfixUnaryOperator(kind ast.Kind) bool
 //go:linkname IsPotentiallyExecutableNode github.com/microsoft/typescript-go/internal/ast.IsPotentiallyExecutableNode
 func IsPotentiallyExecutableNode(node *ast.Node) bool
 //go:linkname IsPrefixUnaryExpression github.com/microsoft/typescript-go/internal/ast.IsPrefixUnaryExpression
 func IsPrefixUnaryExpression(node *ast.Node) bool
+//go:linkname IsPrefixUnaryOperator github.com/microsoft/typescript-go/internal/ast.IsPrefixUnaryOperator
+func IsPrefixUnaryOperator(kind ast.Kind) bool
+//go:linkname IsPrimitiveLiteralValue github.com/microsoft/typescript-go/internal/ast.IsPrimitiveLiteralValue
+func IsPrimitiveLiteralValue(node *ast.Node, includeBigInt bool) bool
 //go:linkname IsPrivateIdentifier github.com/microsoft/typescript-go/internal/ast.IsPrivateIdentifier
 func IsPrivateIdentifier(node *ast.Node) bool
 //go:linkname IsPrivateIdentifierClassElementDeclaration github.com/microsoft/typescript-go/internal/ast.IsPrivateIdentifierClassElementDeclaration
@@ -1141,8 +1290,12 @@ func IsPropertyName(node *ast.Node) bool
 func IsPropertyNameLiteral(node *ast.Node) bool
 //go:linkname IsPropertySignatureDeclaration github.com/microsoft/typescript-go/internal/ast.IsPropertySignatureDeclaration
 func IsPropertySignatureDeclaration(node *ast.Node) bool
+//go:linkname IsPrototypeAccess github.com/microsoft/typescript-go/internal/ast.IsPrototypeAccess
+func IsPrototypeAccess(node *ast.Node) bool
+//go:linkname IsPseudoLiteralKind github.com/microsoft/typescript-go/internal/ast.IsPseudoLiteralKind
+func IsPseudoLiteralKind(kind ast.Kind) bool
 //go:linkname IsPunctuationKind github.com/microsoft/typescript-go/internal/ast.IsPunctuationKind
-func IsPunctuationKind(token ast.Kind) bool
+func IsPunctuationKind(kind ast.Kind) bool
 //go:linkname IsPushOrUnshiftIdentifier github.com/microsoft/typescript-go/internal/ast.IsPushOrUnshiftIdentifier
 func IsPushOrUnshiftIdentifier(node *ast.Node) bool
 //go:linkname IsQualifiedName github.com/microsoft/typescript-go/internal/ast.IsQualifiedName
@@ -1151,6 +1304,10 @@ func IsQualifiedName(node *ast.Node) bool
 func IsQuestionToken(node *ast.Node) bool
 //go:linkname IsRegularExpressionLiteral github.com/microsoft/typescript-go/internal/ast.IsRegularExpressionLiteral
 func IsRegularExpressionLiteral(node *ast.Node) bool
+//go:linkname IsRelationalOperator github.com/microsoft/typescript-go/internal/ast.IsRelationalOperator
+func IsRelationalOperator(kind ast.Kind) bool
+//go:linkname IsRelationalOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsRelationalOperatorOrHigher
+func IsRelationalOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsRequireCall github.com/microsoft/typescript-go/internal/ast.IsRequireCall
 func IsRequireCall(node *ast.Node, requireStringLiteralLikeArgument bool) bool
 //go:linkname IsRequireVariableStatement github.com/microsoft/typescript-go/internal/ast.IsRequireVariableStatement
@@ -1171,6 +1328,10 @@ func IsSatisfiesExpression(node *ast.Node) bool
 func IsSemicolonClassElement(node *ast.Node) bool
 //go:linkname IsSetAccessorDeclaration github.com/microsoft/typescript-go/internal/ast.IsSetAccessorDeclaration
 func IsSetAccessorDeclaration(node *ast.Node) bool
+//go:linkname IsShiftOperator github.com/microsoft/typescript-go/internal/ast.IsShiftOperator
+func IsShiftOperator(kind ast.Kind) bool
+//go:linkname IsShiftOperatorOrHigher github.com/microsoft/typescript-go/internal/ast.IsShiftOperatorOrHigher
+func IsShiftOperatorOrHigher(kind ast.Kind) bool
 //go:linkname IsShorthandPropertyAssignment github.com/microsoft/typescript-go/internal/ast.IsShorthandPropertyAssignment
 func IsShorthandPropertyAssignment(node *ast.Node) bool
 //go:linkname IsSignedNumericLiteral github.com/microsoft/typescript-go/internal/ast.IsSignedNumericLiteral
@@ -1243,18 +1404,22 @@ func IsThisParameter(node *ast.Node) bool
 func IsThisTypeNode(node *ast.Node) bool
 //go:linkname IsThrowStatement github.com/microsoft/typescript-go/internal/ast.IsThrowStatement
 func IsThrowStatement(node *ast.Node) bool
+//go:linkname IsToken github.com/microsoft/typescript-go/internal/ast.IsToken
+func IsToken(node *ast.Node) bool
 //go:linkname IsTokenKind github.com/microsoft/typescript-go/internal/ast.IsTokenKind
-func IsTokenKind(token ast.Kind) bool
+func IsTokenKind(kind ast.Kind) bool
 //go:linkname IsTrivia github.com/microsoft/typescript-go/internal/ast.IsTrivia
 func IsTrivia(token ast.Kind) bool
+//go:linkname IsTriviaKind github.com/microsoft/typescript-go/internal/ast.IsTriviaKind
+func IsTriviaKind(kind ast.Kind) bool
 //go:linkname IsTryStatement github.com/microsoft/typescript-go/internal/ast.IsTryStatement
 func IsTryStatement(node *ast.Node) bool
 //go:linkname IsTupleTypeNode github.com/microsoft/typescript-go/internal/ast.IsTupleTypeNode
 func IsTupleTypeNode(node *ast.Node) bool
 //go:linkname IsTypeAliasDeclaration github.com/microsoft/typescript-go/internal/ast.IsTypeAliasDeclaration
 func IsTypeAliasDeclaration(node *ast.Node) bool
-//go:linkname IsTypeAssertionExpression github.com/microsoft/typescript-go/internal/ast.IsTypeAssertionExpression
-func IsTypeAssertionExpression(node *ast.Node) bool
+//go:linkname IsTypeAssertion github.com/microsoft/typescript-go/internal/ast.IsTypeAssertion
+func IsTypeAssertion(node *ast.Node) bool
 //go:linkname IsTypeDeclaration github.com/microsoft/typescript-go/internal/ast.IsTypeDeclaration
 func IsTypeDeclaration(node *ast.Node) bool
 //go:linkname IsTypeDeclarationName github.com/microsoft/typescript-go/internal/ast.IsTypeDeclarationName
@@ -1317,6 +1482,8 @@ func IsVariableDeclarationInitializedToRequire(node *ast.Node) bool
 func IsVariableDeclarationList(node *ast.Node) bool
 //go:linkname IsVariableLike github.com/microsoft/typescript-go/internal/ast.IsVariableLike
 func IsVariableLike(node *ast.Node) bool
+//go:linkname IsVariableParameterOrProperty github.com/microsoft/typescript-go/internal/ast.IsVariableParameterOrProperty
+func IsVariableParameterOrProperty(node *ast.Node) bool
 //go:linkname IsVariableStatement github.com/microsoft/typescript-go/internal/ast.IsVariableStatement
 func IsVariableStatement(node *ast.Node) bool
 //go:linkname IsVoidExpression github.com/microsoft/typescript-go/internal/ast.IsVoidExpression
@@ -1337,6 +1504,7 @@ func IsWriteAccessForReference(node *ast.Node) bool
 func IsWriteOnlyAccess(node *ast.Node) bool
 //go:linkname IsYieldExpression github.com/microsoft/typescript-go/internal/ast.IsYieldExpression
 func IsYieldExpression(node *ast.Node) bool
+type IterationStatementBase = ast.IterationStatementBase
 type JSDeclarationKind = ast.JSDeclarationKind
 const JSDeclarationKindExportsProperty = ast.JSDeclarationKindExportsProperty
 const JSDeclarationKindModuleExports = ast.JSDeclarationKindModuleExports
@@ -1347,50 +1515,85 @@ const JSDeclarationKindProperty = ast.JSDeclarationKindProperty
 const JSDeclarationKindThisProperty = ast.JSDeclarationKindThisProperty
 type JSDoc = ast.JSDoc
 type JSDocAllType = ast.JSDocAllType
+type JSDocAllTypeNode = ast.JSDocAllTypeNode
 type JSDocAugmentsTag = ast.JSDocAugmentsTag
+type JSDocAugmentsTagNode = ast.JSDocAugmentsTagNode
 type JSDocCallbackTag = ast.JSDocCallbackTag
+type JSDocCallbackTagNode = ast.JSDocCallbackTagNode
 type JSDocComment = ast.JSDocComment
 type JSDocCommentBase = ast.JSDocCommentBase
 type JSDocDeprecatedTag = ast.JSDocDeprecatedTag
+type JSDocDeprecatedTagNode = ast.JSDocDeprecatedTagNode
 type JSDocImplementsTag = ast.JSDocImplementsTag
+type JSDocImplementsTagNode = ast.JSDocImplementsTagNode
 type JSDocImportTag = ast.JSDocImportTag
+type JSDocImportTagNode = ast.JSDocImportTagNode
 type JSDocLink = ast.JSDocLink
 type JSDocLinkCode = ast.JSDocLinkCode
+type JSDocLinkCodeNode = ast.JSDocLinkCodeNode
+type JSDocLinkNode = ast.JSDocLinkNode
 type JSDocLinkPlain = ast.JSDocLinkPlain
+type JSDocLinkPlainNode = ast.JSDocLinkPlainNode
 type JSDocNameReference = ast.JSDocNameReference
+type JSDocNameReferenceNode = ast.JSDocNameReferenceNode
 type JSDocNode = ast.JSDocNode
+type JSDocNodeSyntaxKind = ast.JSDocNodeSyntaxKind
 type JSDocNonNullableType = ast.JSDocNonNullableType
+type JSDocNonNullableTypeNode = ast.JSDocNonNullableTypeNode
 type JSDocNullableType = ast.JSDocNullableType
+type JSDocNullableTypeNode = ast.JSDocNullableTypeNode
 type JSDocOptionalType = ast.JSDocOptionalType
+type JSDocOptionalTypeNode = ast.JSDocOptionalTypeNode
 type JSDocOverloadTag = ast.JSDocOverloadTag
+type JSDocOverloadTagNode = ast.JSDocOverloadTagNode
 type JSDocOverrideTag = ast.JSDocOverrideTag
+type JSDocOverrideTagNode = ast.JSDocOverrideTagNode
 type JSDocParameterOrPropertyTag = ast.JSDocParameterOrPropertyTag
-type JSDocParameterTag = ast.JSDocParameterTag
+type JSDocParameterOrPropertyTagNode = ast.JSDocParameterOrPropertyTagNode
 type JSDocPrivateTag = ast.JSDocPrivateTag
-type JSDocPropertyTag = ast.JSDocPropertyTag
+type JSDocPrivateTagNode = ast.JSDocPrivateTagNode
 type JSDocProtectedTag = ast.JSDocProtectedTag
+type JSDocProtectedTagNode = ast.JSDocProtectedTagNode
 type JSDocPublicTag = ast.JSDocPublicTag
+type JSDocPublicTagNode = ast.JSDocPublicTagNode
 type JSDocReadonlyTag = ast.JSDocReadonlyTag
+type JSDocReadonlyTagNode = ast.JSDocReadonlyTagNode
 type JSDocReturnTag = ast.JSDocReturnTag
+type JSDocReturnTagNode = ast.JSDocReturnTagNode
 type JSDocSatisfiesTag = ast.JSDocSatisfiesTag
+type JSDocSatisfiesTagNode = ast.JSDocSatisfiesTagNode
 type JSDocSeeTag = ast.JSDocSeeTag
+type JSDocSeeTagNode = ast.JSDocSeeTagNode
 type JSDocSignature = ast.JSDocSignature
+type JSDocSignatureNode = ast.JSDocSignatureNode
 type JSDocTag = ast.JSDocTag
 type JSDocTagBase = ast.JSDocTagBase
 type JSDocTemplateTag = ast.JSDocTemplateTag
+type JSDocTemplateTagNode = ast.JSDocTemplateTagNode
 type JSDocText = ast.JSDocText
+type JSDocTextNode = ast.JSDocTextNode
 type JSDocThisTag = ast.JSDocThisTag
+type JSDocThisTagNode = ast.JSDocThisTagNode
 type JSDocThrowsTag = ast.JSDocThrowsTag
+type JSDocThrowsTagNode = ast.JSDocThrowsTagNode
+type JSDocTypeBase = ast.JSDocTypeBase
 type JSDocTypeExpression = ast.JSDocTypeExpression
+type JSDocTypeExpressionNode = ast.JSDocTypeExpressionNode
 type JSDocTypeLiteral = ast.JSDocTypeLiteral
+type JSDocTypeLiteralNode = ast.JSDocTypeLiteralNode
 type JSDocTypeTag = ast.JSDocTypeTag
+type JSDocTypeTagNode = ast.JSDocTypeTagNode
 type JSDocTypedefTag = ast.JSDocTypedefTag
+type JSDocTypedefTagNode = ast.JSDocTypedefTagNode
 type JSDocUnknownTag = ast.JSDocUnknownTag
+type JSDocUnknownTagNode = ast.JSDocUnknownTagNode
 type JSDocVariadicType = ast.JSDocVariadicType
+type JSDocVariadicTypeNode = ast.JSDocVariadicTypeNode
 type JsxAttribute = ast.JsxAttribute
 type JsxAttributeLike = ast.JsxAttributeLike
 type JsxAttributeList = ast.JsxAttributeList
 type JsxAttributeName = ast.JsxAttributeName
+type JsxAttributeNode = ast.JsxAttributeNode
 type JsxAttributeValue = ast.JsxAttributeValue
 type JsxAttributes = ast.JsxAttributes
 type JsxAttributesNode = ast.JsxAttributesNode
@@ -1401,20 +1604,33 @@ type JsxClosingElementNode = ast.JsxClosingElementNode
 type JsxClosingFragment = ast.JsxClosingFragment
 type JsxClosingFragmentNode = ast.JsxClosingFragmentNode
 type JsxElement = ast.JsxElement
+type JsxElementNode = ast.JsxElementNode
 type JsxExpression = ast.JsxExpression
+type JsxExpressionNode = ast.JsxExpressionNode
 type JsxFragment = ast.JsxFragment
+type JsxFragmentNode = ast.JsxFragmentNode
 type JsxNamespacedName = ast.JsxNamespacedName
+type JsxNamespacedNameNode = ast.JsxNamespacedNameNode
 type JsxOpeningElement = ast.JsxOpeningElement
 type JsxOpeningElementNode = ast.JsxOpeningElementNode
 type JsxOpeningFragment = ast.JsxOpeningFragment
 type JsxOpeningFragmentNode = ast.JsxOpeningFragmentNode
 type JsxOpeningLikeElement = ast.JsxOpeningLikeElement
 type JsxSelfClosingElement = ast.JsxSelfClosingElement
+type JsxSelfClosingElementNode = ast.JsxSelfClosingElementNode
 type JsxSpreadAttribute = ast.JsxSpreadAttribute
+type JsxSpreadAttributeNode = ast.JsxSpreadAttributeNode
 type JsxTagNameExpression = ast.JsxTagNameExpression
 type JsxText = ast.JsxText
+type JsxTextNode = ast.JsxTextNode
+type JsxTokenSyntaxKind = ast.JsxTokenSyntaxKind
 type KeywordExpression = ast.KeywordExpression
+type KeywordExpressionNode = ast.KeywordExpressionNode
+type KeywordExpressionSyntaxKind = ast.KeywordExpressionSyntaxKind
+type KeywordSyntaxKind = ast.KeywordSyntaxKind
 type KeywordTypeNode = ast.KeywordTypeNode
+type KeywordTypeNodeNode = ast.KeywordTypeNodeNode
+type KeywordTypeSyntaxKind = ast.KeywordTypeSyntaxKind
 type Kind = ast.Kind
 const KindAbstractKeyword = ast.KindAbstractKeyword
 const KindAccessorKeyword = ast.KindAccessorKeyword
@@ -1469,10 +1685,7 @@ const KindCloseBraceToken = ast.KindCloseBraceToken
 const KindCloseBracketToken = ast.KindCloseBracketToken
 const KindCloseParenToken = ast.KindCloseParenToken
 const KindColonToken = ast.KindColonToken
-const KindCommaListExpression = ast.KindCommaListExpression
 const KindCommaToken = ast.KindCommaToken
-const KindComment = ast.KindComment
-const KindCommonJSExport = ast.KindCommonJSExport
 const KindComputedPropertyName = ast.KindComputedPropertyName
 const KindConditionalExpression = ast.KindConditionalExpression
 const KindConditionalType = ast.KindConditionalType
@@ -1594,7 +1807,6 @@ const KindJSDocImportTag = ast.KindJSDocImportTag
 const KindJSDocLink = ast.KindJSDocLink
 const KindJSDocLinkCode = ast.KindJSDocLinkCode
 const KindJSDocLinkPlain = ast.KindJSDocLinkPlain
-const KindJSDocMemberName = ast.KindJSDocMemberName
 const KindJSDocNameReference = ast.KindJSDocNameReference
 const KindJSDocNonNullableType = ast.KindJSDocNonNullableType
 const KindJSDocNullableType = ast.KindJSDocNullableType
@@ -1611,7 +1823,6 @@ const KindJSDocReturnTag = ast.KindJSDocReturnTag
 const KindJSDocSatisfiesTag = ast.KindJSDocSatisfiesTag
 const KindJSDocSeeTag = ast.KindJSDocSeeTag
 const KindJSDocSignature = ast.KindJSDocSignature
-const KindJSDocTag = ast.KindJSDocTag
 const KindJSDocTemplateTag = ast.KindJSDocTemplateTag
 const KindJSDocText = ast.KindJSDocText
 const KindJSDocThisTag = ast.KindJSDocThisTag
@@ -1620,8 +1831,8 @@ const KindJSDocTypeExpression = ast.KindJSDocTypeExpression
 const KindJSDocTypeLiteral = ast.KindJSDocTypeLiteral
 const KindJSDocTypeTag = ast.KindJSDocTypeTag
 const KindJSDocTypedefTag = ast.KindJSDocTypedefTag
+const KindJSDocUnknownTag = ast.KindJSDocUnknownTag
 const KindJSDocVariadicType = ast.KindJSDocVariadicType
-const KindJSExportAssignment = ast.KindJSExportAssignment
 const KindJSImportDeclaration = ast.KindJSImportDeclaration
 const KindJSTypeAliasDeclaration = ast.KindJSTypeAliasDeclaration
 const KindJsxAttribute = ast.KindJsxAttribute
@@ -1656,6 +1867,7 @@ const KindLastTemplateToken = ast.KindLastTemplateToken
 const KindLastToken = ast.KindLastToken
 const KindLastTriviaToken = ast.KindLastTriviaToken
 const KindLastTypeNode = ast.KindLastTypeNode
+const KindLastUnaryOperator = ast.KindLastUnaryOperator
 const KindLessThanEqualsToken = ast.KindLessThanEqualsToken
 const KindLessThanLessThanEqualsToken = ast.KindLessThanLessThanEqualsToken
 const KindLessThanLessThanToken = ast.KindLessThanLessThanToken
@@ -1807,19 +2019,35 @@ const KindWithStatement = ast.KindWithStatement
 const KindYieldExpression = ast.KindYieldExpression
 const KindYieldKeyword = ast.KindYieldKeyword
 type LabeledStatement = ast.LabeledStatement
+type LabeledStatementNode = ast.LabeledStatementNode
 type LeftHandSideExpression = ast.LeftHandSideExpression
+type LeftHandSideExpressionBase = ast.LeftHandSideExpressionBase
 type LiteralExpression = ast.LiteralExpression
-type LiteralLikeBase = ast.LiteralLikeBase
+type LiteralExpressionBase = ast.LiteralExpressionBase
 type LiteralLikeNode = ast.LiteralLikeNode
-type LiteralType = ast.LiteralType
+type LiteralLikeNodeBase = ast.LiteralLikeNodeBase
+type LiteralSyntaxKind = ast.LiteralSyntaxKind
+type LiteralToken = ast.LiteralToken
 type LiteralTypeNode = ast.LiteralTypeNode
+type LiteralTypeNodeNode = ast.LiteralTypeNodeNode
 type LocalsContainerBase = ast.LocalsContainerBase
+type LogicalOperator = ast.LogicalOperator
+type LogicalOperatorOrHigher = ast.LogicalOperatorOrHigher
+type LogicalOrCoalescingAssignmentOperator = ast.LogicalOrCoalescingAssignmentOperator
 type MappedTypeNode = ast.MappedTypeNode
+type MappedTypeNodeNode = ast.MappedTypeNodeNode
+type MemberExpressionBase = ast.MemberExpressionBase
 type MemberName = ast.MemberName
 type MetaProperty = ast.MetaProperty
+type MetaPropertyNode = ast.MetaPropertyNode
 type MethodDeclaration = ast.MethodDeclaration
+type MethodDeclarationNode = ast.MethodDeclarationNode
 type MethodSignatureDeclaration = ast.MethodSignatureDeclaration
+type MethodSignatureDeclarationNode = ast.MethodSignatureDeclarationNode
+type MinusToken = ast.MinusToken
 type MissingDeclaration = ast.MissingDeclaration
+type MissingDeclarationNode = ast.MissingDeclarationNode
+type Modifier = ast.Modifier
 type ModifierFlags = ast.ModifierFlags
 const ModifierFlagsAbstract = ast.ModifierFlagsAbstract
 const ModifierFlagsAccessibilityModifier = ast.ModifierFlagsAccessibilityModifier
@@ -1862,12 +2090,14 @@ const ModifierFlagsSyntacticOrJSDocModifiers = ast.ModifierFlagsSyntacticOrJSDoc
 const ModifierFlagsTypeScriptModifier = ast.ModifierFlagsTypeScriptModifier
 type ModifierLike = ast.ModifierLike
 type ModifierList = ast.ModifierList
+type ModifierSyntaxKind = ast.ModifierSyntaxKind
 //go:linkname ModifierToFlag github.com/microsoft/typescript-go/internal/ast.ModifierToFlag
 func ModifierToFlag(token ast.Kind) ast.ModifierFlags
 type ModifiersBase = ast.ModifiersBase
 //go:linkname ModifiersToFlags github.com/microsoft/typescript-go/internal/ast.ModifiersToFlags
 func ModifiersToFlags(modifiers []*ast.Node) ast.ModifierFlags
 type ModuleBlock = ast.ModuleBlock
+type ModuleBlockNode = ast.ModuleBlockNode
 type ModuleBody = ast.ModuleBody
 type ModuleDeclaration = ast.ModuleDeclaration
 type ModuleDeclarationNode = ast.ModuleDeclarationNode
@@ -1881,19 +2111,26 @@ const ModuleInstanceStateNonInstantiated = ast.ModuleInstanceStateNonInstantiate
 const ModuleInstanceStateUnknown = ast.ModuleInstanceStateUnknown
 type ModuleName = ast.ModuleName
 type ModuleReference = ast.ModuleReference
+type MultiplicativeOperator = ast.MultiplicativeOperator
+type MultiplicativeOperatorOrHigher = ast.MultiplicativeOperatorOrHigher
 type MutableNode = ast.MutableNode
 type NamedExportBindings = ast.NamedExportBindings
 type NamedExports = ast.NamedExports
 type NamedExportsNode = ast.NamedExportsNode
 type NamedImportBindings = ast.NamedImportBindings
 type NamedImports = ast.NamedImports
+type NamedImportsNode = ast.NamedImportsNode
 type NamedImportsOrExports = ast.NamedImportsOrExports
 type NamedMember = ast.NamedMember
 type NamedMemberBase = ast.NamedMemberBase
 type NamedTupleMember = ast.NamedTupleMember
+type NamedTupleMemberNode = ast.NamedTupleMemberNode
 type NamespaceExport = ast.NamespaceExport
 type NamespaceExportDeclaration = ast.NamespaceExportDeclaration
+type NamespaceExportDeclarationNode = ast.NamespaceExportDeclarationNode
+type NamespaceExportNode = ast.NamespaceExportNode
 type NamespaceImport = ast.NamespaceImport
+type NamespaceImportNode = ast.NamespaceImportNode
 //go:linkname NewCompilerDiagnostic github.com/microsoft/typescript-go/internal/ast.NewCompilerDiagnostic
 func NewCompilerDiagnostic(message *diagnostics.Message, args ...any) *ast.Diagnostic
 //go:linkname NewDiagnostic github.com/microsoft/typescript-go/internal/ast.NewDiagnostic
@@ -1903,6 +2140,7 @@ func NewDiagnosticChain(chain *ast.Diagnostic, message *diagnostics.Message, arg
 //go:linkname NewDiagnosticFromSerialized github.com/microsoft/typescript-go/internal/ast.NewDiagnosticFromSerialized
 func NewDiagnosticFromSerialized(file *ast.SourceFile, loc core.TextRange, code int32, category diagnostics.Category, messageKey diagnostics.Key, messageArgs []string, messageChain []*ast.Diagnostic, relatedInformation []*ast.Diagnostic, reportsUnnecessary bool, reportsDeprecated bool, skippedOnNoEmit bool) *ast.Diagnostic
 type NewExpression = ast.NewExpression
+type NewExpressionNode = ast.NewExpressionNode
 //go:linkname NewFlowReduceLabelData github.com/microsoft/typescript-go/internal/ast.NewFlowReduceLabelData
 func NewFlowReduceLabelData(target *ast.FlowLabel, antecedents *ast.FlowList) *ast.Node
 //go:linkname NewFlowSwitchClauseData github.com/microsoft/typescript-go/internal/ast.NewFlowSwitchClauseData
@@ -1914,8 +2152,10 @@ func NewNodeFactory(hooks ast.NodeFactoryHooks) *ast.NodeFactory
 //go:linkname NewNodeVisitor github.com/microsoft/typescript-go/internal/ast.NewNodeVisitor
 func NewNodeVisitor(visit func(node *ast.Node) *ast.Node, factory *ast.NodeFactory, hooks ast.NodeVisitorHooks) *ast.NodeVisitor
 type NoSubstitutionTemplateLiteral = ast.NoSubstitutionTemplateLiteral
+type NoSubstitutionTemplateLiteralNode = ast.NoSubstitutionTemplateLiteralNode
 type Node = ast.Node
 type NodeBase = ast.NodeBase
+type NodeBody = ast.NodeBody
 //go:linkname NodeCanBeDecorated github.com/microsoft/typescript-go/internal/ast.NodeCanBeDecorated
 func NodeCanBeDecorated(useLegacyDecorators bool, node *ast.Node, parent *ast.Node, grandparent *ast.Node) bool
 type NodeDefault = ast.NodeDefault
@@ -1935,7 +2175,7 @@ const NodeFlagsDecoratorContext = ast.NodeFlagsDecoratorContext
 const NodeFlagsDisallowConditionalTypesContext = ast.NodeFlagsDisallowConditionalTypesContext
 const NodeFlagsDisallowInContext = ast.NodeFlagsDisallowInContext
 const NodeFlagsExportContext = ast.NodeFlagsExportContext
-const NodeFlagsHasAggregatedChildData = ast.NodeFlagsHasAggregatedChildData
+const NodeFlagsHasAsyncFunctions = ast.NodeFlagsHasAsyncFunctions
 const NodeFlagsHasExplicitReturn = ast.NodeFlagsHasExplicitReturn
 const NodeFlagsHasImplicitReturn = ast.NodeFlagsHasImplicitReturn
 const NodeFlagsHasJSDoc = ast.NodeFlagsHasJSDoc
@@ -1951,6 +2191,7 @@ const NodeFlagsPermanentlySetIncrementalFlags = ast.NodeFlagsPermanentlySetIncre
 const NodeFlagsPossiblyContainsDeprecatedTag = ast.NodeFlagsPossiblyContainsDeprecatedTag
 const NodeFlagsPossiblyContainsDynamicImport = ast.NodeFlagsPossiblyContainsDynamicImport
 const NodeFlagsPossiblyContainsImportMeta = ast.NodeFlagsPossiblyContainsImportMeta
+const NodeFlagsReachabilityAndEmitFlags = ast.NodeFlagsReachabilityAndEmitFlags
 const NodeFlagsReachabilityCheckFlags = ast.NodeFlagsReachabilityCheckFlags
 const NodeFlagsReparsed = ast.NodeFlagsReparsed
 const NodeFlagsSynthesized = ast.NodeFlagsSynthesized
@@ -1980,10 +2221,16 @@ type NodeList = ast.NodeList
 func NodeOrChildIsDecorated(useLegacyDecorators bool, node *ast.Node, parent *ast.Node, grandparent *ast.Node) bool
 type NodeVisitor = ast.NodeVisitor
 type NodeVisitorHooks = ast.NodeVisitorHooks
+type NodeWithTypeArgumentsBase = ast.NodeWithTypeArgumentsBase
 type NonNullExpression = ast.NonNullExpression
+type NonNullExpressionNode = ast.NonNullExpressionNode
 type NotEmittedStatement = ast.NotEmittedStatement
+type NotEmittedStatementNode = ast.NotEmittedStatementNode
 type NotEmittedTypeElement = ast.NotEmittedTypeElement
+type NotEmittedTypeElementNode = ast.NotEmittedTypeElementNode
+type NullLiteral = ast.NullLiteral
 type NumericLiteral = ast.NumericLiteral
+type NumericLiteralNode = ast.NumericLiteralNode
 type NumericOrStringLikeLiteral = ast.NumericOrStringLikeLiteral
 const OEKAll = ast.OEKAll
 const OEKAssertions = ast.OEKAssertions
@@ -1994,13 +2241,17 @@ const OEKParentheses = ast.OEKParentheses
 const OEKPartiallyEmittedExpressions = ast.OEKPartiallyEmittedExpressions
 const OEKSatisfies = ast.OEKSatisfies
 const OEKTypeAssertions = ast.OEKTypeAssertions
+type ObjectDestructuringAssignment = ast.ObjectDestructuringAssignment
 type ObjectLiteralElement = ast.ObjectLiteralElement
 type ObjectLiteralElementBase = ast.ObjectLiteralElementBase
+type ObjectLiteralElementLike = ast.ObjectLiteralElementLike
 type ObjectLiteralExpression = ast.ObjectLiteralExpression
 type ObjectLiteralExpressionNode = ast.ObjectLiteralExpressionNode
 type ObjectLiteralLike = ast.ObjectLiteralLike
+type ObjectLiteralLikeNode = ast.ObjectLiteralLikeNode
 type ObjectTypeDeclaration = ast.ObjectTypeDeclaration
 type OmittedExpression = ast.OmittedExpression
+type OmittedExpressionNode = ast.OmittedExpressionNode
 type OperatorPrecedence = ast.OperatorPrecedence
 const OperatorPrecedenceAdditive = ast.OperatorPrecedenceAdditive
 const OperatorPrecedenceAssignment = ast.OperatorPrecedenceAssignment
@@ -2035,18 +2286,27 @@ const OperatorPrecedenceUnary = ast.OperatorPrecedenceUnary
 const OperatorPrecedenceUpdate = ast.OperatorPrecedenceUpdate
 const OperatorPrecedenceYield = ast.OperatorPrecedenceYield
 type OptionalTypeNode = ast.OptionalTypeNode
+type OptionalTypeNodeNode = ast.OptionalTypeNodeNode
+type OutKeyword = ast.OutKeyword
 type OuterExpressionKinds = ast.OuterExpressionKinds
+type OverrideKeyword = ast.OverrideKeyword
 type ParameterDeclaration = ast.ParameterDeclaration
 type ParameterDeclarationNode = ast.ParameterDeclarationNode
 type ParameterList = ast.ParameterList
 type ParenthesizedExpression = ast.ParenthesizedExpression
+type ParenthesizedExpressionNode = ast.ParenthesizedExpressionNode
 type ParenthesizedTypeNode = ast.ParenthesizedTypeNode
+type ParenthesizedTypeNodeNode = ast.ParenthesizedTypeNodeNode
 type PartiallyEmittedExpression = ast.PartiallyEmittedExpression
+type PartiallyEmittedExpressionNode = ast.PartiallyEmittedExpressionNode
 type PatternAmbientModule = ast.PatternAmbientModule
+type PlusToken = ast.PlusToken
 //go:linkname PositionIsSynthesized github.com/microsoft/typescript-go/internal/ast.PositionIsSynthesized
 func PositionIsSynthesized(pos int) bool
 type PositionMap = ast.PositionMap
 type PostfixUnaryExpression = ast.PostfixUnaryExpression
+type PostfixUnaryExpressionNode = ast.PostfixUnaryExpressionNode
+type PostfixUnaryOperator = ast.PostfixUnaryOperator
 type Pragma = ast.Pragma
 type PragmaArgument = ast.PragmaArgument
 type PragmaArgumentSpecification = ast.PragmaArgumentSpecification
@@ -2059,24 +2319,51 @@ const PragmaKindSingleLine = ast.PragmaKindSingleLine
 const PragmaKindTripleSlashXML = ast.PragmaKindTripleSlashXML
 type PragmaSpecification = ast.PragmaSpecification
 type PrefixUnaryExpression = ast.PrefixUnaryExpression
+type PrefixUnaryExpressionNode = ast.PrefixUnaryExpressionNode
+type PrefixUnaryOperator = ast.PrefixUnaryOperator
+type PrimaryExpressionBase = ast.PrimaryExpressionBase
 type PrivateIdentifier = ast.PrivateIdentifier
 type PrivateIdentifierNode = ast.PrivateIdentifierNode
+type PrivateKeyword = ast.PrivateKeyword
 type PropertyAccessExpression = ast.PropertyAccessExpression
 type PropertyAccessExpressionNode = ast.PropertyAccessExpressionNode
 type PropertyAssignment = ast.PropertyAssignment
+type PropertyAssignmentNode = ast.PropertyAssignmentNode
 type PropertyDeclaration = ast.PropertyDeclaration
+type PropertyDeclarationNode = ast.PropertyDeclarationNode
 type PropertyDefinitionList = ast.PropertyDefinitionList
 type PropertyName = ast.PropertyName
+type PropertyNameLiteral = ast.PropertyNameLiteral
 type PropertySignatureDeclaration = ast.PropertySignatureDeclaration
+type PropertySignatureDeclarationNode = ast.PropertySignatureDeclarationNode
+type ProtectedKeyword = ast.ProtectedKeyword
+type PseudoLiteralSyntaxKind = ast.PseudoLiteralSyntaxKind
+type PseudoLiteralToken = ast.PseudoLiteralToken
+type PublicKeyword = ast.PublicKeyword
+type PunctuationSyntaxKind = ast.PunctuationSyntaxKind
 type QualifiedName = ast.QualifiedName
+type QualifiedNameNode = ast.QualifiedNameNode
+type QuestionDotToken = ast.QuestionDotToken
+type QuestionToken = ast.QuestionToken
 //go:linkname RangeIsSynthesized github.com/microsoft/typescript-go/internal/ast.RangeIsSynthesized
 func RangeIsSynthesized(loc core.TextRange) bool
+type ReadonlyKeyword = ast.ReadonlyKeyword
 type RegularExpressionLiteral = ast.RegularExpressionLiteral
+type RegularExpressionLiteralNode = ast.RegularExpressionLiteralNode
+type RelationalOperator = ast.RelationalOperator
+type RelationalOperatorOrHigher = ast.RelationalOperatorOrHigher
 //go:linkname ReplaceModifiers github.com/microsoft/typescript-go/internal/ast.ReplaceModifiers
 func ReplaceModifiers(factory *ast.NodeFactory, node *ast.Node, modifierArray *ast.ModifierList) *ast.Node
+type RepopulateDiagnosticInfo = ast.RepopulateDiagnosticInfo
+type RepopulateDiagnosticKind = ast.RepopulateDiagnosticKind
+const RepopulateModeMismatch = ast.RepopulateModeMismatch
+const RepopulateModuleNotFound = ast.RepopulateModuleNotFound
 type RestTypeNode = ast.RestTypeNode
+type RestTypeNodeNode = ast.RestTypeNodeNode
 type ReturnStatement = ast.ReturnStatement
+type ReturnStatementNode = ast.ReturnStatementNode
 type SatisfiesExpression = ast.SatisfiesExpression
+type SatisfiesExpressionNode = ast.SatisfiesExpressionNode
 type SemanticMeaning = ast.SemanticMeaning
 const SemanticMeaningAll = ast.SemanticMeaningAll
 const SemanticMeaningNamespace = ast.SemanticMeaningNamespace
@@ -2084,7 +2371,9 @@ const SemanticMeaningNone = ast.SemanticMeaningNone
 const SemanticMeaningType = ast.SemanticMeaningType
 const SemanticMeaningValue = ast.SemanticMeaningValue
 type SemicolonClassElement = ast.SemicolonClassElement
+type SemicolonClassElementNode = ast.SemicolonClassElementNode
 type SetAccessorDeclaration = ast.SetAccessorDeclaration
+type SetAccessorDeclarationNode = ast.SetAccessorDeclarationNode
 //go:linkname SetExternalModuleIndicator github.com/microsoft/typescript-go/internal/ast.SetExternalModuleIndicator
 func SetExternalModuleIndicator(file *ast.SourceFile, opts ast.ExternalModuleIndicatorOptions)
 //go:linkname SetImportsOfSourceFile github.com/microsoft/typescript-go/internal/ast.SetImportsOfSourceFile
@@ -2093,7 +2382,10 @@ func SetImportsOfSourceFile(node *ast.SourceFile, imports []*ast.LiteralLikeNode
 func SetParentInChildren(node *ast.Node)
 //go:linkname SetParseJSDocForNode github.com/microsoft/typescript-go/internal/ast.SetParseJSDocForNode
 func SetParseJSDocForNode(fn func(*ast.SourceFile, *ast.Node) []*ast.Node)
+type ShiftOperator = ast.ShiftOperator
+type ShiftOperatorOrHigher = ast.ShiftOperatorOrHigher
 type ShorthandPropertyAssignment = ast.ShorthandPropertyAssignment
+type ShorthandPropertyAssignmentNode = ast.ShorthandPropertyAssignmentNode
 //go:linkname ShouldTransformImportCall github.com/microsoft/typescript-go/internal/ast.ShouldTransformImportCall
 func ShouldTransformImportCall(fileName string, options *core.CompilerOptions, impliedNodeFormatForEmit core.ModuleKind) bool
 type SignatureDeclaration = ast.SignatureDeclaration
@@ -2111,12 +2403,16 @@ type SourceFileMetaData = ast.SourceFileMetaData
 type SourceFileNode = ast.SourceFileNode
 type SourceFileParseOptions = ast.SourceFileParseOptions
 type SpreadAssignment = ast.SpreadAssignment
+type SpreadAssignmentNode = ast.SpreadAssignmentNode
 type SpreadElement = ast.SpreadElement
+type SpreadElementNode = ast.SpreadElementNode
 type Statement = ast.Statement
 type StatementBase = ast.StatementBase
 type StatementList = ast.StatementList
+type StaticKeyword = ast.StaticKeyword
 type StringLiteral = ast.StringLiteral
 type StringLiteralLike = ast.StringLiteralLike
+type StringLiteralLikeNode = ast.StringLiteralLikeNode
 type StringLiteralNode = ast.StringLiteralNode
 const SubtreeContainsAnyAwait = ast.SubtreeContainsAnyAwait
 const SubtreeContainsAwait = ast.SubtreeContainsAwait
@@ -2138,6 +2434,7 @@ const SubtreeContainsESObjectRestOrSpread = ast.SubtreeContainsESObjectRestOrSpr
 const SubtreeContainsExponentiationOperator = ast.SubtreeContainsExponentiationOperator
 const SubtreeContainsForAwaitOrAsyncGenerator = ast.SubtreeContainsForAwaitOrAsyncGenerator
 const SubtreeContainsIdentifier = ast.SubtreeContainsIdentifier
+const SubtreeContainsInvalidTemplateEscape = ast.SubtreeContainsInvalidTemplateEscape
 const SubtreeContainsJsx = ast.SubtreeContainsJsx
 const SubtreeContainsLexicalSuper = ast.SubtreeContainsLexicalSuper
 const SubtreeContainsLexicalThis = ast.SubtreeContainsLexicalThis
@@ -2175,7 +2472,9 @@ const SubtreeExclusionsVariableDeclarationList = ast.SubtreeExclusionsVariableDe
 type SubtreeFacts = ast.SubtreeFacts
 const SubtreeFactsComputed = ast.SubtreeFactsComputed
 const SubtreeFactsNone = ast.SubtreeFactsNone
+type SuperExpression = ast.SuperExpression
 type SwitchStatement = ast.SwitchStatement
+type SwitchStatementNode = ast.SwitchStatementNode
 type Symbol = ast.Symbol
 type SymbolFlags = ast.SymbolFlags
 const SymbolFlagsAccessor = ast.SymbolFlagsAccessor
@@ -2251,18 +2550,25 @@ type SymbolId = ast.SymbolId
 func SymbolName(symbol *ast.Symbol) string
 type SymbolTable = ast.SymbolTable
 type SyntaxList = ast.SyntaxList
+type SyntaxListNode = ast.SyntaxListNode
 type SyntheticExpression = ast.SyntheticExpression
+type SyntheticExpressionNode = ast.SyntheticExpressionNode
 type SyntheticReferenceExpression = ast.SyntheticReferenceExpression
+type SyntheticReferenceExpressionNode = ast.SyntheticReferenceExpressionNode
 //go:linkname TagNamesAreEquivalent github.com/microsoft/typescript-go/internal/ast.TagNamesAreEquivalent
 func TagNamesAreEquivalent(lhs *ast.Expression, rhs *ast.Expression) bool
 type TaggedTemplateExpression = ast.TaggedTemplateExpression
+type TaggedTemplateExpressionNode = ast.TaggedTemplateExpressionNode
 type TemplateExpression = ast.TemplateExpression
+type TemplateExpressionNode = ast.TemplateExpressionNode
 type TemplateHead = ast.TemplateHead
 type TemplateHeadNode = ast.TemplateHeadNode
 type TemplateLiteral = ast.TemplateLiteral
-type TemplateLiteralLikeBase = ast.TemplateLiteralLikeBase
 type TemplateLiteralLikeNode = ast.TemplateLiteralLikeNode
+type TemplateLiteralLikeNodeBase = ast.TemplateLiteralLikeNodeBase
+type TemplateLiteralToken = ast.TemplateLiteralToken
 type TemplateLiteralTypeNode = ast.TemplateLiteralTypeNode
+type TemplateLiteralTypeNodeNode = ast.TemplateLiteralTypeNodeNode
 type TemplateLiteralTypeSpan = ast.TemplateLiteralTypeSpan
 type TemplateLiteralTypeSpanList = ast.TemplateLiteralTypeSpanList
 type TemplateLiteralTypeSpanNode = ast.TemplateLiteralTypeSpanNode
@@ -2274,8 +2580,11 @@ type TemplateSpanList = ast.TemplateSpanList
 type TemplateSpanNode = ast.TemplateSpanNode
 type TemplateTail = ast.TemplateTail
 type TemplateTailNode = ast.TemplateTailNode
+type ThisExpression = ast.ThisExpression
 type ThisTypeNode = ast.ThisTypeNode
+type ThisTypeNodeNode = ast.ThisTypeNodeNode
 type ThrowStatement = ast.ThrowStatement
+type ThrowStatementNode = ast.ThrowStatementNode
 //go:linkname ToFindAncestorResult github.com/microsoft/typescript-go/internal/ast.ToFindAncestorResult
 func ToFindAncestorResult(b bool) ast.FindAncestorResult
 type Token = ast.Token
@@ -2309,6 +2618,9 @@ const TokenFlagsUnicodeEscape = ast.TokenFlagsUnicodeEscape
 const TokenFlagsUnterminated = ast.TokenFlagsUnterminated
 const TokenFlagsWithSpecifier = ast.TokenFlagsWithSpecifier
 type TokenNode = ast.TokenNode
+type TokenSyntaxKind = ast.TokenSyntaxKind
+type TriviaSyntaxKind = ast.TriviaSyntaxKind
+type TrueLiteral = ast.TrueLiteral
 //go:linkname TryGetClassExtendingExpressionWithTypeArguments github.com/microsoft/typescript-go/internal/ast.TryGetClassExtendingExpressionWithTypeArguments
 func TryGetClassExtendingExpressionWithTypeArguments(node *ast.Node) *ast.ClassLikeDeclaration
 //go:linkname TryGetClassImplementingOrExtendingExpressionWithTypeArguments github.com/microsoft/typescript-go/internal/ast.TryGetClassImplementingOrExtendingExpressionWithTypeArguments
@@ -2320,21 +2632,27 @@ func TryGetPropertyNameOfBindingOrAssignmentElement(bindingElement *ast.Node) *a
 //go:linkname TryGetTextOfPropertyName github.com/microsoft/typescript-go/internal/ast.TryGetTextOfPropertyName
 func TryGetTextOfPropertyName(name *ast.Node) (string, bool)
 type TryStatement = ast.TryStatement
+type TryStatementNode = ast.TryStatementNode
 type TupleTypeNode = ast.TupleTypeNode
+type TupleTypeNodeNode = ast.TupleTypeNodeNode
 type TypeAliasDeclaration = ast.TypeAliasDeclaration
+type TypeAliasDeclarationNode = ast.TypeAliasDeclarationNode
 type TypeArgumentList = ast.TypeArgumentList
 type TypeAssertion = ast.TypeAssertion
+type TypeAssertionNode = ast.TypeAssertionNode
 type TypeElement = ast.TypeElement
 type TypeElementBase = ast.TypeElementBase
 type TypeElementList = ast.TypeElementList
 type TypeList = ast.TypeList
-type TypeLiteral = ast.TypeLiteral
 type TypeLiteralNode = ast.TypeLiteralNode
+type TypeLiteralNodeNode = ast.TypeLiteralNodeNode
 type TypeNode = ast.TypeNode
 type TypeNodeBase = ast.TypeNodeBase
 type TypeOfExpression = ast.TypeOfExpression
+type TypeOfExpressionNode = ast.TypeOfExpressionNode
 type TypeOnlyImportDeclaration = ast.TypeOnlyImportDeclaration
 type TypeOperatorNode = ast.TypeOperatorNode
+type TypeOperatorNodeNode = ast.TypeOperatorNodeNode
 type TypeParameterDeclaration = ast.TypeParameterDeclaration
 type TypeParameterDeclarationNode = ast.TypeParameterDeclarationNode
 type TypeParameterList = ast.TypeParameterList
@@ -2353,11 +2671,16 @@ type TypePredicateNode = ast.TypePredicateNode
 type TypePredicateNodeNode = ast.TypePredicateNodeNode
 type TypePredicateParameterName = ast.TypePredicateParameterName
 type TypeQueryNode = ast.TypeQueryNode
+type TypeQueryNodeNode = ast.TypeQueryNodeNode
 type TypeReferenceNode = ast.TypeReferenceNode
+type TypeReferenceNodeNode = ast.TypeReferenceNodeNode
+type TypeSyntaxBase = ast.TypeSyntaxBase
+type UnaryExpressionBase = ast.UnaryExpressionBase
 type UnionOrIntersectionTypeNode = ast.UnionOrIntersectionTypeNode
 type UnionOrIntersectionTypeNodeBase = ast.UnionOrIntersectionTypeNodeBase
-type UnionType = ast.UnionType
 type UnionTypeNode = ast.UnionTypeNode
+type UnionTypeNodeNode = ast.UnionTypeNodeNode
+type UpdateExpressionBase = ast.UpdateExpressionBase
 type ValidImportTypeNode = ast.ValidImportTypeNode
 type VariableDeclaration = ast.VariableDeclaration
 type VariableDeclarationList = ast.VariableDeclarationList
@@ -2367,8 +2690,10 @@ type VariableDeclarationNodeList = ast.VariableDeclarationNodeList
 type VariableOrParameterDeclaration = ast.VariableOrParameterDeclaration
 type VariableOrPropertyDeclaration = ast.VariableOrPropertyDeclaration
 type VariableStatement = ast.VariableStatement
+type VariableStatementNode = ast.VariableStatementNode
 type Visitor = ast.Visitor
 type VoidExpression = ast.VoidExpression
+type VoidExpressionNode = ast.VoidExpressionNode
 //go:linkname WalkUpBindingElementsAndPatterns github.com/microsoft/typescript-go/internal/ast.WalkUpBindingElementsAndPatterns
 func WalkUpBindingElementsAndPatterns(binding *ast.Node) *ast.Node
 //go:linkname WalkUpParenthesizedExpressions github.com/microsoft/typescript-go/internal/ast.WalkUpParenthesizedExpressions
@@ -2376,5 +2701,8 @@ func WalkUpParenthesizedExpressions(node *ast.Expression) *ast.Node
 //go:linkname WalkUpParenthesizedTypes github.com/microsoft/typescript-go/internal/ast.WalkUpParenthesizedTypes
 func WalkUpParenthesizedTypes(node *ast.TypeNode) *ast.Node
 type WhileStatement = ast.WhileStatement
+type WhileStatementNode = ast.WhileStatementNode
 type WithStatement = ast.WithStatement
+type WithStatementNode = ast.WithStatementNode
 type YieldExpression = ast.YieldExpression
+type YieldExpressionNode = ast.YieldExpressionNode

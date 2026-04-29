@@ -16,6 +16,7 @@ func TestNormalizeJSONConfig_CoreRulesDefault(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// After normalization, core rules should be present
@@ -48,6 +49,7 @@ func TestNormalizeJSONConfig_PluginAutoEnablesRules(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// Should have TS rules enabled
@@ -77,12 +79,14 @@ func TestNormalizeJSONConfig_UserRulesTakePrecedence(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// User's "off" should override the auto-enabled "error"
 	rc := merged.Rules["no-debugger"]
 	if rc == nil {
 		t.Fatal("Expected no-debugger rule to be present")
+		return
 	}
 	if rc.IsEnabled() {
 		t.Error("Expected no-debugger to be disabled (user set 'off')")
@@ -112,10 +116,12 @@ func TestNormalizeJSONConfig_IgnoredFilesNotLinted(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for non-ignored file")
+		return
 	}
 	rc := merged.Rules["no-template-curly-in-string"]
 	if rc == nil {
 		t.Fatal("Expected no-template-curly-in-string in merged rules")
+		return
 	}
 	if rc.IsEnabled() {
 		t.Error("Expected no-template-curly-in-string to be disabled (user set 'off')")
@@ -159,11 +165,13 @@ func TestNormalizeJSONConfig_ArrayUserRuleTakesPrecedence(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	rc := merged.Rules["no-console"]
 	if rc == nil {
 		t.Fatal("Expected no-console rule to be present")
+		return
 	}
 	// User's ["warn", {allow: ["error"]}] should take precedence over auto-enabled "error"
 	if rc.Level != "warn" {
@@ -209,6 +217,7 @@ func TestNormalizeJSONConfig_MultipleEntries_DifferentPlugins(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for .ts file")
+		return
 	}
 	if _, ok := merged.Rules["@typescript-eslint/no-explicit-any"]; !ok {
 		t.Error("Expected TS rule for .ts file")
@@ -217,6 +226,7 @@ func TestNormalizeJSONConfig_MultipleEntries_DifferentPlugins(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.js", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for .js file")
+		return
 	}
 	if _, ok := merged.Rules["@typescript-eslint/no-explicit-any"]; ok {
 		t.Error("Expected no TS rule for .js file")
@@ -244,6 +254,7 @@ func TestNormalizeJSONConfig_IgnoresWithRulesOff(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for non-ignored file")
+		return
 	}
 	if merged.Rules["no-template-curly-in-string"].IsEnabled() {
 		t.Error("Expected no-template-curly-in-string to be disabled")
@@ -281,6 +292,7 @@ func TestNormalizeJSONConfig_EslintPluginImport(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// Import plugin rules should be injected (e.g. import/no-self-import)
@@ -313,6 +325,7 @@ func TestNormalizeJSONConfig_PluginNameAlias(t *testing.T) {
 
 	if merged1 == nil || merged2 == nil {
 		t.Fatal("Expected non-nil configs")
+		return
 	}
 
 	// Count import/ rules in each — should be identical

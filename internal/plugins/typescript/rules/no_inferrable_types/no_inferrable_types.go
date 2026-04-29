@@ -201,7 +201,7 @@ func matchesTypeAnnotation(typeNode *ast.Node, expectedType string) bool {
 		return typeNode.Kind == ast.KindSymbolKeyword
 	case "RegExp":
 		if typeNode.Kind == ast.KindTypeReference {
-			typeRef := typeNode.AsTypeReference()
+			typeRef := typeNode.AsTypeReferenceNode()
 			if typeRef != nil && typeRef.TypeName != nil && typeRef.TypeName.Kind == ast.KindIdentifier {
 				return typeRef.TypeName.AsIdentifier().Text == "RegExp"
 			}

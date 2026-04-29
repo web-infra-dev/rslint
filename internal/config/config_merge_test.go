@@ -16,6 +16,7 @@ func TestGetConfigForFile_ExplicitRulesOnly(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// Only explicitly listed rules should be present
@@ -40,6 +41,7 @@ func TestGetConfigForFile_WithoutNormalize_PluginDoesNotAutoEnable(t *testing.T)
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// No rules should be enabled (JS config behavior)
@@ -68,6 +70,7 @@ func TestGetConfigForFile_GlobalIgnores(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for non-ignored file")
+		return
 	}
 }
 
@@ -105,6 +108,7 @@ func TestGetConfigForFile_EntryIgnores_OtherEntryMatches(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.test.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config (matched by second entry)")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; ok {
 		t.Error("Expected no-debugger to not be present (from ignored entry)")
@@ -126,6 +130,7 @@ func TestGetConfigForFile_FilesMatching(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger for matching .ts file")
@@ -157,6 +162,7 @@ func TestGetConfigForFile_RulesShallowMerge(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// no-debugger should be overridden to "warn"
@@ -191,6 +197,7 @@ func TestGetConfigForFile_SettingsShallowMerge(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	if merged.Settings["importResolver"] != "node" {
@@ -332,11 +339,13 @@ func TestGetConfigForFile_ArrayRuleConfig(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	rc := merged.Rules["array-type"]
 	if rc == nil {
 		t.Fatal("Expected array-type rule to be present")
+		return
 	}
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn', got %q", rc.Level)
@@ -364,11 +373,13 @@ func TestGetConfigForFile_RuleOff(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	rc := merged.Rules["no-debugger"]
 	if rc == nil {
 		t.Fatal("Expected no-debugger rule config to be present")
+		return
 	}
 	if rc.IsEnabled() {
 		t.Error("Expected no-debugger to be disabled after being turned off")
@@ -400,6 +411,7 @@ func TestGetConfigForFile_MultipleEntries_LanguageOptionsMerge(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	if merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
@@ -425,11 +437,13 @@ func TestGetConfigForFile_ArrayRuleOff(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	rc := merged.Rules["no-debugger"]
 	if rc == nil {
 		t.Fatal("Expected no-debugger rule config to be present")
+		return
 	}
 	if rc.IsEnabled() {
 		t.Error("Expected no-debugger to be disabled via [\"off\"] array syntax")
@@ -449,6 +463,7 @@ func TestGetConfigForFile_EntryIgnores_NoFiles(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for non-ignored file")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger for non-ignored file")
@@ -486,6 +501,7 @@ func TestGetConfigForFile_MultipleEntries_DifferentFilesPatterns(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for .ts file")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger from entry1")
@@ -498,6 +514,7 @@ func TestGetConfigForFile_MultipleEntries_DifferentFilesPatterns(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.js", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for .js file")
+		return
 	}
 	if _, ok := merged.Rules["no-console"]; !ok {
 		t.Error("Expected no-console from entry2")
@@ -534,6 +551,7 @@ func TestGetConfigForFile_MultipleEntries_PartialMatch(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for .ts file")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger from entry1")
@@ -549,6 +567,7 @@ func TestGetConfigForFile_MultipleEntries_PartialMatch(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.vue", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for .vue file")
+		return
 	}
 	if _, ok := merged.Rules["no-console"]; !ok {
 		t.Error("Expected no-console from entry2")
@@ -587,6 +606,7 @@ func TestGetConfigForFile_ThreeEntries_CascadingOverride(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// no-debugger: entry1 "error" → entry2 "warn" → final "warn"
@@ -621,11 +641,13 @@ func TestGetConfigForFile_MultipleEntries_ArrayRuleOverridesString(t *testing.T)
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	rc := merged.Rules["no-console"]
 	if rc == nil {
 		t.Fatal("Expected no-console in merged rules")
+		return
 	}
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn' from array override, got %q", rc.Level)
@@ -633,6 +655,7 @@ func TestGetConfigForFile_MultipleEntries_ArrayRuleOverridesString(t *testing.T)
 	optsMap2, _ := rc.Options.(map[string]interface{})
 	if optsMap2 == nil {
 		t.Fatal("Expected options from array config")
+		return
 	}
 	allow, ok := optsMap2["allow"].([]interface{})
 	if !ok || len(allow) != 2 {
@@ -669,6 +692,7 @@ func TestGetConfigForFile_GlobalIgnore_PlusEntryIgnores(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil for normal file")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger from entry2")
@@ -695,6 +719,7 @@ func TestGetConfigForFile_CwdAffectsMatching(t *testing.T) {
 	merged := config.GetConfigForFile(absPath, "/monorepo/packages/foo")
 	if merged == nil {
 		t.Fatal("Expected match when cwd is the config directory")
+		return
 	}
 	if merged.Rules["no-console"] == nil {
 		t.Error("Expected no-console rule to be enabled")
@@ -732,6 +757,7 @@ func TestGetConfigForFile_CwdIgnoresMatching(t *testing.T) {
 	merged = config.GetConfigForFile(absPath, "/other")
 	if merged == nil {
 		t.Fatal("Expected file to NOT be ignored with wrong cwd")
+		return
 	}
 }
 

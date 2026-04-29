@@ -25,7 +25,8 @@ func (m *mockFS) FileExists(path string) bool {
 // Stubbed implementations of other vfs.FS interface methods for testing purposes
 func (m *mockFS) UseCaseSensitiveFileNames() bool                                   { return true }
 func (m *mockFS) ReadFile(path string) (string, bool)                               { return "", false }
-func (m *mockFS) WriteFile(path string, data string) error { return nil }
+func (m *mockFS) WriteFile(path string, data string) error                         { return nil }
+func (m *mockFS) AppendFile(path string, data string) error                         { return nil }
 func (m *mockFS) Remove(path string) error                                          { return nil }
 func (m *mockFS) Chtimes(path string, aTime time.Time, mTime time.Time) error       { return nil }
 func (m *mockFS) DirectoryExists(path string) bool                                  { return false }

@@ -111,7 +111,7 @@ var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 			arg := arguments.Nodes[i]
 			param := parameters[i]
 
-			defaultType := param.AsTypeParameter().DefaultType
+			defaultType := param.AsTypeParameterDeclaration().DefaultType
 			if defaultType == nil {
 				return
 			}
@@ -145,7 +145,7 @@ var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 				checkArgsAndParameters(expr.TypeArguments, getTypeParametersFromType(node, expr.Expression))
 			},
 			ast.KindTypeReference: func(node *ast.Node) {
-				expr := node.AsTypeReference()
+				expr := node.AsTypeReferenceNode()
 				checkArgsAndParameters(expr.TypeArguments, getTypeParametersFromType(node, expr.TypeName))
 			},
 

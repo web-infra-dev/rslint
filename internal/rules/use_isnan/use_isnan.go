@@ -17,13 +17,6 @@ import (
 func unwrapToValue(node *ast.Node) *ast.Node {
 	stripped := ast.SkipParentheses(node)
 
-	// Resolve one level of comma expression
-	if stripped.Kind == ast.KindCommaListExpression {
-		children := stripped.Children()
-		if children != nil && len(children.Nodes) > 0 {
-			return ast.SkipParentheses(children.Nodes[len(children.Nodes)-1])
-		}
-	}
 	if stripped.Kind == ast.KindBinaryExpression {
 		binary := stripped.AsBinaryExpression()
 		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindCommaToken {

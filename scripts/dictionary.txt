@@ -224,6 +224,7 @@ Unwatch
 unwinded
 USERPROFILE
 variabledeclaration
+vfsmatch
 visitchildren
 walltime
 wasmer

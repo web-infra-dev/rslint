@@ -119,7 +119,7 @@ func GetTypeName(
 		decls := symbol.Declarations
 		if len(decls) > 0 {
 			if ast.IsTypeParameterDeclaration(decls[0]) {
-				typeParamDecl := decls[0].AsTypeParameter()
+				typeParamDecl := decls[0].AsTypeParameterDeclaration()
 				if typeParamDecl.Constraint != nil {
 					return GetTypeName(typeChecker, checker.Checker_getTypeFromTypeNode(typeChecker, typeParamDecl.Constraint))
 				}
@@ -342,7 +342,7 @@ func IsArrayMethodCallWithPredicate(
 }
 
 func IsRestParameterDeclaration(decl *ast.Declaration) bool {
-	return ast.IsParameter(decl) && decl.AsParameterDeclaration().DotDotDotToken != nil
+	return ast.IsParameterDeclaration(decl) && decl.AsParameterDeclaration().DotDotDotToken != nil
 }
 
 // GetDeclaration returns the first declaration of the symbol at `node`.
@@ -515,7 +515,7 @@ func GetContextualType(
 			// is the callee, so has no contextual type
 			return nil
 		}
-	} else if ast.IsVariableDeclaration(parent) || ast.IsPropertyDeclaration(parent) || ast.IsParameter(parent) {
+	} else if ast.IsVariableDeclaration(parent) || ast.IsPropertyDeclaration(parent) || ast.IsParameterDeclaration(parent) {
 		if t := parent.Type(); t != nil {
 			return checker.Checker_getTypeFromTypeNode(typeChecker, t)
 		}
@@ -1241,7 +1241,7 @@ func IsDeclarationIdentifier(node *ast.Node) bool {
 	case ast.KindEnumMember:
 		return parent.AsEnumMember().Name() == node
 	case ast.KindTypeParameter:
-		return parent.AsTypeParameter().Name() == node
+		return parent.AsTypeParameterDeclaration().Name() == node
 	}
 	return false
 }
@@ -1281,7 +1281,7 @@ func GetDeclarationIdentifier(decl *ast.Node) *ast.Node {
 	case ast.KindBindingElement:
 		return decl.AsBindingElement().Name()
 	case ast.KindTypeParameter:
-		return decl.AsTypeParameter().Name()
+		return decl.AsTypeParameterDeclaration().Name()
 	}
 	return nil
 }
