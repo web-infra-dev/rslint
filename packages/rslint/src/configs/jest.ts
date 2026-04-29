@@ -11,7 +11,7 @@ const recommended: RslintConfigEntry = {
     // 'jest/no-conditional-expect': 'error', // not implemented
     // 'jest/no-deprecated-functions': 'error', // not implemented
     'jest/no-disabled-tests': 'warn',
-    // 'jest/no-done-callback': 'error', // not implemented
+    'jest/no-done-callback': 'error',
     // 'jest/no-export': 'error', // not implemented
     'jest/no-focused-tests': 'error',
     // 'jest/no-identical-title': 'error', // not implemented
