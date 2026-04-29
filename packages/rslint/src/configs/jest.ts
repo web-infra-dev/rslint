@@ -27,4 +27,13 @@ const recommended: RslintConfigEntry = {
   },
 };
 
-export { recommended };
+const style: RslintConfigEntry = {
+  plugins: ['jest'],
+  rules: {
+    // 'jest/prefer-to-be': 'error', // not implemented
+    'jest/prefer-to-contain': 'error',
+    'jest/prefer-to-have-length': 'error',
+  },
+};
+
+export { recommended, style };
