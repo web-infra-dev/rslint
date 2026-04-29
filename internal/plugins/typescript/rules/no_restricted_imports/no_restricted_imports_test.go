@@ -634,6 +634,86 @@ declare module 'foo' {
 				Options: []interface{}{"restricted"},
 			},
 
+			// ---- `as` rename: importNames matches the SOURCE name, not the local binding ----
+			{
+				// Source name is `Foo`; local is `Bar`. importNames=['Bar'] should NOT match.
+				Code: `import { Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "importNames": []interface{}{"Bar"},
+					}},
+				}},
+			},
+			{
+				// allowImportNames includes the SOURCE name `Foo` → permitted.
+				Code: `import { Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowImportNames": []interface{}{"Foo"},
+					}},
+				}},
+			},
+
+			// ---- `as` rename + inline type-only + allowTypeImports → exempted ----
+			{
+				// `type Foo as Bar` is a type-only specifier; with allowTypeImports it's skipped.
+				Code: `import { type Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowTypeImports": true, "importNames": []interface{}{"Foo"},
+					}},
+				}},
+			},
+			{
+				// Multiple type-only renames, all exempted via allowTypeImports.
+				Code: `import { type A as X, type B as Y } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowTypeImports": true, "importNames": []interface{}{"A", "B"},
+					}},
+				}},
+			},
+			{
+				// All-type-only with rename → whole-import-type-only short-circuit applies.
+				Code: `import type { A as X, B as Y } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowTypeImports": true, "importNames": []interface{}{"A", "B"},
+					}},
+				}},
+			},
+
+			// ---- export rename + allowTypeImports ----
+			{
+				// `export { type Foo as Bar }` source name is `Foo`, type-only specifier exempted.
+				Code: `export { type Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowTypeImports": true, "importNames": []interface{}{"Foo"},
+					}},
+				}},
+			},
+			{
+				// `export type { Foo as Bar }` whole-type-only export → short-circuit.
+				Code: `export type { Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowTypeImports": true, "importNames": []interface{}{"Foo"},
+					}},
+				}},
+			},
+
+			// ---- string-literal source name in rename: `import { 'A' as B } from 'lib'` ----
+			// tsgo parses the string literal property; source name is the literal value.
+			{
+				Code: `import { 'A' as B } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "importNames": []interface{}{"B"},
+					}},
+				}},
+			},
+
 			{
 				// `allowImportNames` includes the synthesized 'default' → no report.
 				Code: `import x = require('foo');`,
@@ -1483,6 +1563,83 @@ declare module 'wrapper' {
 				Options: []interface{}{map[string]interface{}{
 					"paths": []interface{}{map[string]interface{}{
 						"name": "foo", "importNames": []interface{}{"Bar"},
+					}},
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "importName", Line: 1, Column: 10},
+				},
+			},
+
+			// ---- `as` rename + allowImportNames: SOURCE name not in allow → report ----
+			{
+				// Source name `Foo` is NOT in allowImportNames=['Bar'] → reports allowedImportName.
+				Code: `import { Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "allowImportNames": []interface{}{"Bar"},
+					}},
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "allowedImportName", Line: 1, Column: 10},
+				},
+			},
+
+			// ---- `as` rename in export + allowTypeImports + value specifier → report ----
+			{
+				// `export { Foo as Bar }` is value (no `type` modifier on the specifier or clause).
+				// Source name `Foo` matches importNames; allowTypeImports doesn't apply (not type-only).
+				Code: `export { Foo as Bar } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name":             "lib",
+						"allowTypeImports": true,
+						"importNames":      []interface{}{"Foo"},
+					}},
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "importName", Line: 1, Column: 10},
+				},
+			},
+
+			// ---- Mixed value+type rename specifiers with importNames matching source names ----
+			{
+				// `import { A as X, type B as Y }` — A is value, B is type-only.
+				// allowTypeImports=true → only A reported (source name 'A').
+				Code: `import { A as X, type B as Y } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name":             "lib",
+						"allowTypeImports": true,
+						"importNames":      []interface{}{"A", "B"},
+					}},
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "importName", Line: 1, Column: 10},
+				},
+			},
+			{
+				// Same code, allowTypeImports=false → both A and B reported.
+				Code: `import { A as X, type B as Y } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name":             "lib",
+						"allowTypeImports": false,
+						"importNames":      []interface{}{"A", "B"},
+					}},
+				}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "importName", Line: 1, Column: 10},
+					{MessageId: "importName", Line: 1, Column: 18},
+				},
+			},
+
+			// ---- string-literal source name in rename matches importNames ----
+			{
+				// `import { 'A' as B }` — source name is the literal value 'A'.
+				Code: `import { 'A' as B } from 'lib';`,
+				Options: []interface{}{map[string]interface{}{
+					"paths": []interface{}{map[string]interface{}{
+						"name": "lib", "importNames": []interface{}{"A"},
 					}},
 				}},
 				Errors: []rule_tester.InvalidTestCaseError{
