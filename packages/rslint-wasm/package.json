@@ -23,7 +23,7 @@
     "type": "git",
     "url": "https://github.com/web-infra-dev/rslint"
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.33.2",
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@microsoft/api-extractor": "7.57.4",
@@ -32,9 +32,9 @@
     "buffer": "^6.0.3",
     "cross-env": "^10.1.0",
     "esbuild-plugin-polyfill-node": "0.3.0",
-    "memfs": "^4.57.1",
-    "prebundle": "1.6.0",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "memfs": "^4.57.2",
+    "prebundle": "1.6.4",
+    "@typescript/native-preview": "7.0.0-dev.20260429.1"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"
