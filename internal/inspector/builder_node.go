@@ -622,7 +622,7 @@ func (b *Builder) buildNodeChildren(node *ast.Node, info *NodeInfo) {
 
 	// TypeParameterDeclaration specific
 	if node.Kind == ast.KindTypeParameter {
-		if tpd := node.AsTypeParameter(); tpd != nil {
+		if tpd := node.AsTypeParameterDeclaration(); tpd != nil {
 			if tpd.Constraint != nil {
 				info.Constraint = b.BuildShallowNodeInfo(tpd.Constraint.AsNode())
 			}

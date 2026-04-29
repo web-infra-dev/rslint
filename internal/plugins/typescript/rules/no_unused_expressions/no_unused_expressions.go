@@ -82,10 +82,6 @@ func isDisallowed(node *ast.Node, opts *options) bool {
 	case ast.KindTemplateExpression:
 		return true
 
-	// Sequence expressions (comma-separated)
-	case ast.KindCommaListExpression:
-		return true
-
 	// Tagged template expressions
 	case ast.KindTaggedTemplateExpression:
 		return !opts.allowTaggedTemplates

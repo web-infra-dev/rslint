@@ -37,6 +37,8 @@ var CompilerOptionsDidYouMeanDiagnostics = tsoptions.CompilerOptionsDidYouMeanDi
 type CompilerOptionsValue = tsoptions.CompilerOptionsValue
 //go:linkname ConvertOptionToAbsolutePath github.com/microsoft/typescript-go/internal/tsoptions.ConvertOptionToAbsolutePath
 func ConvertOptionToAbsolutePath(o string, v any, optionMap tsoptions.CommandLineOptionNameMap, cwd string) (any, bool)
+//go:linkname ConvertToTSConfig github.com/microsoft/typescript-go/internal/tsoptions.ConvertToTSConfig
+func ConvertToTSConfig(configParseResult *tsoptions.ParsedCommandLine, configFileName string) *tsoptions.TSConfig
 //go:linkname CreateDiagnosticAtReferenceSyntax github.com/microsoft/typescript-go/internal/tsoptions.CreateDiagnosticAtReferenceSyntax
 func CreateDiagnosticAtReferenceSyntax(config *tsoptions.ParsedCommandLine, index int, message *diagnostics.Message, args ...any) *ast.Diagnostic
 //go:linkname CreateDiagnosticForNodeInSourceFile github.com/microsoft/typescript-go/internal/tsoptions.CreateDiagnosticForNodeInSourceFile
@@ -67,7 +69,6 @@ func GetParsedCommandLineOfConfigFilePath(configFileName string, path tspath.Pat
 func GetSupportedExtensionsWithJsonIfResolveJsonModule(compilerOptions *core.CompilerOptions, supportedExtensions [][]string) [][]string
 //go:linkname GetTsConfigPropArrayElementValue github.com/microsoft/typescript-go/internal/tsoptions.GetTsConfigPropArrayElementValue
 func GetTsConfigPropArrayElementValue(tsConfigSourceFile *ast.SourceFile, propKey string, elementValue string) *ast.StringLiteral
-var InverseJsxOptionMap = tsoptions.InverseJsxOptionMap
 var LibFilesSet = tsoptions.LibFilesSet
 var LibMap = tsoptions.LibMap
 var Libs = tsoptions.Libs
@@ -108,6 +109,7 @@ func ParseWatchOptions(key string, value any, allOptions *core.WatchOptions) []*
 type ParsedBuildCommandLine = tsoptions.ParsedBuildCommandLine
 type ParsedCommandLine = tsoptions.ParsedCommandLine
 type SourceOutputAndProjectReference = tsoptions.SourceOutputAndProjectReference
+type TSConfig = tsoptions.TSConfig
 //go:linkname TargetToLibMap github.com/microsoft/typescript-go/internal/tsoptions.TargetToLibMap
 func TargetToLibMap() map[core.ScriptTarget]string
 type TsConfigSourceFile = tsoptions.TsConfigSourceFile

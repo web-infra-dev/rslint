@@ -301,7 +301,7 @@ func getEffectiveParent(node *ast.Node) *ast.Node {
 
 // isTypeAssertion checks if a node is `x as T` or `<T>x`.
 func isTypeAssertion(node *ast.Node) bool {
-	return ast.IsAsExpression(node) || ast.IsTypeAssertionExpression(node)
+	return ast.IsAsExpression(node) || ast.IsTypeAssertion(node)
 }
 
 // isVariableDeclaratorWithTypeAnnotation checks if a node is a VariableDeclaration with a type annotation.

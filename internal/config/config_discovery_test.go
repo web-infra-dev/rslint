@@ -15,6 +15,7 @@ func TestFindNearestConfig_DirectMatch(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 }
 
@@ -29,6 +30,7 @@ func TestFindNearestConfig_Subdirectory(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 }
 
@@ -44,6 +46,7 @@ func TestFindNearestConfig_NearestWins(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 	if _, ok := cfg[0].Rules["foo-rule"]; !ok {
 		t.Error("Expected foo-rule in config")
@@ -88,6 +91,7 @@ func TestFindNearestConfig_FileInConfigDir(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 }
 
@@ -104,6 +108,7 @@ func TestFindNearestConfig_MultipleConfigsSameDepth(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 	if _, ok := cfg[0].Rules["foo-rule"]; !ok {
 		t.Error("Expected foo-rule")
@@ -116,6 +121,7 @@ func TestFindNearestConfig_MultipleConfigsSameDepth(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 	if _, ok := cfg[0].Rules["bar-rule"]; !ok {
 		t.Error("Expected bar-rule")
@@ -151,6 +157,7 @@ func TestFindNearestConfig_NestedConfigDirs(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 	if _, ok := cfg[0].Rules["components-rule"]; !ok {
 		t.Error("Expected components-rule")
@@ -177,6 +184,7 @@ func TestFindNearestConfig_RootConfig(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 }
 
@@ -206,6 +214,7 @@ func TestFindNearestConfig_TrailingSlashInKey(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config with trailing slash key, got nil")
+		return
 	}
 }
 
@@ -261,6 +270,7 @@ func TestFindNearestConfig_SingleConfigFallback(t *testing.T) {
 	}
 	if cfg == nil {
 		t.Fatal("Expected config, got nil")
+		return
 	}
 
 	// File NOT under config dir

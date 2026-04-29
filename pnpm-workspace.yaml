@@ -4,9 +4,5 @@ packages:
   - 'npm/rslint/*'
   - 'npm/tsgo/*'
   - 'website'
-  - 'typescript-go/_packages/ast'
-  - 'typescript-go/_packages/api'
-overrides:
-  '@typescript/ast': 'workspace:*'
 ignoreDepScripts: true
 ignoreScripts: true

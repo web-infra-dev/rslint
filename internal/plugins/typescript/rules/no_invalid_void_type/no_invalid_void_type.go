@@ -412,7 +412,7 @@ var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
 
 				// --- Default type parameter: <T = void> ---
 				case ast.KindTypeParameter:
-					typeParam := parent.AsTypeParameter()
+					typeParam := parent.AsTypeParameterDeclaration()
 					if typeParam.DefaultType == node && isAllowInGenericTruthy(opts) {
 						return // void as default is valid when generics are allowed
 					}

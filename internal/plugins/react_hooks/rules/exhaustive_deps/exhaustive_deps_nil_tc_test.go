@@ -68,6 +68,7 @@ function MyComponent({theme}) {
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
+		return
 	}
 
 	// Settings include `additionalHooks` so the additional-hooks code

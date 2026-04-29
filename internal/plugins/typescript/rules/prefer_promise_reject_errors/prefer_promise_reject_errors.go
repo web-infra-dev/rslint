@@ -85,7 +85,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 					}
 					param := symbol.ValueDeclaration
 
-					if param == nil || !ast.IsParameter(param) {
+					if param == nil || !ast.IsParameterDeclaration(param) {
 						return
 					}
 

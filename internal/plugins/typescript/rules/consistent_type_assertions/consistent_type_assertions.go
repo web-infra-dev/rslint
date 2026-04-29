@@ -73,7 +73,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		}
 
 		if typeNode != nil && typeNode.Kind == ast.KindTypeReference {
-			typeRef := typeNode.AsTypeReference()
+			typeRef := typeNode.AsTypeReferenceNode()
 			if typeRef != nil && typeRef.TypeName != nil {
 				typeName := typeRef.TypeName
 				if typeName.Kind == ast.KindIdentifier {

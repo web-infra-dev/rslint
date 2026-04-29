@@ -53,8 +53,9 @@ func NewProject(configFileName string, kind project.Kind, currentDirectory strin
 //go:linkname NewSession github.com/microsoft/typescript-go/internal/project.NewSession
 func NewSession(init *project.SessionInit) *project.Session
 //go:linkname NewSnapshot github.com/microsoft/typescript-go/internal/project.NewSnapshot
-func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, allUserPreferences *lsutil.UserConfig, autoImports *autoimport.Registry, autoImportsWatch *project.WatchedFiles[map[tspath.Path]string], toPath func(fileName string) tspath.Path) *project.Snapshot
+func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, userPreferences lsutil.UserPreferences, autoImports *autoimport.Registry, autoImportsWatch *project.WatchedFiles[map[tspath.Path]string], toPath func(fileName string) tspath.Path) *project.Snapshot
 type Overlay = project.Overlay
+type OwnerCache[K comparable, V, LoadArgs any] = project.OwnerCache[K,V,LoadArgs]
 type ParseCache = project.ParseCache
 type ParseCacheKey = project.ParseCacheKey
 type PatternsAndIgnored = project.PatternsAndIgnored
@@ -71,7 +72,7 @@ type Project = project.Project
 type ProjectCollection = project.ProjectCollection
 type ProjectCollectionBuilder = project.ProjectCollectionBuilder
 type ProjectTreeRequest = project.ProjectTreeRequest
-type RefCountCache[K comparable, V, LoadArgs any] = project.RefCountCache[K,V,LoadArgs]
+type RefCountCache[K comparable, V, AcquireArgs any] = project.RefCountCache[K,V,AcquireArgs]
 type RefCountCacheOptions = project.RefCountCacheOptions
 type ResourceRequest = project.ResourceRequest
 type Session = project.Session
@@ -95,3 +96,4 @@ const UpdateReasonRequestedLoadProjectTree = project.UpdateReasonRequestedLoadPr
 const UpdateReasonUnknown = project.UpdateReasonUnknown
 type WatchedFiles[T any] = project.WatchedFiles[T]
 type WatcherID = project.WatcherID
+type Watchers = project.Watchers

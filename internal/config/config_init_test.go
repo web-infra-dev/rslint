@@ -114,6 +114,7 @@ func TestMigrate_BothConfigAndJSON_ErrorsOnExisting(t *testing.T) {
 	err := InitDefaultConfig(dir)
 	if err == nil {
 		t.Fatal("Expected error when JS/TS config already exists")
+		return
 	}
 	assertContains(t, err.Error(), "config file already exists")
 	// JSON should NOT be deleted
@@ -127,6 +128,7 @@ func TestMigrate_EmptyJSON_Errors(t *testing.T) {
 	err := InitDefaultConfig(dir)
 	if err == nil {
 		t.Fatal("Expected error for empty JSON config")
+		return
 	}
 	assertContains(t, err.Error(), "empty")
 }
@@ -1130,6 +1132,7 @@ func TestMigrate_InvalidJSON_ReturnsError(t *testing.T) {
 	err := InitDefaultConfig(dir)
 	if err == nil {
 		t.Fatal("Expected error for invalid JSON")
+		return
 	}
 	assertContains(t, err.Error(), "failed to parse")
 }
@@ -1141,6 +1144,7 @@ func TestMigrate_JSONNotArray_ReturnsError(t *testing.T) {
 	err := InitDefaultConfig(dir)
 	if err == nil {
 		t.Fatal("Expected error for non-array JSON")
+		return
 	}
 }
 

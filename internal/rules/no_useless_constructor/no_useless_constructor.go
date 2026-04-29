@@ -39,7 +39,7 @@ func checkAccessibility(node *ast.Node, classHasSuperClass bool) bool {
 
 func checkParams(node *ast.Node, params []*ast.Node) bool {
 	for _, param := range params {
-		if !ast.IsParameter(param) {
+		if !ast.IsParameterDeclaration(param) {
 			continue
 		}
 		if ast.IsParameterPropertyDeclaration(param, node) {
@@ -53,7 +53,7 @@ func checkParams(node *ast.Node, params []*ast.Node) bool {
 }
 
 func isSimpleParam(param *ast.Node) bool {
-	if !ast.IsParameter(param) {
+	if !ast.IsParameterDeclaration(param) {
 		return false
 	}
 	pd := param.AsParameterDeclaration()

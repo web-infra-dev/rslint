@@ -764,7 +764,7 @@ func collectInferTypes(node *ast.Node, s *scope) {
 	case ast.KindInferType:
 		it := node.AsInferTypeNode()
 		if it != nil && it.TypeParameter != nil {
-			tp := it.TypeParameter.AsTypeParameter()
+			tp := it.TypeParameter.AsTypeParameterDeclaration()
 			if tp != nil && tp.Name() != nil && tp.Name().Kind == ast.KindIdentifier {
 				s.add(&variable{
 					name:           tp.Name().Text(),
@@ -803,7 +803,7 @@ func (b *builder) addTypeParameters(node *ast.Node, s *scope) {
 		if tp == nil {
 			continue
 		}
-		tpDecl := tp.AsTypeParameter()
+		tpDecl := tp.AsTypeParameterDeclaration()
 		if tpDecl == nil || tpDecl.Name() == nil || tpDecl.Name().Kind != ast.KindIdentifier {
 			continue
 		}
