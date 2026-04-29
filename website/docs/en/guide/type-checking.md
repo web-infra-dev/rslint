@@ -104,6 +104,12 @@ When `--type-check` is enabled, the summary always splits lint errors and type e
 Found 3 lint errors, 2 type errors and 1 warning (linted 42 files in 120ms using 8 threads)
 ```
 
+## Alignment with `tsc --noEmit`
+
+`--type-check` is designed to produce the same diagnostics as `tsc --noEmit` (and `tsgo --noEmit`) for any given TypeScript program — same error code, same file, same line and column.
+
+The one intentional difference: TypeScript diagnostics that have no source-file anchor (e.g. tsconfig validation messages such as `TS18003` "No inputs were found in config file" or `TS5108` "Option … has been removed") are not reported by `--type-check`, because rslint's output is rendered per file. Run `tsc --noEmit` directly when you need to surface those configuration-level errors.
+
 ## Files Without tsconfig Coverage
 
 Files that match your config's `files` patterns but are not included in any tsconfig (e.g. root-level scripts, config files) are still linted with syntax-level rules. However, `--type-check` will **not** report semantic type errors for these files, since reliable type information requires tsconfig coverage.

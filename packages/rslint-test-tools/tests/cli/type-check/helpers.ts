@@ -112,7 +112,7 @@ export const TS_CONFIG = JSON.stringify({
     target: 'ES2020',
     module: 'ESNext',
     strict: true,
-    moduleResolution: 'node',
+    moduleResolution: 'bundler',
   },
   include: ['**/*.ts'],
 });

@@ -181,7 +181,7 @@ func TestRunLinter_AllowFilesIntegration(t *testing.T) {
 	})
 
 	lintedFileNames := []string{}
-	result, err := RunLinter([]*compiler.Program{program}, true, []string{paths["b.ts"]}, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["b.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
@@ -204,7 +204,7 @@ func TestRunLinter_AllowFilesNilPassthrough(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,

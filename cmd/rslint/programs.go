@@ -12,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/vfsmatch"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -243,4 +244,33 @@ func buildFileFilters(
 		}
 	}
 	return filters
+}
+
+// toFileFilters converts the legacy `[]func(string) bool` per-program filter
+// slice (used by buildFileFilters) into linter.FileFilter typed entries. The
+// underlying functions are identical; this is purely a type adapter.
+func toFileFilters(in []func(string) bool) []linter.FileFilter {
+	if in == nil {
+		return nil
+	}
+	out := make([]linter.FileFilter, len(in))
+	for i, f := range in {
+		out[i] = f
+	}
+	return out
+}
+
+// buildTypeCheckSkipMask returns a parallel-to-Programs []bool where the entry
+// at fallbackIdx is true (skip type-check) and all others are false. Returns
+// nil when fallbackIdx is -1 (no fallback program), so callers don't allocate
+// an all-false slice.
+func buildTypeCheckSkipMask(numPrograms int, fallbackIdx int) []bool {
+	if fallbackIdx < 0 {
+		return nil
+	}
+	mask := make([]bool, numPrograms)
+	if fallbackIdx < numPrograms {
+		mask[fallbackIdx] = true
+	}
+	return mask
 }

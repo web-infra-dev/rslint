@@ -232,14 +232,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Run linter
-	lintResult, err := linter.RunLinter(
-		programs,
-		false, // Don't use single-threaded mode for IPC
-		allowedFiles,
-		nil, // no allowDirs in API mode
-		utils.ExcludePaths,
-
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+		Programs:       programs,
+		SingleThreaded: false, // Don't use single-threaded mode for IPC
+		Scope:          linter.FileScope{Files: allowedFiles},
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
 			filePath := tspath.ConvertToRelativePath(sourceFile.FileName(), comparePathOptions)
@@ -262,11 +259,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				}
 			})
 		},
-		false, // no type-check in API mode
-		diagnosticCollector,
-		nil, // no typeInfoFiles distinction in API mode (all files have type info)
-		nil, // no file filters in API mode (single config)
-	)
+		OnDiagnostic: diagnosticCollector,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %w", err)
 	}

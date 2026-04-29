@@ -83,7 +83,7 @@ func TestRunLinter_ExecutedRules(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			return []ConfiguredRule{
 				{Name: "rule-a", Severity: rule.SeverityWarning, Run: func(ctx rule.RuleContext) rule.RuleListeners { return nil }},
@@ -114,7 +114,7 @@ func TestRunLinter_ExecutedRulesPerFile(t *testing.T) {
 	})
 
 	// Different files get different rules — ExecutedRules should be the union.
-	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			if sf.FileName() == paths["a.ts"] {
 				return []ConfiguredRule{
@@ -148,7 +148,7 @@ func TestRunLinter_ExecutedRulesEmpty(t *testing.T) {
 	})
 
 	// No rules returned → ExecutedRules should be empty.
-	result, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		false, func(d rule.RuleDiagnostic) {}, nil, nil,
 	)

@@ -27,7 +27,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	util "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
@@ -719,14 +718,18 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		diagnostics = append(diagnostics, d)
 	}
 
-	linter.RunLinterInProgram(program, []string{filename}, nil, util.ExcludePaths,
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: program,
+		File:    filename,
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
 			if !hasTypeInfo {
 				activeRules = linter.FilterNonTypeAwareRules(activeRules)
 			}
 			return activeRules
-		}, false, diagnosticCollector, nil, nil)
+		},
+		OnDiagnostic: diagnosticCollector,
+	})
 
 	if diagnostics == nil {
 		diagnostics = []rule.RuleDiagnostic{}

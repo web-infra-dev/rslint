@@ -174,10 +174,13 @@ func TestTypeCheck_CoexistsWithLintRules(t *testing.T) {
 
 // --- Type-check respects file filtering ---
 
-func TestTypeCheck_RespectsAllowFiles(t *testing.T) {
+// Type-check is program-scoped (tsc-aligned) and is NOT constrained by
+// allowFiles. allowFiles only narrows lint-rule visit; type errors continue
+// to be reported for every file in the program.
+func TestTypeCheck_NotConstrainedByAllowFiles(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
-		"a.ts": "const x: number = 'hello';", // type error
-		"b.ts": "const y: string = 42;",      // type error
+		"a.ts": "const x: number = 'hello';",
+		"b.ts": "const y: string = 42;",
 	})
 
 	var diagnostics []rule.RuleDiagnostic
@@ -188,17 +191,28 @@ func TestTypeCheck_RespectsAllowFiles(t *testing.T) {
 		nil,
 	)
 
+	gotA, gotB := false, false
 	for _, d := range diagnostics {
-		if d.SourceFile.FileName() != paths["a.ts"] {
-			t.Errorf("Expected diagnostics only from a.ts, got from %s", d.SourceFile.FileName())
+		if d.SourceFile.FileName() == paths["a.ts"] {
+			gotA = true
 		}
+		if d.SourceFile.FileName() == paths["b.ts"] {
+			gotB = true
+		}
+	}
+	if !gotA {
+		t.Error("expected type error from a.ts (in allowFiles)")
+	}
+	if !gotB {
+		t.Error("expected type error from b.ts even though it is outside allowFiles (program-scoped tsc-aligned semantics)")
 	}
 }
 
-func TestTypeCheck_RespectsAllowDirs(t *testing.T) {
+// Same idea for allowDirs: program-level type-check is unaffected.
+func TestTypeCheck_NotConstrainedByAllowDirs(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
-		"src/a.ts": "const x: number = 'hello';", // type error
-		"lib/b.ts": "const y: string = 42;",      // type error
+		"src/a.ts": "const x: number = 'hello';",
+		"lib/b.ts": "const y: string = 42;",
 	})
 
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
@@ -210,10 +224,20 @@ func TestTypeCheck_RespectsAllowDirs(t *testing.T) {
 		nil,
 	)
 
+	gotSrc, gotLib := false, false
 	for _, d := range diagnostics {
-		if !strings.Contains(d.SourceFile.FileName(), "/src/") {
-			t.Errorf("Expected diagnostics only from src/, got from %s", d.SourceFile.FileName())
+		if strings.Contains(d.SourceFile.FileName(), "/src/") {
+			gotSrc = true
 		}
+		if strings.Contains(d.SourceFile.FileName(), "/lib/") {
+			gotLib = true
+		}
+	}
+	if !gotSrc {
+		t.Error("expected type error from src/a.ts (in allowDirs)")
+	}
+	if !gotLib {
+		t.Error("expected type error from lib/b.ts even though outside allowDirs (program-scoped tsc-aligned semantics)")
 	}
 }
 
@@ -225,7 +249,7 @@ func TestTypeCheck_RunLinter_Integration(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	_, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	_, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -254,7 +278,7 @@ func TestTypeCheck_RunLinter_DisabledIntegration(t *testing.T) {
 	})
 
 	var diagnostics []rule.RuleDiagnostic
-	_, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
+	_, err := runLinterPositional([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		false,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
@@ -544,7 +568,11 @@ const x: Foo = { a: 'hello' };
 
 // --- skipFiles filtering ---
 
-func TestTypeCheck_RespectsSkipFiles(t *testing.T) {
+// node_modules participation in type-check is governed by typescript-go's
+// SkipTypeChecking (skipLibCheck etc.), not by rslint's lint-scope skipFiles.
+// When a node_modules file is part of the program and skipLibCheck is off,
+// errors there are reported.
+func TestTypeCheck_NodeModulesIncludedWhenInProgram(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts":              "const x: number = 'hello';",
 		"node_modules/b.ts": "const y: string = 42;",
@@ -558,21 +586,21 @@ func TestTypeCheck_RespectsSkipFiles(t *testing.T) {
 		nil,
 	)
 
-	for _, d := range diagnostics {
-		if strings.Contains(d.SourceFile.FileName(), "node_modules") {
-			t.Errorf("Expected node_modules to be skipped, got diagnostic from %s", d.SourceFile.FileName())
-		}
-	}
-	// Should still report errors from a.ts
-	found := false
+	var aDiags, bDiags int
 	for _, d := range diagnostics {
 		if strings.HasPrefix(d.RuleName, "TypeScript(") {
-			found = true
-			break
+			if strings.Contains(d.SourceFile.FileName(), "node_modules") {
+				bDiags++
+			} else {
+				aDiags++
+			}
 		}
 	}
-	if !found {
-		t.Error("Expected type errors from non-skipped file a.ts")
+	if aDiags == 0 {
+		t.Error("expected type errors from a.ts")
+	}
+	if bDiags == 0 {
+		t.Error("expected node_modules/b.ts type errors to also be reported (program-scoped tsc-aligned semantics; ExcludePaths is a lint-only filter)")
 	}
 }
 
@@ -889,7 +917,7 @@ func TestTypeCheck_MultiplePrograms(t *testing.T) {
 
 	var mu sync.Mutex
 	var diagnostics []rule.RuleDiagnostic
-	result, err := RunLinter(
+	result, err := runLinterPositional(
 		[]*compiler.Program{program1, program2},
 		true,
 		nil, nil, utils.ExcludePaths,
@@ -998,7 +1026,10 @@ func TestTypeCheck_NoDuplicateDiagnostics(t *testing.T) {
 
 // --- allowFiles empty slice (non-nil) blocks type-check ---
 
-func TestTypeCheck_AllowFilesEmptySliceBlocksAll(t *testing.T) {
+// Empty allowFiles blocks all lint-rule visits (LintedFileCount=0) but does
+// NOT suppress the program-level type-check phase. Type errors are still
+// reported, mirroring tsc.
+func TestTypeCheck_AllowFilesEmptySliceBlocksLintOnly(t *testing.T) {
 	program, _ := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x: number = 'hello';",
 	})
@@ -1012,10 +1043,16 @@ func TestTypeCheck_AllowFilesEmptySliceBlocksAll(t *testing.T) {
 	)
 
 	if count != 0 {
-		t.Errorf("Expected lintedFileCount=0 with empty allowFiles, got %d", count)
+		t.Errorf("Expected lintedFileCount=0 (lint-rule visits), got %d", count)
 	}
-	if len(diagnostics) != 0 {
-		t.Errorf("Expected no diagnostics with empty allowFiles, got %d", len(diagnostics))
+	tsCount := 0
+	for _, d := range diagnostics {
+		if strings.HasPrefix(d.RuleName, "TypeScript(") {
+			tsCount++
+		}
+	}
+	if tsCount == 0 {
+		t.Error("expected at least one type-check diagnostic; type-check is program-level and must not be silenced by an empty allowFiles slice")
 	}
 }
 
@@ -1257,10 +1294,12 @@ func TestTypeCheck_MessageIdEmpty(t *testing.T) {
 	}
 }
 
-// fileFilter rejecting a file must suppress BOTH rule and type-check
-// diagnostics for it, and exclude it from the returned LintedFileCount.
-// This is what wires config `ignores` into the linter at the CLI/LSP layer.
-func TestTypeCheck_FileFilterSuppressesDiagnostics(t *testing.T) {
+// fileFilter rejecting a file suppresses lint-rule diagnostics and excludes
+// the file from LintedFileCount, but does NOT silence type-check
+// diagnostics. Type-check is program-scoped and aligned with tsc; the
+// per-program filter is a lint-rule concept (config `ignores`,
+// multi-config ownership) and must not be re-applied to type errors.
+func TestTypeCheck_FileFilterSuppressesLintRulesOnly(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"kept.ts":    "const x: number = 'hello';",
 		"ignored.ts": "const y: number = 'world';",
@@ -1274,18 +1313,20 @@ func TestTypeCheck_FileFilterSuppressesDiagnostics(t *testing.T) {
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
 		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) }, nil,
-		// Reject ignored.ts — stands in for config `ignores` hitting the file.
 		func(fileName string) bool { return fileName != ignoredPath },
 	)
 
-	// Count should exclude the filtered file.
+	// Lint-rule visit count excludes the filtered file.
 	if count != 1 {
-		t.Errorf("LintedFileCount = %d, want 1 (ignored file should not count)", count)
+		t.Errorf("LintedFileCount = %d, want 1 (filter applies to lint phase)", count)
 	}
 
-	// Kept file should still produce its TS error; filtered file must be silent.
+	// Both files contribute type errors — the filter is lint-only.
 	var keptDiags, ignoredDiags int
 	for _, d := range diagnostics {
+		if !strings.HasPrefix(d.RuleName, "TypeScript(") {
+			continue
+		}
 		switch d.SourceFile.FileName() {
 		case keptPath:
 			keptDiags++
@@ -1294,32 +1335,39 @@ func TestTypeCheck_FileFilterSuppressesDiagnostics(t *testing.T) {
 		}
 	}
 	if keptDiags == 0 {
-		t.Error("expected kept.ts to produce TS diagnostics, got none")
+		t.Error("expected kept.ts to produce TS diagnostics")
 	}
-	if ignoredDiags != 0 {
-		t.Errorf("expected ignored.ts to produce no diagnostics, got %d", ignoredDiags)
+	if ignoredDiags == 0 {
+		t.Error("expected ignored.ts to STILL produce TS diagnostics — type-check is not gated by per-program filter")
 	}
 }
 
-// Parallel scenario: multiple programs each with their own filter.
-func TestTypeCheck_FileFilterSuppressesAcrossPrograms(t *testing.T) {
+// Parallel scenario: even when every program has a reject-all filter, the
+// type-check phase runs on each program. Lint-rule visits collapse to zero,
+// but type errors are still surfaced.
+func TestTypeCheck_FileFilterDoesNotMaskTypeChecksAcrossPrograms(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const x: number = 'hello';",
 		"b.ts": "const y: number = 'world';",
 	})
 
-	// Filter that rejects everything — simulates all files being ignored.
 	rejectAll := func(string) bool { return false }
 
 	var diagCount int
 	var mu sync.Mutex
-	result, err := RunLinter(
+	result, err := runLinterPositional(
 		[]*compiler.Program{program},
-		true, // singleThreaded
+		true,
 		nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
 		true,
-		func(d rule.RuleDiagnostic) { mu.Lock(); diagCount++; mu.Unlock() },
+		func(d rule.RuleDiagnostic) {
+			mu.Lock()
+			defer mu.Unlock()
+			if strings.HasPrefix(d.RuleName, "TypeScript(") {
+				diagCount++
+			}
+		},
 		nil,
 		[]func(string) bool{rejectAll},
 	)
@@ -1327,12 +1375,11 @@ func TestTypeCheck_FileFilterSuppressesAcrossPrograms(t *testing.T) {
 		t.Fatalf("RunLinter: %v", err)
 	}
 	if result.LintedFileCount != 0 {
-		t.Errorf("LintedFileCount = %d, want 0", result.LintedFileCount)
+		t.Errorf("LintedFileCount = %d, want 0 (filter rejects all → no lint visits)", result.LintedFileCount)
 	}
-	if diagCount != 0 {
-		t.Errorf("diagnostic count = %d, want 0", diagCount)
+	if diagCount < 2 {
+		t.Errorf("expected at least 2 type-check diagnostics (a.ts + b.ts), got %d", diagCount)
 	}
-	// Reference paths so the test fails obviously if the helper changes shape.
 	_ = paths["a.ts"]
 	_ = paths["b.ts"]
 }

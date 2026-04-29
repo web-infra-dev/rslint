@@ -86,7 +86,7 @@ func requireProgramHasFile(t *testing.T, program *compiler.Program, fileName str
 func collectLintedFiles(t *testing.T, programs []*compiler.Program) map[string]int {
 	t.Helper()
 	counts := make(map[string]int)
-	_, err := RunLinter(
+	_, err := runLinterPositional(
 		programs, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule {
 			counts[sf.FileName()]++
@@ -294,7 +294,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 
 	// Multi-program mode
 	multiDiags := 0
-	RunLinter(
+	runLinterPositional(
 		[]*compiler.Program{programLib, programApp},
 		true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
