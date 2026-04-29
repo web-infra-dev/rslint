@@ -363,19 +363,23 @@ import type { foo } from 'import2/private/bar';
 			},
 
 			// ---- Whitespace in source — base trims, so '  foo  ' matches 'foo' ----
-			{
-				Code: `import x from '  foo  ';`,
-				Options: []interface{}{map[string]interface{}{
-					"paths": []interface{}{map[string]interface{}{"name": "foo", "allowTypeImports": true}},
-				}},
-				// Not type-only → not exempted, but source matches by trim. Wait — this is import value, would error.
-				// Skip: import value of 'foo' (after trim) IS restricted. Move to invalid.
-				Skip: true,
-			},
+			// Whole-type-only import of '  foo  ' trims to 'foo', matches the
+			// allow-type path → short-circuit skip.
 			{
 				Code: `import type x from '  foo  ';`,
 				Options: []interface{}{map[string]interface{}{
 					"paths": []interface{}{map[string]interface{}{"name": "foo", "allowTypeImports": true}},
+				}},
+			},
+
+			// ---- Case-sensitive pattern: uppercase source NOT matched by lowercase glob ----
+			{
+				Code: `import x from 'FOO';`,
+				Options: []interface{}{map[string]interface{}{
+					"patterns": []interface{}{map[string]interface{}{
+						"group":         []interface{}{"foo"},
+						"caseSensitive": true,
+					}},
 				}},
 			},
 
@@ -1319,23 +1323,6 @@ declare module 'foo' {
 					{MessageId: "patternAndImportName", Line: 1, Column: 8},
 				},
 			},
-			{
-				// `import type x = require('foo')` is whole-type-only at the source level;
-				// allowTypeImports=true on a matching path skips it entirely (short-circuit).
-				// No error expected.
-				Code: `import type x = require('foo');`,
-				Options: []interface{}{map[string]interface{}{
-					"paths": []interface{}{
-						map[string]interface{}{
-							"name":             "foo",
-							"importNames":      []interface{}{"default"},
-							"allowTypeImports": true,
-						},
-					},
-				}},
-				Skip: true, // valid case, but rule_tester only takes invalid here — moved to valid below
-			},
-
 			// ============================================================
 			// tsgo-specific implementation differences — extra invalid coverage
 			// ============================================================
@@ -1696,20 +1683,6 @@ import {
 					{MessageId: "patterns", Line: 1, Column: 1},
 				},
 			},
-			{
-				// Case-sensitive blocks the match.
-				Code: `import x from 'FOO';`,
-				Options: []interface{}{map[string]interface{}{
-					"patterns": []interface{}{map[string]interface{}{
-						"group":         []interface{}{"foo"},
-						"caseSensitive": true,
-					}},
-				}},
-				// Should NOT match — but rule_tester requires Errors for InvalidTestCase.
-				// So we move this to the valid section. Skip here.
-				Skip: true,
-			},
-
 			// ---- Value-only namespace import on a restricted path ----
 			{
 				Code:    `import * as ns from 'foo';`,
