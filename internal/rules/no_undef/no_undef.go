@@ -46,11 +46,14 @@ func parseGlobalComments(sourceText string) map[string]bool {
 }
 
 var NoUndefRule = rule.Rule{
-	Name: "no-undef",
+	Name:             "no-undef",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 
-		// Without TypeChecker, this rule cannot resolve symbols
+		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
+		// gap files / inferred-project files, but if a future caller bypasses
+		// the filter we still want to no-op rather than nil-deref.
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

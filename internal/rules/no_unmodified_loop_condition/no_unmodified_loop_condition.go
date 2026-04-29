@@ -291,8 +291,12 @@ func checkLoopCondition(ctx rule.RuleContext, condition *ast.Node, body *ast.Nod
 
 // NoUnmodifiedLoopConditionRule disallows variables in loop conditions that are not modified in the loop
 var NoUnmodifiedLoopConditionRule = rule.Rule{
-	Name: "no-unmodified-loop-condition",
+	Name:             "no-unmodified-loop-condition",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
+		// gap files / inferred-project files, but if a future caller bypasses
+		// the filter we still want to no-op rather than nil-deref.
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

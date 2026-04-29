@@ -579,8 +579,12 @@ func (s *runState) checkForLoops(node *ast.Node) {
 // NoLoopFuncRule disallows function declarations that contain unsafe
 // references to variable(s) inside loop statements.
 var NoLoopFuncRule = rule.Rule{
-	Name: "no-loop-func",
+	Name:             "no-loop-func",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
+		// gap files / inferred-project files, but if a future caller bypasses
+		// the filter we still want to no-op rather than nil-deref.
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

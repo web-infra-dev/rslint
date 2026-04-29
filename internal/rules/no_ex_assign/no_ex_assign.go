@@ -263,7 +263,8 @@ func checkReassignments(block *ast.Node, names []string, symbols []*ast.Symbol, 
 }
 
 var NoExAssignRule = rule.Rule{
-	Name: "no-ex-assign",
+	Name:             "no-ex-assign",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCatchClause: func(node *ast.Node) {
