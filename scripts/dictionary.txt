@@ -257,6 +257,7 @@ destructures
 segs
 setstate
 Setstate
+packagejson
 middot
 xlink
 nend

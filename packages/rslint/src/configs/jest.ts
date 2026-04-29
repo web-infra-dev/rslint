@@ -9,7 +9,7 @@ const recommended: RslintConfigEntry = {
     'jest/no-alias-methods': 'error',
     // 'jest/no-commented-out-tests': 'warn', // not implemented
     // 'jest/no-conditional-expect': 'error', // not implemented
-    // 'jest/no-deprecated-functions': 'error', // not implemented
+    'jest/no-deprecated-functions': 'error',
     'jest/no-disabled-tests': 'warn',
     // 'jest/no-done-callback': 'error', // not implemented
     // 'jest/no-export': 'error', // not implemented
