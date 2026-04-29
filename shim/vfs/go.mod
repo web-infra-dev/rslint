@@ -3,7 +3,7 @@ module github.com/microsoft/typescript-go/shim/vfs
 go 1.25
 
 require (
-	github.com/dlclark/regexp2 v1.11.5
+	github.com/dlclark/regexp2 v1.12.0
 	github.com/microsoft/typescript-go v0.0.0-20250829050502-5d1d69a77a4c
 )
 
