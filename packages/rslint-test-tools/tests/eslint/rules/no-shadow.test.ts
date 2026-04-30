@@ -718,6 +718,29 @@ function bar() { }`,
   }
 		`,
     },
+
+    // ---- Function-name initializer exception covers arbitrary wrappers
+    // (ESLint scope-based check: outerScope === innerScope.upper).
+    'const a = wrap(function a() {});',
+    'const a = foo || wrap(function a() {});',
+    'const { a = wrap(function a() {}) } = obj;',
+    'const { a = foo || wrap(function a() {}) } = obj;',
+    'const { a = foo, b = function a() {} } = {}',
+    'const { A = Foo, B = class A {} } = {}',
+    'function foo(a = wrap(function a() {})) {}',
+    'function foo(a = foo || wrap(function a() {})) {}',
+    'const A = wrap(class A {});',
+    'const A = foo || wrap(class A {});',
+    'const { A = wrap(class A {}) } = obj;',
+    'const { A = foo || wrap(class A {}) } = obj;',
+    'function foo(A = wrap(class A {})) {}',
+    'function foo(A = foo || wrap(class A {})) {}',
+    'var a = function a() {} ? foo : bar',
+    'var A = class A {} ? foo : bar',
+    {
+      code: 'let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });',
+      options: [{ hoist: 'all' }] as any,
+    },
   ],
   invalid: [
     // ---- Core JS shadow with line/column ----
@@ -1040,71 +1063,9 @@ function bar() { }`,
       errors: [{ messageId: 'noShadow', line: 1, column: 20 }],
     },
 
-    // ---- Call-wrap does NOT trigger the initializer exception ----
-    {
-      code: 'const a = wrap(function a() {});',
-      errors: [{ messageId: 'noShadow', line: 1, column: 25 }],
-    },
-    {
-      code: 'const a = foo || wrap(function a() {});',
-      errors: [{ messageId: 'noShadow', line: 1, column: 32 }],
-    },
-    {
-      code: 'const { a = wrap(function a() {}) } = obj;',
-      errors: [{ messageId: 'noShadow', line: 1, column: 27 }],
-    },
-    {
-      code: 'const { a = foo || wrap(function a() {}) } = obj;',
-      errors: [{ messageId: 'noShadow', line: 1, column: 34 }],
-    },
-    {
-      code: 'const { a = foo, b = function a() {} } = {}',
-      errors: [{ messageId: 'noShadow', line: 1, column: 31 }],
-    },
-    {
-      code: 'const { A = Foo, B = class A {} } = {}',
-      errors: [{ messageId: 'noShadow', line: 1, column: 28 }],
-    },
-    {
-      code: 'function foo(a = wrap(function a() {})) {}',
-      errors: [{ messageId: 'noShadow', line: 1, column: 32 }],
-    },
-    {
-      code: 'function foo(a = foo || wrap(function a() {})) {}',
-      errors: [{ messageId: 'noShadow', line: 1, column: 39 }],
-    },
-    {
-      code: 'const A = wrap(class A {});',
-      errors: [{ messageId: 'noShadow', line: 1, column: 22 }],
-    },
-    {
-      code: 'const A = foo || wrap(class A {});',
-      errors: [{ messageId: 'noShadow', line: 1, column: 29 }],
-    },
-    {
-      code: 'const { A = wrap(class A {}) } = obj;',
-      errors: [{ messageId: 'noShadow', line: 1, column: 24 }],
-    },
-    {
-      code: 'const { A = foo || wrap(class A {}) } = obj;',
-      errors: [{ messageId: 'noShadow', line: 1, column: 31 }],
-    },
-    {
-      code: 'function foo(A = wrap(class A {})) {}',
-      errors: [{ messageId: 'noShadow', line: 1, column: 29 }],
-    },
-    {
-      code: 'function foo(A = foo || wrap(class A {})) {}',
-      errors: [{ messageId: 'noShadow', line: 1, column: 36 }],
-    },
-    {
-      code: 'var a = function a() {} ? foo : bar',
-      errors: [{ messageId: 'noShadow', line: 1, column: 18 }],
-    },
-    {
-      code: 'var A = class A {} ? foo : bar',
-      errors: [{ messageId: 'noShadow', line: 1, column: 15 }],
-    },
+    // (Removed: call-wrap and conditional-test-position cases — ESLint's
+    // `outerScope === innerScope.upper` filter exempts them; corresponding
+    // valid cases live in the valid section.)
     {
       code: '(function Array() {})',
       options: [{ builtinGlobals: true }] as any,
@@ -1798,11 +1759,6 @@ foo(a => {});`,
 let y;`,
       options: [{ hoist: 'all' }] as any,
       errors: [{ messageId: 'noShadow' }, { messageId: 'noShadow' }],
-    },
-    {
-      code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`,
-      options: [{ hoist: 'all' }] as any,
-      errors: [{ messageId: 'noShadow' }],
     },
     {
       code: `

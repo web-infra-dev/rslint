@@ -125,8 +125,24 @@ func defaultOptions() options {
 	}
 }
 
-func parseOptions(raw any) options {
-	opts := defaultOptions()
+// defaultOptionsTSESLint returns the typescript-eslint defaults: identical to
+// the ESLint core defaults except `hoist` is `functions-and-types`.
+func defaultOptionsTSESLint() options {
+	o := defaultOptions()
+	o.hoist = hoistFunctionsAndTypes
+	return o
+}
+
+func parseOptionsWith(raw any, opts options) options {
+	// Always copy the allow map: the caller's `opts` may be a long-lived
+	// defaults instance shared across rule invocations (e.g. the closure
+	// captured by `runWithDefaults`). Mutating in-place would leak state
+	// from one source file's lint run to the next.
+	src := opts.allow
+	opts.allow = make(map[string]bool, len(src)+4)
+	for k, v := range src {
+		opts.allow[k] = v
+	}
 	optsMap := utils.GetOptionsMap(raw)
 	if optsMap == nil {
 		return opts
@@ -1294,8 +1310,22 @@ func (b *builder) visitSwitchCases(sw *ast.SwitchStatement, outer *scope) {
 
 var NoShadowRule = rule.Rule{
 	Name: "no-shadow",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
-		opts := parseOptions(rawOptions)
+	Run:  runWithDefaults(defaultOptions()),
+}
+
+// RunTSESLint exposes the rule body with typescript-eslint's defaults so the
+// `@typescript-eslint/no-shadow` wrapper can reuse the implementation. The
+// underlying closure is built once at package init — `parseOptionsWith`
+// copies the captured `allow` map per invocation, so this is safe.
+var runTSESLint = runWithDefaults(defaultOptionsTSESLint())
+
+func RunTSESLint(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	return runTSESLint(ctx, rawOptions)
+}
+
+func runWithDefaults(defaults options) func(rule.RuleContext, any) rule.RuleListeners {
+	return func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+		opts := parseOptionsWith(rawOptions, defaults)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
@@ -1361,7 +1391,7 @@ var NoShadowRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{}
-	},
+	}
 }
 
 // isDuplicatedClassNameInClassScope suppresses the inner class-name binding
@@ -1626,6 +1656,15 @@ func isInTdz(inner *variable, outer *variable, mode hoistMode) bool {
 
 // isFunctionNameInitializerException implements the `var a = function a() {}`
 // / `var A = class A {}` / default-destructuring variants that ESLint ignores.
+//
+// Mirrors ESLint's `isOnInitializer`: requires (a) the inner is a Function-
+// Expression name or ClassExpression inner-name, (b) the inner identifier
+// sits inside the outer binding's declarator/parameter range, and (c) the
+// inner's enclosing scope IS the scope owning the outer binding. Together,
+// (b)+(c) handle arbitrary call/decorator wrappers (`wrap(function x() {})`)
+// without an AST-walk whitelist, while still rejecting unrelated siblings
+// (`const a = 1; const b = function a() {}` — different declarator ranges,
+// so (b) fails and we report).
 func isFunctionNameInitializerException(inner *variable, outer *variable) bool {
 	if outer.defNode == nil || inner.defNode == nil {
 		return false
@@ -1633,60 +1672,39 @@ func isFunctionNameInitializerException(inner *variable, outer *variable) bool {
 	if inner.kind != defFnExprName && (inner.kind != defClassInnerName || inner.defNode.Kind != ast.KindClassExpression) {
 		return false
 	}
-	expr := inner.defNode // FunctionExpression / ClassExpression
-	// Outer must be a VariableDeclaration or BindingElement with an initializer.
-	var initializer *ast.Node
-	switch outer.defNode.Kind {
-	case ast.KindVariableDeclaration:
-		vd := outer.defNode.AsVariableDeclaration()
-		if vd != nil {
-			initializer = vd.Initializer
-		}
-	case ast.KindBindingElement, ast.KindParameter:
-		initializer = outer.defNode.Initializer()
-	}
-	if initializer == nil {
+	if inner.scope == nil || inner.scope.parent == nil || outer.scope == nil {
 		return false
 	}
-	if initializer.Pos() > expr.Pos() || expr.End() > initializer.End() {
+	startPos, endPos, ok := outerInitializerLexicalRange(outer.defNode)
+	if !ok {
 		return false
 	}
-	// Walk up from `expr` through logical / ternary / paren wrappers only;
-	// success iff we land exactly on `initializer`.
-	current := expr
-	for {
-		if current == initializer {
-			return true
-		}
-		parent := current.Parent
-		if parent == nil {
-			return false
-		}
-		switch parent.Kind {
-		case ast.KindParenthesizedExpression:
-			current = parent
-			continue
-		case ast.KindBinaryExpression:
-			be := parent.AsBinaryExpression()
-			if be != nil && be.OperatorToken != nil {
-				op := be.OperatorToken.Kind
-				if op == ast.KindBarBarToken || op == ast.KindAmpersandAmpersandToken || op == ast.KindQuestionQuestionToken {
-					current = parent
-					continue
+	expr := inner.defNode
+	if startPos > expr.Pos() || expr.End() > endPos {
+		return false
+	}
+	return inner.scope.parent == outer.scope
+}
+
+// outerInitializerLexicalRange returns the range ESLint's scope manager would
+// expose as the binding's `Definition.parent.range`: the enclosing
+// VariableDeclaration for var/let/const + destructuring elements, and the
+// enclosing function-like node for parameters.
+func outerInitializerLexicalRange(defNode *ast.Node) (int, int, bool) {
+	for cur := defNode; cur != nil; cur = cur.Parent {
+		switch cur.Kind {
+		case ast.KindVariableDeclaration:
+			return cur.Pos(), cur.End(), true
+		case ast.KindParameter:
+			for p := cur.Parent; p != nil; p = p.Parent {
+				if ast.IsFunctionLike(p) {
+					return p.Pos(), p.End(), true
 				}
 			}
-			return false
-		case ast.KindConditionalExpression:
-			ce := parent.AsConditionalExpression()
-			if ce != nil && ce.Condition != current {
-				current = parent
-				continue
-			}
-			return false
-		default:
-			return false
+			return cur.Pos(), cur.End(), true
 		}
 	}
+	return 0, 0, false
 }
 
 // isInInitPatternCall handles the `ignoreOnInitialization` option.
