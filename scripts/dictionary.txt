@@ -305,3 +305,12 @@ modns
 Modns
 módulo
 dedup
+estree
+combinator
+combinators
+wellformed
+finalizer
+centralising
+normalises
+bareword
+uninitialised

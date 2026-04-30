@@ -197,6 +197,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_regex_spaces"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
+	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_syntax"
 	"github.com/web-infra-dev/rslint/internal/rules/no_return_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
@@ -670,6 +671,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-new-func", no_new_func.NoNewFuncRule)
 	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
 	GlobalRuleRegistry.Register("no-restricted-imports", no_restricted_imports.NoRestrictedImportsRule)
+	GlobalRuleRegistry.Register("no-restricted-syntax", no_restricted_syntax.NoRestrictedSyntaxRule)
 	GlobalRuleRegistry.Register("no-multi-assign", no_multi_assign.NoMultiAssignRule)
 	GlobalRuleRegistry.Register("no-multi-str", no_multi_str.NoMultiStrRule)
 	GlobalRuleRegistry.Register("no-nested-ternary", no_nested_ternary.NoNestedTernaryRule)
