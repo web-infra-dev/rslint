@@ -316,34 +316,12 @@ func isSymbolDeclaredInside(sym *ast.Symbol, funcNode *ast.Node) bool {
 	return false
 }
 
-// GetVarDeclListKind returns the kind of a VariableDeclarationList: one of
-// "const", "let", "var", "using", "await using", or "" for anything else.
-//
-// IMPORTANT: tsgo encodes `await using` as `NodeFlagsConst | NodeFlagsUsing`
-// (see the node-flags definitions in typescript-go's ast package), so the aggregate flag
-// `NodeFlagsAwaitUsing` is NOT a single bit. We must inspect the individual
-// `NodeFlagsUsing` and `NodeFlagsConst` bits and only report `"await using"`
-// when BOTH are set, otherwise `flags & NodeFlagsAwaitUsing != 0` would
-// collapse plain `const` and plain `using` into `"await using"`.
+// GetVarDeclListKind is a thin wrapper around utils.GetVarDeclListKind kept
+// for backwards compatibility with the typescript-eslint counterpart in
+// internal/plugins/typescript/rules/no_loop_func, which imports this symbol.
+// New callers should use utils.GetVarDeclListKind directly.
 func GetVarDeclListKind(declList *ast.Node) string {
-	if declList == nil || declList.Kind != ast.KindVariableDeclarationList {
-		return ""
-	}
-	flags := declList.Flags
-	hasUsing := flags&ast.NodeFlagsUsing != 0
-	hasConst := flags&ast.NodeFlagsConst != 0
-	switch {
-	case hasUsing && hasConst:
-		return "await using"
-	case hasUsing:
-		return "using"
-	case hasConst:
-		return "const"
-	case flags&ast.NodeFlagsLet != 0:
-		return "let"
-	default:
-		return "var"
-	}
+	return utils.GetVarDeclListKind(declList)
 }
 
 // enclosingVarDeclOfBindingElement walks up through nested BindingElement /

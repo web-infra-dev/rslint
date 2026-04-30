@@ -2,8 +2,6 @@ package no_var
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -41,7 +39,7 @@ var NoVarRule = rule.Rule{
 				}
 
 				if ctx.TypeChecker != nil && canFix(node, &ctx) {
-					varRange := getVarKeywordRange(node, ctx.SourceFile)
+					varRange := utils.GetVarKeywordRange(node, ctx.SourceFile)
 					ctx.ReportNodeWithFixes(reportNode, msg,
 						rule.RuleFixReplaceRange(varRange, "let"))
 				} else {
@@ -57,12 +55,6 @@ func isInDeclareGlobal(node *ast.Node) bool {
 	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
 		return ast.IsGlobalScopeAugmentation(n)
 	}) != nil
-}
-
-// getVarKeywordRange returns the text range of the `var` keyword in a VariableDeclarationList.
-func getVarKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
-	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-	return core.NewTextRange(s.TokenStart(), s.TokenEnd())
 }
 
 // ---------- canFix: determines if var→let is safe ----------

@@ -316,3 +316,6 @@ centralising
 normalises
 bareword
 uninitialised
+uninit
+espree
+norf

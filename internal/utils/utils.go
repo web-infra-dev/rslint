@@ -17,6 +17,46 @@ func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRang
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
+// GetVarKeywordRange returns the range of the kind keyword (`var`/`let`/`const`/
+// `using` or `await` for `await using`) inside a VariableStatement or
+// VariableDeclarationList. For VariableStatement it skips the modifier list
+// (e.g. `export`/`declare`) so the returned range starts at the actual kind
+// keyword. Used by rules that synthesize fixes around the kind keyword
+// (one-var, no-var, prefer-const, etc.).
+func GetVarKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
+	pos := TrimNodeTextRange(sourceFile, node).Pos()
+	if node.Kind == ast.KindVariableStatement {
+		if mods := node.Modifiers(); mods != nil && len(mods.Nodes) > 0 {
+			pos = mods.End()
+		}
+	}
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, pos)
+}
+
+// GetVarDeclListKind returns the kind keyword for a VariableDeclarationList:
+// "var", "let", "const", "using", "await using", or "" if the node is not a
+// VariableDeclarationList. Uses tsgo's IsVar* helpers (which apply
+// GetCombinedNodeFlags and correctly handle the `NodeFlagsConst|NodeFlagsUsing`
+// encoding of `await using`). Centralizes what was duplicated across no-var,
+// prefer-const, no-loop-func, and one-var.
+func GetVarDeclListKind(node *ast.Node) string {
+	if node == nil || node.Kind != ast.KindVariableDeclarationList {
+		return ""
+	}
+	switch {
+	case ast.IsVarAwaitUsing(node):
+		return "await using"
+	case ast.IsVarUsing(node):
+		return "using"
+	case ast.IsVarConst(node):
+		return "const"
+	case ast.IsVarLet(node):
+		return "let"
+	default:
+		return "var"
+	}
+}
+
 // TrimmedNodeText returns the source text for node over the same span as TrimNodeTextRange.
 func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	r := TrimNodeTextRange(sourceFile, node)

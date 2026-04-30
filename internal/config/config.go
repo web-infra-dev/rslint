@@ -229,6 +229,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
+	"github.com/web-infra-dev/rslint/internal/rules/one_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	core_prefer_promise_reject_errors "github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
@@ -727,6 +728,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
 	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
 	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
+	GlobalRuleRegistry.Register("one-var", one_var.OneVarRule)
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 	GlobalRuleRegistry.Register("no-throw-literal", no_throw_literal.NoThrowLiteralRule)
 	GlobalRuleRegistry.Register("no-useless-call", no_useless_call.NoUselessCallRule)
