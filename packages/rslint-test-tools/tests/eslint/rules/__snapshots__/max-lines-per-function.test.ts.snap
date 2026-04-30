@@ -1,0 +1,800 @@
+// Rstest Snapshot v1
+
+exports[`max-lines-per-function > invalid 1`] = `
+{
+  "code": "function name() {
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 2`] = `
+{
+  "code": "var func = function() {
+}",
+  "diagnostics": [
+    {
+      "message": "Function has too many lines (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 3`] = `
+{
+  "code": "const bar = () => {
+const x = 2 + 1;
+return x;
+}",
+  "diagnostics": [
+    {
+      "message": "Arrow function has too many lines (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 4`] = `
+{
+  "code": "const bar = () =>
+ 2",
+  "diagnostics": [
+    {
+      "message": "Arrow function has too many lines (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 5`] = `
+{
+  "code": "() => {foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+foo
+}",
+  "diagnostics": [
+    {
+      "message": "Arrow function has too many lines (61). Maximum allowed is 50.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 61,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 6`] = `
+{
+  "code": "function name() {
+var x = 5;
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (7). Maximum allowed is 6.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 7`] = `
+{
+  "code": "function name() {
+var x = 5;
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (7). Maximum allowed is 6.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 8`] = `
+{
+  "code": "function name() {
+var x = 5;
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 9`] = `
+{
+  "code": "function name() {
+var x = 5;
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 10`] = `
+{
+  "code": "function name() { // end of line comment
+var x = 5; /* mid line comment */
+	// single line comment taking up whole line
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (7). Maximum allowed is 6.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 11`] = `
+{
+  "code": "function name() { // end of line comment
+var x = 5; /* mid line comment */
+	// single line comment taking up whole line
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (4). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 12`] = `
+{
+  "code": "function name() { // end of line comment
+var x = 5; /* mid line comment */
+	// single line comment taking up whole line
+	
+ 
+
+var x = 2;
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'name' has too many lines (5). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 13`] = `
+{
+  "code": "function foo(
+    aaa = 1,
+    bbb = 2,
+    ccc = 3
+) {
+    return aaa + bbb + ccc
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many lines (7). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 14`] = `
+{
+  "code": "(
+function
+()
+{
+}
+)
+()",
+  "diagnostics": [
+    {
+      "message": "Function has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 15`] = `
+{
+  "code": "function parent() {
+var x = 0;
+function nested() {
+    var y = 0;
+    x = 2;
+}
+if ( x === y ) {
+    x++;
+}
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'parent' has too many lines (10). Maximum allowed is 9.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 10,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 16`] = `
+{
+  "code": "function parent() {
+var x = 0;
+function nested() {
+    var y = 0;
+    x = 2;
+}
+if ( x === y ) {
+    x++;
+}
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'parent' has too many lines (10). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 10,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+    {
+      "message": "Function 'nested' has too many lines (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 17`] = `
+{
+  "code": "class foo {
+    method() {
+        let y = 10;
+        let x = 20;
+        return y + x;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Method 'method' has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 18`] = `
+{
+  "code": "class A {
+    static
+    foo
+    (a) {
+        return a
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Static method 'foo' has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 19`] = `
+{
+  "code": "var obj = {
+    get
+    foo
+    () {
+        return 1
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Getter 'foo' has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 20`] = `
+{
+  "code": "var obj = {
+    set
+    foo
+    ( val ) {
+        this._foo = val;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Setter 'foo' has too many lines (5). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 21`] = `
+{
+  "code": "class A {
+    static
+    [
+        foo +
+            bar
+    ]
+    (a) {
+        return a
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Static method has too many lines (8). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 9,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 22`] = `
+{
+  "code": "(function(){
+    let x = 0;
+    let y = 0;
+    let z = x + y;
+    let foo = {};
+    return bar;
+}());",
+  "diagnostics": [
+    {
+      "message": "Function has too many lines (7). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-lines-per-function > invalid 23`] = `
+{
+  "code": "(() => {
+    let x = 0;
+    let y = 0;
+    let z = x + y;
+    let foo = {};
+    return bar;
+})();",
+  "diagnostics": [
+    {
+      "message": "Arrow function has too many lines (7). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-lines-per-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

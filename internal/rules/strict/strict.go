@@ -2,7 +2,6 @@ package strict
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -143,71 +142,6 @@ func getFunctionBodyStatements(node *ast.Node) []*ast.Node {
 	return block.Statements.Nodes
 }
 
-// functionDescription mirrors ESLint's astUtils.getFunctionNameWithKind. It
-// produces the `{{name}}` placeholder of the `wrap` message — e.g.
-// `"async generator function 'foo'"`, `"static private method '#bar'"`,
-// `"arrow function"`. Modifier order matches ESLint: static, private, async,
-// generator.
-func functionDescription(node *ast.Node) string {
-	if node.Kind == ast.KindConstructor {
-		return "constructor"
-	}
-
-	flags := ast.GetFunctionFlags(node)
-	isAsync := flags&ast.FunctionFlagsAsync != 0
-	isGenerator := flags&ast.FunctionFlagsGenerator != 0
-
-	isStatic, isPrivate := false, false
-	parent := node.Parent
-	inClassBody := parent != nil && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)
-	if inClassBody {
-		switch node.Kind {
-		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-			isStatic = ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic)
-			if n := node.Name(); n != nil && n.Kind == ast.KindPrivateIdentifier {
-				isPrivate = true
-			}
-		}
-	}
-
-	var tokens []string
-	if isStatic {
-		tokens = append(tokens, "static")
-	}
-	if isPrivate {
-		tokens = append(tokens, "private")
-	}
-	if isAsync {
-		tokens = append(tokens, "async")
-	}
-	if isGenerator {
-		tokens = append(tokens, "generator")
-	}
-
-	switch node.Kind {
-	case ast.KindGetAccessor:
-		tokens = append(tokens, "getter")
-	case ast.KindSetAccessor:
-		tokens = append(tokens, "setter")
-	case ast.KindMethodDeclaration:
-		tokens = append(tokens, "method")
-	case ast.KindArrowFunction:
-		tokens = append(tokens, "arrow", "function")
-	default:
-		tokens = append(tokens, "function")
-	}
-
-	if name := node.Name(); name != nil {
-		if name.Kind == ast.KindPrivateIdentifier {
-			// PrivateIdentifier.Text already includes the leading '#'.
-			tokens = append(tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
-		} else if nameStr, ok := utils.GetStaticPropertyName(name); ok {
-			tokens = append(tokens, fmt.Sprintf("'%s'", nameStr))
-		}
-	}
-
-	return strings.Join(tokens, " ")
-}
 
 func reportDirectives(ctx rule.RuleContext, directives []*ast.Node, msgId string, fix bool) {
 	desc := messageDescriptionFor(msgId)
@@ -379,7 +313,7 @@ func buildFunctionModeListeners(ctx rule.RuleContext) rule.RuleListeners {
 			} else {
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "wrap",
-					Description: fmt.Sprintf("Wrap %s in a function with 'use strict' directive.", functionDescription(node)),
+					Description: fmt.Sprintf("Wrap %s in a function with 'use strict' directive.", utils.GetFunctionNameWithKind(node)),
 				})
 			}
 		}

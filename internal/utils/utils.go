@@ -234,6 +234,45 @@ func IsStrWhiteSpace(r rune) bool {
 	return unicode.Is(unicode.Zs, r)
 }
 
+// IsECMABlankLine reports whether s contains only ECMAScript WhiteSpace /
+// LineTerminator runes — matching JavaScript's `"".trim() === ""` check used
+// by rules like max-lines / max-lines-per-function for `skipBlankLines`.
+// Go's strings.TrimSpace diverges on U+FEFF (BOM) and U+0085 (NEL), so we
+// can't use it directly.
+func IsECMABlankLine(s string) bool {
+	for _, r := range s {
+		if !IsStrWhiteSpace(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// LineContentEnd returns the byte position just past the last character of the
+// line whose successor starts at nextLineStart — i.e. nextLineStart with its
+// immediately-preceding ECMA line terminator (LF, CR, CRLF, LS, PS) stripped.
+// Useful when slicing a single line out of source text without its terminator,
+// matching the behavior of ESLint's SourceCode.lines entries.
+func LineContentEnd(text string, nextLineStart int) int {
+	if nextLineStart >= 2 && text[nextLineStart-2] == '\r' && text[nextLineStart-1] == '\n' {
+		return nextLineStart - 2
+	}
+	if nextLineStart >= 1 {
+		c := text[nextLineStart-1]
+		if c == '\r' || c == '\n' {
+			return nextLineStart - 1
+		}
+		// U+2028 / U+2029 encode as 0xE2 0x80 0xA8 / 0xA9.
+		if nextLineStart >= 3 &&
+			text[nextLineStart-3] == 0xE2 &&
+			text[nextLineStart-2] == 0x80 &&
+			(text[nextLineStart-1] == 0xA8 || text[nextLineStart-1] == 0xA9) {
+			return nextLineStart - 3
+		}
+	}
+	return nextLineStart
+}
+
 // ExcludePaths contains path substrings that should be excluded from linting.
 // Used by RunLinterInProgram to skip files during program source file iteration.
 var ExcludePaths = []string{"/node_modules/", "bundled:"}

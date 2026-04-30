@@ -133,6 +133,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
 	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
+	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
@@ -624,6 +625,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("guard-for-in", guard_for_in.GuardForInRule)
 	GlobalRuleRegistry.Register("max-depth", max_depth.MaxDepthRule)
 	GlobalRuleRegistry.Register("max-lines", max_lines.MaxLinesRule)
+	GlobalRuleRegistry.Register("max-lines-per-function", max_lines_per_function.MaxLinesPerFunctionRule)
 	GlobalRuleRegistry.Register("no-alert", no_alert.NoAlertRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
 	GlobalRuleRegistry.Register("no-await-in-loop", no_await_in_loop.NoAwaitInLoopRule)

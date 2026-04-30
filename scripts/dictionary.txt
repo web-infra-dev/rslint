@@ -106,6 +106,7 @@ Metas
 minimatch
 mobx
 morestack
+multibyte
 multilines
 myfunc
 nanotime

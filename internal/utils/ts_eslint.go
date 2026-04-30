@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"math"
 	"math/big"
 	"slices"
@@ -260,6 +261,76 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 	}
 
 	return TrimNodeTextRange(sourceFile, node)
+}
+
+// GetFunctionNameWithKind mirrors ESLint's astUtils.getFunctionNameWithKind.
+// It produces a human-readable description of the function used in diagnostic
+// messages (e.g., `"function 'foo'"`, `"static private method '#bar'"`,
+// `"arrow function"`, `"constructor"`). Modifier order matches ESLint:
+// static, private, async, generator, then the function-kind keyword.
+//
+// Callers that need the upper-cased form (e.g., as the leading {{name}}
+// placeholder of a sentence) should apply that transform themselves — this
+// helper returns the lower-cased form to keep both call sites simple.
+func GetFunctionNameWithKind(node *ast.Node) string {
+	if node.Kind == ast.KindConstructor {
+		return "constructor"
+	}
+
+	flags := ast.GetFunctionFlags(node)
+	isAsync := flags&ast.FunctionFlagsAsync != 0
+	isGenerator := flags&ast.FunctionFlagsGenerator != 0
+
+	isStatic, isPrivate := false, false
+	parent := node.Parent
+	inClassBody := parent != nil && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)
+	if inClassBody {
+		switch node.Kind {
+		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+			isStatic = ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic)
+			if n := node.Name(); n != nil && n.Kind == ast.KindPrivateIdentifier {
+				isPrivate = true
+			}
+		}
+	}
+
+	var tokens []string
+	if isStatic {
+		tokens = append(tokens, "static")
+	}
+	if isPrivate {
+		tokens = append(tokens, "private")
+	}
+	if isAsync {
+		tokens = append(tokens, "async")
+	}
+	if isGenerator {
+		tokens = append(tokens, "generator")
+	}
+
+	switch node.Kind {
+	case ast.KindGetAccessor:
+		tokens = append(tokens, "getter")
+	case ast.KindSetAccessor:
+		tokens = append(tokens, "setter")
+	case ast.KindMethodDeclaration:
+		tokens = append(tokens, "method")
+	case ast.KindArrowFunction:
+		tokens = append(tokens, "arrow", "function")
+	default:
+		tokens = append(tokens, "function")
+	}
+
+	if name := node.Name(); name != nil {
+		if name.Kind == ast.KindPrivateIdentifier {
+			// PrivateIdentifier.Text already includes the leading '#'.
+			tokens = append(tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
+		} else if nameStr, ok := GetStaticPropertyName(name); ok {
+			tokens = append(tokens, fmt.Sprintf("'%s'", nameStr))
+		}
+	}
+
+	return strings.Join(tokens, " ")
 }
 
 // nodeStartSkippingDecorators returns a TextRange whose start is the first
