@@ -296,6 +296,17 @@ pleaseExpect([{a:1}]).toContain({a:1});
 					{MessageId: "useToContain", Line: 1, Column: 36},
 				},
 			},
+			// Regression: when an unknown matcher is chained after an equality
+			// matcher, only the equality matcher (the inner CallExpression) must
+			// be reported. The outer call must not produce a duplicate report or
+			// a fix that drops the trailing chained call.
+			{
+				Code:   `expect(a.includes(b)).toBe(true).somethingElse(true);`,
+				Output: []string{`expect(a).toContain(b).somethingElse(true);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useToContain", Line: 1, Column: 23},
+				},
+			},
 		},
 	)
 }

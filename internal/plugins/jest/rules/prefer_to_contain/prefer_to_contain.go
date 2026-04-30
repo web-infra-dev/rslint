@@ -100,13 +100,12 @@ var PreferToContainRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)
-				if jestFnCall == nil || jestFnCall.Kind != jestUtils.JestFnTypeExpect {
+				if jestFnCall == nil || jestFnCall.Kind != jestUtils.JestFnTypeExpect || len(jestFnCall.Members) == 0 {
 					return
 				}
 
-				if len(jestFnCall.Members) == 0 || !slices.ContainsFunc(jestFnCall.Members, func(m string) bool {
-					return jestUtils.EQUALITY_METHOD_NAMES[m]
-				}) {
+				lastMember := jestFnCall.Members[len(jestFnCall.Members)-1]
+				if !jestUtils.EQUALITY_METHOD_NAMES[lastMember] {
 					return
 				}
 
