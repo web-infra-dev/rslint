@@ -35,6 +35,7 @@ export default defineConfig({
     './tests/eslint/rules/no-dupe-class-members.test.ts',
     './tests/eslint/rules/no-dupe-keys.test.ts',
     './tests/eslint/rules/no-duplicate-case.test.ts',
+    './tests/eslint/rules/no-duplicate-imports.test.ts',
     './tests/eslint/rules/no-empty.test.ts',
     './tests/eslint/rules/no-empty-pattern.test.ts',
     './tests/eslint/rules/no-eval.test.ts',

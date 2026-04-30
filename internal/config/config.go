@@ -153,6 +153,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
+	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
@@ -639,6 +640,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-dupe-class-members", no_dupe_class_members.NoDupeClassMembersRule)
 	GlobalRuleRegistry.Register("no-dupe-keys", no_dupe_keys.NoDupeKeysRule)
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
+	GlobalRuleRegistry.Register("no-duplicate-imports", no_duplicate_imports.NoDuplicateImportsRule)
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-eval", no_eval.NoEvalRule)

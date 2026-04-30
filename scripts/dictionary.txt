@@ -301,3 +301,6 @@ goroutines
 GOMAXPROCS
 fanout
 humanfs
+modns
+Modns
+módulo
