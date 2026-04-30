@@ -45,6 +45,16 @@ func TestNoDeprecatedFunctionsRule(t *testing.T) {
 				Settings: jestSettings("21"),
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
 			},
+			// Double-call form: only the inner deprecated callee should be
+			// reported and rewritten; the outer call's callee is itself a
+			// CallExpression and must be ignored to preserve the chained-call
+			// semantics.
+			{
+				Code:     `jest.resetModuleRegistry()()`,
+				Output:   []string{`jest.resetModules()()`},
+				Settings: jestSettings("21"),
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "deprecatedFunction"}},
+			},
 			// jest.addMatchers -> expect.extend (Jest 24)
 			{
 				Code:     `jest.addMatchers()`,

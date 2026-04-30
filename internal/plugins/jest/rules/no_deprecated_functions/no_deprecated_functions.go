@@ -88,6 +88,17 @@ var NoDeprecatedFunctionsRule = rule.Rule{
 					return
 				}
 
+				// Mirror eslint-plugin-jest's `node.callee.type === MemberExpression`
+				// guard. Without this, double-call forms like `jest.resetModuleRegistry()()`
+				// would be reported twice (once on the inner call, once on the outer)
+				// because GetJestFnMemberEntries unwraps a CallExpression callee back
+				// into the same member chain, and the outer fix would replace the
+				// entire `jest.resetModuleRegistry()` callee, swallowing a pair of
+				// parentheses.
+				if callee.Kind != ast.KindPropertyAccessExpression && callee.Kind != ast.KindElementAccessExpression {
+					return
+				}
+
 				entries := utils.GetJestFnMemberEntries(callee)
 				if len(entries) < 2 {
 					return
