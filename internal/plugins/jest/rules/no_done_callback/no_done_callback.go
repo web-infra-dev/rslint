@@ -1,6 +1,7 @@
 package no_done_callback
 
 import (
+	"fmt"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -19,10 +20,10 @@ func buildErrorNoDoneCallbackMessage() rule.RuleMessage {
 	}
 }
 
-func buildErrorSuggestWrappingInPromiseMessage() rule.RuleMessage {
+func buildErrorSuggestWrappingInPromiseMessage(callbackName string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "suggestWrappingInPromise",
-		Description: "Wrap in `new Promise({{ callback }} => ...`",
+		Description: fmt.Sprintf("Wrap in `new Promise(%s => ...`", callbackName),
 	}
 }
 
@@ -168,7 +169,7 @@ var NoDoneCallbackRule = rule.Rule{
 					argument,
 					buildErrorNoDoneCallbackMessage(),
 					rule.RuleSuggestion{
-						Message:  buildErrorSuggestWrappingInPromiseMessage(),
+						Message:  buildErrorSuggestWrappingInPromiseMessage(callbackName),
 						FixesArr: fixes,
 					},
 				)
