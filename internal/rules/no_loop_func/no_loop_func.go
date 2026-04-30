@@ -199,7 +199,19 @@ func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry
 		}
 
 		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			sym := s.Ctx.TypeChecker.GetSymbolAtLocation(n)
+			// Shorthand property assignments dual-purpose the identifier as
+			// the property name AND a value reference to a same-named
+			// variable. GetSymbolAtLocation returns the property symbol;
+			// GetShorthandAssignmentValueSymbol returns the variable symbol.
+			// This applies in BOTH destructuring (`({port} = obj)`, where
+			// the variable is being written) and object literal value
+			// position (`f({port})`, where the variable is being read).
+			var sym *ast.Symbol
+			if n.Parent != nil && n.Parent.Kind == ast.KindShorthandPropertyAssignment {
+				sym = s.Ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n.Parent)
+			} else {
+				sym = s.Ctx.TypeChecker.GetSymbolAtLocation(n)
+			}
 			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
 					refs = append(refs, ReferenceEntry{
@@ -500,9 +512,11 @@ func GetDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
 
 // buildRefIndex performs a single pass over the source file and groups every
 // value-position identifier by its resolved symbol. ShorthandPropertyAssignment
-// inside destructuring needs special handling because TypeChecker resolves the
-// shorthand key to the property symbol, not the written-to variable symbol —
-// we store the name identifier keyed by the variable symbol instead.
+// nodes need special handling because TypeChecker.GetSymbolAtLocation resolves
+// the shorthand key to the property symbol, not the variable symbol — we use
+// GetShorthandAssignmentValueSymbol instead and key by the variable symbol.
+// This is needed BOTH for destructuring shorthand (which is a write) and for
+// object-literal shorthand (which is a read).
 func (s *RunState) buildRefIndex() {
 	if s.refIndex != nil {
 		return
@@ -515,10 +529,19 @@ func (s *RunState) buildRefIndex() {
 			return
 		}
 		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			if sym := tc.GetSymbolAtLocation(n); sym != nil {
+			var sym *ast.Symbol
+			if n.Parent != nil && n.Parent.Kind == ast.KindShorthandPropertyAssignment {
+				sym = tc.GetShorthandAssignmentValueSymbol(n.Parent)
+			} else {
+				sym = tc.GetSymbolAtLocation(n)
+			}
+			if sym != nil {
 				s.refIndex[sym] = append(s.refIndex[sym], n)
 			}
 		} else if n.Kind == ast.KindShorthandPropertyAssignment && utils.IsInDestructuringAssignment(n) {
+			// Already handled above via the Identifier branch in most cases,
+			// but keep this explicit indexing for the destructuring write
+			// path where the parent walk may not visit the Identifier directly.
 			if sym := tc.GetShorthandAssignmentValueSymbol(n); sym != nil {
 				if nameNode := n.AsShorthandPropertyAssignment().Name(); nameNode != nil {
 					s.refIndex[sym] = append(s.refIndex[sym], nameNode)

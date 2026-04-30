@@ -850,6 +850,16 @@ for (var i = 0; i < l; i++) {
 					MessageId: "unsafeRefs",
 				}},
 			},
+			// Shorthand property `{port}` in object literal value position.
+			// The identifier is a real read of the variable, not a property
+			// name — `port` must be picked up as a through reference.
+			{
+				Code: `declare function setup(opts: any, cb: () => void): void; declare const tryLimits: number; let port = 3000; let found = false; let attempts = 0; const host = 'localhost'; while (!found && attempts <= tryLimits) { try { new Promise((resolve, reject) => { setup({ port, host }, () => { found = true; resolve(0); }); }); } catch { port++; } attempts++; }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'port', 'found'.",
+				}},
+			},
 		},
 	)
 }
