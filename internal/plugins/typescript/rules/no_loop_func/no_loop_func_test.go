@@ -860,6 +860,42 @@ for (var i = 0; i < l; i++) {
 					Message:   "Function declared in a loop contains unsafe references to variable(s) 'port', 'found'.",
 				}},
 			},
+			// Shorthand property in destructuring assignment write — closure
+			// after reads the same variable, which was overwritten.
+			{
+				Code: `let port = 0; for (var i = 0; i < 5; i++) { ({port} = {port: i}); (function () { port; }); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'port'.",
+				}},
+			},
+			// Closure body itself contains a destructuring shorthand write.
+			{
+				Code: `let port = 0; for (var i = 0; i < 5; i++) { (function () { ({port} = {port: i}); }); }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'port', 'i'.",
+				}},
+			},
+			// Private class field arrow capturing loop var. Only the field
+			// arrow is a function-in-loop; `g()` only calls `this.#f()`
+			// which contains no through reference to the loop var.
+			{
+				Code: `for (var i = 0; i < 5; i++) { class C { #f = () => i; g() { return this.#f(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+				}},
+			},
+			// JSX expression container with arrow capturing loop var.
+			{
+				Code:     `declare const React: any; declare function Foo(p: any): any; function App() { const items: any[] = []; for (var i = 0; i < 5; i++) { items.push(<Foo onClick={() => i} />); } return items; }`,
+				FileName: "react.tsx",
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "unsafeRefs",
+					Message:   "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+				}},
+			},
 		},
 	)
 }
