@@ -1,0 +1,1651 @@
+// Rstest Snapshot v1
+
+exports[`no-multi-assign > invalid 1`] = `
+{
+  "code": "var a = b = c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 2`] = `
+{
+  "code": "var a = b = c = d;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 3`] = `
+{
+  "code": "let foo = bar = cee = 100;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 4`] = `
+{
+  "code": "a=b=c=d=e",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 5`] = `
+{
+  "code": "a=b=c",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 6`] = `
+{
+  "code": "a
+=b
+=c",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 7`] = `
+{
+  "code": "var a = (b) = (((c)))",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 8`] = `
+{
+  "code": "var a = ((b)) = (c)",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 9`] = `
+{
+  "code": "var a = b = ( (c * 12) + 2)",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 10`] = `
+{
+  "code": "var a =
+((b))
+ = (c)",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 11`] = `
+{
+  "code": "a = b = '=' + c + 'foo';",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 12`] = `
+{
+  "code": "a = b = 7 * 12 + 5;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 13`] = `
+{
+  "code": "const x = {};
+const y = x.one = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 14`] = `
+{
+  "code": "let a, b;a = b = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 15`] = `
+{
+  "code": "let x, y;x = y = 'baz'",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 16`] = `
+{
+  "code": "const a = b = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 17`] = `
+{
+  "code": "class C { field = foo = 0 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 18`] = `
+{
+  "code": "class C { field = foo = 0 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 19`] = `
+{
+  "code": "var a = (b = c);",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 20`] = `
+{
+  "code": "var a = ((b = c));",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 21`] = `
+{
+  "code": "a = (b = c);",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 22`] = `
+{
+  "code": "var a = b += c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 23`] = `
+{
+  "code": "var a = b ||= c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 24`] = `
+{
+  "code": "a = b ??= c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 25`] = `
+{
+  "code": "a += b = c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 26`] = `
+{
+  "code": "for (let i = j = 0;;) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 27`] = `
+{
+  "code": "class C { static x = y = 1 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 28`] = `
+{
+  "code": "class C { #x = y = 1 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 29`] = `
+{
+  "code": "let a: number = b = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 30`] = `
+{
+  "code": "let a = b = 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 31`] = `
+{
+  "code": "var a = b = c = d = e = f;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 32`] = `
+{
+  "code": "var a = b = c, d = e = f;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 33`] = `
+{
+  "code": "a = b = c ??= d",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 34`] = `
+{
+  "code": "\`\${a = b = c}\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 35`] = `
+{
+  "code": "() => a = b = c",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 36`] = `
+{
+  "code": "class C { x = (y = 1); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 37`] = `
+{
+  "code": "class A { x = class { y = z = 1 } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 38`] = `
+{
+  "code": "var a = (() => { return b = c = 1; })();",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 39`] = `
+{
+  "code": "var a = b /* hi */ = c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 40`] = `
+{
+  "code": "var a =
+  b =
+  c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 41`] = `
+{
+  "code": "const f = () => { return a = b = 1; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 42`] = `
+{
+  "code": "obj.a = obj.b = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 43`] = `
+{
+  "code": "obj['a'] = obj['b'] = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 44`] = `
+{
+  "code": "this.x = this.y = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 45`] = `
+{
+  "code": "a[k] = b[k] = v;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 46`] = `
+{
+  "code": "class C { static x = (y = 1); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 47`] = `
+{
+  "code": "var a = ((b) = c);",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 48`] = `
+{
+  "code": "var a = (b as any) = c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 49`] = `
+{
+  "code": "var a = b **= c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 50`] = `
+{
+  "code": "class C { x!: number = y = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 51`] = `
+{
+  "code": "{ using a = b = c; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 52`] = `
+{
+  "code": "export let a = b = c;",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 53`] = `
+{
+  "code": "{ let a = b = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 54`] = `
+{
+  "code": "switch (x) { case 1: a = b = 2; break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 55`] = `
+{
+  "code": "var a = ((((b = c))));",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 56`] = `
+{
+  "code": "a = ((b = c));",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 57`] = `
+{
+  "code": "let a = (b = 1);",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-assign > invalid 58`] = `
+{
+  "code": "class C { x = (y = 1); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected chained assignment.",
+      "messageId": "unexpectedChain",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

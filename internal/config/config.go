@@ -178,6 +178,7 @@ import (
 	core_no_loop_func "github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
+	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new"
@@ -663,6 +664,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-new-func", no_new_func.NoNewFuncRule)
 	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
 	GlobalRuleRegistry.Register("no-restricted-imports", no_restricted_imports.NoRestrictedImportsRule)
+	GlobalRuleRegistry.Register("no-multi-assign", no_multi_assign.NoMultiAssignRule)
 	GlobalRuleRegistry.Register("no-multi-str", no_multi_str.NoMultiStrRule)
 	GlobalRuleRegistry.Register("no-nested-ternary", no_nested_ternary.NoNestedTernaryRule)
 	GlobalRuleRegistry.Register("no-octal", no_octal.NoOctalRule)
