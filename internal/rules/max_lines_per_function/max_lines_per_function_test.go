@@ -793,26 +793,28 @@ build() { return 1; },
 				},
 			},
 
-			// Test anonymous function assigned to variable is recognized
+			// Test anonymous function assigned to variable is recognized — name
+			// resolved via parent VariableDeclaration to match ESLint's getName.
 			{
 				Code:    "var func = function() {\n}",
 				Options: 1,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Function has too many lines (2). Maximum allowed is 1.",
+						Message:   "Function 'func' has too many lines (2). Maximum allowed is 1.",
 					},
 				},
 			},
 
-			// Test arrow functions are recognized
+			// Test arrow functions are recognized — name resolved via parent
+			// VariableDeclaration to match ESLint's getName.
 			{
 				Code:    "const bar = () => {\nconst x = 2 + 1;\nreturn x;\n}",
 				Options: 3,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (4). Maximum allowed is 3.",
+						Message:   "Arrow function 'bar' has too many lines (4). Maximum allowed is 3.",
 					},
 				},
 			},
@@ -824,7 +826,7 @@ build() { return 1; },
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (2). Maximum allowed is 1.",
+						Message:   "Arrow function 'bar' has too many lines (2). Maximum allowed is 1.",
 					},
 				},
 			},
@@ -1164,7 +1166,7 @@ if ( x === y ) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (3). Maximum allowed is 1.",
+						Message:   "Arrow function 'bar' has too many lines (3). Maximum allowed is 1.",
 						Line:      1,
 						Column:    13,
 						EndLine:   3,
@@ -1173,14 +1175,14 @@ if ( x === y ) {
 				},
 			},
 
-			// Async arrow function — name "Async arrow function"
+			// Async arrow function — description includes "async" + parent-walked name
 			{
 				Code:    "const bar = async () => {\nawait g();\nreturn 1;\n}",
 				Options: 2,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Async arrow function has too many lines (4). Maximum allowed is 2.",
+						Message:   "Async arrow function 'bar' has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1287,8 +1289,10 @@ return 2;
 				},
 			},
 
-			// Class field arrow — counts as arrow function (parent is PropertyDeclaration,
-			// not a method), with NO name (ESLint also doesn't use the property key here).
+			// Class field arrow — counts as arrow function (parent is
+			// PropertyDeclaration, not a method); name is resolved from the
+			// property key, matching ESLint's getName which inspects
+			// PropertyDefinition.key.
 			{
 				Code: `class A {
 foo = () => {
@@ -1300,19 +1304,19 @@ return 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (4). Maximum allowed is 2.",
+						Message:   "Arrow function 'foo' has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
 
-			// Object literal arrow assignment — same: arrow function, no name
+			// Object literal arrow assignment — name resolved from property key.
 			{
 				Code:    "var o = { foo: () => {\nreturn 1;\nreturn 2;\n} }",
 				Options: 2,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (4). Maximum allowed is 2.",
+						Message:   "Arrow function 'foo' has too many lines (4). Maximum allowed is 2.",
 					},
 				},
 			},
@@ -1505,7 +1509,8 @@ let b = 2;
 			},
 
 			// Triple-nested arrow chain — each arrow gets its own visit. The
-			// outermost spans 4 lines; max=1 should report all three.
+			// outermost spans 4 lines; max=1 should report all three. Only the
+			// outermost is bound to a variable, so only it carries a name.
 			{
 				Code: `var f = () =>
 () =>
@@ -1515,7 +1520,7 @@ let b = 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (4). Maximum allowed is 1.",
+						Message:   "Arrow function 'f' has too many lines (4). Maximum allowed is 1.",
 					},
 					{
 						MessageId: "exceed",
@@ -1791,7 +1796,7 @@ class A { method() { return 1; } }
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (3). Maximum allowed is 0.",
+						Message:   "Arrow function 'f' has too many lines (3). Maximum allowed is 0.",
 					},
 					{
 						MessageId: "exceed",
@@ -1866,7 +1871,7 @@ let b = 2;
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (4). Maximum allowed is 2.",
+						Message:   "Arrow function 'f' has too many lines (4). Maximum allowed is 2.",
 						Line:      1,
 						Column:    11,
 						EndLine:   4,
@@ -1929,11 +1934,11 @@ console.log('thrice');
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (5). Maximum allowed is 2.",
+						Message:   "Arrow function 'Button' has too many lines (5). Maximum allowed is 2.",
 					},
 					{
 						MessageId: "exceed",
-						Message:   "Arrow function has too many lines (5). Maximum allowed is 2.",
+						Message:   "Arrow function 'onClick' has too many lines (5). Maximum allowed is 2.",
 					},
 				},
 			},

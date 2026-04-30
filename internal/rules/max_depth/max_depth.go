@@ -134,10 +134,10 @@ func parseMaxDepth(options any) int {
 		if len(arr) == 0 {
 			return defaultMax
 		}
-		if n, ok := toInt(arr[0]); ok {
+		if n, ok := utils.CoerceInt(arr[0]); ok {
 			return n
 		}
-	} else if n, ok := toInt(options); ok {
+	} else if n, ok := utils.CoerceInt(options); ok {
 		return n
 	}
 	// Object form: `{ max: 3 }` or `[{ max: 3 }]`. Use the shared extractor so
@@ -155,12 +155,12 @@ func parseMaxDepth(options any) int {
 		return defaultMax
 	}
 	if hasMaximum {
-		if v, ok := toInt(m["maximum"]); ok && v != 0 {
+		if v, ok := utils.CoerceInt(m["maximum"]); ok && v != 0 {
 			return v
 		}
 	}
 	if hasMax {
-		if v, ok := toInt(m["max"]); ok {
+		if v, ok := utils.CoerceInt(m["max"]); ok {
 			return v
 		}
 	}
@@ -171,18 +171,3 @@ func parseMaxDepth(options any) int {
 	return math.MaxInt
 }
 
-func toInt(v any) (int, bool) {
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case int32:
-		return int(n), true
-	case int64:
-		return int(n), true
-	case float64:
-		return int(n), true
-	case float32:
-		return int(n), true
-	}
-	return 0, false
-}

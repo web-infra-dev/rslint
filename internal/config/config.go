@@ -51,6 +51,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_inferrable_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_magic_numbers"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_meaningless_void_operator"
@@ -514,6 +515,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/dot-notation", dot_notation.DotNotationRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/explicit-function-return-type", explicit_function_return_type.ExplicitFunctionReturnTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/explicit-member-accessibility", explicit_member_accessibility.ExplicitMemberAccessibilityRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/max-params", max_params.MaxParamsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/member-ordering", member_ordering.MemberOrderingRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/method-signature-style", method_signature_style.MethodSignatureStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/naming-convention", naming_convention.NamingConventionRule)

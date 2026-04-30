@@ -330,6 +330,26 @@ func GetOptionsMap(opts any) map[string]interface{} {
 	return optsMap
 }
 
+// CoerceInt converts a JSON-decoded numeric value to int. JSON numbers come in
+// as float64 from `encoding/json`, but rule_tester / test fixtures may pass
+// raw int / int32 / int64 / float32, so accept all of them. Returns
+// (value, true) on success, (0, false) for non-numeric inputs (including nil).
+func CoerceInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	case float32:
+		return int(n), true
+	}
+	return 0, false
+}
+
 // GetOptionsString extracts a string option from the weakly-typed options parameter.
 // It handles both direct string format ("value") and array format (["value"]).
 func GetOptionsString(opts any) string {

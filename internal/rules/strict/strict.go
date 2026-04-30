@@ -142,7 +142,6 @@ func getFunctionBodyStatements(node *ast.Node) []*ast.Node {
 	return block.Statements.Nodes
 }
 
-
 func reportDirectives(ctx rule.RuleContext, directives []*ast.Node, msgId string, fix bool) {
 	desc := messageDescriptionFor(msgId)
 	for _, d := range directives {

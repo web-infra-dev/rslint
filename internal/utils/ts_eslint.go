@@ -258,6 +258,18 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 			return core.NewTextRange(start, node.Body().Pos())
 		}
 		return TrimNodeTextRange(sourceFile, node)
+
+	case ast.KindFunctionType:
+		// Mirror ESLint's astUtils.getFunctionHeadLoc fallback for
+		// TSFunctionType: range from the node's start to the opening '(' of
+		// its parameters. With no type parameters this collapses to a
+		// zero-width position at '('; with `<T>(...)` the range covers the
+		// type-parameter list, exactly as upstream produces.
+		trimmed := TrimNodeTextRange(sourceFile, node)
+		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+			return trimmed.WithEnd(parenPos)
+		}
+		return trimmed
 	}
 
 	return TrimNodeTextRange(sourceFile, node)
@@ -269,9 +281,21 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 // `"arrow function"`, `"constructor"`). Modifier order matches ESLint:
 // static, private, async, generator, then the function-kind keyword.
 //
+// For nameless function-likes, walks the parent (VariableDeclaration,
+// PropertyAssignment, PropertyDeclaration, PropertySignature,
+// TypeAliasDeclaration) to recover the binding name where ESLint does the
+// same via its `getName` / `getOuterName` helpers.
+//
+// For a FunctionExpression assigned as the value of an object literal
+// property (`var obj = { foo: function () {} }`), classifies the node as a
+// "method" — ESTree models that case via `Property.value === FunctionExpression`
+// and ESLint's classifier emits "method"; tsgo only collapses method-shorthand
+// (`{ foo() {} }`) into MethodDeclaration, so we recover the same description
+// from the parent.
+//
 // Callers that need the upper-cased form (e.g., as the leading {{name}}
-// placeholder of a sentence) should apply that transform themselves — this
-// helper returns the lower-cased form to keep both call sites simple.
+// placeholder of a sentence) should apply UpperCaseFirstASCII — this helper
+// returns the lower-cased form to keep call sites simple.
 func GetFunctionNameWithKind(node *ast.Node) string {
 	if node.Kind == ast.KindConstructor {
 		return "constructor"
@@ -281,15 +305,34 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	isAsync := flags&ast.FunctionFlagsAsync != 0
 	isGenerator := flags&ast.FunctionFlagsGenerator != 0
 
-	isStatic, isPrivate := false, false
 	parent := node.Parent
-	inClassBody := parent != nil && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)
-	if inClassBody {
+	isStatic, isPrivate := false, false
+	// Direct class member (MethodDeclaration / GetAccessor / SetAccessor):
+	// modifiers and private-key live on the function-like node itself.
+	if parent != nil && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression) {
 		switch node.Kind {
 		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 			isStatic = ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic)
 			if n := node.Name(); n != nil && n.Kind == ast.KindPrivateIdentifier {
 				isPrivate = true
+			}
+		}
+	}
+	// Class field with arrow / function-expression initializer: modifiers and
+	// private-key live on the surrounding PropertyDeclaration. Mirrors ESLint
+	// v9's `parent.type === "PropertyDefinition" && parent.value === node`
+	// branch in `astUtils.getFunctionNameWithKind`.
+	if parent != nil && parent.Kind == ast.KindPropertyDeclaration {
+		if grandparent := parent.Parent; grandparent != nil &&
+			(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression) {
+			switch node.Kind {
+			case ast.KindArrowFunction, ast.KindFunctionExpression:
+				if ast.HasSyntacticModifier(parent, ast.ModifierFlagsStatic) {
+					isStatic = true
+				}
+				if n := parent.Name(); n != nil && n.Kind == ast.KindPrivateIdentifier {
+					isPrivate = true
+				}
 			}
 		}
 	}
@@ -317,20 +360,83 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 		tokens = append(tokens, "method")
 	case ast.KindArrowFunction:
 		tokens = append(tokens, "arrow", "function")
+	case ast.KindFunctionExpression:
+		if parent != nil && parent.Kind == ast.KindPropertyAssignment {
+			tokens = append(tokens, "method")
+		} else {
+			tokens = append(tokens, "function")
+		}
 	default:
 		tokens = append(tokens, "function")
 	}
 
-	if name := node.Name(); name != nil {
-		if name.Kind == ast.KindPrivateIdentifier {
-			// PrivateIdentifier.Text already includes the leading '#'.
-			tokens = append(tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
-		} else if nameStr, ok := GetStaticPropertyName(name); ok {
-			tokens = append(tokens, fmt.Sprintf("'%s'", nameStr))
-		}
+	if name := getFunctionDisplayName(node); name != "" {
+		tokens = append(tokens, fmt.Sprintf("'%s'", name))
 	}
 
 	return strings.Join(tokens, " ")
+}
+
+// getFunctionDisplayName resolves the user-visible name of a function-like
+// node — first by inspecting the node's own name, then by walking the parent
+// for variable / property / type binding sites that ESLint's `getName` covers.
+func getFunctionDisplayName(node *ast.Node) string {
+	if n := node.Name(); n != nil {
+		switch n.Kind {
+		case ast.KindPrivateIdentifier:
+			return n.AsPrivateIdentifier().Text
+		case ast.KindIdentifier:
+			return n.AsIdentifier().Text
+		}
+		if s, ok := GetStaticPropertyName(n); ok {
+			return s
+		}
+	}
+	parent := node.Parent
+	if parent == nil {
+		return ""
+	}
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		if n := parent.Name(); n != nil && n.Kind == ast.KindIdentifier {
+			return n.AsIdentifier().Text
+		}
+	case ast.KindPropertyAssignment, ast.KindPropertyDeclaration, ast.KindPropertySignature:
+		if n := parent.Name(); n != nil {
+			if n.Kind == ast.KindIdentifier {
+				return n.AsIdentifier().Text
+			}
+			if n.Kind == ast.KindPrivateIdentifier {
+				// PrivateIdentifier.Text already includes the leading '#',
+				// matching ESLint's `getName` for PropertyDefinition with a
+				// PrivateIdentifier key.
+				return n.AsPrivateIdentifier().Text
+			}
+			if s, ok := GetStaticPropertyName(n); ok {
+				return s
+			}
+		}
+	case ast.KindTypeAliasDeclaration:
+		if n := parent.Name(); n != nil && n.Kind == ast.KindIdentifier {
+			return n.AsIdentifier().Text
+		}
+	}
+	return ""
+}
+
+// UpperCaseFirstASCII returns s with its first byte mapped to upper case if
+// the byte is an ASCII lowercase letter; otherwise returns s unchanged.
+// Sufficient for ESLint's `astUtils.upperCaseFirst` since all function-kind
+// tokens are ASCII English ("function", "method", "constructor", …).
+func UpperCaseFirstASCII(s string) string {
+	if s == "" {
+		return s
+	}
+	r := s[0]
+	if r >= 'a' && r <= 'z' {
+		return string(r-('a'-'A')) + s[1:]
+	}
+	return s
 }
 
 // nodeStartSkippingDecorators returns a TextRange whose start is the first

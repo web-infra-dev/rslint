@@ -33,7 +33,7 @@ exports[`max-lines-per-function > invalid 2`] = `
 }",
   "diagnostics": [
     {
-      "message": "Function has too many lines (2). Maximum allowed is 1.",
+      "message": "Function 'func' has too many lines (2). Maximum allowed is 1.",
       "messageId": "exceed",
       "range": {
         "end": {
@@ -62,7 +62,7 @@ return x;
 }",
   "diagnostics": [
     {
-      "message": "Arrow function has too many lines (4). Maximum allowed is 3.",
+      "message": "Arrow function 'bar' has too many lines (4). Maximum allowed is 3.",
       "messageId": "exceed",
       "range": {
         "end": {
@@ -89,7 +89,7 @@ exports[`max-lines-per-function > invalid 4`] = `
  2",
   "diagnostics": [
     {
-      "message": "Arrow function has too many lines (2). Maximum allowed is 1.",
+      "message": "Arrow function 'bar' has too many lines (2). Maximum allowed is 1.",
       "messageId": "exceed",
       "range": {
         "end": {

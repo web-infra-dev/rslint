@@ -41,13 +41,13 @@ func parseOptions(opts any) maxLinesOptions {
 		}
 		opts = arr[0]
 	}
-	if n, ok := toInt(opts); ok {
+	if n, ok := utils.CoerceInt(opts); ok {
 		result.max = n
 		return result
 	}
 	if m, ok := opts.(map[string]interface{}); ok {
 		if v, ok := m["max"]; ok {
-			if n, ok := toInt(v); ok {
+			if n, ok := utils.CoerceInt(v); ok {
 				result.max = n
 			}
 		}
@@ -61,21 +61,6 @@ func parseOptions(opts any) maxLinesOptions {
 	return result
 }
 
-func toInt(v any) (int, bool) {
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case int32:
-		return int(n), true
-	case int64:
-		return int(n), true
-	case float64:
-		return int(n), true
-	case float32:
-		return int(n), true
-	}
-	return 0, false
-}
 
 func checkMaxLines(ctx rule.RuleContext, options any) {
 	opts := parseOptions(options)
