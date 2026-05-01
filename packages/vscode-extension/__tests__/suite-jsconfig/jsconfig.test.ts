@@ -4,40 +4,71 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 suite('rslint JS config support', function () {
-  this.timeout(60000);
+  this.timeout(120_000);
 
   function getWorkspaceRoot(): string {
     return vscode.workspace.workspaceFolders![0].uri.fsPath;
   }
 
-  async function waitForDiagnostics(
+  /**
+   * Race-free `onDidChangeDiagnostics` waiter.
+   *
+   * Compared to a polling `getDiagnostics` + `setTimeout` loop, this
+   * subscribes BEFORE checking the initial state, eliminating the
+   * subscribe-after-check window where an event fired between the
+   * synchronous read and the listener registration would be lost.
+   *
+   * The waiter returns as soon as `predicate` accepts a snapshot — no
+   * file edits, no nudges, no sleeps. It relies on the server's own
+   * push channel: `internal/lsp/service.go::handleConfigUpdate` ends
+   * with `s.RefreshDiagnostics(ctx)`, which signals `refreshCh`; the
+   * dispatch loop in `internal/lsp/server.go` consumes that signal and
+   * calls `pushDiagnostics(uri)` for every open document. So the LSP
+   * server already publishes new diagnostics after a config reload —
+   * tests just need to listen for them.
+   *
+   * Default 60s timeout (vs the older helper's 30s × 20 polling
+   * budget) gives headroom for slow CI runners where the JS-config
+   * reload chain (ESM dynamic import + IO) can take 10s+.
+   */
+  function waitForDiagnostics(
     doc: vscode.TextDocument,
     predicate?: (diags: vscode.Diagnostic[]) => boolean,
+    timeoutMs = 60_000,
   ): Promise<vscode.Diagnostic[]> {
-    for (let i = 0; i < 20; i++) {
-      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      if (predicate ? predicate(diagnostics) : diagnostics.length > 0) {
-        return diagnostics;
-      }
-
-      await new Promise((resolve) => {
-        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
-          for (const uri of e.uris) {
-            if (uri.toString() === doc.uri.toString()) {
-              disposable.dispose();
-              resolve(void 0);
-              return;
-            }
-          }
-        });
-        setTimeout(() => {
-          disposable.dispose();
-          resolve(void 0);
-        }, 1500);
+    const matches = predicate ?? ((ds) => ds.length > 0);
+    return new Promise<vscode.Diagnostic[]>((resolve, reject) => {
+      let done = false;
+      const finish = (
+        value: vscode.Diagnostic[] | undefined,
+        err?: Error,
+      ): void => {
+        if (done) return;
+        done = true;
+        sub.dispose();
+        clearTimeout(timer);
+        if (err) reject(err);
+        else resolve(value!);
+      };
+      const sub = vscode.languages.onDidChangeDiagnostics((e) => {
+        if (!e.uris.some((u) => u.toString() === doc.uri.toString())) return;
+        const ds = vscode.languages.getDiagnostics(doc.uri);
+        if (matches(ds)) finish(ds);
       });
-    }
-
-    return vscode.languages.getDiagnostics(doc.uri);
+      const timer = setTimeout(
+        () =>
+          finish(
+            undefined,
+            new Error('waitForDiagnostics: timeout waiting for predicate'),
+          ),
+        timeoutMs,
+      );
+      // Check current state in case the matching publish already
+      // happened before subscription. Safe because finish() is
+      // idempotent.
+      const initial = vscode.languages.getDiagnostics(doc.uri);
+      if (matches(initial)) finish(initial);
+    });
   }
 
   async function openFixture(filename: string): Promise<vscode.TextDocument> {
@@ -88,21 +119,19 @@ suite('rslint JS config support', function () {
 
   test('config hot reload should update diagnostics', async () => {
     const doc = await openFixture('index.ts');
-    const editor = await vscode.window.showTextDocument(doc);
+    await vscode.window.showTextDocument(doc);
 
-    // 1. Verify initial diagnostics have no-unsafe-member-access
-    const initialDiags = await waitForDiagnostics(doc, (diags) =>
+    // 1. Verify initial diagnostics have no-unsafe-member-access.
+    await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
     );
-    assert.ok(
-      initialDiags.some((d) => d.message.includes('no-unsafe-member-access')),
-      'Initial diagnostics should include no-unsafe-member-access',
-    );
 
-    // 2. Modify rslint.config.js to use a different rule
+    // 2. Subscribe BEFORE writing the new config — eliminates the
+    //    "publish fires between write and subscribe" race window. The
+    //    waiter listens; the server pushes after handleConfigUpdate
+    //    via RefreshDiagnostics; we resolve.
     const configPath = path.join(getWorkspaceRoot(), 'rslint.config.js');
     const originalConfig = fs.readFileSync(configPath, 'utf8');
-
     const newConfig = `export default [
   {
     files: ['**/*.ts'],
@@ -120,26 +149,16 @@ suite('rslint JS config support', function () {
   },
 ];
 `;
+    const reloaded = waitForDiagnostics(
+      doc,
+      (diags) =>
+        diags.some((d) => d.message.includes('no-explicit-any')) &&
+        !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+    );
 
     try {
       fs.writeFileSync(configPath, newConfig, 'utf8');
-
-      // 3. Wait for file watcher to trigger and config to be sent
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // 4. Trigger diagnostic refresh by editing the document
-      await editor.edit((eb) => {
-        eb.insert(new vscode.Position(0, 0), ' ');
-      });
-      await editor.edit((eb) => {
-        eb.delete(new vscode.Range(0, 0, 0, 1));
-      });
-
-      // 5. Wait for updated diagnostics
-      const updatedDiags = await waitForDiagnostics(doc, (diags) =>
-        diags.some((d) => d.message.includes('no-explicit-any')),
-      );
-
+      const updatedDiags = await reloaded;
       assert.ok(
         updatedDiags.some((d) => d.message.includes('no-explicit-any')),
         'After hot reload, diagnostics should include no-explicit-any',
@@ -151,7 +170,6 @@ suite('rslint JS config support', function () {
         'After hot reload, no-unsafe-member-access should be gone',
       );
     } finally {
-      // 6. Restore original config
       fs.writeFileSync(configPath, originalConfig, 'utf8');
     }
   });
@@ -160,33 +178,22 @@ suite('rslint JS config support', function () {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
-    // 1. Verify initial diagnostics exist
-    const initialDiags = await waitForDiagnostics(doc, (diags) =>
+    await waitForDiagnostics(doc, (diags) =>
       diags.some((d) => d.message.includes('no-unsafe-member-access')),
-    );
-    assert.ok(
-      initialDiags.length > 0,
-      'Should have diagnostics before deleting config',
     );
 
     const configPath = path.join(getWorkspaceRoot(), 'rslint.config.js');
     const originalConfig = fs.readFileSync(configPath, 'utf8');
 
+    const cleared = waitForDiagnostics(
+      doc,
+      (diags) =>
+        !diags.some((d) => d.message.includes('no-unsafe-member-access')),
+    );
+
     try {
-      // 2. Delete the JS config file
       fs.unlinkSync(configPath);
-
-      // 3. Wait for file watcher to trigger onDidDelete
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // 4. Diagnostics should eventually clear (no JS config, JSON config
-      //    has different rules — we check that the old JS config rules are gone)
-      const afterDeleteDiags = await waitForDiagnostics(
-        doc,
-        (diags) =>
-          // Either diagnostics cleared entirely or switched to JSON config rules
-          !diags.some((d) => d.message.includes('no-unsafe-member-access')),
-      );
+      const afterDeleteDiags = await cleared;
       assert.ok(
         !afterDeleteDiags.some((d) =>
           d.message.includes('no-unsafe-member-access'),
@@ -194,26 +201,31 @@ suite('rslint JS config support', function () {
         'After deleting JS config, no-unsafe-member-access should be gone',
       );
     } finally {
-      // 5. Restore config
+      // Restore config and wait for the reload to settle so the next
+      // test starts from a known state. Subscribe first, then write.
+      const restored = waitForDiagnostics(doc, (diags) =>
+        diags.some((d) => d.message.includes('no-unsafe-member-access')),
+      ).catch(() => undefined);
       fs.writeFileSync(configPath, originalConfig, 'utf8');
-      // Wait for watcher to pick up the restore
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await restored;
     }
   });
 
   test('creating a new JS config should load it and produce diagnostics', async () => {
     const configPath = path.join(getWorkspaceRoot(), 'rslint.config.js');
     const originalConfig = fs.readFileSync(configPath, 'utf8');
-
-    // 1. Delete the config first to start from a no-JS-config state
-    fs.unlinkSync(configPath);
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
+    // Step 1: delete existing config and wait until its diagnostics drop.
+    const cleared = waitForDiagnostics(doc, (diags) =>
+      diags.every((d) => !d.message.includes('no-unsafe-member-access')),
+    );
+    fs.unlinkSync(configPath);
+    await cleared;
+
     try {
-      // 2. Create a new JS config with a different rule
+      // Step 2: subscribe for the new rule, then create the file.
       const newConfig = `export default [
   {
     files: ['**/*.ts'],
@@ -230,23 +242,21 @@ suite('rslint JS config support', function () {
   },
 ];
 `;
-      fs.writeFileSync(configPath, newConfig, 'utf8');
-
-      // 3. Wait for file watcher to trigger onDidCreate
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // 4. Diagnostics should reflect the new config
-      const afterCreateDiags = await waitForDiagnostics(doc, (diags) =>
+      const created = waitForDiagnostics(doc, (diags) =>
         diags.some((d) => d.message.includes('no-explicit-any')),
       );
+      fs.writeFileSync(configPath, newConfig, 'utf8');
+      const afterCreateDiags = await created;
       assert.ok(
         afterCreateDiags.some((d) => d.message.includes('no-explicit-any')),
         'After creating new JS config, should see no-explicit-any diagnostic',
       );
     } finally {
-      // 5. Restore original config
+      const restored = waitForDiagnostics(doc, (diags) =>
+        diags.some((d) => d.message.includes('no-unsafe-member-access')),
+      ).catch(() => undefined);
       fs.writeFileSync(configPath, originalConfig, 'utf8');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await restored;
     }
   });
 });

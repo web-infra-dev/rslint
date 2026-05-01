@@ -32,6 +32,9 @@ func TestNoDoneCallbackRule(t *testing.T) {
 			{Code: `afterAll(() => {})`},
 			{Code: `afterAll(async function () {})`},
 			{Code: `afterAll(async function () {}, 5)`},
+			{Code: "test.each``(\"only one arg\")"},
+			{Code: "it.each``(\"only one arg\")"},
+			{Code: `test.each([])("only one arg")`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

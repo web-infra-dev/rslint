@@ -11,6 +11,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/collections => ./shim/collections
 	github.com/microsoft/typescript-go/shim/compiler => ./shim/compiler
 	github.com/microsoft/typescript-go/shim/core => ./shim/core
+	github.com/microsoft/typescript-go/shim/diagnostics => ./shim/diagnostics
 	github.com/microsoft/typescript-go/shim/evaluator => ./shim/evaluator
 	github.com/microsoft/typescript-go/shim/jsonrpc => ./shim/jsonrpc
 	github.com/microsoft/typescript-go/shim/ls => ./shim/ls
@@ -22,6 +23,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
 	github.com/microsoft/typescript-go/shim/vfs/osvfs => ./shim/vfs/osvfs
+	github.com/microsoft/typescript-go/shim/vfs/vfsmatch => ./shim/vfs/vfsmatch
 )
 
 require (
@@ -34,6 +36,7 @@ require (
 	github.com/microsoft/typescript-go/shim/collections v0.0.0
 	github.com/microsoft/typescript-go/shim/compiler v0.0.0
 	github.com/microsoft/typescript-go/shim/core v0.0.0
+	github.com/microsoft/typescript-go/shim/diagnostics v0.0.0
 	github.com/microsoft/typescript-go/shim/jsonrpc v0.0.0
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
 	github.com/microsoft/typescript-go/shim/project v0.0.0
@@ -43,6 +46,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
+	github.com/microsoft/typescript-go/shim/vfs/vfsmatch v0.0.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sync v0.20.0

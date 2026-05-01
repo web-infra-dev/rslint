@@ -5,13 +5,23 @@ import path from 'node:path';
 import {
   waitForDiagnostics,
   waitForDiagnosticsCount,
+  waitForContentChange,
   withOnSaveFixAll,
+  prewarmOnSaveFixAll,
   replaceAll,
   getFixturesDir,
 } from './fixall-helpers';
 
 suite('rslint fixAll - on-save', function () {
-  this.timeout(90000);
+  this.timeout(120000);
+
+  // Prime the on-save fixAll pipeline once before the first test that
+  // exercises it. The helper is process-wide idempotent — if another
+  // suite has already warmed it, this resolves immediately.
+  suiteSetup(async function () {
+    this.timeout(120000);
+    await prewarmOnSaveFixAll();
+  });
 
   test('generic source.fixAll triggers rslint via on-save', async () => {
     const fixturesDir = getFixturesDir();
@@ -219,12 +229,17 @@ suite('rslint fixAll - on-save', function () {
 
       await doc.save();
 
-      const startTime = Date.now();
-      while (
-        doc.getText().includes('quickVal as string') &&
-        Date.now() - startTime < 20000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
+      // Event-driven wait — Windows CI needs more headroom than the previous
+      // 20 s polling loop, and `onDidChangeTextDocument` resolves the moment
+      // the on-save fixAll edit lands (sub-ms vs. 500 ms poll cadence).
+      try {
+        await waitForContentChange(
+          doc,
+          (content) => !content.includes('quickVal as string'),
+          60000,
+        );
+      } catch {
+        // fall through to assertion for a clearer failure message
       }
 
       assert.ok(

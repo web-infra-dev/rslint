@@ -1251,32 +1251,13 @@ const test = Boolean(((a = b), b || c));
         },
       ],
     },
-    {
-      code: `
-let a: string | true | undefined;
-let b: string | boolean | undefined;
-
-const x = Boolean(a ? a : b);
-      `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
-    },
-    {
-      code: `
-let a: string | boolean | undefined;
-let b: string | boolean | undefined;
-
-const test = Boolean(!a ? b : a);
-      `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
-    },
+    // `Boolean((a ? a : b) || c)` / `Boolean(c || (!a ? b : a))` — ternary
+    // is wrapped by `||`, so its effective parent (after paren-skip) is the
+    // `||`, NOT `CallExpression`. The carve-out only fires when the ternary
+    // is the direct paren-stripped argument of `Boolean(...)`, so under
+    // `ignoreBooleanCoercion: true` these stay valid (verified against
+    // upstream byte-for-byte). The bare `Boolean(a ? a : b)` form IS
+    // reported and is in the `invalid` section below.
     {
       code: `
 let a: string | boolean | undefined;
@@ -1285,11 +1266,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean((a ? a : b) || c);
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -1299,11 +1276,7 @@ let c: string | boolean | undefined;
 
 const test = Boolean(c || (!a ? b : a));
       `,
-      options: [
-        {
-          ignoreBooleanCoercion: true,
-        },
-      ],
+      options: [{ ignoreBooleanCoercion: true }],
     },
     {
       code: `
@@ -2505,8 +2478,12 @@ ${code.split('\n')[1]}
       output: null,
     })),
 
-    // noStrictNullCheck
+    // noStrictNullCheck — SKIP: rslint-test-tools doesn't propagate per-test
+    // `parserOptions.tsconfigRootDir` to a different tsconfig, so the file is
+    // linted against the strict default and the noStrictNullCheck branch
+    // never fires.
     {
+      skip: true,
       code: `
 declare let x: string[] | null;
 if (x) {
@@ -6317,6 +6294,68 @@ c ?? (c ? 1 : 2);
           ],
         },
       ],
+      output: null,
+    },
+    // ignoreBooleanCoercion carve-out: a ConditionalExpression whose paren-
+    // stripped direct parent is `CallExpression` (i.e. ternary IS the bare
+    // argument of `Boolean(...)`) still reports even with
+    // ignoreBooleanCoercion: true. Verified against upstream byte-for-byte.
+    //
+    // Note the strictness of upstream's carve-out: when the ternary is
+    // wrapped in another expression like `Boolean((a ? a : b) || c)` or
+    // `Boolean(c || (!a ? b : a))`, the ternary's effective parent becomes
+    // the `||`, NOT `CallExpression`, so the carve-out does NOT apply and
+    // those cases are correctly silent (kept in `valid` above).
+    {
+      code: `
+let a: string | true | undefined;
+let b: string | boolean | undefined;
+
+const x = Boolean(a ? a : b);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              output: `
+let a: string | true | undefined;
+let b: string | boolean | undefined;
+
+const x = Boolean(a ?? b);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreBooleanCoercion: true }],
+      output: null,
+    },
+    {
+      code: `
+let a: string | boolean | undefined;
+let b: string | boolean | undefined;
+
+const test = Boolean(!a ? b : a);
+      `,
+      errors: [
+        {
+          messageId: 'preferNullishOverTernary',
+          suggestions: [
+            {
+              messageId: 'suggestNullish',
+              output: `
+let a: string | boolean | undefined;
+let b: string | boolean | undefined;
+
+const test = Boolean(a ?? b);
+      `,
+            },
+          ],
+        },
+      ],
+      options: [{ ignoreBooleanCoercion: true }],
       output: null,
     },
   ],

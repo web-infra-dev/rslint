@@ -52,6 +52,7 @@ function MyComponent({ theme }: { theme: string }) {
 	sourceFile := program.GetSourceFile(filePath)
 	if sourceFile == nil {
 		t.Fatalf("source file not found for %s", filePath)
+		return
 	}
 
 	ctx := rule.RuleContext{

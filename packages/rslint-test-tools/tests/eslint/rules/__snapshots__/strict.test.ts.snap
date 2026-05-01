@@ -1139,7 +1139,7 @@ exports[`strict > invalid 40`] = `
   "code": "var foo = (a = 0) => { };",
   "diagnostics": [
     {
-      "message": "Wrap arrow function in a function with 'use strict' directive.",
+      "message": "Wrap arrow function 'foo' in a function with 'use strict' directive.",
       "messageId": "wrap",
       "range": {
         "end": {
@@ -1165,7 +1165,7 @@ exports[`strict > invalid 41`] = `
   "code": "var foo = async (a = 0) => { };",
   "diagnostics": [
     {
-      "message": "Wrap async arrow function in a function with 'use strict' directive.",
+      "message": "Wrap async arrow function 'foo' in a function with 'use strict' directive.",
       "messageId": "wrap",
       "range": {
         "end": {

@@ -1807,422 +1807,6 @@ exports[`no-shadow > invalid 67`] = `
 
 exports[`no-shadow > invalid 68`] = `
 {
-  "code": "const a = wrap(function a() {});",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 26,
-          "line": 1,
-        },
-        "start": {
-          "column": 25,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 69`] = `
-{
-  "code": "const a = foo || wrap(function a() {});",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 33,
-          "line": 1,
-        },
-        "start": {
-          "column": 32,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 70`] = `
-{
-  "code": "const { a = wrap(function a() {}) } = obj;",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 28,
-          "line": 1,
-        },
-        "start": {
-          "column": 27,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 71`] = `
-{
-  "code": "const { a = foo || wrap(function a() {}) } = obj;",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 35,
-          "line": 1,
-        },
-        "start": {
-          "column": 34,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 72`] = `
-{
-  "code": "const { a = foo, b = function a() {} } = {}",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 32,
-          "line": 1,
-        },
-        "start": {
-          "column": 31,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 73`] = `
-{
-  "code": "const { A = Foo, B = class A {} } = {}",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 29,
-          "line": 1,
-        },
-        "start": {
-          "column": 28,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 74`] = `
-{
-  "code": "function foo(a = wrap(function a() {})) {}",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 14.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 33,
-          "line": 1,
-        },
-        "start": {
-          "column": 32,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 75`] = `
-{
-  "code": "function foo(a = foo || wrap(function a() {})) {}",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 14.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 40,
-          "line": 1,
-        },
-        "start": {
-          "column": 39,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 76`] = `
-{
-  "code": "const A = wrap(class A {});",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 23,
-          "line": 1,
-        },
-        "start": {
-          "column": 22,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 77`] = `
-{
-  "code": "const A = foo || wrap(class A {});",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 7.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 30,
-          "line": 1,
-        },
-        "start": {
-          "column": 29,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 78`] = `
-{
-  "code": "const { A = wrap(class A {}) } = obj;",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 25,
-          "line": 1,
-        },
-        "start": {
-          "column": 24,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 79`] = `
-{
-  "code": "const { A = foo || wrap(class A {}) } = obj;",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 9.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 32,
-          "line": 1,
-        },
-        "start": {
-          "column": 31,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 80`] = `
-{
-  "code": "function foo(A = wrap(class A {})) {}",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 14.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 30,
-          "line": 1,
-        },
-        "start": {
-          "column": 29,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 81`] = `
-{
-  "code": "function foo(A = foo || wrap(class A {})) {}",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 14.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 37,
-          "line": 1,
-        },
-        "start": {
-          "column": 36,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 82`] = `
-{
-  "code": "var a = function a() {} ? foo : bar",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 5.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 19,
-          "line": 1,
-        },
-        "start": {
-          "column": 18,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 83`] = `
-{
-  "code": "var A = class A {} ? foo : bar",
-  "diagnostics": [
-    {
-      "message": "'A' is already declared in the upper scope on line 1 column 5.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 16,
-          "line": 1,
-        },
-        "start": {
-          "column": 15,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 84`] = `
-{
   "code": "(function Array() {})",
   "diagnostics": [
     {
@@ -2247,7 +1831,7 @@ exports[`no-shadow > invalid 84`] = `
 }
 `;
 
-exports[`no-shadow > invalid 85`] = `
+exports[`no-shadow > invalid 69`] = `
 {
   "code": "let a; { let b = (function a() {}) }",
   "diagnostics": [
@@ -2273,7 +1857,7 @@ exports[`no-shadow > invalid 85`] = `
 }
 `;
 
-exports[`no-shadow > invalid 86`] = `
+exports[`no-shadow > invalid 70`] = `
 {
   "code": "let a = foo; { let b = (function a() {}) }",
   "diagnostics": [
@@ -2299,7 +1883,7 @@ exports[`no-shadow > invalid 86`] = `
 }
 `;
 
-exports[`no-shadow > invalid 87`] = `
+exports[`no-shadow > invalid 71`] = `
 {
   "code": "
   type T = 1;
@@ -2330,7 +1914,7 @@ exports[`no-shadow > invalid 87`] = `
 }
 `;
 
-exports[`no-shadow > invalid 88`] = `
+exports[`no-shadow > invalid 72`] = `
 {
   "code": "
   type T = 1;
@@ -2359,7 +1943,7 @@ exports[`no-shadow > invalid 88`] = `
 }
 `;
 
-exports[`no-shadow > invalid 89`] = `
+exports[`no-shadow > invalid 73`] = `
 {
   "code": "
   function foo<T>() {
@@ -2389,7 +1973,7 @@ exports[`no-shadow > invalid 89`] = `
 }
 `;
 
-exports[`no-shadow > invalid 90`] = `
+exports[`no-shadow > invalid 74`] = `
 {
   "code": "
   type T = string;
@@ -2418,7 +2002,7 @@ exports[`no-shadow > invalid 90`] = `
 }
 `;
 
-exports[`no-shadow > invalid 91`] = `
+exports[`no-shadow > invalid 75`] = `
 {
   "code": "
   const x = 1;
@@ -2449,7 +2033,7 @@ exports[`no-shadow > invalid 91`] = `
 }
 `;
 
-exports[`no-shadow > invalid 92`] = `
+exports[`no-shadow > invalid 76`] = `
 {
   "code": "
   const test = 1;
@@ -2478,7 +2062,7 @@ exports[`no-shadow > invalid 92`] = `
 }
 `;
 
-exports[`no-shadow > invalid 93`] = `
+exports[`no-shadow > invalid 77`] = `
 {
   "code": "
   const arg = 0;
@@ -2509,7 +2093,7 @@ exports[`no-shadow > invalid 93`] = `
 }
 `;
 
-exports[`no-shadow > invalid 94`] = `
+exports[`no-shadow > invalid 78`] = `
 {
   "code": "
   const arg = 0;
@@ -2540,7 +2124,7 @@ exports[`no-shadow > invalid 94`] = `
 }
 `;
 
-exports[`no-shadow > invalid 95`] = `
+exports[`no-shadow > invalid 79`] = `
 {
   "code": "
   const arg = 0;
@@ -2569,7 +2153,7 @@ exports[`no-shadow > invalid 95`] = `
 }
 `;
 
-exports[`no-shadow > invalid 96`] = `
+exports[`no-shadow > invalid 80`] = `
 {
   "code": "
   const arg = 0;
@@ -2598,7 +2182,7 @@ exports[`no-shadow > invalid 96`] = `
 }
 `;
 
-exports[`no-shadow > invalid 97`] = `
+exports[`no-shadow > invalid 81`] = `
 {
   "code": "
   const arg = 0;
@@ -2629,7 +2213,7 @@ exports[`no-shadow > invalid 97`] = `
 }
 `;
 
-exports[`no-shadow > invalid 98`] = `
+exports[`no-shadow > invalid 82`] = `
 {
   "code": "
   const arg = 0;
@@ -2660,7 +2244,7 @@ exports[`no-shadow > invalid 98`] = `
 }
 `;
 
-exports[`no-shadow > invalid 99`] = `
+exports[`no-shadow > invalid 83`] = `
 {
   "code": "
   const arg = 0;
@@ -2689,7 +2273,7 @@ exports[`no-shadow > invalid 99`] = `
 }
 `;
 
-exports[`no-shadow > invalid 100`] = `
+exports[`no-shadow > invalid 84`] = `
 {
   "code": "
   const arg = 0;
@@ -2720,7 +2304,7 @@ exports[`no-shadow > invalid 100`] = `
 }
 `;
 
-exports[`no-shadow > invalid 101`] = `
+exports[`no-shadow > invalid 85`] = `
 {
   "code": "
 import type { foo } from './foo';
@@ -2749,7 +2333,7 @@ function doThing(foo: number) {}
 }
 `;
 
-exports[`no-shadow > invalid 102`] = `
+exports[`no-shadow > invalid 86`] = `
 {
   "code": "
 import { type foo } from './foo';
@@ -2778,7 +2362,7 @@ function doThing(foo: number) {}
 }
 `;
 
-exports[`no-shadow > invalid 103`] = `
+exports[`no-shadow > invalid 87`] = `
 {
   "code": "
 import { foo } from './foo';
@@ -2807,7 +2391,7 @@ function doThing(foo: number, bar: number) {}
 }
 `;
 
-exports[`no-shadow > invalid 104`] = `
+exports[`no-shadow > invalid 88`] = `
 {
   "code": "
 interface Foo {}
@@ -2836,7 +2420,7 @@ declare module 'bar' { export interface Foo { x: string } }
 }
 `;
 
-exports[`no-shadow > invalid 105`] = `
+exports[`no-shadow > invalid 89`] = `
 {
   "code": "
 import type { Foo } from 'bar';
@@ -2865,7 +2449,7 @@ declare module 'baz' { export interface Foo { x: string } }
 }
 `;
 
-exports[`no-shadow > invalid 106`] = `
+exports[`no-shadow > invalid 90`] = `
 {
   "code": "
 import { type Foo } from 'bar';
@@ -2894,7 +2478,7 @@ declare module 'baz' { export interface Foo { x: string } }
 }
 `;
 
-exports[`no-shadow > invalid 107`] = `
+exports[`no-shadow > invalid 91`] = `
 {
   "code": "
   let x = foo((x, y) => {});
@@ -2938,7 +2522,7 @@ exports[`no-shadow > invalid 107`] = `
 }
 `;
 
-exports[`no-shadow > invalid 108`] = `
+exports[`no-shadow > invalid 92`] = `
 {
   "code": "
   let x = foo((x, y) => {});
@@ -2967,7 +2551,7 @@ exports[`no-shadow > invalid 108`] = `
 }
 `;
 
-exports[`no-shadow > invalid 109`] = `
+exports[`no-shadow > invalid 93`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -2996,7 +2580,7 @@ exports[`no-shadow > invalid 109`] = `
 }
 `;
 
-exports[`no-shadow > invalid 110`] = `
+exports[`no-shadow > invalid 94`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3025,7 +2609,7 @@ exports[`no-shadow > invalid 110`] = `
 }
 `;
 
-exports[`no-shadow > invalid 111`] = `
+exports[`no-shadow > invalid 95`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3054,7 +2638,7 @@ exports[`no-shadow > invalid 111`] = `
 }
 `;
 
-exports[`no-shadow > invalid 112`] = `
+exports[`no-shadow > invalid 96`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -3083,7 +2667,7 @@ exports[`no-shadow > invalid 112`] = `
 }
 `;
 
-exports[`no-shadow > invalid 113`] = `
+exports[`no-shadow > invalid 97`] = `
 {
   "code": "
   {
@@ -3114,7 +2698,7 @@ exports[`no-shadow > invalid 113`] = `
 }
 `;
 
-exports[`no-shadow > invalid 114`] = `
+exports[`no-shadow > invalid 98`] = `
 {
   "code": "
   {
@@ -3145,7 +2729,7 @@ exports[`no-shadow > invalid 114`] = `
 }
 `;
 
-exports[`no-shadow > invalid 115`] = `
+exports[`no-shadow > invalid 99`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -3174,7 +2758,7 @@ exports[`no-shadow > invalid 115`] = `
 }
 `;
 
-exports[`no-shadow > invalid 116`] = `
+exports[`no-shadow > invalid 100`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3203,7 +2787,7 @@ exports[`no-shadow > invalid 116`] = `
 }
 `;
 
-exports[`no-shadow > invalid 117`] = `
+exports[`no-shadow > invalid 101`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3232,7 +2816,7 @@ exports[`no-shadow > invalid 117`] = `
 }
 `;
 
-exports[`no-shadow > invalid 118`] = `
+exports[`no-shadow > invalid 102`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -3261,7 +2845,7 @@ exports[`no-shadow > invalid 118`] = `
 }
 `;
 
-exports[`no-shadow > invalid 119`] = `
+exports[`no-shadow > invalid 103`] = `
 {
   "code": "
   {
@@ -3292,7 +2876,7 @@ exports[`no-shadow > invalid 119`] = `
 }
 `;
 
-exports[`no-shadow > invalid 120`] = `
+exports[`no-shadow > invalid 104`] = `
 {
   "code": "
   {
@@ -3323,7 +2907,7 @@ exports[`no-shadow > invalid 120`] = `
 }
 `;
 
-exports[`no-shadow > invalid 121`] = `
+exports[`no-shadow > invalid 105`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -3352,7 +2936,7 @@ exports[`no-shadow > invalid 121`] = `
 }
 `;
 
-exports[`no-shadow > invalid 122`] = `
+exports[`no-shadow > invalid 106`] = `
 {
   "code": "
 	if (true) {
@@ -3384,7 +2968,7 @@ exports[`no-shadow > invalid 122`] = `
 }
 `;
 
-exports[`no-shadow > invalid 123`] = `
+exports[`no-shadow > invalid 107`] = `
 {
   "code": "
 	// types
@@ -3436,7 +3020,7 @@ exports[`no-shadow > invalid 123`] = `
 }
 `;
 
-exports[`no-shadow > invalid 124`] = `
+exports[`no-shadow > invalid 108`] = `
 {
   "code": "
 	// types
@@ -3473,7 +3057,7 @@ exports[`no-shadow > invalid 124`] = `
 }
 `;
 
-exports[`no-shadow > invalid 125`] = `
+exports[`no-shadow > invalid 109`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3502,7 +3086,7 @@ exports[`no-shadow > invalid 125`] = `
 }
 `;
 
-exports[`no-shadow > invalid 126`] = `
+exports[`no-shadow > invalid 110`] = `
 {
   "code": "
   interface Foo<A> {}
@@ -3531,7 +3115,7 @@ exports[`no-shadow > invalid 126`] = `
 }
 `;
 
-exports[`no-shadow > invalid 127`] = `
+exports[`no-shadow > invalid 111`] = `
 {
   "code": "
   type Foo<A> = 1;
@@ -3560,7 +3144,7 @@ exports[`no-shadow > invalid 127`] = `
 }
 `;
 
-exports[`no-shadow > invalid 128`] = `
+exports[`no-shadow > invalid 112`] = `
 {
   "code": "
   {
@@ -3591,7 +3175,7 @@ exports[`no-shadow > invalid 128`] = `
 }
 `;
 
-exports[`no-shadow > invalid 129`] = `
+exports[`no-shadow > invalid 113`] = `
 {
   "code": "
   {
@@ -3622,7 +3206,7 @@ exports[`no-shadow > invalid 129`] = `
 }
 `;
 
-exports[`no-shadow > invalid 130`] = `
+exports[`no-shadow > invalid 114`] = `
 {
   "code": "
 		const A = 2;
@@ -3654,7 +3238,7 @@ exports[`no-shadow > invalid 130`] = `
 }
 `;
 
-exports[`no-shadow > invalid 131`] = `
+exports[`no-shadow > invalid 115`] = `
 {
   "code": "type X<T> = T extends (infer U) ? (U extends (infer U) ? U : never) : never;",
   "diagnostics": [
@@ -3680,7 +3264,7 @@ exports[`no-shadow > invalid 131`] = `
 }
 `;
 
-exports[`no-shadow > invalid 132`] = `
+exports[`no-shadow > invalid 116`] = `
 {
   "code": "const x = 1; const o = { foo(x: number) { return x; } };",
   "diagnostics": [
@@ -3706,7 +3290,7 @@ exports[`no-shadow > invalid 132`] = `
 }
 `;
 
-exports[`no-shadow > invalid 133`] = `
+exports[`no-shadow > invalid 117`] = `
 {
   "code": "const x = 1; const o = { get foo() { const x = 2; return x; } };",
   "diagnostics": [
@@ -3732,7 +3316,7 @@ exports[`no-shadow > invalid 133`] = `
 }
 `;
 
-exports[`no-shadow > invalid 134`] = `
+exports[`no-shadow > invalid 118`] = `
 {
   "code": "const x = 1; const o = { async foo(x: number) { return x; } };",
   "diagnostics": [
@@ -3758,7 +3342,7 @@ exports[`no-shadow > invalid 134`] = `
 }
 `;
 
-exports[`no-shadow > invalid 135`] = `
+exports[`no-shadow > invalid 119`] = `
 {
   "code": "const x = 1; const o = { *foo(x: number) { yield x; } };",
   "diagnostics": [
@@ -3784,7 +3368,7 @@ exports[`no-shadow > invalid 135`] = `
 }
 `;
 
-exports[`no-shadow > invalid 136`] = `
+exports[`no-shadow > invalid 120`] = `
 {
   "code": "using u = { [Symbol.dispose]() {} }; { using u = { [Symbol.dispose]() {} }; }",
   "diagnostics": [
@@ -3810,7 +3394,7 @@ exports[`no-shadow > invalid 136`] = `
 }
 `;
 
-exports[`no-shadow > invalid 137`] = `
+exports[`no-shadow > invalid 121`] = `
 {
   "code": "class C<T> { static s<T>(): T { return null as any; } i<T>(): T { return null as any; } }",
   "diagnostics": [
@@ -3836,7 +3420,7 @@ exports[`no-shadow > invalid 137`] = `
 }
 `;
 
-exports[`no-shadow > invalid 138`] = `
+exports[`no-shadow > invalid 122`] = `
 {
   "code": "const a = 1; function f({ x: a }: any) { return a; }",
   "diagnostics": [
@@ -3862,7 +3446,7 @@ exports[`no-shadow > invalid 138`] = `
 }
 `;
 
-exports[`no-shadow > invalid 139`] = `
+exports[`no-shadow > invalid 123`] = `
 {
   "code": "const fn = function f(f: number) { return f; };",
   "diagnostics": [
@@ -3888,7 +3472,7 @@ exports[`no-shadow > invalid 139`] = `
 }
 `;
 
-exports[`no-shadow > invalid 140`] = `
+exports[`no-shadow > invalid 124`] = `
 {
   "code": "function dec(x: any) { return x; }
 @dec class CD { method() { const dec = 1; return dec; } }",
@@ -3915,7 +3499,7 @@ exports[`no-shadow > invalid 140`] = `
 }
 `;
 
-exports[`no-shadow > invalid 141`] = `
+exports[`no-shadow > invalid 125`] = `
 {
   "code": "const k = 'x'; class C { foo() { const k = 1; return k; } }",
   "diagnostics": [
@@ -3941,7 +3525,7 @@ exports[`no-shadow > invalid 141`] = `
 }
 `;
 
-exports[`no-shadow > invalid 142`] = `
+exports[`no-shadow > invalid 126`] = `
 {
   "code": "const a = 1; function f({ a = a }: any) { return a; }",
   "diagnostics": [
@@ -3967,7 +3551,7 @@ exports[`no-shadow > invalid 142`] = `
 }
 `;
 
-exports[`no-shadow > invalid 143`] = `
+exports[`no-shadow > invalid 127`] = `
 {
   "code": "const e = 1; try {} catch ({ message: e }) { return e; }",
   "diagnostics": [
@@ -3993,7 +3577,7 @@ exports[`no-shadow > invalid 143`] = `
 }
 `;
 
-exports[`no-shadow > invalid 144`] = `
+exports[`no-shadow > invalid 128`] = `
 {
   "code": "async function* g() { const v = 1; for await (const v of [Promise.resolve(1)]) yield v; }",
   "diagnostics": [
@@ -4019,7 +3603,7 @@ exports[`no-shadow > invalid 144`] = `
 }
 `;
 
-exports[`no-shadow > invalid 145`] = `
+exports[`no-shadow > invalid 129`] = `
 {
   "code": "const a = 1, b = 2; function f() { const a = 3, b = 4; return a + b; }",
   "diagnostics": [
@@ -4060,7 +3644,7 @@ exports[`no-shadow > invalid 145`] = `
 }
 `;
 
-exports[`no-shadow > invalid 146`] = `
+exports[`no-shadow > invalid 130`] = `
 {
   "code": "function f() { const z = 1; switch (z) { case 1: { const z = 2; break; } case 2: { const z = 3; break; } } }",
   "diagnostics": [
@@ -4101,7 +3685,7 @@ exports[`no-shadow > invalid 146`] = `
 }
 `;
 
-exports[`no-shadow > invalid 147`] = `
+exports[`no-shadow > invalid 131`] = `
 {
   "code": "import * as Mods from 'fs'; function f(Mods: number) { return Mods; }",
   "diagnostics": [
@@ -4127,7 +3711,7 @@ exports[`no-shadow > invalid 147`] = `
 }
 `;
 
-exports[`no-shadow > invalid 148`] = `
+exports[`no-shadow > invalid 132`] = `
 {
   "code": "const Z = 1; const make = () => class Z {};",
   "diagnostics": [
@@ -4153,7 +3737,7 @@ exports[`no-shadow > invalid 148`] = `
 }
 `;
 
-exports[`no-shadow > invalid 149`] = `
+exports[`no-shadow > invalid 133`] = `
 {
   "code": "const t = 1; type T = typeof t; function f(t: number) { return t; }",
   "diagnostics": [
@@ -4179,7 +3763,7 @@ exports[`no-shadow > invalid 149`] = `
 }
 `;
 
-exports[`no-shadow > invalid 150`] = `
+exports[`no-shadow > invalid 134`] = `
 {
   "code": "const opts = { x: 1 }; function f(opts: typeof opts = opts) { return opts; }",
   "diagnostics": [
@@ -4205,7 +3789,7 @@ exports[`no-shadow > invalid 150`] = `
 }
 `;
 
-exports[`no-shadow > invalid 151`] = `
+exports[`no-shadow > invalid 135`] = `
 {
   "code": "const a = 1; const fn = function() { const a = 2; return a; };",
   "diagnostics": [
@@ -4231,7 +3815,7 @@ exports[`no-shadow > invalid 151`] = `
 }
 `;
 
-exports[`no-shadow > invalid 152`] = `
+exports[`no-shadow > invalid 136`] = `
 {
   "code": "const A = 1; class A_outer { x = class A {}; }",
   "diagnostics": [
@@ -4257,7 +3841,7 @@ exports[`no-shadow > invalid 152`] = `
 }
 `;
 
-exports[`no-shadow > invalid 153`] = `
+exports[`no-shadow > invalid 137`] = `
 {
   "code": "function f(...args: number[]) { function g({ args }: any) { return args; } }",
   "diagnostics": [
@@ -4283,7 +3867,7 @@ exports[`no-shadow > invalid 153`] = `
 }
 `;
 
-exports[`no-shadow > invalid 154`] = `
+exports[`no-shadow > invalid 138`] = `
 {
   "code": "function* g() { const v = 1; for (const v of [1,2,3]) { yield v; } }",
   "diagnostics": [
@@ -4309,7 +3893,7 @@ exports[`no-shadow > invalid 154`] = `
 }
 `;
 
-exports[`no-shadow > invalid 155`] = `
+exports[`no-shadow > invalid 139`] = `
 {
   "code": "function f<A>(fn: <A>(x: A) => A): A { return fn as any; }",
   "diagnostics": [
@@ -4335,7 +3919,7 @@ exports[`no-shadow > invalid 155`] = `
 }
 `;
 
-exports[`no-shadow > invalid 156`] = `
+exports[`no-shadow > invalid 140`] = `
 {
   "code": "function f<T>(): <T>(x: T) => T { return null as any; }",
   "diagnostics": [
@@ -4361,7 +3945,7 @@ exports[`no-shadow > invalid 156`] = `
 }
 `;
 
-exports[`no-shadow > invalid 157`] = `
+exports[`no-shadow > invalid 141`] = `
 {
   "code": "try {} catch (e) { try {} catch (e) {} }",
   "diagnostics": [
@@ -4387,7 +3971,7 @@ exports[`no-shadow > invalid 157`] = `
 }
 `;
 
-exports[`no-shadow > invalid 158`] = `
+exports[`no-shadow > invalid 142`] = `
 {
   "code": "class C<T> { m<T>(x: T): T { return x; } }",
   "diagnostics": [
@@ -4413,7 +3997,7 @@ exports[`no-shadow > invalid 158`] = `
 }
 `;
 
-exports[`no-shadow > invalid 159`] = `
+exports[`no-shadow > invalid 143`] = `
 {
   "code": "const x = 1; function f(x: number) { function g(x: number) { return x; } return g; }",
   "diagnostics": [
@@ -4454,7 +4038,7 @@ exports[`no-shadow > invalid 159`] = `
 }
 `;
 
-exports[`no-shadow > invalid 160`] = `
+exports[`no-shadow > invalid 144`] = `
 {
   "code": "const a = 1; function f([, a]: any[]) { return a; }",
   "diagnostics": [
@@ -4480,7 +4064,7 @@ exports[`no-shadow > invalid 160`] = `
 }
 `;
 
-exports[`no-shadow > invalid 161`] = `
+exports[`no-shadow > invalid 145`] = `
 {
   "code": "const a = 1; const fn = { call: (cb: any) => cb }; fn.call?.(a => a);",
   "diagnostics": [
@@ -4506,7 +4090,7 @@ exports[`no-shadow > invalid 161`] = `
 }
 `;
 
-exports[`no-shadow > invalid 162`] = `
+exports[`no-shadow > invalid 146`] = `
 {
   "code": "const x = 1; class C { constructor(public x: number) {} m() { const x = 1; return x; } }",
   "diagnostics": [
@@ -4547,7 +4131,7 @@ exports[`no-shadow > invalid 162`] = `
 }
 `;
 
-exports[`no-shadow > invalid 163`] = `
+exports[`no-shadow > invalid 147`] = `
 {
   "code": "const mod = 1; import('m').then((mod) => mod);",
   "diagnostics": [
@@ -4573,7 +4157,7 @@ exports[`no-shadow > invalid 163`] = `
 }
 `;
 
-exports[`no-shadow > invalid 164`] = `
+exports[`no-shadow > invalid 148`] = `
 {
   "code": "type X<T> = T extends Array<infer U> ? (U extends Array<infer U> ? U : never) : never;",
   "diagnostics": [
@@ -4599,7 +4183,7 @@ exports[`no-shadow > invalid 164`] = `
 }
 `;
 
-exports[`no-shadow > invalid 165`] = `
+exports[`no-shadow > invalid 149`] = `
 {
   "code": "const g = Array<number>; function f(Array: any) { return Array; }",
   "diagnostics": [
@@ -4625,7 +4209,7 @@ exports[`no-shadow > invalid 165`] = `
 }
 `;
 
-exports[`no-shadow > invalid 166`] = `
+exports[`no-shadow > invalid 150`] = `
 {
   "code": "const x = 1; class C { accessor x = 1; m() { const x = 2; return x; } }",
   "diagnostics": [
@@ -4651,7 +4235,7 @@ exports[`no-shadow > invalid 166`] = `
 }
 `;
 
-exports[`no-shadow > invalid 167`] = `
+exports[`no-shadow > invalid 151`] = `
 {
   "code": "async function f() { const x = 1; for await (const { v: x } of [Promise.resolve({ v: 1 })]) { return x; } }",
   "diagnostics": [
@@ -4677,7 +4261,7 @@ exports[`no-shadow > invalid 167`] = `
 }
 `;
 
-exports[`no-shadow > invalid 168`] = `
+exports[`no-shadow > invalid 152`] = `
 {
   "code": "async function f() { using u = { [Symbol.dispose]() {} }; for (const u of [] as any[]) { void u; } }",
   "diagnostics": [
@@ -4703,7 +4287,7 @@ exports[`no-shadow > invalid 168`] = `
 }
 `;
 
-exports[`no-shadow > invalid 169`] = `
+exports[`no-shadow > invalid 153`] = `
 {
   "code": "const k = 'a'; function f({ [k]: v }: any) { const k = 1; return [v, k]; }",
   "diagnostics": [
@@ -4729,7 +4313,7 @@ exports[`no-shadow > invalid 169`] = `
 }
 `;
 
-exports[`no-shadow > invalid 170`] = `
+exports[`no-shadow > invalid 154`] = `
 {
   "code": "function withTheme<P>(Component: any) { return function ThemedComponent(props: P) { const Component = 1; return Component; }; }",
   "diagnostics": [
@@ -4755,7 +4339,7 @@ exports[`no-shadow > invalid 170`] = `
 }
 `;
 
-exports[`no-shadow > invalid 171`] = `
+exports[`no-shadow > invalid 155`] = `
 {
   "code": "type A = { type: 'inc' } | { type: 'set'; value: number }; function reducer(state: number, action: A) { switch (action.type) { case 'inc': { const state = 1; return state + 1; } case 'set': return action.value; } }",
   "diagnostics": [
@@ -4781,7 +4365,7 @@ exports[`no-shadow > invalid 171`] = `
 }
 `;
 
-exports[`no-shadow > invalid 172`] = `
+exports[`no-shadow > invalid 156`] = `
 {
   "code": "function chain() { const item = { id: 1 }; [1, 2, 3].map(item => item + 1).filter(item => item > 1).forEach(item => void item); void item; }",
   "diagnostics": [
@@ -4837,7 +4421,7 @@ exports[`no-shadow > invalid 172`] = `
 }
 `;
 
-exports[`no-shadow > invalid 173`] = `
+exports[`no-shadow > invalid 157`] = `
 {
   "code": "const e = 1; try { try { throw new Error(); } catch (e) { try { throw e; } catch (e) {} } } catch (e) {} void e;",
   "diagnostics": [
@@ -4893,7 +4477,7 @@ exports[`no-shadow > invalid 173`] = `
 }
 `;
 
-exports[`no-shadow > invalid 174`] = `
+exports[`no-shadow > invalid 158`] = `
 {
   "code": "const methodName = 'foo'; const obj = { [methodName](methodName: string) { return methodName; } };",
   "diagnostics": [
@@ -4919,7 +4503,7 @@ exports[`no-shadow > invalid 174`] = `
 }
 `;
 
-exports[`no-shadow > invalid 175`] = `
+exports[`no-shadow > invalid 159`] = `
 {
   "code": "function f() { for (let i = 0; i < 1; i++) { for (let i = 0; i < 1; i++) {} } }",
   "diagnostics": [
@@ -4945,7 +4529,7 @@ exports[`no-shadow > invalid 175`] = `
 }
 `;
 
-exports[`no-shadow > invalid 176`] = `
+exports[`no-shadow > invalid 160`] = `
 {
   "code": "const a = 1; class C { m(x: string): void; m(x: number): void; m(a: any): void { void a; } }",
   "diagnostics": [
@@ -4971,7 +4555,7 @@ exports[`no-shadow > invalid 176`] = `
 }
 `;
 
-exports[`no-shadow > invalid 177`] = `
+exports[`no-shadow > invalid 161`] = `
 {
   "code": "function mk<T>(x: T) { return { get<T>(): T { return null as any; } }; }",
   "diagnostics": [
@@ -4997,7 +4581,7 @@ exports[`no-shadow > invalid 177`] = `
 }
 `;
 
-exports[`no-shadow > invalid 178`] = `
+exports[`no-shadow > invalid 162`] = `
 {
   "code": "const c = 1; { /* empty */ } { const c = 2; void c; }",
   "diagnostics": [
@@ -5023,7 +4607,7 @@ exports[`no-shadow > invalid 178`] = `
 }
 `;
 
-exports[`no-shadow > invalid 179`] = `
+exports[`no-shadow > invalid 163`] = `
 {
   "code": "const enum E { A, B } function f(E: number) { return E; }",
   "diagnostics": [
@@ -5049,7 +4633,7 @@ exports[`no-shadow > invalid 179`] = `
 }
 `;
 
-exports[`no-shadow > invalid 180`] = `
+exports[`no-shadow > invalid 164`] = `
 {
   "code": "abstract class C<T extends object> { abstract m<T>(): T; }",
   "diagnostics": [
@@ -5075,7 +4659,7 @@ exports[`no-shadow > invalid 180`] = `
 }
 `;
 
-exports[`no-shadow > invalid 181`] = `
+exports[`no-shadow > invalid 165`] = `
 {
   "code": "const iter = 1; class C { [Symbol.iterator](iter: number) { return iter; } }",
   "diagnostics": [
@@ -5101,7 +4685,7 @@ exports[`no-shadow > invalid 181`] = `
 }
 `;
 
-exports[`no-shadow > invalid 182`] = `
+exports[`no-shadow > invalid 166`] = `
 {
   "code": "const x = 1; class C { constructor(x?: number) { void x; } }",
   "diagnostics": [
@@ -5127,7 +4711,7 @@ exports[`no-shadow > invalid 182`] = `
 }
 `;
 
-exports[`no-shadow > invalid 183`] = `
+exports[`no-shadow > invalid 167`] = `
 {
   "code": "const val = { x: 1 }; function f(val: typeof val) { return val; }",
   "diagnostics": [
@@ -5153,7 +4737,7 @@ exports[`no-shadow > invalid 183`] = `
 }
 `;
 
-exports[`no-shadow > invalid 184`] = `
+exports[`no-shadow > invalid 168`] = `
 {
   "code": "const x = 1; class C { async m(x: number) { return x; } }",
   "diagnostics": [
@@ -5179,7 +4763,7 @@ exports[`no-shadow > invalid 184`] = `
 }
 `;
 
-exports[`no-shadow > invalid 185`] = `
+exports[`no-shadow > invalid 169`] = `
 {
   "code": "const x = 1; class C { *m(x: number) { yield x; } }",
   "diagnostics": [
@@ -5205,7 +4789,7 @@ exports[`no-shadow > invalid 185`] = `
 }
 `;
 
-exports[`no-shadow > invalid 186`] = `
+exports[`no-shadow > invalid 170`] = `
 {
   "code": "declare function foo(): void; function bar() { const foo = 1; return foo; }",
   "diagnostics": [
@@ -5231,7 +4815,7 @@ exports[`no-shadow > invalid 186`] = `
 }
 `;
 
-exports[`no-shadow > invalid 187`] = `
+exports[`no-shadow > invalid 171`] = `
 {
   "code": "const h = 1; class C extends (function() { const h = 2; return class {}; })() {}",
   "diagnostics": [
@@ -5257,7 +4841,7 @@ exports[`no-shadow > invalid 187`] = `
 }
 `;
 
-exports[`no-shadow > invalid 188`] = `
+exports[`no-shadow > invalid 172`] = `
 {
   "code": "const h = 1; class C extends ((h => h)(1), Object) {}",
   "diagnostics": [
@@ -5283,7 +4867,7 @@ exports[`no-shadow > invalid 188`] = `
 }
 `;
 
-exports[`no-shadow > invalid 189`] = `
+exports[`no-shadow > invalid 173`] = `
 {
   "code": "function dec(x: any) { return x; }
 @((target: any) => { const dec = 1; return dec && target; })
@@ -5311,7 +4895,7 @@ class D {}",
 }
 `;
 
-exports[`no-shadow > invalid 190`] = `
+exports[`no-shadow > invalid 174`] = `
 {
   "code": "const md = 1; class C { @((t: any, k: string) => { const md = 1; void md; }) method() {} }",
   "diagnostics": [
@@ -5337,7 +4921,7 @@ exports[`no-shadow > invalid 190`] = `
 }
 `;
 
-exports[`no-shadow > invalid 191`] = `
+exports[`no-shadow > invalid 175`] = `
 {
   "code": "const pd = 1; class C { method(@((t: any, k: any, i: number) => { const pd = 1; void pd; }) x: number) {} }",
   "diagnostics": [
@@ -5363,7 +4947,7 @@ exports[`no-shadow > invalid 191`] = `
 }
 `;
 
-exports[`no-shadow > invalid 192`] = `
+exports[`no-shadow > invalid 176`] = `
 {
   "code": "const k = 1; class C { [((k) => k)(2)]() {} }",
   "diagnostics": [
@@ -5389,7 +4973,7 @@ exports[`no-shadow > invalid 192`] = `
 }
 `;
 
-exports[`no-shadow > invalid 193`] = `
+exports[`no-shadow > invalid 177`] = `
 {
   "code": "const k = 1; class C { [((k) => k)(2)] = 1; }",
   "diagnostics": [
@@ -5415,7 +4999,7 @@ exports[`no-shadow > invalid 193`] = `
 }
 `;
 
-exports[`no-shadow > invalid 194`] = `
+exports[`no-shadow > invalid 178`] = `
 {
   "code": "const g = 1; class C { get [((g) => g)(1)]() { return 1; } }",
   "diagnostics": [
@@ -5441,7 +5025,7 @@ exports[`no-shadow > invalid 194`] = `
 }
 `;
 
-exports[`no-shadow > invalid 195`] = `
+exports[`no-shadow > invalid 179`] = `
 {
   "code": "const m = 1; class C { async *[((m) => m)(1)]() {} }",
   "diagnostics": [
@@ -5467,7 +5051,7 @@ exports[`no-shadow > invalid 195`] = `
 }
 `;
 
-exports[`no-shadow > invalid 196`] = `
+exports[`no-shadow > invalid 180`] = `
 {
   "code": "
   {
@@ -5498,7 +5082,7 @@ exports[`no-shadow > invalid 196`] = `
 }
 `;
 
-exports[`no-shadow > invalid 197`] = `
+exports[`no-shadow > invalid 181`] = `
 {
   "code": "
   {
@@ -5529,7 +5113,7 @@ exports[`no-shadow > invalid 197`] = `
 }
 `;
 
-exports[`no-shadow > invalid 198`] = `
+exports[`no-shadow > invalid 182`] = `
 {
   "code": "
 	if (true) {
@@ -5561,7 +5145,7 @@ exports[`no-shadow > invalid 198`] = `
 }
 `;
 
-exports[`no-shadow > invalid 199`] = `
+exports[`no-shadow > invalid 183`] = `
 {
   "code": "
 	// types
@@ -5613,7 +5197,7 @@ exports[`no-shadow > invalid 199`] = `
 }
 `;
 
-exports[`no-shadow > invalid 200`] = `
+exports[`no-shadow > invalid 184`] = `
 {
   "code": "
 	// types
@@ -5650,7 +5234,7 @@ exports[`no-shadow > invalid 200`] = `
 }
 `;
 
-exports[`no-shadow > invalid 201`] = `
+exports[`no-shadow > invalid 185`] = `
 {
   "code": "
   {
@@ -5681,7 +5265,7 @@ exports[`no-shadow > invalid 201`] = `
 }
 `;
 
-exports[`no-shadow > invalid 202`] = `
+exports[`no-shadow > invalid 186`] = `
 {
   "code": "let x = foo((x,y) => {});
 let y;",
@@ -5723,7 +5307,7 @@ let y;",
 }
 `;
 
-exports[`no-shadow > invalid 203`] = `
+exports[`no-shadow > invalid 187`] = `
 {
   "code": "function a() {}
 foo(a => {});",
@@ -5750,7 +5334,7 @@ foo(a => {});",
 }
 `;
 
-exports[`no-shadow > invalid 204`] = `
+exports[`no-shadow > invalid 188`] = `
 {
   "code": "let x = ((x,y) => {})();
 let y;",
@@ -5792,33 +5376,7 @@ let y;",
 }
 `;
 
-exports[`no-shadow > invalid 205`] = `
-{
-  "code": "let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });",
-  "diagnostics": [
-    {
-      "message": "'a' is already declared in the upper scope on line 1 column 29.",
-      "messageId": "noShadow",
-      "range": {
-        "end": {
-          "column": 48,
-          "line": 1,
-        },
-        "start": {
-          "column": 47,
-          "line": 1,
-        },
-      },
-      "ruleName": "no-shadow",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-shadow > invalid 206`] = `
+exports[`no-shadow > invalid 189`] = `
 {
   "code": "
   type T = 1;
@@ -5849,7 +5407,7 @@ exports[`no-shadow > invalid 206`] = `
 }
 `;
 
-exports[`no-shadow > invalid 207`] = `
+exports[`no-shadow > invalid 190`] = `
 {
   "code": "
   type T = 1;
@@ -5878,7 +5436,7 @@ exports[`no-shadow > invalid 207`] = `
 }
 `;
 
-exports[`no-shadow > invalid 208`] = `
+exports[`no-shadow > invalid 191`] = `
 {
   "code": "
   function foo<T>() {
@@ -5908,7 +5466,7 @@ exports[`no-shadow > invalid 208`] = `
 }
 `;
 
-exports[`no-shadow > invalid 209`] = `
+exports[`no-shadow > invalid 192`] = `
 {
   "code": "
   type T = string;
@@ -5937,7 +5495,7 @@ exports[`no-shadow > invalid 209`] = `
 }
 `;
 
-exports[`no-shadow > invalid 210`] = `
+exports[`no-shadow > invalid 193`] = `
 {
   "code": "
   const arg = 0;
@@ -5969,7 +5527,7 @@ exports[`no-shadow > invalid 210`] = `
 }
 `;
 
-exports[`no-shadow > invalid 211`] = `
+exports[`no-shadow > invalid 194`] = `
 {
   "code": "
   import type { foo } from './foo';
@@ -5998,7 +5556,7 @@ exports[`no-shadow > invalid 211`] = `
 }
 `;
 
-exports[`no-shadow > invalid 212`] = `
+exports[`no-shadow > invalid 195`] = `
 {
   "code": "
   import { type foo } from './foo';
@@ -6027,7 +5585,7 @@ exports[`no-shadow > invalid 212`] = `
 }
 `;
 
-exports[`no-shadow > invalid 213`] = `
+exports[`no-shadow > invalid 196`] = `
 {
   "code": "
   import { foo } from './foo';
@@ -6056,7 +5614,7 @@ exports[`no-shadow > invalid 213`] = `
 }
 `;
 
-exports[`no-shadow > invalid 214`] = `
+exports[`no-shadow > invalid 197`] = `
 {
   "code": "
   interface Foo {}
@@ -6090,7 +5648,7 @@ exports[`no-shadow > invalid 214`] = `
 }
 `;
 
-exports[`no-shadow > invalid 215`] = `
+exports[`no-shadow > invalid 198`] = `
 {
   "code": "
   import type { Foo } from 'bar';
@@ -6124,7 +5682,7 @@ exports[`no-shadow > invalid 215`] = `
 }
 `;
 
-exports[`no-shadow > invalid 216`] = `
+exports[`no-shadow > invalid 199`] = `
 {
   "code": "
   import { type Foo } from 'bar';
@@ -6158,7 +5716,7 @@ exports[`no-shadow > invalid 216`] = `
 }
 `;
 
-exports[`no-shadow > invalid 217`] = `
+exports[`no-shadow > invalid 200`] = `
 {
   "code": "
   let x = foo((x, y) => {});
@@ -6202,7 +5760,7 @@ exports[`no-shadow > invalid 217`] = `
 }
 `;
 
-exports[`no-shadow > invalid 218`] = `
+exports[`no-shadow > invalid 201`] = `
 {
   "code": "
   let x = foo((x, y) => {});
@@ -6231,7 +5789,7 @@ exports[`no-shadow > invalid 218`] = `
 }
 `;
 
-exports[`no-shadow > invalid 219`] = `
+exports[`no-shadow > invalid 202`] = `
 {
   "code": "
   {
@@ -6262,7 +5820,7 @@ exports[`no-shadow > invalid 219`] = `
 }
 `;
 
-exports[`no-shadow > invalid 220`] = `
+exports[`no-shadow > invalid 203`] = `
 {
   "code": "
   {
@@ -6293,7 +5851,7 @@ exports[`no-shadow > invalid 220`] = `
 }
 `;
 
-exports[`no-shadow > invalid 221`] = `
+exports[`no-shadow > invalid 204`] = `
 {
   "code": "
 	if (true) {
@@ -6325,7 +5883,7 @@ exports[`no-shadow > invalid 221`] = `
 }
 `;
 
-exports[`no-shadow > invalid 222`] = `
+exports[`no-shadow > invalid 205`] = `
 {
   "code": "
 	// types
@@ -6377,7 +5935,7 @@ exports[`no-shadow > invalid 222`] = `
 }
 `;
 
-exports[`no-shadow > invalid 223`] = `
+exports[`no-shadow > invalid 206`] = `
 {
   "code": "
 	// types
@@ -6414,7 +5972,7 @@ exports[`no-shadow > invalid 223`] = `
 }
 `;
 
-exports[`no-shadow > invalid 224`] = `
+exports[`no-shadow > invalid 207`] = `
 {
   "code": "
   {
@@ -6445,7 +6003,7 @@ exports[`no-shadow > invalid 224`] = `
 }
 `;
 
-exports[`no-shadow > invalid 225`] = `
+exports[`no-shadow > invalid 208`] = `
 {
   "code": "
 			const A = 2;

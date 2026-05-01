@@ -23,6 +23,7 @@ func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
 	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", false)
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	// Build lookup for returned enabled rules
@@ -88,6 +89,7 @@ func TestGetEnabledRules_EnforcePlugins_BlocksUndeclaredPlugin(t *testing.T) {
 	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	ruleMap := make(map[string]linter.ConfiguredRule)
@@ -123,6 +125,7 @@ func TestGetEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
 	if mergedConfig == nil {
 		t.Fatal("Expected non-nil merged config")
+		return
 	}
 
 	ruleMap := make(map[string]linter.ConfiguredRule)

@@ -664,9 +664,12 @@ function bar() {}
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "wrap",
-						Message:   "Wrap arrow function in a function with 'use strict' directive.",
-						Line:      1,
-						Column:    11,
+						// Now resolves the binding name from the parent
+						// VariableDeclaration, matching ESLint's
+						// astUtils.getName.
+						Message: "Wrap arrow function 'foo' in a function with 'use strict' directive.",
+						Line:    1,
+						Column:  11,
 					},
 				},
 			},
@@ -676,7 +679,7 @@ function bar() {}
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "wrap",
-						Message:   "Wrap async arrow function in a function with 'use strict' directive.",
+						Message:   "Wrap async arrow function 'foo' in a function with 'use strict' directive.",
 						Line:      1,
 						Column:    11,
 					},

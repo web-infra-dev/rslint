@@ -378,7 +378,8 @@ func isEvaluatedDuringInitialization(refNode *ast.Node, decl *ast.Node) bool {
 // ---------------------------------------------------------------------------
 
 var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
-	Name: "no-use-before-define",
+	Name:             "no-use-before-define",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
 		return rule.RuleListeners{

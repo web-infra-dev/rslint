@@ -1,0 +1,2744 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-syntax > invalid 1`] = `
+{
+  "code": "var foo = 41;",
+  "diagnostics": [
+    {
+      "message": "Using 'VariableDeclaration' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 2`] = `
+{
+  "code": ";function lol(a) { return 42; }",
+  "diagnostics": [
+    {
+      "message": "Using 'EmptyStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 3`] = `
+{
+  "code": "try { voila(); } catch (e) { oops(); }",
+  "diagnostics": [
+    {
+      "message": "Using 'TryStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'CallExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'CatchClause' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'CallExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 4`] = `
+{
+  "code": "bar;",
+  "diagnostics": [
+    {
+      "message": "Using 'Identifier[name="bar"]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 5`] = `
+{
+  "code": "bar;",
+  "diagnostics": [
+    {
+      "message": "Using 'Identifier' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'Identifier[name="bar"]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 6`] = `
+{
+  "code": "() => {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ArrowFunctionExpression > BlockStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 7`] = `
+{
+  "code": "({ foo: 1, 'bar': 2 })",
+  "diagnostics": [
+    {
+      "message": "Using 'Property > Literal.key' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 8`] = `
+{
+  "code": "A: for (;;) break A;",
+  "diagnostics": [
+    {
+      "message": "Using 'BreakStatement[label]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 9`] = `
+{
+  "code": "function foo(bar, baz, qux) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'FunctionDeclaration[params.length>2]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 10`] = `
+{
+  "code": "var foo = 41;",
+  "diagnostics": [
+    {
+      "message": "Using 'VariableDeclaration' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 11`] = `
+{
+  "code": "function foo(bar, baz, qux) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'FunctionDeclaration[params.length>2]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 12`] = `
+{
+  "code": "function foo(bar, baz, qux) {}",
+  "diagnostics": [
+    {
+      "message": "custom error message.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 13`] = `
+{
+  "code": "console.log(/a/i);",
+  "diagnostics": [
+    {
+      "message": "Using 'Literal[regex.flags=/./]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 14`] = `
+{
+  "code": "var foo = foo?.bar?.();",
+  "diagnostics": [
+    {
+      "message": "Using 'ChainExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 15`] = `
+{
+  "code": "var foo = foo?.bar?.();",
+  "diagnostics": [
+    {
+      "message": "Using '[optional=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using '[optional=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 16`] = `
+{
+  "code": "{ using x = foo(); }",
+  "diagnostics": [
+    {
+      "message": "Using 'VariableDeclaration[kind='using']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 17`] = `
+{
+  "code": "async function f() { await using x = foo(); }",
+  "diagnostics": [
+    {
+      "message": "Using 'VariableDeclaration[kind='await using']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 18`] = `
+{
+  "code": "import values from 'some/path';",
+  "diagnostics": [
+    {
+      "message": "Using 'ImportDeclaration[source.value=/^some\\/path$/]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 19`] = `
+{
+  "code": "foo + bar + baz",
+  "diagnostics": [
+    {
+      "message": "Using ':is(Identifier[name='foo'], Identifier[name='bar'], Identifier[name='baz'])' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using ':is(Identifier[name='foo'], Identifier[name='bar'], Identifier[name='baz'])' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using ':is(Identifier[name='foo'], Identifier[name='bar'], Identifier[name='baz'])' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 20`] = `
+{
+  "code": "a?.b",
+  "diagnostics": [
+    {
+      "message": "Using ':nth-child(1)' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 21`] = `
+{
+  "code": "with (x) { y; }",
+  "diagnostics": [
+    {
+      "message": "Using 'WithStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 22`] = `
+{
+  "code": "console.log('msg');",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression[callee.object.name='console']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 23`] = `
+{
+  "code": "setTimeout(fn, 0);",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression[callee.name='setTimeout']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 24`] = `
+{
+  "code": "for (const k in obj) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ForInStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 25`] = `
+{
+  "code": "export default 1;",
+  "diagnostics": [
+    {
+      "message": "Using 'ExportDefaultDeclaration' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 26`] = `
+{
+  "code": "async function f() {}",
+  "diagnostics": [
+    {
+      "message": "Using 'FunctionDeclaration[async=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 27`] = `
+{
+  "code": "function* g() {}",
+  "diagnostics": [
+    {
+      "message": "Using 'FunctionDeclaration[generator=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 28`] = `
+{
+  "code": "const f = () => { return 5; };",
+  "diagnostics": [
+    {
+      "message": "Using 'ArrowFunctionExpression[body.type='BlockStatement']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 29`] = `
+{
+  "code": "var a = 1;",
+  "diagnostics": [
+    {
+      "message": "Using 'VariableDeclaration[kind='var']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 30`] = `
+{
+  "code": "new Promise(function (res, rej) { res(); });",
+  "diagnostics": [
+    {
+      "message": "Using 'NewExpression[callee.name='Promise']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 31`] = `
+{
+  "code": "function f() { return function g() {}; }",
+  "diagnostics": [
+    {
+      "message": "Using 'FunctionDeclaration FunctionExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 32`] = `
+{
+  "code": "f(1, 2);",
+  "diagnostics": [
+    {
+      "message": "Using 'Literal + Literal' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 33`] = `
+{
+  "code": "import foo from "Lodash";",
+  "diagnostics": [
+    {
+      "message": "Using 'ImportDeclaration[source.value=/lodash/i]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 34`] = `
+{
+  "code": "++x;",
+  "diagnostics": [
+    {
+      "message": "Using 'UpdateExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 35`] = `
+{
+  "code": "typeof x;",
+  "diagnostics": [
+    {
+      "message": "Using 'UnaryExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 36`] = `
+{
+  "code": "a += b;",
+  "diagnostics": [
+    {
+      "message": "Using 'AssignmentExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 37`] = `
+{
+  "code": "var x = (a, b);",
+  "diagnostics": [
+    {
+      "message": "Using 'SequenceExpression' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 38`] = `
+{
+  "code": "({ a, b: 1, get c() {}, set d(v) {}, e() {} });",
+  "diagnostics": [
+    {
+      "message": "Using 'Property' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'Property' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'Property' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'Property' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'Property' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 39`] = `
+{
+  "code": "var a = 1; with (x) {}",
+  "diagnostics": [
+    {
+      "message": "Use let or const, not var.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'WithStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 40`] = `
+{
+  "code": "var a = 1, b = 2;",
+  "diagnostics": [
+    {
+      "message": "Using 'VariableDeclarator' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+    {
+      "message": "Using 'VariableDeclarator' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 41`] = `
+{
+  "code": "(console).log('msg');",
+  "diagnostics": [
+    {
+      "message": "Using 'MemberExpression[object.name='console']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 42`] = `
+{
+  "code": "console!.log('msg');",
+  "diagnostics": [
+    {
+      "message": "Using 'MemberExpression[object.name='console']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 43`] = `
+{
+  "code": "(console as any).log('msg');",
+  "diagnostics": [
+    {
+      "message": "Using 'MemberExpression[object.name='console']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 44`] = `
+{
+  "code": "typeof x;",
+  "diagnostics": [
+    {
+      "message": "Using 'UnaryExpression[operator='typeof']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 45`] = `
+{
+  "code": "delete a.b;",
+  "diagnostics": [
+    {
+      "message": "Using 'UnaryExpression[operator='delete']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 46`] = `
+{
+  "code": "import { useEffect } from 'react';",
+  "diagnostics": [
+    {
+      "message": "Using 'ImportSpecifier[imported.name='useEffect']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 47`] = `
+{
+  "code": "obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "Using 'MemberExpression[property.name='__proto__']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 48`] = `
+{
+  "code": "obj.hasOwnProperty(k);",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression[callee.property.name='hasOwnProperty']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 49`] = `
+{
+  "code": "arguments.callee;",
+  "diagnostics": [
+    {
+      "message": "Using 'MemberExpression[object.name='arguments'][property.name='callee']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 50`] = `
+{
+  "code": "if (a == b) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'BinaryExpression[operator='==']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 51`] = `
+{
+  "code": "var _hidden = 1;",
+  "diagnostics": [
+    {
+      "message": "Using 'Identifier[name=/^_/]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 52`] = `
+{
+  "code": "eval(userInput);",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression[callee.name='eval']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 53`] = `
+{
+  "code": "x instanceof Foo;",
+  "diagnostics": [
+    {
+      "message": "Using 'BinaryExpression[operator='instanceof']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 54`] = `
+{
+  "code": "for (var i in obj) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ForInStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 55`] = `
+{
+  "code": "outer: for (;;) { break outer; }",
+  "diagnostics": [
+    {
+      "message": "Using 'LabeledStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 56`] = `
+{
+  "code": "obj[Symbol.iterator];",
+  "diagnostics": [
+    {
+      "message": "Using 'MemberExpression[property.object.name='Symbol'][property.property.name='iterator']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 57`] = `
+{
+  "code": "it.skip('does nothing', () => {});",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression[callee.property.name='skip']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 58`] = `
+{
+  "code": "setTimeout(fn);",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression[callee.name=/^(setTimeout|setInterval)$/]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 59`] = `
+{
+  "code": "const f = () => 1;",
+  "diagnostics": [
+    {
+      "message": "Using 'ArrowFunctionExpression[params.length=0]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 60`] = `
+{
+  "code": "export default function f() {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ExportDefaultDeclaration > FunctionDeclaration' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 61`] = `
+{
+  "code": "({ ['foo']: 1 });",
+  "diagnostics": [
+    {
+      "message": "Using 'Property[computed=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 62`] = `
+{
+  "code": "class A { #x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Using 'PropertyDefinition > PrivateIdentifier.key' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 63`] = `
+{
+  "code": "try { f(); } catch (e) { g(); }",
+  "diagnostics": [
+    {
+      "message": "Using 'CatchClause[param]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 64`] = `
+{
+  "code": "const n = 1n;",
+  "diagnostics": [
+    {
+      "message": "Using 'Literal[value=/n$/]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 65`] = `
+{
+  "code": "class Component {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ClassDeclaration[id.name='Component']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 66`] = `
+{
+  "code": "const s = \`hi \${name}\`;",
+  "diagnostics": [
+    {
+      "message": "Using 'TemplateLiteral' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 67`] = `
+{
+  "code": "var a = 1;",
+  "diagnostics": [
+    {
+      "message": "Using ':is(VariableDeclaration, FunctionDeclaration):not([kind='let'])' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 68`] = `
+{
+  "code": "function f() { return new.target; }",
+  "diagnostics": [
+    {
+      "message": "Using 'MetaProperty[meta.name='new']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 69`] = `
+{
+  "code": "const u = import.meta.url;",
+  "diagnostics": [
+    {
+      "message": "Using 'MetaProperty[property.name='meta']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 70`] = `
+{
+  "code": "class C { foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Using 'MethodDefinition' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 71`] = `
+{
+  "code": "({ foo() {} });",
+  "diagnostics": [
+    {
+      "message": "Using 'Property' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 72`] = `
+{
+  "code": "for (const k in obj) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ForInStatement[left.type='VariableDeclaration']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 73`] = `
+{
+  "code": "for (let v of items) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ForOfStatement[left.kind='let']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 74`] = `
+{
+  "code": "export { foo as bar } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "Using 'ExportSpecifier[local.name='foo']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 75`] = `
+{
+  "code": "export { foo as bar } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "Using 'ExportSpecifier[exported.name='bar']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 76`] = `
+{
+  "code": "class C { foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Using 'MethodDefinition[kind='method']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 77`] = `
+{
+  "code": "class C { constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Using 'MethodDefinition[kind='constructor']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 78`] = `
+{
+  "code": "class C { get x() { return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Using 'MethodDefinition[kind='get']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 79`] = `
+{
+  "code": "class C { static foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Using 'MethodDefinition[static=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 80`] = `
+{
+  "code": "const a = 1; ({ a });",
+  "diagnostics": [
+    {
+      "message": "Using 'Property[shorthand=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 81`] = `
+{
+  "code": "({ foo() {} });",
+  "diagnostics": [
+    {
+      "message": "Using 'Property[method=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 82`] = `
+{
+  "code": "({ [x]: 1 });",
+  "diagnostics": [
+    {
+      "message": "Using 'Property[computed=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 83`] = `
+{
+  "code": "function f(...args) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'RestElement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 84`] = `
+{
+  "code": "function f(a = 1) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'AssignmentPattern' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 85`] = `
+{
+  "code": "class C extends Component {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ClassDeclaration[superClass.name='Component']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 86`] = `
+{
+  "code": "switch (x) { default: y; }",
+  "diagnostics": [
+    {
+      "message": "Using 'SwitchCase[test=null]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 87`] = `
+{
+  "code": "switch (x) { case 1: y; break; }",
+  "diagnostics": [
+    {
+      "message": "Using 'SwitchCase[consequent.length>0]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 88`] = `
+{
+  "code": "for (var i = 0; i < 10; i++) {}",
+  "diagnostics": [
+    {
+      "message": "Using 'ForStatement[update]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 89`] = `
+{
+  "code": "class C { x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Using 'PropertyDefinition[value]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 90`] = `
+{
+  "code": "class C { onClick = () => {}; }",
+  "diagnostics": [
+    {
+      "message": "Using 'PropertyDefinition[value.type='ArrowFunctionExpression']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 91`] = `
+{
+  "code": "const s = \`a\${b}c\`;",
+  "diagnostics": [
+    {
+      "message": "Using 'TemplateLiteral[expressions.length>0]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 92`] = `
+{
+  "code": ""use strict"; foo();",
+  "diagnostics": [
+    {
+      "message": "Using 'ExpressionStatement[directive='use strict']' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 93`] = `
+{
+  "code": "const n = 1n;",
+  "diagnostics": [
+    {
+      "message": "Using 'Literal[bigint]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 94`] = `
+{
+  "code": "const r = /abc/;",
+  "diagnostics": [
+    {
+      "message": "Using 'Literal[regex]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 95`] = `
+{
+  "code": "function* g() { yield* x; }",
+  "diagnostics": [
+    {
+      "message": "Using 'YieldExpression[delegate=true]' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 96`] = `
+{
+  "code": "try { f(); } catch (e) { g(); }",
+  "diagnostics": [
+    {
+      "message": "Using 'CatchClause > BlockStatement' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 97`] = `
+{
+  "code": "class C extends B { constructor() { super(); } }",
+  "diagnostics": [
+    {
+      "message": "Using 'CallExpression > Super' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-syntax > invalid 98`] = `
+{
+  "code": "class C { static { initialize(); } }",
+  "diagnostics": [
+    {
+      "message": "Using 'StaticBlock' is not allowed.",
+      "messageId": "restrictedSyntax",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-syntax",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

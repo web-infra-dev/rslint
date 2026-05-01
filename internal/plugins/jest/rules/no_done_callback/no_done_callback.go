@@ -48,7 +48,7 @@ func findCallbackArgument(callExpr *ast.CallExpression, jestFnCall *utils.Parsed
 		return nil
 	}
 
-	if isJestEach || (jestFnCall.Kind == utils.JestFnTypeTest && argLength >= 2) {
+	if (isJestEach || jestFnCall.Kind == utils.JestFnTypeTest) && argLength >= 2 {
 		return nodes[1]
 	} else if jestFnCall.Kind == utils.JestFnTypeHook && argLength >= 1 {
 		return nodes[0]

@@ -315,7 +315,7 @@ func getPropertyName(node *ast.Node) *ast.Node {
 	if ast.IsPropertyDeclaration(node) {
 		return node.AsPropertyDeclaration().Name()
 	}
-	if ast.IsParameter(node) {
+	if ast.IsParameterDeclaration(node) {
 		return node.AsParameterDeclaration().Name()
 	}
 	return nil
@@ -325,7 +325,7 @@ func getInitializer(node *ast.Node) *ast.Node {
 	if ast.IsPropertyDeclaration(node) {
 		return node.AsPropertyDeclaration().Initializer
 	}
-	if ast.IsParameter(node) {
+	if ast.IsParameterDeclaration(node) {
 		return node.AsParameterDeclaration().Initializer
 	}
 	return nil
@@ -335,7 +335,7 @@ func getTypeAnnotation(node *ast.Node) *ast.Node {
 	if ast.IsPropertyDeclaration(node) {
 		return node.AsPropertyDeclaration().Type
 	}
-	if ast.IsParameter(node) {
+	if ast.IsParameterDeclaration(node) {
 		return node.AsParameterDeclaration().Type
 	}
 	return nil

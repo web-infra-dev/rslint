@@ -106,6 +106,7 @@ Metas
 minimatch
 mobx
 morestack
+multibyte
 multilines
 myfunc
 nanotime
@@ -224,6 +225,7 @@ Unwatch
 unwinded
 USERPROFILE
 variabledeclaration
+vfsmatch
 visitchildren
 walltime
 wasmer
@@ -257,6 +259,7 @@ destructures
 segs
 setstate
 Setstate
+packagejson
 middot
 xlink
 nend
@@ -300,3 +303,16 @@ goroutines
 GOMAXPROCS
 fanout
 humanfs
+modns
+Modns
+módulo
+dedup
+estree
+combinator
+combinators
+wellformed
+finalizer
+centralising
+normalises
+bareword
+uninitialised

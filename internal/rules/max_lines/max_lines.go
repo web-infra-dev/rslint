@@ -41,13 +41,13 @@ func parseOptions(opts any) maxLinesOptions {
 		}
 		opts = arr[0]
 	}
-	if n, ok := toInt(opts); ok {
+	if n, ok := utils.CoerceInt(opts); ok {
 		result.max = n
 		return result
 	}
 	if m, ok := opts.(map[string]interface{}); ok {
 		if v, ok := m["max"]; ok {
-			if n, ok := toInt(v); ok {
+			if n, ok := utils.CoerceInt(v); ok {
 				result.max = n
 			}
 		}
@@ -61,21 +61,6 @@ func parseOptions(opts any) maxLinesOptions {
 	return result
 }
 
-func toInt(v any) (int, bool) {
-	switch n := v.(type) {
-	case int:
-		return n, true
-	case int32:
-		return int(n), true
-	case int64:
-		return int(n), true
-	case float64:
-		return int(n), true
-	case float32:
-		return int(n), true
-	}
-	return 0, false
-}
 
 func checkMaxLines(ctx rule.RuleContext, options any) {
 	opts := parseOptions(options)
@@ -94,7 +79,7 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 		if i+1 >= nLines {
 			return text[start:]
 		}
-		return text[start:lineContentEnd(text, int(lineStarts[i+1]))]
+		return text[start:utils.LineContentEnd(text, int(lineStarts[i+1]))]
 	}
 
 	// If the file ends with a line terminator, the final entry is an extra
@@ -112,7 +97,7 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 
 	if opts.skipBlankLines {
 		for i := range nLines {
-			if keep[i] && isECMABlankLine(lineContent(i)) {
+			if keep[i] && utils.IsECMABlankLine(lineContent(i)) {
 				keep[i] = false
 			}
 		}
@@ -152,42 +137,6 @@ func checkMaxLines(ctx rule.RuleContext, options any) {
 			Description: fmt.Sprintf("File has too many lines (%d). Maximum allowed is %d.", len(kept), opts.max),
 		},
 	)
-}
-
-// lineContentEnd returns the byte position just past the last character of the
-// line whose successor starts at nextLineStart — i.e. nextLineStart with its
-// immediately-preceding ECMA line terminator (LF, CR, CRLF, LS, PS) stripped.
-func lineContentEnd(text string, nextLineStart int) int {
-	if nextLineStart >= 2 && text[nextLineStart-2] == '\r' && text[nextLineStart-1] == '\n' {
-		return nextLineStart - 2
-	}
-	if nextLineStart >= 1 {
-		c := text[nextLineStart-1]
-		if c == '\r' || c == '\n' {
-			return nextLineStart - 1
-		}
-		// U+2028 / U+2029 encode as 0xE2 0x80 0xA8 / 0xA9.
-		if nextLineStart >= 3 &&
-			text[nextLineStart-3] == 0xE2 &&
-			text[nextLineStart-2] == 0x80 &&
-			(text[nextLineStart-1] == 0xA8 || text[nextLineStart-1] == 0xA9) {
-			return nextLineStart - 3
-		}
-	}
-	return nextLineStart
-}
-
-// isECMABlankLine reports whether s contains only ECMAScript WhiteSpace /
-// LineTerminator runes — matching JavaScript's `"".trim() === ""` check used
-// by ESLint's `skipBlankLines`. Go's strings.TrimSpace diverges on U+FEFF
-// (BOM) and U+0085 (NEL), so we can't use it directly.
-func isECMABlankLine(s string) bool {
-	for _, r := range s {
-		if !utils.IsStrWhiteSpace(r) {
-			return false
-		}
-	}
-	return true
 }
 
 // commentOnlyLines returns the set of 1-indexed line numbers that contain only

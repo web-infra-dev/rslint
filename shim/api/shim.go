@@ -17,6 +17,7 @@ type CheckerSignatureParams = api.CheckerSignatureParams
 type CheckerTypeParams = api.CheckerTypeParams
 type ConfigFileResponse = api.ConfigFileResponse
 type Conn = api.Conn
+type DiagnosticResponse = api.DiagnosticResponse
 type DocumentIdentifier = api.DocumentIdentifier
 var ErrClientError = api.ErrClientError
 var ErrConnClosed = api.ErrConnClosed
@@ -27,11 +28,13 @@ func GeneratePipePath(name string) string
 type GetBaseTypeOfLiteralTypeParams = api.GetBaseTypeOfLiteralTypeParams
 type GetContextualTypeParams = api.GetContextualTypeParams
 type GetDefaultProjectForFileParams = api.GetDefaultProjectForFileParams
+type GetDiagnosticsParams = api.GetDiagnosticsParams
 type GetExportSymbolOfSymbolParams = api.GetExportSymbolOfSymbolParams
 type GetExportsOfSymbolParams = api.GetExportsOfSymbolParams
 type GetIntrinsicTypeParams = api.GetIntrinsicTypeParams
 type GetMembersOfSymbolParams = api.GetMembersOfSymbolParams
 type GetParentOfSymbolParams = api.GetParentOfSymbolParams
+type GetProjectDiagnosticsParams = api.GetProjectDiagnosticsParams
 type GetSignaturesOfTypeParams = api.GetSignaturesOfTypeParams
 type GetSourceFileParams = api.GetSourceFileParams
 type GetSymbolAtLocationParams = api.GetSymbolAtLocationParams
@@ -70,9 +73,11 @@ const MethodGetBaseTypes = api.MethodGetBaseTypes
 const MethodGetBigIntType = api.MethodGetBigIntType
 const MethodGetBooleanType = api.MethodGetBooleanType
 const MethodGetCheckTypeOfType = api.MethodGetCheckTypeOfType
+const MethodGetConfigFileParsingDiagnostics = api.MethodGetConfigFileParsingDiagnostics
 const MethodGetConstraintOfType = api.MethodGetConstraintOfType
 const MethodGetConstraintOfTypeParameter = api.MethodGetConstraintOfTypeParameter
 const MethodGetContextualType = api.MethodGetContextualType
+const MethodGetDeclarationDiagnostics = api.MethodGetDeclarationDiagnostics
 const MethodGetDeclaredTypeOfSymbol = api.MethodGetDeclaredTypeOfSymbol
 const MethodGetDefaultProjectForFile = api.MethodGetDefaultProjectForFile
 const MethodGetESSymbolType = api.MethodGetESSymbolType
@@ -92,15 +97,18 @@ const MethodGetParentOfSymbol = api.MethodGetParentOfSymbol
 const MethodGetPropertiesOfType = api.MethodGetPropertiesOfType
 const MethodGetRestTypeOfSignature = api.MethodGetRestTypeOfSignature
 const MethodGetReturnTypeOfSignature = api.MethodGetReturnTypeOfSignature
+const MethodGetSemanticDiagnostics = api.MethodGetSemanticDiagnostics
 const MethodGetShorthandAssignmentValueSymbol = api.MethodGetShorthandAssignmentValueSymbol
 const MethodGetSignaturesOfType = api.MethodGetSignaturesOfType
 const MethodGetSourceFile = api.MethodGetSourceFile
 const MethodGetStringType = api.MethodGetStringType
+const MethodGetSuggestionDiagnostics = api.MethodGetSuggestionDiagnostics
 const MethodGetSymbolAtLocation = api.MethodGetSymbolAtLocation
 const MethodGetSymbolAtPosition = api.MethodGetSymbolAtPosition
 const MethodGetSymbolOfType = api.MethodGetSymbolOfType
 const MethodGetSymbolsAtLocations = api.MethodGetSymbolsAtLocations
 const MethodGetSymbolsAtPositions = api.MethodGetSymbolsAtPositions
+const MethodGetSyntacticDiagnostics = api.MethodGetSyntacticDiagnostics
 const MethodGetTargetOfType = api.MethodGetTargetOfType
 const MethodGetTypeArguments = api.MethodGetTypeArguments
 const MethodGetTypeAtLocation = api.MethodGetTypeAtLocation
@@ -129,6 +137,10 @@ const MethodUpdateSnapshot = api.MethodUpdateSnapshot
 func NewAsyncConn(rwc io.ReadWriteCloser, handler api.Handler) *api.AsyncConn
 //go:linkname NewAsyncConnWithProtocol github.com/microsoft/typescript-go/internal/api.NewAsyncConnWithProtocol
 func NewAsyncConnWithProtocol(rwc io.ReadWriteCloser, protocol api.Protocol, handler api.Handler) *api.AsyncConn
+//go:linkname NewDiagnosticResponse github.com/microsoft/typescript-go/internal/api.NewDiagnosticResponse
+func NewDiagnosticResponse(d *ast.Diagnostic) *api.DiagnosticResponse
+//go:linkname NewDiagnosticResponses github.com/microsoft/typescript-go/internal/api.NewDiagnosticResponses
+func NewDiagnosticResponses(diags []*ast.Diagnostic) []*api.DiagnosticResponse
 //go:linkname NewJSONRPCProtocol github.com/microsoft/typescript-go/internal/api.NewJSONRPCProtocol
 func NewJSONRPCProtocol(rw io.ReadWriter) *api.JSONRPCProtocol
 //go:linkname NewMessagePackProtocol github.com/microsoft/typescript-go/internal/api.NewMessagePackProtocol

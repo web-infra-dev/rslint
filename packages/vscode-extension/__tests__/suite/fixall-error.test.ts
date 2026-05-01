@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import {
   waitForDiagnostics,
   findFixAllAction,
+  prewarmOnSaveFixAll,
   requestFixAll,
   withTmpFile,
   withOnSaveFixAll,
@@ -10,7 +11,15 @@ import {
 } from './fixall-helpers';
 
 suite('rslint fixAll - error flows', function () {
-  this.timeout(90000);
+  this.timeout(120000);
+
+  // Prime the on-save fixAll pipeline once before the first test that
+  // exercises it. The helper is process-wide idempotent — if another
+  // suite has already warmed it, this resolves immediately.
+  suiteSetup(async function () {
+    this.timeout(120000);
+    await prewarmOnSaveFixAll();
+  });
 
   test('fixAll on file with syntax errors does not crash', async () => {
     const brokenContent = 'const x: string = \nfunction (\nexport { \n';

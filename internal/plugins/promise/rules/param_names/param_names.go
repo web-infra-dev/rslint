@@ -65,7 +65,7 @@ func buildRejectParamNamesMessage(pattern string) rule.RuleMessage {
 // in ESTree), or is a rest element — matching ESLint's `params[i].name`, which
 // is only defined on Identifier-shaped parameters.
 func paramName(param *ast.Node) string {
-	if param == nil || !ast.IsParameter(param) {
+	if param == nil || !ast.IsParameterDeclaration(param) {
 		return ""
 	}
 	decl := param.AsParameterDeclaration()

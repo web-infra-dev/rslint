@@ -129,6 +129,31 @@ func TestNoShadowRule(t *testing.T) {
 			// ---- allow list ----
 			{Code: `function foo(cb) { (function (cb) { cb(42); })(cb); }`, Options: map[string]interface{}{"allow": []interface{}{"cb"}}},
 
+			// ---- Function-name initializer exception with arbitrary CallExpression
+			// wrappers — ESLint's `outerScope === innerScope.upper` accepts any
+			// non-scope-introducing wrapper, not just a fixed list of operators.
+			{Code: `const a = wrap(function a() {});`},
+			{Code: `const a = foo || wrap(function a() {});`},
+			{Code: `const { a = wrap(function a() {}) } = obj;`},
+			{Code: `const { a = foo || wrap(function a() {}) } = obj;`},
+			{Code: `function foo(a = wrap(function a() {})) {}`},
+			{Code: `function foo(a = foo || wrap(function a() {})) {}`},
+			{Code: `const A = wrap(class A {});`},
+			{Code: `const A = foo || wrap(class A {});`},
+			{Code: `const { A = wrap(class A {}) } = obj;`},
+			{Code: `const { A = foo || wrap(class A {}) } = obj;`},
+			{Code: `function foo(A = wrap(class A {})) {}`},
+			{Code: `function foo(A = foo || wrap(class A {})) {}`},
+			// Sibling-init in same destructuring also exempted by the same rule.
+			{Code: `const { a = foo, b = function a() {} } = {}`},
+			{Code: `const { A = Foo, B = class A {} } = {}`},
+			// FunctionExpression / ClassExpression at the test position of a
+			// ternary in the initializer is also exempted (same scope/range).
+			{Code: `var a = function a() {} ? foo : bar`},
+			{Code: `var A = class A {} ? foo : bar`},
+			// Wrap with side-effecting top-level `let` — still exempted.
+			{Code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`, Options: map[string]interface{}{"hoist": "all"}},
+
 			// ---- Class fields / methods (not shadowing — different kinds) ----
 			{Code: `class C { foo; foo() { let foo; } }`},
 
@@ -691,24 +716,6 @@ function bar() { }`},
 				},
 			},
 
-			// ---- Call-wrap: initializer-exception does NOT apply ----
-			{Code: `const a = wrap(function a() {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 25}}},
-			{Code: `const a = foo || wrap(function a() {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 32}}},
-			{Code: `const { a = wrap(function a() {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 27}}},
-			{Code: `const { a = foo || wrap(function a() {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 34}}},
-			{Code: `const { a = foo, b = function a() {} } = {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 31}}},
-			{Code: `const { A = Foo, B = class A {} } = {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 28}}},
-			{Code: `function foo(a = wrap(function a() {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 32}}},
-			{Code: `function foo(a = foo || wrap(function a() {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 39}}},
-			{Code: `const A = wrap(class A {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 22}}},
-			{Code: `const A = foo || wrap(class A {});`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 29}}},
-			{Code: `const { A = wrap(class A {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 24}}},
-			{Code: `const { A = foo || wrap(class A {}) } = obj;`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 31}}},
-			{Code: `function foo(A = wrap(class A {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 29}}},
-			{Code: `function foo(A = foo || wrap(class A {})) {}`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 36}}},
-			// Ternary test branch: fn expr is `test`, not an unwrap path.
-			{Code: `var a = function a() {} ? foo : bar`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 18}}},
-			{Code: `var A = class A {} ? foo : bar`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 15}}},
 			// SKIP: `(function Array() {})` + builtinGlobals — relies on env/sourceType=module.
 			{Code: `(function Array() {})`, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Line: 1, Column: 11}}},
 			{Code: `let a; { let b = (function a() {}) }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow", Line: 1, Column: 28}}},
@@ -1457,7 +1464,6 @@ let y;`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.
 foo(a => {});`, Options: map[string]interface{}{"ignoreOnInitialization": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 			{Code: `let x = ((x,y) => {})();
 let y;`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}, {MessageId: "noShadow"}}},
-			{Code: `let x = false; export const a = wrap(function a() { if (!x) { x = true; a(); } });`, Options: map[string]interface{}{"hoist": "all"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadow"}}},
 			{Code: `
   type T = 1;
   {
