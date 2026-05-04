@@ -23,7 +23,8 @@
       "@typescript-eslint/no-namespace": "error",
       "@typescript-eslint/ban-types": "error",
       "@typescript-eslint/no-inferrable-types": "error",
-      "prefer-const": "off"
+      "prefer-const": "off",
+      "one-var": "off"
     },
     "plugins": ["@typescript-eslint"]
   }
