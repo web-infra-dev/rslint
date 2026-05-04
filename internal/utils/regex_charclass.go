@@ -97,7 +97,7 @@ func IterateRegexCharacterClasses(pattern string, flags RegexFlags, cb func(star
 	for i < len(pattern) {
 		switch pattern[i] {
 		case '\\':
-			step, ok := skipPatternEscape(pattern, i, flags)
+			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
 				return false
 			}
@@ -128,7 +128,7 @@ func IterateRegexCharacterClasses(pattern string, flags RegexFlags, cb func(star
 // flag, for any nested classes). Returns the index just past `]`, or ok=false
 // on malformed input.
 func iterateClassFromLBracket(pattern string, start int, flags RegexFlags, cb func(start, end int)) (int, bool) {
-	end, ok := classEnd(pattern, start, flags)
+	end, ok := ClassEnd(pattern, start, flags)
 	if !ok {
 		return start, false
 	}
@@ -142,7 +142,7 @@ func iterateClassFromLBracket(pattern string, start int, flags RegexFlags, cb fu
 		for i < end-1 {
 			c := pattern[i]
 			if c == '\\' {
-				step, ok := skipPatternEscape(pattern, i, flags)
+				step, ok := SkipPatternEscape(pattern, i, flags)
 				if !ok {
 					return start, false
 				}
@@ -169,10 +169,10 @@ func iterateClassFromLBracket(pattern string, start int, flags RegexFlags, cb fu
 	return end, true
 }
 
-// classEnd returns the byte index just past the matching `]` for a class
+// ClassEnd returns the byte index just past the matching `]` for a class
 // starting at `[` at pattern[start]. Handles escaped `]`, v-flag nested
 // classes, and `\q{...}` which contains a literal `]` inside braces.
-func classEnd(pattern string, start int, flags RegexFlags) (int, bool) {
+func ClassEnd(pattern string, start int, flags RegexFlags) (int, bool) {
 	if start >= len(pattern) || pattern[start] != '[' {
 		return start, false
 	}
@@ -186,7 +186,7 @@ func classEnd(pattern string, start int, flags RegexFlags) (int, bool) {
 		c := pattern[i]
 		switch {
 		case c == '\\':
-			step, ok := skipPatternEscape(pattern, i, flags)
+			step, ok := SkipPatternEscape(pattern, i, flags)
 			if !ok {
 				return start, false
 			}
@@ -212,10 +212,10 @@ func classEnd(pattern string, start int, flags RegexFlags) (int, bool) {
 	return start, false
 }
 
-// skipPatternEscape returns how many bytes a `\`-prefixed escape consumes at
+// SkipPatternEscape returns how many bytes a `\`-prefixed escape consumes at
 // pattern[i] (including the leading `\`) for the purposes of class-boundary
 // scanning. Returns ok=false at EOF on `\`.
-func skipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
+func SkipPatternEscape(pattern string, i int, flags RegexFlags) (int, bool) {
 	if i+1 >= len(pattern) {
 		return 0, false
 	}
@@ -329,7 +329,7 @@ func ParseRegexCharacterClass(pattern string, start int, flags RegexFlags) ([]Re
 		case c == '[' && flags.UnicodeSets:
 			// v-flag nested class — emit as breaker; caller recurses via
 			// IterateRegexCharacterClasses to parse nested contents.
-			nestedEnd, ok := classEnd(pattern, i, flags)
+			nestedEnd, ok := ClassEnd(pattern, i, flags)
 			if !ok {
 				return nil, start, false
 			}

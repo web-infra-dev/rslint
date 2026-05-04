@@ -320,3 +320,7 @@ uninit
 espree
 norf
 McCabe
+bref
+brefs
+backref
+backrefs

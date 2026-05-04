@@ -315,6 +315,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unsafe-negation.test.ts',
     './tests/eslint/rules/no-throw-literal.test.ts',
     './tests/eslint/rules/no-unsafe-optional-chaining.test.ts',
+    './tests/eslint/rules/no-useless-backreference.test.ts',
     './tests/eslint/rules/no-useless-call.test.ts',
     './tests/eslint/rules/no-useless-catch.test.ts',
     './tests/eslint/rules/no-useless-rename.test.ts',

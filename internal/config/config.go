@@ -228,6 +228,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
@@ -737,6 +738,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("one-var", one_var.OneVarRule)
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 	GlobalRuleRegistry.Register("no-throw-literal", no_throw_literal.NoThrowLiteralRule)
+	GlobalRuleRegistry.Register("no-useless-backreference", no_useless_backreference.NoUselessBackreferenceRule)
 	GlobalRuleRegistry.Register("no-useless-call", no_useless_call.NoUselessCallRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
 	GlobalRuleRegistry.Register("no-useless-rename", no_useless_rename.NoUselessRenameRule)
