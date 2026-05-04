@@ -125,6 +125,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
+	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
@@ -622,6 +623,7 @@ func registerAllEslintImportPluginRules() {
 func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("accessor-pairs", accessor_pairs.AccessorPairsRule)
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
+	GlobalRuleRegistry.Register("complexity", complexity.ComplexityRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
 	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)
 	GlobalRuleRegistry.Register("default-case-last", default_case_last.DefaultCaseLastRule)

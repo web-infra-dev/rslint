@@ -1,0 +1,580 @@
+// Rstest Snapshot v1
+
+exports[`complexity > invalid 1`] = `
+{
+  "code": "function a(x) {}",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 1. Maximum allowed is 0.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 2`] = `
+{
+  "code": "function foo(x) {if (x > 10) {return 'x is greater than 10';} else if (x > 5) {return 'x is greater than 5';} else {return 'x is less than 5';}}",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has a complexity of 3. Maximum allowed is 2.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 3`] = `
+{
+  "code": "var func = function () {}",
+  "diagnostics": [
+    {
+      "message": "Function has a complexity of 1. Maximum allowed is 0.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 4`] = `
+{
+  "code": "var obj = { a(x) {} }",
+  "diagnostics": [
+    {
+      "message": "Method 'a' has a complexity of 1. Maximum allowed is 0.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 5`] = `
+{
+  "code": "class Test { a(x) {} }",
+  "diagnostics": [
+    {
+      "message": "Method 'a' has a complexity of 1. Maximum allowed is 0.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 6`] = `
+{
+  "code": "function a(x) {if (true) {return x;}}",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 7`] = `
+{
+  "code": "function a(x) {return x || 4;}",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 8`] = `
+{
+  "code": "function a(x) {x ||= 4;}",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 9`] = `
+{
+  "code": "var obj = { a(x) { return x ? 0 : 1; } };",
+  "diagnostics": [
+    {
+      "message": "Method 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 10`] = `
+{
+  "code": "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: 3;}}",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 11`] = `
+{
+  "code": "class C { x = a || b; }",
+  "diagnostics": [
+    {
+      "message": "Class field initializer has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 12`] = `
+{
+  "code": "class C { x = a || b; y = b || c || d; z = e || f; }",
+  "diagnostics": [
+    {
+      "message": "Class field initializer has a complexity of 3. Maximum allowed is 2.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 13`] = `
+{
+  "code": "class C { x = () => a || b || c; }",
+  "diagnostics": [
+    {
+      "message": "Method 'x' has a complexity of 3. Maximum allowed is 2.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 14`] = `
+{
+  "code": "class C { static { a || b; }  }",
+  "diagnostics": [
+    {
+      "message": "Class static block has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 15`] = `
+{
+  "code": "class C { static { a || b || c || d; } static { e || f || g; } }",
+  "diagnostics": [
+    {
+      "message": "Class static block has a complexity of 4. Maximum allowed is 3.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 16`] = `
+{
+  "code": "function a(b) { b?.c; }",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 17`] = `
+{
+  "code": "function a(b) { b?.c?.d; }",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 3. Maximum allowed is 2.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 18`] = `
+{
+  "code": "function a(b) { b?.c?.()?.(); }",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 4. Maximum allowed is 3.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 19`] = `
+{
+  "code": "function a(b = '') {}",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 20`] = `
+{
+  "code": "function a(b) { const { c = '' } = b; }",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 2. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 21`] = `
+{
+  "code": "function a(b) { const [ { c: d = '' } = {} ] = b; }",
+  "diagnostics": [
+    {
+      "message": "Function 'a' has a complexity of 3. Maximum allowed is 1.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`complexity > invalid 22`] = `
+{
+  "code": "function foo() {
+    if (a) {
+        if (b) {
+            if (c) {
+            }
+        }
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has a complexity of 4. Maximum allowed is 2.",
+      "messageId": "complex",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "complexity",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
