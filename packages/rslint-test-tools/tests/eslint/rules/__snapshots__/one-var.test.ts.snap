@@ -247,7 +247,7 @@ exports[`one-var > invalid 10`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 8,
           "line": 1,
         },
       },
