@@ -1,0 +1,1019 @@
+// Rstest Snapshot v1
+
+exports[`no-unexpected-multiline > invalid 1`] = `
+{
+  "code": "var a = b
+(x || y).doSomething()",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 2`] = `
+{
+  "code": "var a = (a || b)
+(x || y).doSomething()",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 3`] = `
+{
+  "code": "var a = (a || b)
+(x).doSomething()",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 4`] = `
+{
+  "code": "var a = b
+[a, b, c].forEach(doSomething)",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 5`] = `
+{
+  "code": "var a = b
+    (x || y).doSomething()",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 6`] = `
+{
+  "code": "var a = b
+  [a, b, c].forEach(doSomething)",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 7`] = `
+{
+  "code": "let x = function() {}
+ \`hello\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 2,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 8`] = `
+{
+  "code": "let x = function() {}
+x
+\`hello\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 9`] = `
+{
+  "code": "x
+.y
+z
+\`Invalid Test Case\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 10`] = `
+{
+  "code": "
+                foo
+                / bar /gym
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 11`] = `
+{
+  "code": "
+                foo
+                / bar /g
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 12`] = `
+{
+  "code": "
+                foo
+                / bar /g.test(baz)
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 13`] = `
+{
+  "code": "
+                foo
+                /bar/gimuygimuygimuy.test(baz)
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 14`] = `
+{
+  "code": "
+                foo
+                /bar/s.test(baz)
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 15`] = `
+{
+  "code": "const x = aaaa<
+  test
+>/*
+test
+*/\`foo\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 16`] = `
+{
+  "code": "class C { field1 = obj
+[field2]; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 17`] = `
+{
+  "code": "class C { field1 = function() {}
+[field2]; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 18`] = `
+{
+  "code": "var a = foo
+(function () {})()",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 19`] = `
+{
+  "code": "const x = arr
+[0]",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 20`] = `
+{
+  "code": "obj.a.b.c
+[d]",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 21`] = `
+{
+  "code": "fn().g()
+\`x\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 22`] = `
+{
+  "code": "obj[k]
+(x)",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 23`] = `
+{
+  "code": "b!
+[c]",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 24`] = `
+{
+  "code": "(b as any)
+(c)",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 25`] = `
+{
+  "code": "(x satisfies Foo)
+(y)",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 26`] = `
+{
+  "code": "(arr as const)
+[0]",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 27`] = `
+{
+  "code": "foo
+/bar/gimsuy",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 28`] = `
+{
+  "code": "x
+/y/i",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 29`] = `
+{
+  "code": "foo /* x */
+/ bar /g",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between numerator and division operator.",
+      "messageId": "division",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 30`] = `
+{
+  "code": "tag
+\`hi\${x}!\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 31`] = `
+{
+  "code": "tag(x)
+\`hello\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 32`] = `
+{
+  "code": "fn?.(x)
+\`hello\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 33`] = `
+{
+  "code": "a?.b
+(c)",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between function and ( of function call.",
+      "messageId": "function",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 34`] = `
+{
+  "code": "var a = b
+
+
+[c]",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 35`] = `
+{
+  "code": "tag(x)
+
+\`hi\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between template tag and template literal.",
+      "messageId": "taggedTemplate",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 36`] = `
+{
+  "code": "class C { field = obj.method()
+[k]; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unexpected-multiline > invalid 37`] = `
+{
+  "code": "class C { field = tag\`x\`
+[k]; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected newline between object and [ of property access.",
+      "messageId": "property",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unexpected-multiline",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

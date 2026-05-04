@@ -216,6 +216,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
@@ -746,6 +747,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
 	GlobalRuleRegistry.Register("require-yield", require_yield.RequireYieldRule)
 	GlobalRuleRegistry.Register("symbol-description", symbol_description.SymbolDescriptionRule)
+	GlobalRuleRegistry.Register("no-unexpected-multiline", no_unexpected_multiline.NoUnexpectedMultilineRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
