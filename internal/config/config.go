@@ -191,6 +191,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
+	"github.com/web-infra-dev/rslint/internal/rules/no_nonoctal_decimal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
@@ -679,6 +680,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-multi-assign", no_multi_assign.NoMultiAssignRule)
 	GlobalRuleRegistry.Register("no-multi-str", no_multi_str.NoMultiStrRule)
 	GlobalRuleRegistry.Register("no-nested-ternary", no_nested_ternary.NoNestedTernaryRule)
+	GlobalRuleRegistry.Register("no-nonoctal-decimal-escape", no_nonoctal_decimal_escape.NoNonoctalDecimalEscapeRule)
 	GlobalRuleRegistry.Register("no-octal", no_octal.NoOctalRule)
 	GlobalRuleRegistry.Register("no-octal-escape", no_octal_escape.NoOctalEscapeRule)
 	GlobalRuleRegistry.Register("no-param-reassign", no_param_reassign.NoParamReassignRule)
