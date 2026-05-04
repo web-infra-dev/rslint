@@ -318,6 +318,7 @@ export default defineConfig({
     './tests/eslint/rules/no-useless-backreference.test.ts',
     './tests/eslint/rules/no-useless-call.test.ts',
     './tests/eslint/rules/no-useless-catch.test.ts',
+    './tests/eslint/rules/no-useless-escape.test.ts',
     './tests/eslint/rules/no-useless-rename.test.ts',
     './tests/eslint/rules/no-useless-constructor.test.ts',
     './tests/eslint/rules/no-prototype-builtins.test.ts',

@@ -325,3 +325,7 @@ brefs
 backref
 backrefs
 gimuygimuygimuy
+neighbour
+metacharacters
+CHARCLASS
+CLASSSET

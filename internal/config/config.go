@@ -228,8 +228,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
-	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
@@ -742,6 +743,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-useless-backreference", no_useless_backreference.NoUselessBackreferenceRule)
 	GlobalRuleRegistry.Register("no-useless-call", no_useless_call.NoUselessCallRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
+	GlobalRuleRegistry.Register("no-useless-escape", no_useless_escape.NoUselessEscapeRule)
 	GlobalRuleRegistry.Register("no-useless-rename", no_useless_rename.NoUselessRenameRule)
 	GlobalRuleRegistry.Register("no-useless-constructor", no_useless_constructor.NoUselessConstructorRule)
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
