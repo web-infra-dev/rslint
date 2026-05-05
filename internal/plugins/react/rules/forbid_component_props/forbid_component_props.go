@@ -91,6 +91,10 @@ func parseOptions(options any) *forbidConfig {
 // set mirrors `Map.prototype.set`: re-setting an existing key replaces the
 // value but preserves the original insertion position. Pattern iteration in
 // `getPropOptions` walks `ordered` so the order is observable.
+//
+// The replace path scans `ordered` linearly (O(n)). `forbid` configs are
+// expected to be small (typically ≤10 entries in real configs), so a linear
+// scan is preferred over carrying a parallel index map purely for replace.
 func (c *forbidConfig) set(key string, e *forbidEntry) {
 	if _, exists := c.byKey[key]; exists {
 		for i, prev := range c.ordered {
@@ -191,6 +195,20 @@ type tagShape struct {
 //	const tag = parentName.name || `${parentName.object.name}.${parentName.property.name}`;
 //	const componentName = parentName.name || parentName.property.name;
 //
+// JSX tag-name grammar (tsgo `parseJsxElementName`, parser.go:4948) restricts
+// the receiver to one of:
+//   - `Identifier`            — `<Foo>`
+//   - `ThisKeyword`           — `<this>` / `<this.X>`
+//   - `JsxNamespacedName`     — `<ns:Name>`
+//   - `PropertyAccessExpression` whose own `.Expression` is recursively one
+//     of the above — `<Foo.Bar>`, `<Foo.Bar.Baz>`
+//
+// Expression wrappers like `(X)`, `X as T`, `X!`, `X satisfies T`, `<T>x` are
+// REJECTED by the parser at JSX-tag-name position (they're parsed as ordinary
+// expressions only outside of JSX tag names). Therefore no `SkipParentheses`
+// / `SkipExpressionWrappers` pass is needed when walking `pa.Expression` — a
+// wrapper kind is unreachable here.
+//
 // Two upstream behaviors are mirrored exactly so allow/disallow lists match
 // byte-for-byte:
 //
@@ -236,8 +254,12 @@ func getTagShape(tagName *ast.Node) (tagShape, bool) {
 		case ast.KindThisKeyword:
 			baseText = "this"
 		default:
-			// Mirror upstream's `${undefined}.<prop>` for chains deeper than
-			// two segments (e.g. `<Foo.Bar.Baz />`).
+			// Per the grammar note above, the only remaining shape here is
+			// `pa.Expression` being itself a `PropertyAccessExpression` —
+			// i.e. chains deeper than two segments (`<Foo.Bar.Baz />`).
+			// Upstream produces `"undefined.<prop>"` for that case because
+			// `parentName.object.name` is undefined when `object` is itself
+			// a member expression; mirror it byte-for-byte.
 			baseText = "undefined"
 		}
 		return tagShape{tag: baseText + "." + propText, componentName: propText}, true

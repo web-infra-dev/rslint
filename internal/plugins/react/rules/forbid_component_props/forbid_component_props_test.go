@@ -308,6 +308,15 @@ func TestForbidComponentPropsRule(t *testing.T) {
 		// ---- Additional edge cases (Dimension 4 universal edge shapes) ----
 		// `<Foo.bar>` — rightmost lowercase, treated as DOM. tag = "Foo.bar".
 		{Code: `<Foo.bar className="x" />;`, Tsx: true},
+		// Bare `<this />` — KindThisKeyword tag; `componentName = "this"` is
+		// lowercase, so the DOM-skip path fires and the prop is not checked
+		// (matches upstream where `parentName.name === "this"` and
+		// `"this"[0] === "t"` is lowercase).
+		{Code: `<this bar="x" />;`, Tsx: true},
+		// Bare `<this className="x" />` — same DOM-skip path. Even though
+		// `className` is in default forbid, the lowercase componentName
+		// short-circuits the rule.
+		{Code: `<this className="x" />;`, Tsx: true},
 		// `<a.B>` — rightmost uppercase, NOT DOM. tag = "a.B"; allowedFor
 		// matches by exact string.
 		{

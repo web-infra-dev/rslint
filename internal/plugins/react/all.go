@@ -2,6 +2,7 @@ package react_plugin
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
@@ -19,7 +20,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_access_state_in_setstate"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
@@ -58,6 +58,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		button_has_type.ButtonHasTypeRule,
+		forbid_component_props.ForbidComponentPropsRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
 		jsx_equals_spacing.JsxEqualsSpacingRule,
@@ -75,7 +76,6 @@ func GetAllRules() []rule.Rule {
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
 		no_access_state_in_setstate.NoAccessStateInSetstateRule,
-		forbid_component_props.ForbidComponentPropsRule,
 		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
 		no_danger_with_children.NoDangerWithChildrenRule,
