@@ -2164,44 +2164,95 @@ func IsCreateElementCallWithChecker(callee *ast.Node, pragma string, tc *checker
 }
 
 func isCreateElementCallCore(callee *ast.Node, pragma string, tc *checker.Checker) bool {
+	return isPragmaFactoryCallCore(callee, pragma, tc, createElementOnly, false)
+}
+
+// IsCreateOrCloneElementCall reports whether the callee resolves to
+// `<pragma>.createElement` / `<pragma>.cloneElement` (configured pragma)
+// or — when `tc` is non-nil — a bare `createElement` / `cloneElement`
+// identifier imported / destructured from the pragma module. Mirrors
+// upstream `eslint-plugin-react`'s `isCreateCloneElement` predicate used
+// by `no-array-index-key`, INCLUDING upstream's acceptance of optional
+// chains (`React?.cloneElement(...)`) — upstream listens on
+// `'CallExpression, OptionalCallExpression'` and gates on
+// `node.type === 'MemberExpression' || node.type === 'OptionalMemberExpression'`.
+//
+// Parens are skipped on the pragma sub-expression so `(React).cloneElement`
+// is recognized (ESTree flattens parens). TS-only expression wrappers
+// (`as` / `satisfies` / `<T>x` / `x!`) on the pragma identifier are NOT
+// skipped — that would over-match relative to ESLint's JS-only AST and
+// is a divergence we deliberately avoid.
+func IsCreateOrCloneElementCall(callee *ast.Node, pragma string, tc *checker.Checker) bool {
+	return isPragmaFactoryCallCore(callee, pragma, tc, createOrCloneElement, true)
+}
+
+type pragmaFactoryNames int
+
+const (
+	createElementOnly pragmaFactoryNames = iota
+	createOrCloneElement
+)
+
+func (k pragmaFactoryNames) matches(name string) bool {
+	switch k {
+	case createElementOnly:
+		return name == "createElement"
+	case createOrCloneElement:
+		return name == "createElement" || name == "cloneElement"
+	}
+	return false
+}
+
+func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checker, names pragmaFactoryNames, allowOptionalChain bool) bool {
 	if callee == nil {
 		return false
 	}
 	if pragma == "" {
 		pragma = DefaultReactPragma
 	}
-	callee = SkipExpressionWrappers(callee)
+	// `IsCreateElementCall` (the public-named variant used by other rules)
+	// historically peels TS expression wrappers off the callee itself —
+	// keep that branch intact for backwards compatibility.
+	// `IsCreateOrCloneElementCall`, used by `no-array-index-key`, mirrors
+	// ESLint's JS-only AST and only skips parentheses on the callee.
+	if names == createElementOnly {
+		callee = SkipExpressionWrappers(callee)
+	} else {
+		callee = ast.SkipParentheses(callee)
+	}
 
-	// Bare callee: `createElement(arg)` — recognize when destructured
-	// from the pragma module. Mirrors upstream's second branch of
-	// `isCreateElement`.
+	// Bare callee: `createElement(arg)` / `cloneElement(arg)` — recognized
+	// only when destructured from the pragma module. Mirrors upstream's
+	// second branch of `isCreateElement` / `isCreateCloneElement`.
 	if callee.Kind == ast.KindIdentifier {
-		if callee.AsIdentifier().Text != "createElement" {
+		if !names.matches(callee.AsIdentifier().Text) {
 			return false
 		}
-		// Without a TypeChecker we can't resolve the binding; bail to
-		// match the conservative non-import-aware path (upstream also
-		// returns false when the destructure gate fails).
 		return IsDestructuredFromPragmaImport(callee, pragma, tc)
 	}
 
-	// Member-access callee: `<pragma>.createElement(arg)`.
+	// Member-access callee: `<pragma>.<name>(arg)`.
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	if ast.IsOptionalChain(callee) {
+	if !allowOptionalChain && ast.IsOptionalChain(callee) {
 		return false
 	}
 	prop := callee.AsPropertyAccessExpression()
 	nameNode := prop.Name()
-	if nameNode.Kind != ast.KindIdentifier || nameNode.AsIdentifier().Text != "createElement" {
+	if nameNode.Kind != ast.KindIdentifier || !names.matches(nameNode.AsIdentifier().Text) {
 		return false
 	}
-	pragmaExpr := SkipExpressionWrappers(prop.Expression)
-	if pragmaExpr.Kind != ast.KindIdentifier || pragmaExpr.AsIdentifier().Text != pragma {
-		return false
+	// Pragma sub-expression: `IsCreateElementCall` historically peels TS
+	// wrappers; `IsCreateOrCloneElementCall` only peels parens to match
+	// ESLint's JS-only AST exactly.
+	var pragmaExpr *ast.Node
+	if names == createElementOnly {
+		pragmaExpr = SkipExpressionWrappers(prop.Expression)
+	} else {
+		pragmaExpr = ast.SkipParentheses(prop.Expression)
 	}
-	return true
+	return pragmaExpr.Kind == ast.KindIdentifier && pragmaExpr.AsIdentifier().Text == pragma
 }
 
 // GetJsxPropName returns the display name of a JSX node.
