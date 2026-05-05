@@ -662,6 +662,12 @@ func DefaultComponentWrappers(pragma string) []ComponentWrapperEntry {
 //   - object: {"property": "memo", "object": "React"} →
 //     {Object: "React", Property: "memo"}; "object" defaults to empty
 //     (bare call) when omitted
+//   - object with `"object": "<pragma>"` placeholder — upstream's
+//     `getWrapperFunctions` (Components.js) substitutes the placeholder
+//     with the configured pragma at read time, so users can write
+//     `{property: 'memo', object: '<pragma>'}` and have it match
+//     whichever pragma the file is configured with. We mirror that
+//     substitution exactly.
 //
 // Unknown / malformed entries are silently ignored, matching upstream.
 func GetComponentWrapperFunctions(settings map[string]interface{}, pragma string) []ComponentWrapperEntry {
@@ -672,6 +678,10 @@ func GetComponentWrapperFunctions(settings map[string]interface{}, pragma string
 	raw, ok := settings["componentWrapperFunctions"]
 	if !ok {
 		return out
+	}
+	resolvedPragma := pragma
+	if resolvedPragma == "" {
+		resolvedPragma = DefaultReactPragma
 	}
 	add := func(v interface{}) {
 		switch e := v.(type) {
@@ -685,6 +695,9 @@ func GetComponentWrapperFunctions(settings map[string]interface{}, pragma string
 				return
 			}
 			obj, _ := e["object"].(string)
+			if obj == "<pragma>" {
+				obj = resolvedPragma
+			}
 			out = append(out, ComponentWrapperEntry{Object: obj, Property: prop, IsUserConfigured: true})
 		}
 	}
@@ -765,25 +778,51 @@ func matchesAnyComponentWrapperCore(call, fn *ast.Node, wrappers []ComponentWrap
 		}
 		switch callee.Kind {
 		case ast.KindIdentifier:
-			if w.Object != "" {
-				continue
-			}
 			if callee.AsIdentifier().Text != w.Property {
 				continue
 			}
-			if w.IsUserConfigured {
-				// User-configured bare entry: accept any callee shape
-				// (call-level optional included). User entries don't
-				// need the pragma-import gate since they're explicit
-				// opt-in.
+			if w.Object == "" {
+				if w.IsUserConfigured {
+					// User-configured bare entry: accept any callee shape
+					// (call-level optional included). User entries don't
+					// need the pragma-import gate since they're explicit
+					// opt-in.
+					return true
+				}
+				// Hardcoded bare default (memo / forwardRef without
+				// object): upstream gates with
+				// `isDestructuredFromPragmaImport`. We always run that
+				// gate — when a TypeChecker is available it resolves
+				// the binding precisely, and when not it falls back to
+				// a syntax-only SourceFile scan that handles the
+				// canonical top-level pragma-import shapes.
+				if !IsDestructuredFromPragmaImport(callee, pragma, tc) {
+					continue
+				}
 				return true
 			}
-			// Hardcoded bare default (memo / forwardRef without object):
-			// upstream gates with `isDestructuredFromPragmaImport`. We
-			// always run that gate — when a TypeChecker is available
-			// it resolves the binding precisely, and when not it falls
-			// back to a syntax-only SourceFile scan that handles the
-			// canonical top-level pragma-import shapes.
+			// Entry HAS an Object — upstream's bare-callee arm:
+			//
+			//   wrapperFunction.property === node.callee.name && (
+			//     !wrapperFunction.object
+			//     || (wrapperFunction.object === pragma &&
+			//         this.isDestructuredFromPragmaImport(node, node.callee.name))
+			//   )
+			//
+			// translates to: when the entry's Object equals the active
+			// pragma AND the bare identifier callee is destructured /
+			// imported / required from the pragma module, the entry
+			// still matches even though `node.callee` is not a
+			// MemberExpression. This covers e.g.
+			// `componentWrapperFunctions: [{property: 'observer', object: '<pragma>'}]`
+			// + `import { observer } from 'react'` + `observer(arrow)`.
+			effectivePragma := pragma
+			if effectivePragma == "" {
+				effectivePragma = DefaultReactPragma
+			}
+			if w.Object != effectivePragma {
+				continue
+			}
 			if !IsDestructuredFromPragmaImport(callee, pragma, tc) {
 				continue
 			}
@@ -1616,10 +1655,21 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 		}
 	}
 
-	// Branch 16 — Property parent + returns only null ⇒ undefined. Already
-	// handled by Branch 10 when !id & !computed (strict isReturningJSX
-	// rejects null-only). The final `return node` for anonymous allowed-
-	// position fallbacks remains.
+	// Branch 16 — Property parent + returns only null ⇒ undefined.
+	// Upstream's tail check:
+	//
+	//   if (parent.type === 'Property' && utils.isReturningOnlyNull(node)) {
+	//     return undefined;
+	//   }
+	//
+	// This is reachable for shapes Branch 10 doesn't filter — anonymous
+	// arrow with a COMPUTED key (`{ [k]: () => null }`) and named FE
+	// values (`{ Foo: function Bar() { return null; } }` once Branch 14's
+	// id-capitalization check has passed). Both cases must fall through
+	// to here and get rejected when the body returns only `null`.
+	if parent.Kind == ast.KindPropertyAssignment && functionReturnsOnlyNull(fn) {
+		return false
+	}
 	return true
 }
 
@@ -2755,6 +2805,253 @@ func IsPropWrapperCall(call *ast.Node, wrappers []PropWrapperEntry) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+// IsFunctionLikeForComponent reports whether `node` is a function-shaped node
+// the React component-detection pipeline classifies as a "potential
+// component" candidate. Covers FunctionDeclaration / FunctionExpression /
+// ArrowFunction and the object-literal shorthand MethodDeclaration /
+// GetAccessor / SetAccessor (upstream's ESTree shape exposes these as a
+// `Property { method: true, value: FunctionExpression }`). Class methods
+// share the same Kind values but are not function-shaped *components*; rule
+// callers gate by parent / context where that matters.
+func IsFunctionLikeForComponent(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindFunctionDeclaration,
+		ast.KindFunctionExpression,
+		ast.KindArrowFunction,
+		ast.KindMethodDeclaration,
+		ast.KindGetAccessor,
+		ast.KindSetAccessor:
+		return true
+	}
+	return false
+}
+
+// JSXRootTagName returns the tag-name of a JsxElement / JsxSelfClosingElement
+// (peeling paren / TS wrappers) when it's a plain Identifier, or "" otherwise.
+// Member-expression tag-names (`<Foo.Bar />`) and namespaced names
+// (`<svg:circle/>`) intentionally return "" — upstream's
+// `getComponentNameFromJSXElement` only matches plain identifiers via the
+// detected-components list keyed by the binding's local name.
+func JSXRootTagName(expr *ast.Node) string {
+	expr = SkipExpressionWrappers(expr)
+	if expr == nil {
+		return ""
+	}
+	var tag *ast.Node
+	switch expr.Kind {
+	case ast.KindJsxElement:
+		opening := expr.AsJsxElement().OpeningElement
+		if opening != nil {
+			tag = opening.AsJsxOpeningElement().TagName
+		}
+	case ast.KindJsxSelfClosingElement:
+		tag = expr.AsJsxSelfClosingElement().TagName
+	default:
+		return ""
+	}
+	if tag == nil || tag.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return tag.AsIdentifier().Text
+}
+
+// ReturnedJSXRootTagName extracts the root JSX tag name from a function's
+// body — covers both the concise-body case (`() => <Foo/>`) and the
+// block-body case where the FIRST top-level ReturnStatement is inspected.
+// Returns empty string when the body doesn't return a JSX element directly.
+func ReturnedJSXRootTagName(fn *ast.Node) string {
+	if fn == nil {
+		return ""
+	}
+	var body *ast.Node
+	switch fn.Kind {
+	case ast.KindArrowFunction:
+		body = fn.AsArrowFunction().Body
+	case ast.KindFunctionExpression:
+		body = fn.AsFunctionExpression().Body
+	case ast.KindFunctionDeclaration:
+		body = fn.AsFunctionDeclaration().Body
+	default:
+		return ""
+	}
+	if body == nil {
+		return ""
+	}
+	if body.Kind == ast.KindBlock {
+		var ret *ast.Node
+		body.ForEachChild(func(child *ast.Node) bool {
+			if child.Kind == ast.KindReturnStatement {
+				ret = child
+				return true
+			}
+			return false
+		})
+		if ret == nil {
+			return ""
+		}
+		return JSXRootTagName(ret.AsReturnStatement().Expression)
+	}
+	return JSXRootTagName(body)
+}
+
+// SourceHasComponentNamedBefore scans `root`'s subtree for a sibling/outer
+// component declaration whose name equals `name` and whose start position
+// precedes `before`. Mirrors upstream's `getDetectedComponents` filter —
+// only `class` declarations and arrow-assigned-to-VariableDeclarator
+// declarations qualify; function declarations do NOT (upstream's filter
+// in `Components.js getDetectedComponents` only retains those two kinds).
+// The position gate replicates upstream's order-dependence: a sibling
+// declared AFTER the use site has not yet been added to the components
+// list when `isPragmaComponentWrapper` runs, so it must not match here
+// either.
+func SourceHasComponentNamedBefore(root *ast.Node, name string, before int) bool {
+	if root == nil || name == "" {
+		return false
+	}
+	var found bool
+	var visit func(n *ast.Node)
+	visit = func(n *ast.Node) {
+		if found || n == nil {
+			return
+		}
+		if n.Pos() >= before {
+			return
+		}
+		switch n.Kind {
+		case ast.KindClassDeclaration:
+			id := n.Name()
+			if id != nil && id.Kind == ast.KindIdentifier && id.AsIdentifier().Text == name {
+				found = true
+				return
+			}
+		case ast.KindVariableDeclaration:
+			vd := n.AsVariableDeclaration()
+			if vd.Initializer == nil {
+				break
+			}
+			init := SkipExpressionWrappers(vd.Initializer)
+			if init == nil || init.Kind != ast.KindArrowFunction {
+				break
+			}
+			id := vd.Name()
+			if id != nil && id.Kind == ast.KindIdentifier && id.AsIdentifier().Text == name {
+				found = true
+				return
+			}
+		}
+		n.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return found
+		})
+	}
+	visit(root)
+	return found
+}
+
+// WrapperWrapsKnownSiblingComponent reports whether `call` is a
+// MemberExpression-callee wrapper (e.g. `React.memo(arrow)`) whose
+// FunctionLike argument's body returns JSX whose root tag-name matches a
+// sibling/outer arrow-assigned-to-VariableDeclarator or ClassDeclaration in
+// the same source file declared before `call`. Mirrors upstream's
+// `nodeWrapsComponent` gate inside `isPragmaComponentWrapper`, which is
+// intentionally name-based (not symbol-based) and only applied to the
+// MemberExpression form of the wrapper. The bare-callee form
+// (`memo(...)` after `import { memo } from 'react'`) is NOT gated this way
+// upstream and must NOT be gated here either.
+func WrapperWrapsKnownSiblingComponent(call *ast.Node, fn *ast.Node) bool {
+	if call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	expr := call.AsCallExpression().Expression
+	if expr == nil || expr.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	tag := ReturnedJSXRootTagName(fn)
+	if tag == "" {
+		return false
+	}
+	src := ast.GetSourceFileOfNode(call)
+	if src == nil {
+		return false
+	}
+	return SourceHasComponentNamedBefore(src.AsNode(), tag, call.Pos())
+}
+
+// IsDetectedComponent reports whether `node` looks like a React component the
+// upstream `Components.detect` pipeline would classify with confidence ≥ 2 —
+// i.e. would surface in `components.list()`. Mirrors `components.get(node)`
+// for the four AST kinds upstream's detection visits:
+//
+//   - FunctionDeclaration / FunctionExpression / ArrowFunction (and the
+//     object-shorthand Method / Get / Set forms): defers to
+//     IsStatelessReactComponentWithWrappers, with a fallback for
+//     user-configured wrappers that the hardcoded memo/forwardRef branch
+//     wouldn't catch on its own.
+//   - ClassDeclaration / ClassExpression: an extends clause that resolves to
+//     `<pragma>.Component` / `Component`.
+//   - ObjectLiteralExpression: the argument shape of `<createClass>(...)`
+//     (ES5 component).
+//   - CallExpression: matches a configured wrapper, has a FunctionLike first
+//     argument, and is not a MemberExpression wrapper around a body whose
+//     root JSX tag refers to a sibling/outer detected component
+//     (`nodeWrapsComponent` gate — see WrapperWrapsKnownSiblingComponent).
+//
+// Note that this function returns true for the inner FunctionLike of a
+// pragma-wrapper call AND for the wrapper CallExpression itself — the same
+// dual classification upstream produces (the inner arrow's
+// `getStatelessComponent` redirects to the outer call, while the outer
+// CallExpression listener also runs). Callers that need single-component
+// identity must dedupe by node pointer or by remapping inner FunctionLike
+// to its enclosing wrapper call (see no-multi-comp's collection pass for
+// the canonical pattern).
+func IsDetectedComponent(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry, tc *checker.Checker) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindFunctionDeclaration,
+		ast.KindFunctionExpression,
+		ast.KindArrowFunction,
+		ast.KindMethodDeclaration,
+		ast.KindGetAccessor,
+		ast.KindSetAccessor:
+		if IsStatelessReactComponentWithWrappers(node, pragma, tc, wrappers) {
+			return true
+		}
+		parent := SkipExpressionWrappersUp(node)
+		if parent != nil && parent.Kind == ast.KindCallExpression &&
+			MatchesAnyComponentWrapperWithChecker(parent, node, wrappers, pragma, tc) &&
+			FunctionReturnsJSXOrNullWithChecker(node, pragma, tc) {
+			return true
+		}
+		return false
+	case ast.KindClassDeclaration, ast.KindClassExpression:
+		return ExtendsReactComponent(node, pragma)
+	case ast.KindObjectLiteralExpression:
+		return IsCreateReactClassObjectArg(node, pragma, createClass)
+	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+			return false
+		}
+		inner := SkipExpressionWrappers(call.Arguments.Nodes[0])
+		if inner == nil || !IsFunctionLikeForComponent(inner) {
+			return false
+		}
+		if !MatchesAnyComponentWrapperWithChecker(node, inner, wrappers, pragma, tc) {
+			return false
+		}
+		if WrapperWrapsKnownSiblingComponent(node, inner) {
+			return false
+		}
+		return true
 	}
 	return false
 }

@@ -34,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_multi_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
@@ -96,6 +97,7 @@ func GetAllRules() []rule.Rule {
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
+		no_multi_comp.NoMultiCompRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
 		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
 		no_unused_state.NoUnusedStateRule,
