@@ -2975,7 +2975,12 @@ func WrapperWrapsKnownSiblingComponent(call *ast.Node, fn *ast.Node) bool {
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}
-	expr := call.AsCallExpression().Expression
+	// Paren / TS-wrapper transparent callee: `(R.memo)(arrow)` /
+	// `(R.memo as any)(arrow)` should still trip the gate because
+	// upstream's ESTree-flattened `node.callee.type === 'MemberExpression'`
+	// check sees the inner MemberExpression directly. tsgo preserves the
+	// wrapper, so we strip it before kind-checking.
+	expr := SkipExpressionWrappers(call.AsCallExpression().Expression)
 	if expr == nil || expr.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}

@@ -575,6 +575,18 @@ func TestNoMultiCompRule(t *testing.T) {
         class A extends React.Component { render() { return <div /> } }
       `, Tsx: true},
 
+		// ---- Lock-in: paren-wrapped MemberExpression wrapper callee + nodeWrapsComponent gate ----
+		// `(React.forwardRef)(arrow)` — paren wraps the MemberExpression
+		// callee. ESTree flattens parens so upstream sees
+		// `callee.type === 'MemberExpression'` and applies the
+		// nodeWrapsComponent gate. tsgo preserves the paren, so
+		// `WrapperWrapsKnownSiblingComponent` must skip it before the
+		// kind check or the gate misfires (over-reports).
+		{Code: `
+        class StoreListItem extends React.PureComponent {}
+        export default (React.forwardRef)((props, ref) => <StoreListItem {...props} forwardRef={ref} />);
+      `, Tsx: true},
+
 		// ---- Lock-in: async-generator object-literal shorthand method ----
 		// `{ async *Foo() { return <div/> } }` — upstream's FE listener
 		// (which fires on ESTree's `Property.value`) treats this as an
