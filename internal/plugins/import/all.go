@@ -1,6 +1,7 @@
 package import_plugin
 
 import (
+	default_rule "github.com/web-infra-dev/rslint/internal/plugins/import/rules/default"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/first"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/newline_after_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_duplicates"
@@ -12,6 +13,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		default_rule.DefaultRule,
 		first.FirstRule,
 		newline_after_import.NewlineAfterImportRule,
 		no_duplicates.NoDuplicatesRule,

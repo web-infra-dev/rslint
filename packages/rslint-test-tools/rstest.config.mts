@@ -76,6 +76,7 @@ export default defineConfig({
     './tests/eslint/rules/no-useless-computed-key.test.ts',
     './tests/eslint/rules/no-useless-concat.test.ts',
     // eslint-plugin-import
+    './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',

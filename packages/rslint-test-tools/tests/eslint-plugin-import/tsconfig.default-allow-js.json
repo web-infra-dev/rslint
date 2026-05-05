@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "target": "esnext",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "esModuleInterop": true,
+    "allowJs": true,
+    "lib": ["es2015", "es2017", "esnext"],
+    "experimentalDecorators": true
+  },
+  "include": ["src/virtual.tsx", "src/virtual.ts"]
+}

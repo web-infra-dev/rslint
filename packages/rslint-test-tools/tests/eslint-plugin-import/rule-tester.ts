@@ -45,6 +45,12 @@ interface TestCaseError {
 // Port from https://github.com/eslint/eslint/blob/34f0723e2d0faf8ac8dc95ec56e6d181bd6b67f2/lib/rule-tester/rule-tester.js#L1145
 
 export class RuleTester {
+  private readonly configRelPath: string;
+
+  constructor(options: { config?: string } = {}) {
+    this.configRelPath = options.config ?? './rslint.json';
+  }
+
   run(
     ruleName: string,
     rule: never,
@@ -54,9 +60,10 @@ export class RuleTester {
     },
   ) {
     ruleName = 'import/' + ruleName;
+    const configRelPath = this.configRelPath;
     describe(ruleName, () => {
       const cwd = process.cwd();
-      const config = path.resolve(import.meta.dirname, './rslint.json');
+      const config = path.resolve(import.meta.dirname, configRelPath);
 
       // test whether case has only
       let hasOnly =

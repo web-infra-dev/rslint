@@ -1,0 +1,17 @@
+[
+  {
+    "language": "javascript",
+    "files": [],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["./tsconfig.virtual.json"]
+      }
+    },
+    "settings": {
+      "import/ignore": ["named-exports"]
+    },
+    "rules": {},
+    "plugins": ["eslint-plugin-import"]
+  }
+]
