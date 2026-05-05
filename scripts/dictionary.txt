@@ -329,3 +329,6 @@ neighbour
 metacharacters
 CHARCLASS
 CLASSSET
+importutil
+xcompose
+nocomment
