@@ -331,3 +331,4 @@ metacharacters
 CHARCLASS
 CLASSSET
 unrepresentable
+fluentui

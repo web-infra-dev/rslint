@@ -1,6 +1,7 @@
 package react_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
@@ -28,9 +29,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
@@ -38,6 +36,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unknown_property"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
@@ -57,6 +58,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
 		forbid_component_props.ForbidComponentPropsRule,
 		jsx_boolean_value.JsxBooleanValueRule,

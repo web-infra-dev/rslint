@@ -92,7 +92,7 @@ func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
 			handleImportDecl(ctx, n, &propTypesPackageName, &reactPackageName)
 		case ast.KindClassDeclaration, ast.KindClassExpression:
 			if reactutil.ExtendsReactComponent(n, pragma) || hasJSDocExtendsReactComponent(n) {
-				if name := declName(n); name != "" {
+				if name := reactutil.BindingIdentifierName(n); name != "" {
 					componentsByName[name] = true
 				}
 			}
@@ -396,7 +396,7 @@ func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
 			if !ast.IsStatic(node) {
 				return
 			}
-			classNode := enclosingClass(node)
+			classNode := reactutil.EnclosingClass(node)
 			if classNode == nil || !reactutil.ExtendsReactComponent(classNode, pragma) {
 				return
 			}
@@ -620,30 +620,6 @@ func propertyValueNode(prop *ast.Node) *ast.Node {
 		// so shorthand is effectively a no-op there. For static-class-property
 		// typo detection the value is unused, so returning nil is fine.
 		return nil
-	}
-	return nil
-}
-
-// declName returns the identifier text of a named declaration (class or
-// function), or "" when the declaration is anonymous or the name is not a
-// bare Identifier.
-func declName(n *ast.Node) string {
-	name := n.Name()
-	if name == nil || name.Kind != ast.KindIdentifier {
-		return ""
-	}
-	return name.AsIdentifier().Text
-}
-
-// enclosingClass returns the nearest ClassDeclaration / ClassExpression
-// ancestor of `node`, or nil. Used to find the class of a PropertyDeclaration
-// so we can test the extends clause.
-func enclosingClass(node *ast.Node) *ast.Node {
-	for p := node.Parent; p != nil; p = p.Parent {
-		switch p.Kind {
-		case ast.KindClassDeclaration, ast.KindClassExpression:
-			return p
-		}
 	}
 	return nil
 }

@@ -2091,7 +2091,7 @@ func findInitializerInStatements(scope *ast.Node, name string) *ast.Node {
 // name (`lib/util/isFirstLetterCapitalized.js`). The semantics are:
 //
 //  1. Strip leading underscores: `_Foo` → "Foo" (so `_Foo` is treated the
-//     same as `Foo`, matching upstream's `word.replace(/^_+/, '')`).
+//     same as `Foo`, matching upstream's `word.replace(/^_+/, ”)`).
 //  2. A character is "capitalized" iff `unicode.ToUpper(r) == r` —
 //     equivalent to upstream's `firstLetter.toUpperCase() === firstLetter`.
 //
@@ -2514,4 +2514,199 @@ func IsJsxLike(node *ast.Node) bool {
 		return false
 	}
 	return IsJsxElementLike(node) || ast.IsJsxFragment(node)
+}
+
+// EnclosingClass returns the nearest ClassDeclaration / ClassExpression
+// ancestor of `node`, or nil when `node` is at the top level. Used by rules
+// that need to test whether a class member belongs to a React component.
+func EnclosingClass(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	for p := node.Parent; p != nil; p = p.Parent {
+		switch p.Kind {
+		case ast.KindClassDeclaration, ast.KindClassExpression:
+			return p
+		}
+	}
+	return nil
+}
+
+// BindingIdentifierName returns the identifier text of a named declaration's
+// binding, or "" when the declaration is anonymous, the binding is a pattern
+// rather than a bare Identifier, or `n` is nil.
+func BindingIdentifierName(n *ast.Node) string {
+	if n == nil {
+		return ""
+	}
+	name := n.Name()
+	if name == nil || name.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return name.AsIdentifier().Text
+}
+
+// FunctionParameters returns the parameter list of a function-like node
+// (FunctionDeclaration / FunctionExpression / ArrowFunction). Returns nil
+// for nil input or any other node kind. Methods / accessors / constructors
+// are intentionally not covered — callers that need them should add the
+// kind explicitly to keep this helper a thin shim over the common shapes.
+func FunctionParameters(fn *ast.Node) []*ast.Node {
+	if fn == nil {
+		return nil
+	}
+	switch fn.Kind {
+	case ast.KindFunctionDeclaration:
+		fd := fn.AsFunctionDeclaration()
+		if fd.Parameters == nil {
+			return nil
+		}
+		return fd.Parameters.Nodes
+	case ast.KindFunctionExpression:
+		fe := fn.AsFunctionExpression()
+		if fe.Parameters == nil {
+			return nil
+		}
+		return fe.Parameters.Nodes
+	case ast.KindArrowFunction:
+		af := fn.AsArrowFunction()
+		if af.Parameters == nil {
+			return nil
+		}
+		return af.Parameters.Nodes
+	}
+	return nil
+}
+
+// FirstParamType returns the type annotation of the first parameter of `fn`
+// (a FunctionDeclaration / FunctionExpression / ArrowFunction), or nil when
+// the function has no parameters or the first parameter is untyped.
+func FirstParamType(fn *ast.Node) *ast.Node {
+	params := FunctionParameters(fn)
+	if len(params) == 0 {
+		return nil
+	}
+	pd := params[0].AsParameterDeclaration()
+	if pd == nil {
+		return nil
+	}
+	return pd.Type
+}
+
+// PropWrapperEntry encodes one entry of `settings.propWrapperFunctions`. The
+// raw entries can be either a bare string (`"forbidExtraProps"`) or an
+// `{object, property}` pair (`{ object: "Object", property: "assign" }` →
+// matches `Object.assign(...)`). Both shapes are normalized to this struct.
+type PropWrapperEntry struct {
+	// Object is the receiver portion of a member-call wrapper (e.g.
+	// `"Object"` for `Object.assign`). Empty for bare-identifier wrappers.
+	Object string
+	// Property is the function name (e.g. `"assign"` for `Object.assign`,
+	// or `"forbidExtraProps"` for a bare-identifier wrapper).
+	Property string
+}
+
+// GetPropWrapperFunctions reads `settings.propWrapperFunctions` from the
+// rslint config and returns the parsed entries. Unknown shapes (a non-array
+// value, an entry that's neither a string nor a `{object, property}` map,
+// an entry with empty `property`) are silently dropped — this matches
+// eslint-plugin-react's `propWrapperUtil` permissive parsing.
+func GetPropWrapperFunctions(settings map[string]interface{}) []PropWrapperEntry {
+	v, ok := settings["propWrapperFunctions"]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	var out []PropWrapperEntry
+	for _, entry := range arr {
+		switch t := entry.(type) {
+		case string:
+			if t != "" {
+				if dot := strings.IndexByte(t, '.'); dot > 0 && dot < len(t)-1 {
+					// Allow `"Object.assign"` style strings (legacy upstream
+					// shape) by splitting on the first dot.
+					out = append(out, PropWrapperEntry{Object: t[:dot], Property: t[dot+1:]})
+				} else {
+					out = append(out, PropWrapperEntry{Property: t})
+				}
+			}
+		case map[string]interface{}:
+			obj, _ := t["object"].(string)
+			prop, _ := t["property"].(string)
+			if prop == "" {
+				continue
+			}
+			out = append(out, PropWrapperEntry{Object: obj, Property: prop})
+		}
+	}
+	return out
+}
+
+// IsPropWrapperCall reports whether `call` is a CallExpression whose callee
+// matches one of the user-configured `propWrapperFunctions` entries.
+//
+// Supports:
+//   - bare identifier callees: `forbidExtraProps(...)`, `merge(...)` —
+//     match an entry with empty `Object`.
+//   - dotted-property callees: `Object.assign(...)`, `_.assign(...)` —
+//     match an entry whose `Object` and `Property` both equal the receiver
+//     and method names respectively.
+//
+// `call` may be wrapped in parens / TS expression wrappers; the callee is
+// unwrapped via `SkipExpressionWrappers`. Anything more complex (computed
+// access, optional-chain wrappers around the callee head) is treated as
+// not matching.
+func IsPropWrapperCall(call *ast.Node, wrappers []PropWrapperEntry) bool {
+	if len(wrappers) == 0 || call == nil || call.Kind != ast.KindCallExpression {
+		return false
+	}
+	callee := SkipExpressionWrappers(call.AsCallExpression().Expression)
+	switch callee.Kind {
+	case ast.KindIdentifier:
+		name := callee.AsIdentifier().Text
+		for _, w := range wrappers {
+			if w.Object == "" && w.Property == name {
+				return true
+			}
+		}
+	case ast.KindPropertyAccessExpression:
+		pa := callee.AsPropertyAccessExpression()
+		obj := SkipExpressionWrappers(pa.Expression)
+		nameNode := pa.Name()
+		if obj.Kind != ast.KindIdentifier || nameNode == nil || nameNode.Kind != ast.KindIdentifier {
+			return false
+		}
+		objText := obj.AsIdentifier().Text
+		propText := nameNode.AsIdentifier().Text
+		for _, w := range wrappers {
+			if w.Object == objText && w.Property == propText {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// EntityNameRightmost returns the rightmost Identifier of a TypeReference's
+// EntityName. For a bare `Foo`, returns `Foo`. For `A.B.C`, returns `C`.
+// Returns nil if no identifier can be extracted.
+func EntityNameRightmost(name *ast.Node) *ast.Node {
+	for name != nil {
+		switch name.Kind {
+		case ast.KindIdentifier:
+			return name
+		case ast.KindQualifiedName:
+			qn := name.AsQualifiedName()
+			if qn == nil || qn.Right == nil {
+				return nil
+			}
+			name = qn.Right
+		default:
+			return nil
+		}
+	}
+	return nil
 }
