@@ -172,6 +172,7 @@ rspress
 rstack
 rstest
 saddr
+samp
 scopemanager
 shadcn
 shouldnt

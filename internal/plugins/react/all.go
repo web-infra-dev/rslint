@@ -47,6 +47,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
 
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_child_element_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_curly_brace_presence"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_comment_textnodes"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_leaked_render"
@@ -99,6 +100,7 @@ func GetAllRules() []rule.Rule {
 		self_closing_comp.SelfClosingCompRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
+		jsx_child_element_spacing.JsxChildElementSpacingRule,
 		jsx_curly_brace_presence.JsxCurlyBracePresenceRule,
 		jsx_no_comment_textnodes.JsxNoCommentTextnodesRule,
 		jsx_no_leaked_render.JsxNoLeakedRenderRule,

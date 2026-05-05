@@ -2243,6 +2243,28 @@ func GetJsxTagName(element *ast.Node) *ast.Node {
 	return nil
 }
 
+// GetJsxChildren returns the child-node list of a JsxElement or JsxFragment,
+// or nil for other kinds (JsxSelfClosingElement has no children) and when the
+// container's child list is absent.
+func GetJsxChildren(parent *ast.Node) []*ast.Node {
+	if parent == nil {
+		return nil
+	}
+	switch parent.Kind {
+	case ast.KindJsxElement:
+		if parent.AsJsxElement().Children == nil {
+			return nil
+		}
+		return parent.AsJsxElement().Children.Nodes
+	case ast.KindJsxFragment:
+		if parent.AsJsxFragment().Children == nil {
+			return nil
+		}
+		return parent.AsJsxFragment().Children.Nodes
+	}
+	return nil
+}
+
 // GetJsxElementAttributes returns the attribute nodes of a JsxOpeningElement or
 // JsxSelfClosingElement, or nil for other kinds or when the element has no
 // attributes. Each returned node is either a JsxAttribute or a JsxSpreadAttribute.

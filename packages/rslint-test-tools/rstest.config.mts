@@ -85,6 +85,7 @@ export default defineConfig({
 
     // eslint-plugin-react
     './tests/eslint-plugin-react/rules/button-has-type.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-child-element-spacing.test.ts',
     './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',
     './tests/eslint-plugin-react/rules/void-dom-elements-no-children.test.ts',
     './tests/eslint-plugin-react/rules/style-prop-object.test.ts',

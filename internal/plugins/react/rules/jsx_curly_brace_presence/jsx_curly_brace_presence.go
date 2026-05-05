@@ -351,25 +351,6 @@ func containsWhitespaceExpression(child *ast.Node) bool {
 	return false
 }
 
-func jsxChildren(parent *ast.Node) []*ast.Node {
-	if parent == nil {
-		return nil
-	}
-	switch parent.Kind {
-	case ast.KindJsxElement:
-		if parent.AsJsxElement().Children == nil {
-			return nil
-		}
-		return parent.AsJsxElement().Children.Nodes
-	case ast.KindJsxFragment:
-		if parent.AsJsxFragment().Children == nil {
-			return nil
-		}
-		return parent.AsJsxFragment().Children.Nodes
-	}
-	return nil
-}
-
 // adjacentSiblings mirrors upstream's `getAdjacentSiblings`. The inner loop
 // deliberately runs `i = 1; i < len-1` and special-cases first/last index
 // — keep verbatim or the boundary-position pairs swap.
@@ -601,7 +582,7 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 			}
 
 			if parent != nil && (parent.Kind == ast.KindJsxElement || parent.Kind == ast.KindJsxFragment) {
-				children := jsxChildren(parent)
+				children := reactutil.GetJsxChildren(parent)
 				if hasAdjacentJsxExpressionContainers(jsxExpr, children) {
 					return false
 				}
@@ -630,7 +611,7 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 				return false
 			}
 			parent := literal.Parent
-			children := jsxChildren(parent)
+			children := reactutil.GetJsxChildren(parent)
 			if len(children) == 1 && containsWhitespaceExpression(children[0]) {
 				return false
 			}
