@@ -4,6 +4,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_dom_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
@@ -62,6 +63,7 @@ func GetAllRules() []rule.Rule {
 		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
 		forbid_component_props.ForbidComponentPropsRule,
+		forbid_dom_props.ForbidDomPropsRule,
 		forbid_elements.ForbidElementsRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,

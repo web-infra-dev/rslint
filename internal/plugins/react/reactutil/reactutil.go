@@ -175,6 +175,24 @@ func IsLowercaseFirstLetter(s string) bool {
 	return unicode.ToLower(r) == r
 }
 
+// IsCasedLowercaseFirstLetter mirrors upstream's
+// `s[0] !== s[0].toUpperCase()` test (used by `forbid-component-props`'s
+// componentName check and `forbid-dom-props`'s tag check): returns true iff
+// the first rune is a cased letter currently in its lowercase form. Digits,
+// `_`, `$`, and uppercase letters all return false. Distinct from
+// IsLowercaseFirstLetter, which uses the looser `r === r.toLowerCase()`
+// predicate (so `_Foo` returns true there, false here).
+func IsCasedLowercaseFirstLetter(s string) bool {
+	if s == "" {
+		return false
+	}
+	r, _ := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return false
+	}
+	return unicode.ToLower(r) == r && unicode.ToUpper(r) != r
+}
+
 // ParamListOpenParenPos returns the source position of the `(` that opens
 // `node`'s parameter list, or -1 when the position cannot be located.
 // Walks tokens after `node.Name().End()` via the scanner — robust against

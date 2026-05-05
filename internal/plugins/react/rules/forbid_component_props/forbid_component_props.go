@@ -3,8 +3,6 @@ package forbid_component_props
 import (
 	"slices"
 	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
@@ -284,19 +282,6 @@ func getTagShape(tagName *ast.Node) (tagShape, bool) {
 	return tagShape{}, false
 }
 
-// isLowercaseStart mirrors upstream's
-// `componentName[0] !== componentName[0].toUpperCase()` test: returns true iff
-// the first rune is a cased letter in its lowercase form. Digits, `_`, `$`,
-// and uppercase letters all return false (the rule then continues, matching
-// upstream).
-func isLowercaseStart(s string) bool {
-	if s == "" {
-		return false
-	}
-	r, _ := utf8.DecodeRuneInString(s)
-	return unicode.ToLower(r) == r && unicode.ToUpper(r) != r
-}
-
 var ForbidComponentPropsRule = rule.Rule{
 	Name: "react/forbid-component-props",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -315,7 +300,7 @@ var ForbidComponentPropsRule = rule.Rule{
 				if !ok {
 					return
 				}
-				if !shape.skipDomCheck && isLowercaseStart(shape.componentName) {
+				if !shape.skipDomCheck && reactutil.IsCasedLowercaseFirstLetter(shape.componentName) {
 					return
 				}
 				prop := reactutil.GetJsxPropName(node)
