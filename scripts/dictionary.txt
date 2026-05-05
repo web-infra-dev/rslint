@@ -89,6 +89,7 @@ isnan
 jakebailey
 jsonc
 jsonline
+justforcheck
 keygen
 ldflags
 ldquo
