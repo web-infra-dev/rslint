@@ -28,6 +28,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_deprecated"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_mount_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
@@ -88,6 +89,7 @@ func GetAllRules() []rule.Rule {
 		no_danger.NoDangerRule,
 		no_danger_with_children.NoDangerWithChildrenRule,
 		no_deprecated.NoDeprecatedRule,
+		no_did_mount_set_state.NoDidMountSetStateRule,
 		no_did_update_set_state.NoDidUpdateSetStateRule,
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
