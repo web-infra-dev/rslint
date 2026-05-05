@@ -1667,7 +1667,13 @@ func isStatelessReactComponentCore(fn *ast.Node, pragma string, tc *checker.Chec
 	// values (`{ Foo: function Bar() { return null; } }` once Branch 14's
 	// id-capitalization check has passed). Both cases must fall through
 	// to here and get rejected when the body returns only `null`.
-	if parent.Kind == ast.KindPropertyAssignment && functionReturnsOnlyNull(fn) {
+	//
+	// Use SkipExpressionWrappersUp to make the check paren / TS-wrapper
+	// transparent, mirroring ESTree's flattened parent (where
+	// `{ [k]: (() => null) }` resolves the arrow's parent directly to
+	// the Property node).
+	if effective := SkipExpressionWrappersUp(fn); effective != nil &&
+		effective.Kind == ast.KindPropertyAssignment && functionReturnsOnlyNull(fn) {
 		return false
 	}
 	return true

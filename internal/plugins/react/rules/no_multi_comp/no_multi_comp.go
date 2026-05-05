@@ -46,11 +46,19 @@ type componentEntry struct {
 }
 
 // isAsyncGenerator reports whether `node` is a function expression /
-// declaration that is BOTH `async` AND a generator (`function*`). Mirrors
-// upstream's `node.async && node.generator` gate inside the
-// `Components.detect` FE / FD listeners — the only path that adds a node
-// with `confidence 0` and excludes it from `components.list()`. Arrow
-// functions cannot be generators, so this never fires on KindArrowFunction.
+// declaration / object-literal shorthand method that is BOTH `async` AND a
+// generator (`function*` or `async *Foo() {}`). Mirrors upstream's
+// `node.async && node.generator` gate inside the `Components.detect` FE / FD
+// listeners — the only path that adds a node with `confidence 0` and excludes
+// it from `components.list()`. Arrow functions cannot be generators, so this
+// never fires on KindArrowFunction.
+//
+// MethodDeclaration is included because ESTree's
+// `Property { method: true, value: FunctionExpression }` shape funnels object-
+// literal shorthand methods through the same FE listener upstream — so a
+// `{ async *Foo() {...} }` declaration is banned upstream as an async-generator
+// FE. tsgo collapses this into a MethodDeclaration whose AsteriskToken / async
+// modifier carry the same signal; we honor it here.
 func isAsyncGenerator(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -73,6 +81,8 @@ func isAsyncGenerator(node *ast.Node) bool {
 		return node.AsFunctionDeclaration().AsteriskToken != nil
 	case ast.KindFunctionExpression:
 		return node.AsFunctionExpression().AsteriskToken != nil
+	case ast.KindMethodDeclaration:
+		return node.AsMethodDeclaration().AsteriskToken != nil
 	}
 	return false
 }
@@ -167,6 +177,19 @@ func collectComponents(sf *ast.SourceFile, pragma, createClass string, wrappers 
 			// `IsStatelessReactComponentWithWrappers`'s first switch arm
 			// already classifies. Class-body occurrences are excluded
 			// inside that helper because their parent is a ClassLike.
+			//
+			// Banned-confidence gate: upstream's FE listener treats an
+			// `async *Foo() {...}` shorthand method as an async
+			// generator (`node.async && node.generator`) and registers
+			// it with confidence 0 — never surfacing in
+			// `components.list()`. We mirror that here so the
+			// MethodDeclaration form does not slip past
+			// IsStatelessReactComponentWithWrappers (which lacks this
+			// gate). Getters / setters cannot be generators by syntax,
+			// so `isAsyncGenerator` always returns false on them.
+			if isAsyncGenerator(n) {
+				break
+			}
 			if reactutil.IsStatelessReactComponentWithWrappers(n, pragma, tc, wrappers) {
 				add(n)
 			}

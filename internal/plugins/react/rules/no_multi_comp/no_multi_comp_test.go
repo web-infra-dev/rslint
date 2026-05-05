@@ -564,6 +564,28 @@ func TestNoMultiCompRule(t *testing.T) {
         class A extends React.Component { render() { return <div /> } }
       `, Tsx: true},
 
+		// ---- Lock-in: Branch 16 paren-transparent ----
+		// `{ [k]: (() => null) }` — paren-wrapped only-null arrow under
+		// computed key. ESTree flattens parens so upstream sees parent
+		// = Property and rejects via Branch 16; rslint must mirror that
+		// via SkipExpressionWrappersUp. Without the gate the paren-
+		// wrapped arrow would surface as a phantom component.
+		{Code: `
+        const obj = { [Symbol.iterator]: (() => null) };
+        class A extends React.Component { render() { return <div /> } }
+      `, Tsx: true},
+
+		// ---- Lock-in: async-generator object-literal shorthand method ----
+		// `{ async *Foo() { return <div/> } }` — upstream's FE listener
+		// (which fires on ESTree's `Property.value`) treats this as an
+		// async generator and registers with confidence 0; rslint
+		// MethodDeclaration arm must apply the same `isAsyncGenerator`
+		// gate so the method does NOT surface as a component.
+		{Code: `
+        const obj = { async *Foo() { return <div /> } };
+        function App() { return <div /> }
+      `, Tsx: true, Options: map[string]interface{}{"ignoreStateless": true}},
+
 		// ---- Documented divergence: JSDoc @extends without extends clause ----
 		// Skip: true. ESLint's `isExplicitComponent` parses JSDoc tags
 		// (`@extends React.Component` / `@augments React.PureComponent`)
