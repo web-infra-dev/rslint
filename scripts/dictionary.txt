@@ -330,3 +330,4 @@ neighbour
 metacharacters
 CHARCLASS
 CLASSSET
+unrepresentable
