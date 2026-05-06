@@ -112,16 +112,19 @@ func TestBoundary_DefaultLibsCleanAcrossPrograms(t *testing.T) {
 
 // === Boundary 2: program-level vs per-file equivalence === //
 //
-// rslint's runTypeCheckForProgram calls GetDiagnosticsOfAnyProgram with
-// file=nil, which goes through compilerCheckerPool.forEachCheckerGroupDo
-// internally. The legacy file-scoped path called GetSemanticDiagnostics
-// per file in a Goroutine pool that calls SkipTypeChecking BEFORE the
-// per-file collect function.
+// rslint's runTypeCheckForProgram aggregates diagnostics via
+// collectNoEmitDiagnostics, which calls GetSemanticDiagnostics(file=nil)
+// internally — going through compilerCheckerPool.forEachCheckerGroupDo.
+// The legacy file-scoped path called GetSemanticDiagnostics per file in
+// a Goroutine pool that calls SkipTypeChecking BEFORE the per-file
+// collect function.
 //
 // These two paths can in principle diverge if SkipTypeChecking is gated
 // differently. This test pins the invariant: the per-file *semantic*
 // diagnostic set (gathered by walking each source file individually) is
-// a SUBSET of what we extract from GetDiagnosticsOfAnyProgram. Failure
+// a SUBSET of what we extract from the program-level path (here probed
+// directly via GetDiagnosticsOfAnyProgram so the test stays grounded in
+// the upstream contract that collectNoEmitDiagnostics mirrors). Failure
 // means the program-level path silently drops a diagnostic that per-file
 // would have surfaced.
 func TestBoundary_ProgramLevelMatchesPerFileSemanticDiagnostics(t *testing.T) {
