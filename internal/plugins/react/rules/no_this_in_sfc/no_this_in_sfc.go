@@ -18,12 +18,18 @@ import (
 // thus resolves to the nearest enclosing function-like (matching upstream's
 // `getScope` + `scope.upper` chain, which also walks past class scope without
 // classifying it as a component).
-func getParentStatelessComponent(node *ast.Node, pragma string) *ast.Node {
+//
+// `wrappers` is the resolved `settings.componentWrapperFunctions` list (plus
+// the built-in `memo` / `forwardRef` defaults) — passing it through to
+// `IsStatelessReactComponentWithWrappers` lets user-configured HOCs be
+// recognized as component-wrapping calls (e.g. `mobx.observer(fn)`,
+// `styled(fn)`).
+func getParentStatelessComponent(node *ast.Node, pragma string, wrappers []reactutil.ComponentWrapperEntry) *ast.Node {
 	for p := node.Parent; p != nil; p = p.Parent {
 		if !ast.IsFunctionLike(p) {
 			continue
 		}
-		if reactutil.IsStatelessReactComponent(p, pragma) {
+		if reactutil.IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
 			return p
 		}
 	}
@@ -66,6 +72,7 @@ var NoThisInSfcRule = rule.Rule{
 	Name: "react/no-this-in-sfc",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
+		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
 
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -83,7 +90,7 @@ var NoThisInSfcRule = rule.Rule{
 			if ast.SkipParentheses(expr).Kind != ast.KindThisKeyword {
 				return
 			}
-			component := getParentStatelessComponent(node, pragma)
+			component := getParentStatelessComponent(node, pragma, wrappers)
 			if component == nil {
 				return
 			}

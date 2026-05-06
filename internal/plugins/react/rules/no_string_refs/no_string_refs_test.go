@@ -222,6 +222,28 @@ var bag = createReactClass({ x: this.refs && 1 });
 			Tsx:      true,
 			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
 		},
+
+		// ---- Cross-helper lock (Helper-A): `this.refs` inside a nested
+		// non-React inner class. Upstream's ES6 detection stops at the
+		// inner non-React class; the outer React component is not
+		// considered. rslint mirrors via GetEnclosingReactComponent's
+		// stop-at-first-non-React-class behavior. ----
+		{
+			Code: `
+        class Outer extends React.Component {
+          render() {
+            class Helper {
+              doStuff() {
+                return this.refs;
+              }
+            }
+            return <div/>;
+          }
+        }
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+		},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream invalid cases ----
 		{
@@ -585,6 +607,35 @@ var Hello = createReactClass({
 			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "thisRefsDeprecated", Line: 5, Column: 32},
+			},
+		},
+
+		// ---- Cross-helper lock: nested non-React class inside
+		// createReactClass arg + this.refs in inner method.
+		// Upstream's `getParentES5Component` walks each FunctionLike
+		// scope; when it reaches `someMethod` (FE inside the
+		// createReactClass arg), block.parent.parent =
+		// ObjectLiteralExpression which IS the createReactClass arg,
+		// so isES5Component returns true. The inner `this.refs`
+		// reports. Empirically verified against ESLint master
+		// (line=5 col=16). ----
+		{
+			Code: `
+var Hello = createReactClass({
+  someMethod: function() {
+    class Helper {
+      doStuff() {
+        return this.refs;
+      }
+    }
+  },
+  render: function() { return <div/>; }
+});
+`,
+			Tsx:      true,
+			Settings: map[string]interface{}{"react": map[string]interface{}{"version": "18.2.0"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "thisRefsDeprecated", Line: 6, Column: 16},
 			},
 		},
 	})

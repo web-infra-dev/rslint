@@ -1131,32 +1131,123 @@ func GetJsxTagBaseIdentifier(tagName *ast.Node) *ast.Node {
 	return nil
 }
 
-// IsInsideReactComponent reports whether `node` is lexically contained within
-// a React component — either an ES5 component (object literal passed as an
-// argument to `<createClass>(...)` / `<pragma>.<createClass>(...)`) or an
-// ES6 component (ClassDeclaration / ClassExpression extending Component or
-// PureComponent, optionally qualified by pragma).
+// IsInsideReactComponent reports whether `node` is lexically inside a
+// React component, applying the SCOPE-BASED detection semantic that
+// upstream's `componentUtil.getParentES6Component(...) ||
+// componentUtil.getParentES5Component(...)` use directly (the pattern
+// of `no-string-refs` and `no-access-state-in-setstate`).
 //
-// Pass the empty string for pragma/createClass to fall back to
-// `DefaultReactPragma` / `DefaultReactCreateClass`.
+// **NOT equivalent to `GetEnclosingReactComponent != nil`**: the latter
+// mimics `Components.set`'s free AST ancestor walk that crosses any
+// non-React class. This helper applies the stricter ES6-stops-at-first-
+// class rule. Pick based on the upstream rule's pattern:
 //
-// Mirrors eslint-plugin-react's componentUtil:
+//   - Rule uses `Components.detect((context, components, utils) => ...)`
+//     and calls `components.set(node, ...)` / `components.get(...)` →
+//     use `GetEnclosingReactComponent`.
 //
-//   - ES6 path: only the nearest enclosing class decides component status
-//     (matching `getParentES6Component`'s `while scope.type !== 'class'`).
-//     A non-component class does not "pass through" to let an outer component
-//     class match — this prevents false positives like a non-React inner
-//     class nested inside a React class.
+//   - Rule calls `componentUtil.getParentES6Component` /
+//     `componentUtil.getParentES5Component` directly → use this helper
+//     (or `GetParentReactComponentScopeBased` for the node).
 //
-//   - ES5 path: `this` / `this.refs` must occur inside some function, whose
-//     ObjectExpression parent is the argument to `<createClass>(...)`. We
-//     approximate this by requiring that an enclosing function has been
-//     passed on the walk up before an ObjectExpression is accepted — which
-//     rules out pathological cases like `createReactClass({ x: this.refs.y })`
-//     where `this` is not inside any function (ESLint's scope walk returns
-//     null for that too).
+// Pass empty strings for pragma/createClass to fall back to defaults.
 func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
-	return GetEnclosingReactComponent(node, pragma, createClass) != nil
+	return GetParentReactComponentScopeBased(node, pragma, createClass) != nil
+}
+
+// GetParentReactComponentScopeBased mirrors upstream's
+// `componentUtil.getParentES6Component(context, node) ||
+// componentUtil.getParentES5Component(context, node)` exactly — the
+// helper used directly by `no-string-refs` and `no-access-state-in-setstate`.
+//
+// **NOT equivalent to `GetEnclosingReactComponent`**: that one mimics
+// `Components.set`'s free AST ancestor walk; this one applies the
+// stricter scope-based rules:
+//
+//   - **ES6 path**: finds the FIRST enclosing class (innermost). If it
+//     extends `Component` / `PureComponent` (bare or pragma-qualified),
+//     returns it; otherwise stops searching outer classes (mirrors
+//     upstream's `while scope.type !== 'class'` loop).
+//
+//   - **ES5 path**: walks each enclosing FunctionLike scope. For each,
+//     checks whether its parent.parent reaches a `createReactClass(...)`
+//     argument ObjectLiteralExpression. This crosses non-React classes
+//     freely — only function-like scopes are inspected.
+//
+// Empirically verified equivalent to ESLint output. Pass empty strings
+// for pragma/createClass to fall back to defaults.
+func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass string) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	if createClass == "" {
+		createClass = DefaultReactCreateClass
+	}
+
+	// ES6 path: find FIRST enclosing class. If React, return; else
+	// remember that ES6 has decided "not a React class" and don't
+	// search outer classes (matches upstream's `while scope.type !==
+	// 'class'` loop that stops at the first class scope).
+	for p := node.Parent; p != nil; p = p.Parent {
+		if p.Kind == ast.KindClassDeclaration || p.Kind == ast.KindClassExpression {
+			if ExtendsReactComponent(p, pragma) {
+				return p
+			}
+			// First class is not React → ES6 detection returns null.
+			// Fall through to ES5 detection below.
+			break
+		}
+	}
+
+	// ES5 path: walk each enclosing FunctionLike. For each, check
+	// whether its parent / parent.parent is a createReactClass(...)
+	// arg ObjectLiteralExpression. Mirrors upstream's per-scope walk:
+	//   `node = scope.block && scope.block.parent && scope.block.parent.parent`
+	// where scope.block is the FunctionLike.
+	for p := node.Parent; p != nil; p = p.Parent {
+		if !ast.IsFunctionLike(p) {
+			continue
+		}
+		// `key: function() {...}` — FE wrapped in PropertyAssignment;
+		// its parent is the ObjectLiteralExpression.
+		// `key() {...}` shorthand — MethodDeclaration / GetAccessor /
+		// SetAccessor directly inside ObjectLiteralExpression.
+		var objLit *ast.Node
+		switch p.Kind {
+		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+			objLit = p.Parent
+		default:
+			propEntry := p.Parent
+			if propEntry == nil || propEntry.Kind != ast.KindPropertyAssignment {
+				continue
+			}
+			objLit = propEntry.Parent
+		}
+		if objLit == nil || objLit.Kind != ast.KindObjectLiteralExpression {
+			continue
+		}
+		// Unwrap parens and verify createReactClass call.
+		arg := objLit
+		for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
+			arg = arg.Parent
+		}
+		callExpr := arg.Parent
+		if callExpr == nil || callExpr.Kind != ast.KindCallExpression {
+			continue
+		}
+		call := callExpr.AsCallExpression()
+		if !isObjectArgumentOf(call, arg) {
+			continue
+		}
+		if IsCreateClassCall(call, pragma, createClass) {
+			return objLit
+		}
+	}
+
+	return nil
 }
 
 // GetEnclosingReactComponent is IsInsideReactComponent's sibling that returns
@@ -1174,28 +1265,29 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 	if createClass == "" {
 		createClass = DefaultReactCreateClass
 	}
-	seenNearestClass := false
-	seenEnclosingFunction := false
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) {
-			seenEnclosingFunction = true
-		}
 		switch p.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			if seenNearestClass {
-				// The nearest class already decided ES6 classification;
-				// outer classes do not get a second chance (matches ESLint's
-				// scope-walk that stops at the first class scope).
-				continue
-			}
-			seenNearestClass = true
+			// Mirror upstream's `Components.set` behavior: it walks
+			// `node.parent` looking for any node in the `_list` of
+			// already-detected components. Non-React classes are NOT
+			// in that list — Components.detect only registers classes
+			// that extend `Component` / `PureComponent` (or pragma-
+			// qualified) — so an inner non-React class does NOT block
+			// the walk from reaching an outer React component or a
+			// `createReactClass({...})` arg above.
+			//
+			// Concretely: a `this.setState({})` inside `class Helper {
+			// foo() {...} }`, where Helper is itself nested inside
+			// `class Outer extends React.Component { render() {...} }`
+			// or inside `createReactClass({ method: function() {
+			// class Helper {...} } })`, MUST attribute to the outer
+			// detected component. Both upstream eslint-plugin-react
+			// and rslint match here.
 			if ExtendsReactComponent(p, pragma) {
 				return p
 			}
 		case ast.KindObjectLiteralExpression:
-			if !seenEnclosingFunction {
-				continue
-			}
 			// The ObjectLiteralExpression may be wrapped in one or more
 			// ParenthesizedExpressions before reaching the CallExpression
 			// (ESTree would flatten these; tsgo preserves them), e.g.
@@ -1214,6 +1306,12 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 				continue
 			}
 			if IsCreateClassCall(call, pragma, createClass) {
+				// Empirically verified against ESLint master:
+				// `createReactClass({ key: this.setState({}) })` —
+				// even a setState call at the TOP-LEVEL property
+				// position (not inside any method/function) attributes
+				// to the createReactClass arg via Components.set's
+				// free parent walk and reports.
 				return p
 			}
 		}
@@ -1284,12 +1382,39 @@ func IsCreateReactClassObjectArg(obj *ast.Node, pragma, createClass string) bool
 // approximate match). This is intentionally conservative: missed detection
 // causes a rule miss, over-detection would cause false-positive reports in
 // non-component functions.
-func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string) *ast.Node {
+func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry) *ast.Node {
 	if comp := GetEnclosingReactComponent(node, pragma, createClass); comp != nil {
 		return comp
 	}
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) && IsStatelessReactComponent(p, pragma) {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+			return p
+		}
+	}
+	return nil
+}
+
+// GetParentReactComponentScopeBasedOrStateless mirrors upstream's
+// `utils.getParentComponent(node)` =
+// `getParentES6Component || getParentES5Component || getParentStatelessComponent`.
+//
+// **NOT equivalent to `GetEnclosingReactComponentOrStateless`**: that one
+// uses `Components.set`'s free AST ancestor walk. This helper applies
+// the stricter scope-based ES6+ES5 detection (see
+// `GetParentReactComponentScopeBased`) and falls back to stateless
+// component detection. Use this for rules that call
+// `utils.getParentComponent(node)` directly inside a listener and gate
+// their report on the result being non-null — e.g.
+// `no-direct-mutation-state`'s `shouldIgnoreComponent(component)`
+// check, which bails when the result is undefined.
+//
+// Pass empty strings for pragma/createClass to fall back to defaults.
+func GetParentReactComponentScopeBasedOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry) *ast.Node {
+	if comp := GetParentReactComponentScopeBased(node, pragma, createClass); comp != nil {
+		return comp
+	}
+	for p := node.Parent; p != nil; p = p.Parent {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
 			return p
 		}
 	}
