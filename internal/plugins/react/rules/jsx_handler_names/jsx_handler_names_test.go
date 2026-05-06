@@ -170,6 +170,34 @@ func TestJsxHandlerNamesRule(t *testing.T) {
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": ""}},
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": ""}},
 
+		// ---- Lock-in: invalid-regex prefix doesn't panic ----
+		// User-provided prefixes are concatenated into the regex source. If
+		// the prefix contains unbalanced metacharacters the resulting regex
+		// fails to compile — `regexp.MustCompile` would panic and crash the
+		// linter. We use `regexp.Compile` and silently disable the half of
+		// the rule whose regex couldn't compile, mirroring upstream's
+		// "rule loading error" outcome (the rule effectively becomes a
+		// no-op for that side instead of taking down the process).
+		// `(` produces an unbalanced `^((props\.on)|((.*\.)?())[0-9]*[A-Z].*$`.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "("}},
+		// `[` produces an unbalanced character class.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "["}},
+		// Same for prop prefix.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": "("}},
+
+		// ---- Lock-in: regex meta in prefix is interpreted as regex (NOT escaped) ----
+		// Upstream concatenates the user prefix into the regex source without
+		// escaping, so `.+` means "any one-or-more chars", `[a-z]` is a class.
+		// Escaping with `regexp.QuoteMeta` would diverge from upstream on
+		// these inputs — we deliberately don't escape.
+		// With `eventHandlerPrefix: '.+'`, the rule's "is this a valid handler
+		// name" regex is `((.*\.)?.+)[0-9]*[A-Z].*` — propValue "aXY" matches
+		// (`.+` consumes "a", then `[A-Z]` consumes "X"), so no violation.
+		{Code: `var x = <TestComponent onChange={this.aXY} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": ".+"}},
+		// With `eventHandlerPrefix: '[a-z]'`, propValue "aXY" matches similarly
+		// (`[a-z]` consumes "a", `[A-Z]` consumes "X").
+		{Code: `var x = <TestComponent onChange={this.aXY} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "[a-z]"}},
+
 		// ---- tsgo edge: TS-only wrappers don't unwrap (Dimension 4) ----
 		// AsExpression / NonNullExpression / SatisfiesExpression don't carry
 		// a `.object` field, so under default `checkLocalVariables: false`

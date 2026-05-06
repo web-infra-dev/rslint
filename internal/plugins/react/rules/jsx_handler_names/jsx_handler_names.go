@@ -86,19 +86,34 @@ func parseOptions(raw any) options {
 	// Mirror upstream: when the corresponding prefix is `false`, the regex is
 	// `null` and acts as a one-sided shut-off — disabling either prefix
 	// disables the matching half of the rule entirely.
+	//
+	// Use `regexp.Compile` (not `MustCompile`) so a user prefix containing
+	// unbalanced regex metacharacters — e.g. `(`, `[` — fails gracefully
+	// instead of panicking. Upstream's `new RegExp(...)` throws a
+	// SyntaxError that ESLint surfaces as a rule-loading error; we mirror
+	// the "rule effectively disabled" outcome by leaving the regex `nil`,
+	// which the `regex != nil` gate below treats the same as a `false`
+	// prefix. Note: prefixes that are *valid* regex (`.+`, `[a-z]`, etc.)
+	// are still interpreted as regex metacharacters, exactly as upstream
+	// does — escaping them with `regexp.QuoteMeta` would diverge from
+	// upstream's input/output semantics on those inputs.
 	if !prefixDisabled {
 		propAlt := opts.eventHandlerPropPrefix
 		if propPrefixDisabled {
 			propAlt = ""
 		}
-		opts.eventHandlerRegex = regexp.MustCompile(
+		if re, err := regexp.Compile(
 			`^((props\.` + propAlt + `)|((.*\.)?` + opts.eventHandlerPrefix + `))[0-9]*[A-Z].*$`,
-		)
+		); err == nil {
+			opts.eventHandlerRegex = re
+		}
 	}
 	if !propPrefixDisabled {
-		opts.propEventHandlerRegex = regexp.MustCompile(
+		if re, err := regexp.Compile(
 			`^(` + opts.eventHandlerPropPrefix + `[A-Z].*|ref)$`,
-		)
+		); err == nil {
+			opts.propEventHandlerRegex = re
+		}
 	}
 
 	if prefixDisabled {
