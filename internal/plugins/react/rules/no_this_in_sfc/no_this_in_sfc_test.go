@@ -479,9 +479,14 @@ func TestNoThisInSfcRule(t *testing.T) {
 			},
 		},
 
-		// ---- Lock-in: bare `forwardRef(...)` wrapper. ----
+		// ---- Lock-in: bare `forwardRef(...)` wrapper.
+		// Upstream gates bare `forwardRef` / `memo` callees on
+		// `isDestructuredFromPragmaImport` — without an import binding
+		// the call is NOT recognized as a wrapper. Locked here with
+		// the explicit import to mirror that gate. ----
 		{
 			Code: `
+        import { forwardRef } from 'react';
         const Foo = forwardRef((props, ref) => <div ref={ref}>{this.props.foo}</div>);
       `,
 			Tsx: true,
@@ -491,10 +496,12 @@ func TestNoThisInSfcRule(t *testing.T) {
 		},
 
 		// ---- Boundary: forwardRef wrapping a NAMED FunctionExpression.
-		// Wrapper-call branch in IsStatelessReactComponent classifies regardless
-		// of name. ----
+		// Wrapper-call branch classifies regardless of inner function
+		// name; the outer `forwardRef` Identifier still requires the
+		// pragma import gate. ----
 		{
 			Code: `
+        import { forwardRef } from 'react';
         const Foo = forwardRef(function Inner(props, ref) {
           return <div ref={ref}>{this.props.foo}</div>;
         });
@@ -626,6 +633,38 @@ func TestNoThisInSfcRule(t *testing.T) {
         }
       `,
 			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noThisInSFC"},
+			},
+		},
+
+		// ---- Cross-helper lock (Helper-B): settings.componentWrapperFunctions
+		// — a user-configured HOC like `myObserver` is recognized as a
+		// component wrapper, so the inner arrow is treated as a stateless
+		// component and `this.props.foo` reports. ----
+		{
+			Code: `
+        const Foo = myObserver((props) => <div>{this.props.foo}</div>);
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{"myObserver"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noThisInSFC"},
+			},
+		},
+
+		// ---- Cross-helper lock (Helper-B): pragma-qualified user wrapper
+		// `React.observer(arrow)` via object-form entry. ----
+		{
+			Code: `
+        const Foo = React.observer((props) => <div>{this.props.foo}</div>);
+      `,
+			Tsx: true,
+			Settings: map[string]interface{}{
+				"componentWrapperFunctions": []interface{}{
+					map[string]interface{}{"property": "observer", "object": "<pragma>"},
+				},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noThisInSFC"},
 			},
