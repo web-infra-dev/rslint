@@ -336,3 +336,16 @@ unrepresentable
 fluentui
 callsite
 Reactlike
+nomatch
+Fooa
+Fooab
+Foox
+Testaa
+Testab
+Testabab
+Buttom
+autobinding
+handl
+ZWNBSP
+recognises
+recognisable
