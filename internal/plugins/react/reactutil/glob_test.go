@@ -95,6 +95,25 @@ func TestMatchGlob_UpstreamMinimatchAlignment(t *testing.T) {
 		// A pattern that produces a malformed regex falls back to "no match"
 		// (we don't crash). `[` with no closing `]` is treated as literal `[`.
 		{"unbalanced [ as literal", "[abc", "[abc", true},
+
+		// ---- Invalid-glob safety: must not panic, must not match arbitrary text ----
+		// Each row exercises a glob shape that produces a regex Go's `RE2`
+		// rejects; `GlobToRegex` returns nil and `MatchGlob` returns false.
+		// These mirror upstream minimatch's "no match on bad pattern" outcome.
+		{"empty char class", "Foo", "Foo[]", false},
+		{"reverse range nomatch", "abc", "[z-a]", false},
+		{"unbalanced { as literal nomatch", "Foo", "Foo{", false},
+
+		// `!` strips one negation marker leaving an empty pattern; the empty
+		// regex `^$` only matches "", so any non-empty text negates to true.
+		{"empty negation matches non-empty", "Foo", "!", true},
+
+		// `**` collapses to `*` (noglobstar) — matches anything.
+		{"globstar matches", "Foo.Bar", "**", true},
+
+		// Pattern containing literal `]` outside a class (no leading `[`) is
+		// treated as a literal char.
+		{"stray ] as literal", "abc]", "abc]", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

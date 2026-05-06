@@ -216,6 +216,40 @@ ruleTester.run('jsx-handler-names', {} as never, {
         { checkLocalVariables: true, ignoreComponentNames: ['Test+(a|b)'] },
       ],
     },
+
+    // ---- Lock-in: invalid-regex prefix doesn't crash the linter ----
+    // Each prefix below produces a regex Go's RE2 rejects (unbalanced `(`,
+    // empty class `[]`, dangling escape `\`, inverted range, etc.). The
+    // upgraded option-parser uses `regexp.Compile` + nil fallback to keep
+    // the lint process alive — the failing half of the rule simply
+    // becomes a no-op for the affected prefix.
+    {
+      code: `var x = <TestComponent onChange={this.handleChange} />`,
+      options: [{ eventHandlerPrefix: '(' }],
+    },
+    {
+      code: `var x = <TestComponent onChange={this.handleChange} />`,
+      options: [{ eventHandlerPrefix: '[a-Z]' }],
+    },
+    {
+      code: `var x = <TestComponent onChange={this.handleChange} />`,
+      options: [{ eventHandlerPrefix: '\\' }],
+    },
+    {
+      code: `var x = <TestComponent onChange={this.handleChange} />`,
+      options: [{ eventHandlerPropPrefix: '*' }],
+    },
+
+    // ---- Lock-in: invalid glob in ignoreComponentNames doesn't crash ----
+    {
+      code: `var x = <TestComponent onChange={whateverHandler} />`,
+      options: [
+        {
+          checkLocalVariables: true,
+          ignoreComponentNames: ['[z-a]', 'TestComponent'],
+        },
+      ],
+    },
   ],
   invalid: [
     // ---- Bad handler name (default) ----

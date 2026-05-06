@@ -178,12 +178,67 @@ func TestJsxHandlerNamesRule(t *testing.T) {
 		// the rule whose regex couldn't compile, mirroring upstream's
 		// "rule loading error" outcome (the rule effectively becomes a
 		// no-op for that side instead of taking down the process).
-		// `(` produces an unbalanced `^((props\.on)|((.*\.)?())[0-9]*[A-Z].*$`.
+		//
+		// Each row exercises a different category of regex-compile failure;
+		// none should panic, and with the failing side disabled the
+		// otherwise-valid `this.handleChange` should produce no diagnostic.
+		// `(`            — unbalanced open paren.
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "("}},
-		// `[` produces an unbalanced character class.
+		// `[`            — unbalanced open class.
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "["}},
-		// Same for prop prefix.
+		// `)`            — stray close paren.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": ")"}},
+		// `*`            — quantifier with no atom (becomes `?*` in the
+		//                  emitted regex, which RE2 rejects as nested).
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "*"}},
+		// `+`            — same as `*`.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "+"}},
+		// `\`            — trailing escape with no following char.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "\\"}},
+		// `[a-Z]`        — inverted character-class range (RE2 rejects).
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "[a-Z]"}},
+		// `(?`           — unbalanced + Perl-syntax fragment.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "(?"}},
+		// `[[:foo:]]`    — bogus POSIX class.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "[[:foo:]]"}},
+
+		// Symmetric coverage on the prop side. Note: when the prop regex
+		// fails to compile, `propIsEventHandler` is permanently false, so
+		// `<X onChange={this.handleChange}>` produces no diagnostic (the
+		// matching half of the rule is disabled).
 		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": "("}},
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": ")"}},
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": "*"}},
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": "+"}},
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": "?"}},
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPropPrefix": "[a-Z]"}},
+
+		// Both prefixes invalid — neither half can fire. No diagnostic
+		// regardless of input.
+		{Code: `var x = <TestComponent onChange={this.bad} />`, Tsx: true, Options: map[string]interface{}{"eventHandlerPrefix": "(", "eventHandlerPropPrefix": "("}},
+
+		// ---- Lock-in: invalid glob in ignoreComponentNames doesn't panic ----
+		// `MatchGlob` returns `false` for patterns that fail to compile, so
+		// invalid globs silently fail to ignore — matching upstream
+		// minimatch's "no match on bad pattern" behavior. The rule then
+		// runs as usual and fires on the bad handler.
+		// `Foo[`         — unbalanced class.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"TestComponent[", "TestComponent"}}},
+		// Empty class `[]`.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"TestComponent[]", "TestComponent"}}},
+		// Reverse range `[z-a]`.
+		{Code: `var x = <TestComponent onChange={this.handleChange} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"[z-a]", "TestComponent"}}},
+
+		// ---- Glob alignment: `!` (empty negation) matches everything ----
+		// `!pattern` strips one `!` and matches text that does NOT match
+		// the rest. With `pattern == ""` and a non-empty text, the empty
+		// regex matches only the empty string → false → negate → true.
+		{Code: `var x = <TestComponent onChange={whateverHandler} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"!"}}},
+
+		// ---- Glob alignment: `**` collapses to `*` (noglobstar) ----
+		// Component-name patterns never carry path separators, so `**` and
+		// `*` are equivalent in practice — both match anything.
+		{Code: `var x = <TestComponent onChange={whateverHandler} />`, Tsx: true, Options: map[string]interface{}{"checkLocalVariables": true, "ignoreComponentNames": []interface{}{"**"}}},
 
 		// ---- Lock-in: regex meta in prefix is interpreted as regex (NOT escaped) ----
 		// Upstream concatenates the user prefix into the regex source without
