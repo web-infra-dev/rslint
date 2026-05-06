@@ -151,7 +151,7 @@ func isExecutorParameterReference(ctx rule.RuleContext, callee *ast.Node, execut
 		symbol := ctx.TypeChecker.GetSymbolAtLocation(callee)
 		if symbol != nil {
 			for _, decl := range symbol.Declarations {
-				if ast.IsParameter(decl) && decl.Parent == executor {
+				if ast.IsParameterDeclaration(decl) && decl.Parent == executor {
 					return true
 				}
 			}

@@ -20,7 +20,8 @@ func skipAssertionsAndParens(node *ast.Node) *ast.Node {
 
 // https://eslint.org/docs/latest/rules/no-obj-calls
 var NoObjCallsRule = rule.Rule{
-	Name: "no-obj-calls",
+	Name:             "no-obj-calls",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// isGlobalSymbol returns true if the symbol comes from lib.d.ts
 		// (none of its declarations are in the current source file).

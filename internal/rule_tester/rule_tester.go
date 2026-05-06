@@ -134,13 +134,12 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		sourceFile := program.GetSourceFile(fileName)
 		allowedFiles := []string{sourceFile.FileName()}
 
-		_, err = linter.RunLinter(
-			[]*compiler.Program{program},
-			true,
-			allowedFiles,
-			nil,        // no allowDirs in test environment
-			[]string{}, // No files to skip in test environment
-			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		_, err = linter.RunLinter(linter.RunLinterOptions{
+			Programs:       []*compiler.Program{program},
+			SingleThreaded: true,
+			Scope:          linter.FileScope{Files: allowedFiles},
+			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
 						Name:     "test",
@@ -152,16 +151,13 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 					},
 				}
 			},
-			false, // no type-check in rule tester
-			func(diagnostic rule.RuleDiagnostic) {
+			OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 				diagnosticsMu.Lock()
 				defer diagnosticsMu.Unlock()
 
 				diagnostics = append(diagnostics, diagnostic)
 			},
-			nil, // no typeInfoFiles distinction in rule tester
-			nil, // no file filters in rule tester
-		)
+		})
 
 		assert.NilError(t, err, "error running linter. code:\n", code)
 

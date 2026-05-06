@@ -9,16 +9,16 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func buildUnsafeRefsMessage(varNames string) rule.RuleMessage {
+func BuildUnsafeRefsMessage(varNames string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unsafeRefs",
 		Description: fmt.Sprintf("Function declared in a loop contains unsafe references to variable(s) %s.", varNames),
 	}
 }
 
-type runState struct {
-	ctx          rule.RuleContext
-	skippedIIFEs map[*ast.Node]bool
+type RunState struct {
+	Ctx          rule.RuleContext
+	SkippedIIFEs map[*ast.Node]bool
 	// refIndex buckets every value-position identifier (and destructuring
 	// shorthand write target) in the source file by resolved symbol. Populated
 	// lazily on the first forEachReference call and reused for all subsequent
@@ -27,10 +27,18 @@ type runState struct {
 	refIndex map[*ast.Symbol][]*ast.Node
 }
 
+// NewRunState constructs a RunState ready for one source-file pass.
+func NewRunState(ctx rule.RuleContext) *RunState {
+	return &RunState{
+		Ctx:          ctx,
+		SkippedIIFEs: map[*ast.Node]bool{},
+	}
+}
+
 // getContainingLoopNode walks up from `node` and returns the nearest enclosing
 // loop statement. Returns nil if no loop is encountered before a non-skipped
 // function-like ancestor is reached.
-func (s *runState) getContainingLoopNode(node *ast.Node) *ast.Node {
+func (s *RunState) GetContainingLoopNode(node *ast.Node) *ast.Node {
 	for current := node; current.Parent != nil; current = current.Parent {
 		parent := current.Parent
 		switch parent.Kind {
@@ -54,7 +62,7 @@ func (s *runState) getContainingLoopNode(node *ast.Node) *ast.Node {
 			// static block runs once per class instantiation and each iteration
 			// creates a new class, so functions defined inside a static block
 			// inside a loop still exhibit the "closure per iteration" problem.
-			if s.skippedIIFEs[parent] {
+			if s.SkippedIIFEs[parent] {
 				continue
 			}
 			return nil
@@ -66,20 +74,20 @@ func (s *runState) getContainingLoopNode(node *ast.Node) *ast.Node {
 // getTopLoopNode walks up through containing loops until it finds the outermost
 // loop whose start is not before `excludedNode`'s end. If `excludedNode` is nil,
 // walks to the outermost loop.
-func (s *runState) getTopLoopNode(node *ast.Node, excludedNode *ast.Node) *ast.Node {
+func (s *RunState) GetTopLoopNode(node *ast.Node, excludedNode *ast.Node) *ast.Node {
 	border := 0
 	if excludedNode != nil {
-		border = utils.TrimNodeTextRange(s.ctx.SourceFile, excludedNode).End()
+		border = utils.TrimNodeTextRange(s.Ctx.SourceFile, excludedNode).End()
 	}
 	outermost := node
 	containing := node
 	for containing != nil {
-		pos := utils.TrimNodeTextRange(s.ctx.SourceFile, containing).Pos()
+		pos := utils.TrimNodeTextRange(s.Ctx.SourceFile, containing).Pos()
 		if pos < border {
 			break
 		}
 		outermost = containing
-		containing = s.getContainingLoopNode(containing)
+		containing = s.GetContainingLoopNode(containing)
 	}
 	return outermost
 }
@@ -87,7 +95,7 @@ func (s *runState) getTopLoopNode(node *ast.Node, excludedNode *ast.Node) *ast.N
 // isIIFE reports whether `node` is a function directly invoked as the callee
 // of a call expression (e.g. `(function () {})()`). The function may be
 // wrapped in one or more parenthesized expressions.
-func isIIFE(node *ast.Node) bool {
+func IsIIFE(node *ast.Node) bool {
 	if node.Kind != ast.KindFunctionExpression && node.Kind != ast.KindArrowFunction {
 		return false
 	}
@@ -108,7 +116,7 @@ func isIIFE(node *ast.Node) bool {
 
 // isAsyncOrGenerator reports whether a function-like node is declared `async`
 // or a generator (`function*` / `*m()`).
-func isAsyncOrGenerator(node *ast.Node) bool {
+func IsAsyncOrGenerator(node *ast.Node) bool {
 	if ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync) {
 		return true
 	}
@@ -145,20 +153,29 @@ func getFunctionBodyRoots(node *ast.Node) []*ast.Node {
 	return roots
 }
 
-// referenceEntry captures a single identifier occurrence and its resolved
+// ReferenceEntry captures a single identifier occurrence and its resolved
 // variable symbol, preserved in source order for first-seen deduplication.
-type referenceEntry struct {
+type ReferenceEntry struct {
 	name   string
 	node   *ast.Node
 	symbol *ast.Symbol
 }
 
+// Name returns the textual name of the identifier reference.
+func (r ReferenceEntry) Name() string { return r.name }
+
+// Node returns the identifier AST node.
+func (r ReferenceEntry) Node() *ast.Node { return r.node }
+
+// Symbol returns the resolved symbol for the reference, or nil if unresolved.
+func (r ReferenceEntry) Symbol() *ast.Symbol { return r.symbol }
+
 // collectThroughReferences walks the function-like node's parameters and body
 // and returns all identifier references whose resolved symbol has at least one
 // declaration outside the function subtree. The function's own name node is
 // excluded from the walk (it's the declaration, not a reference).
-func (s *runState) collectThroughReferences(funcNode *ast.Node) []referenceEntry {
-	var refs []referenceEntry
+func (s *RunState) CollectThroughReferences(funcNode *ast.Node) []ReferenceEntry {
+	var refs []ReferenceEntry
 	nameNode := funcNode.Name()
 
 	var walk func(n *ast.Node)
@@ -182,10 +199,22 @@ func (s *runState) collectThroughReferences(funcNode *ast.Node) []referenceEntry
 		}
 
 		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			sym := s.ctx.TypeChecker.GetSymbolAtLocation(n)
+			// Shorthand property assignments dual-purpose the identifier as
+			// the property name AND a value reference to a same-named
+			// variable. GetSymbolAtLocation returns the property symbol;
+			// GetShorthandAssignmentValueSymbol returns the variable symbol.
+			// This applies in BOTH destructuring (`({port} = obj)`, where
+			// the variable is being written) and object literal value
+			// position (`f({port})`, where the variable is being read).
+			var sym *ast.Symbol
+			if n.Parent != nil && n.Parent.Kind == ast.KindShorthandPropertyAssignment {
+				sym = s.Ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n.Parent)
+			} else {
+				sym = s.Ctx.TypeChecker.GetSymbolAtLocation(n)
+			}
 			if sym != nil && (sym.Flags&ast.SymbolFlagsValue) != 0 {
 				if !isSymbolDeclaredInside(sym, funcNode) {
-					refs = append(refs, referenceEntry{
+					refs = append(refs, ReferenceEntry{
 						name:   n.Text(),
 						node:   n,
 						symbol: sym,
@@ -287,25 +316,12 @@ func isSymbolDeclaredInside(sym *ast.Symbol, funcNode *ast.Node) bool {
 	return false
 }
 
-// getVarDeclListKind returns the kind of a VariableDeclarationList: one of
-// "const", "let", "var", "using", "await using", or "" for anything else.
-func getVarDeclListKind(declList *ast.Node) string {
-	if declList == nil || declList.Kind != ast.KindVariableDeclarationList {
-		return ""
-	}
-	flags := declList.Flags
-	switch {
-	case flags&ast.NodeFlagsAwaitUsing != 0:
-		return "await using"
-	case flags&ast.NodeFlagsUsing != 0:
-		return "using"
-	case flags&ast.NodeFlagsConst != 0:
-		return "const"
-	case flags&ast.NodeFlagsLet != 0:
-		return "let"
-	default:
-		return "var"
-	}
+// GetVarDeclListKind is a thin wrapper around utils.GetVarDeclListKind kept
+// for backwards compatibility with the typescript-eslint counterpart in
+// internal/plugins/typescript/rules/no_loop_func, which imports this symbol.
+// New callers should use utils.GetVarDeclListKind directly.
+func GetVarDeclListKind(declList *ast.Node) string {
+	return utils.GetVarDeclListKind(declList)
 }
 
 // enclosingVarDeclOfBindingElement walks up through nested BindingElement /
@@ -328,7 +344,7 @@ func enclosingVarDeclOfBindingElement(bindingElement *ast.Node) *ast.Node {
 // `var/let/const` declarations with initializers, the bindings introduced
 // by `for (var/let/const ... in/of ...)` iteration, and catch-clause
 // parameters (bound anew per thrown exception).
-func isWriteRef(node *ast.Node) bool {
+func IsWriteRef(node *ast.Node) bool {
 	if utils.IsWriteReference(node) {
 		return true
 	}
@@ -392,7 +408,7 @@ func isVarDeclInForInOrOf(varDecl *ast.Node) bool {
 // isSafe reports whether a through-reference `ref` to a symbol `sym` is safe
 // with respect to a loop node `loopNode`. Safe means: no write to `sym` can
 // modify the function's closed-over view of it during successive iterations.
-func (s *runState) isSafe(loopNode *ast.Node, ref referenceEntry) bool {
+func (s *RunState) isSafeCore(loopNode *ast.Node, ref ReferenceEntry) bool {
 	sym := ref.symbol
 	if sym == nil || len(sym.Declarations) == 0 {
 		return true
@@ -400,15 +416,15 @@ func (s *runState) isSafe(loopNode *ast.Node, ref referenceEntry) bool {
 	decl := sym.Declarations[0]
 
 	// Look up the enclosing VariableDeclarationList (for var/let/const/using).
-	declList := getDeclListForSymbolDecl(decl)
-	kind := getVarDeclListKind(declList)
+	declList := GetDeclListForSymbolDecl(decl)
+	kind := GetVarDeclListKind(declList)
 
 	// Constant bindings never get rewritten, so they're safe.
 	if kind == "const" || kind == "using" || kind == "await using" {
 		return true
 	}
 
-	sf := s.ctx.SourceFile
+	sf := s.Ctx.SourceFile
 	loopRange := utils.TrimNodeTextRange(sf, loopNode)
 
 	// `let` declared inside the loop gets a fresh binding per iteration.
@@ -423,7 +439,7 @@ func (s *runState) isSafe(loopNode *ast.Node, ref referenceEntry) bool {
 	if kind == "let" {
 		excluded = declList
 	}
-	top := s.getTopLoopNode(loopNode, excluded)
+	top := s.GetTopLoopNode(loopNode, excluded)
 	border := utils.TrimNodeTextRange(sf, top).Pos()
 
 	// The variable's "variable scope" — the nearest function-like scope of its
@@ -432,8 +448,8 @@ func (s *runState) isSafe(loopNode *ast.Node, ref referenceEntry) bool {
 	varScope := utils.FindEnclosingScope(decl)
 
 	safe := true
-	s.forEachReference(sym, func(refNode *ast.Node) bool {
-		if !isWriteRef(refNode) {
+	s.ForEachReference(sym, func(refNode *ast.Node) bool {
+		if !IsWriteRef(refNode) {
 			return false
 		}
 		refScope := utils.FindEnclosingScope(refNode)
@@ -451,7 +467,7 @@ func (s *runState) isSafe(loopNode *ast.Node, ref referenceEntry) bool {
 
 // getDeclListForSymbolDecl returns the VariableDeclarationList associated with
 // a declaration node, or nil if the declaration is not a variable-like binding.
-func getDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
+func GetDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
 	if decl == nil {
 		return nil
 	}
@@ -474,25 +490,36 @@ func getDeclListForSymbolDecl(decl *ast.Node) *ast.Node {
 
 // buildRefIndex performs a single pass over the source file and groups every
 // value-position identifier by its resolved symbol. ShorthandPropertyAssignment
-// inside destructuring needs special handling because TypeChecker resolves the
-// shorthand key to the property symbol, not the written-to variable symbol —
-// we store the name identifier keyed by the variable symbol instead.
-func (s *runState) buildRefIndex() {
+// nodes need special handling because TypeChecker.GetSymbolAtLocation resolves
+// the shorthand key to the property symbol, not the variable symbol — we use
+// GetShorthandAssignmentValueSymbol instead and key by the variable symbol.
+// This is needed BOTH for destructuring shorthand (which is a write) and for
+// object-literal shorthand (which is a read).
+func (s *RunState) buildRefIndex() {
 	if s.refIndex != nil {
 		return
 	}
 	s.refIndex = map[*ast.Symbol][]*ast.Node{}
-	tc := s.ctx.TypeChecker
+	tc := s.Ctx.TypeChecker
 	var walk func(n *ast.Node)
 	walk = func(n *ast.Node) {
 		if n == nil {
 			return
 		}
 		if n.Kind == ast.KindIdentifier && isValueReferencePosition(n) {
-			if sym := tc.GetSymbolAtLocation(n); sym != nil {
+			var sym *ast.Symbol
+			if n.Parent != nil && n.Parent.Kind == ast.KindShorthandPropertyAssignment {
+				sym = tc.GetShorthandAssignmentValueSymbol(n.Parent)
+			} else {
+				sym = tc.GetSymbolAtLocation(n)
+			}
+			if sym != nil {
 				s.refIndex[sym] = append(s.refIndex[sym], n)
 			}
 		} else if n.Kind == ast.KindShorthandPropertyAssignment && utils.IsInDestructuringAssignment(n) {
+			// Already handled above via the Identifier branch in most cases,
+			// but keep this explicit indexing for the destructuring write
+			// path where the parent walk may not visit the Identifier directly.
 			if sym := tc.GetShorthandAssignmentValueSymbol(n); sym != nil {
 				if nameNode := n.AsShorthandPropertyAssignment().Name(); nameNode != nil {
 					s.refIndex[sym] = append(s.refIndex[sym], nameNode)
@@ -504,13 +531,13 @@ func (s *runState) buildRefIndex() {
 			return false
 		})
 	}
-	walk(s.ctx.SourceFile.AsNode())
+	walk(s.Ctx.SourceFile.AsNode())
 }
 
 // forEachReference invokes `cb` for every identifier node resolving to `sym`,
 // in source order. Returns early when `cb` returns true. The underlying index
 // is built on first use via buildRefIndex so subsequent calls are O(refs).
-func (s *runState) forEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
+func (s *RunState) ForEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
 	s.buildRefIndex()
 	for _, node := range s.refIndex[sym] {
 		if cb(node) {
@@ -521,19 +548,19 @@ func (s *runState) forEachReference(sym *ast.Symbol, cb func(*ast.Node) bool) {
 
 // checkForLoops processes a function-like node: if it is inside a loop and
 // has unsafe through-references, it is reported.
-func (s *runState) checkForLoops(node *ast.Node) {
-	loopNode := s.getContainingLoopNode(node)
+func (s *RunState) checkForLoopsCore(node *ast.Node) {
+	loopNode := s.GetContainingLoopNode(node)
 	if loopNode == nil {
 		return
 	}
 
-	refs := s.collectThroughReferences(node)
+	refs := s.CollectThroughReferences(node)
 
 	// IIFE handling — matches ESLint: non-async, non-generator IIFEs that are
 	// not self-referenced (either anonymous or whose name isn't used inside the
 	// function body) are skipped. Skipping marks them so nested functions can
 	// walk through them to find the enclosing loop.
-	if !isAsyncOrGenerator(node) && isIIFE(node) {
+	if !IsAsyncOrGenerator(node) && IsIIFE(node) {
 		isFunctionExpression := node.Kind == ast.KindFunctionExpression
 		name := node.Name()
 		isFunctionReferenced := false
@@ -547,7 +574,7 @@ func (s *runState) checkForLoops(node *ast.Node) {
 			}
 		}
 		if !isFunctionReferenced {
-			s.skippedIIFEs[node] = true
+			s.SkippedIIFEs[node] = true
 			return
 		}
 	}
@@ -561,7 +588,7 @@ func (s *runState) checkForLoops(node *ast.Node) {
 		if seen[r.name] {
 			continue
 		}
-		if s.isSafe(loopNode, r) {
+		if s.isSafeCore(loopNode, r) {
 			continue
 		}
 		seen[r.name] = true
@@ -573,23 +600,27 @@ func (s *runState) checkForLoops(node *ast.Node) {
 	}
 
 	varNames := "'" + strings.Join(names, "', '") + "'"
-	s.ctx.ReportNode(node, buildUnsafeRefsMessage(varNames))
+	s.Ctx.ReportNode(node, BuildUnsafeRefsMessage(varNames))
 }
 
 // NoLoopFuncRule disallows function declarations that contain unsafe
 // references to variable(s) inside loop statements.
 var NoLoopFuncRule = rule.Rule{
-	Name: "no-loop-func",
+	Name:             "no-loop-func",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
+		// gap files / inferred-project files, but if a future caller bypasses
+		// the filter we still want to no-op rather than nil-deref.
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}
-		s := &runState{
-			ctx:          ctx,
-			skippedIIFEs: map[*ast.Node]bool{},
+		s := &RunState{
+			Ctx:          ctx,
+			SkippedIIFEs: map[*ast.Node]bool{},
 		}
 		check := func(node *ast.Node) {
-			s.checkForLoops(node)
+			s.checkForLoopsCore(node)
 		}
 		return rule.RuleListeners{
 			ast.KindArrowFunction:       check,

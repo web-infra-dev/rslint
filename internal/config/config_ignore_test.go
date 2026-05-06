@@ -128,6 +128,7 @@ func TestGetConfigForFile_NegationInGlobalIgnore(t *testing.T) {
 	merged := config.GetConfigForFile("build/test.js", "")
 	if merged == nil {
 		t.Fatal("Expected build/test.js to NOT be ignored (re-included by !)")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger rule for re-included file")
@@ -141,6 +142,7 @@ func TestGetConfigForFile_NegationInGlobalIgnore(t *testing.T) {
 	merged3 := config.GetConfigForFile("src/index.js", "")
 	if merged3 == nil {
 		t.Fatal("Expected src/index.js to be linted")
+		return
 	}
 }
 
@@ -156,6 +158,7 @@ func TestGetConfigForFile_NegationInEntryIgnore(t *testing.T) {
 	merged := config.GetConfigForFile("vendor/keep/src/b.ts", "")
 	if merged == nil {
 		t.Fatal("Expected vendor/keep/src/b.ts to NOT be ignored (re-included by !)")
+		return
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger rule for re-included file")
@@ -306,6 +309,7 @@ func TestGetConfigForFile_NegationWithEmptyCwd(t *testing.T) {
 	merged := config.GetConfigForFile("vendor/keep/src/b.ts", "")
 	if merged == nil {
 		t.Fatal("Expected vendor/keep/src/b.ts to be re-included with empty cwd")
+		return
 	}
 
 	merged2 := config.GetConfigForFile("vendor/lib/src/a.ts", "")
@@ -338,6 +342,7 @@ func TestGetConfigForFile_NegationGlobalAndEntryInteraction(t *testing.T) {
 	merged2 := config.GetConfigForFile("src/index.js", "")
 	if merged2 == nil {
 		t.Fatal("Expected src/index.js to be linted")
+		return
 	}
 }
 
@@ -371,6 +376,7 @@ func TestGetConfigForFile_NegationAcrossGlobalIgnoreEntries(t *testing.T) {
 	merged3 := config2.GetConfigForFile("build/test.js", "")
 	if merged3 == nil {
 		t.Fatal("Expected build/test.js to be re-included with build/**/* (file-level)")
+		return
 	}
 
 	// Same-entry with dir/** + ! → dir blocks, ! has no effect
@@ -417,6 +423,7 @@ func TestGetConfigForFile_NegationSequentialOverride(t *testing.T) {
 	merged2 := config2.GetConfigForFile("dist/index.js", "")
 	if merged2 == nil {
 		t.Fatal("Expected dist/index.js to be linted (file-level sequential override)")
+		return
 	}
 
 	merged3 := config2.GetConfigForFile("dist/generated/a.js", "")

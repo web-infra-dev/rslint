@@ -99,6 +99,11 @@ func CreateRule(r Rule) Rule {
 type RuleMessage struct {
 	Id          string
 	Description string
+	// Data exposes the placeholder values that were substituted into
+	// Description (e.g. ESLint's `report({ data: { type } })`). Downstream
+	// reporters / IDE clients can use this for structured access. Optional —
+	// rules that don't carry placeholders may leave it nil.
+	Data map[string]string
 }
 
 type RuleFix struct {

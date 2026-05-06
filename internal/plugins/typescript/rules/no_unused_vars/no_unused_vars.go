@@ -2185,7 +2185,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 				if isInsideAmbientModuleBlock(node) || isInDtsWithoutExplicitExports(node) {
 					return
 				}
-				typeParam := node.AsTypeParameter()
+				typeParam := node.AsTypeParameterDeclaration()
 				if typeParam == nil {
 					return
 				}

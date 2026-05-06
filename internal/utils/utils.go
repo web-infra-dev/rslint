@@ -17,6 +17,46 @@ func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRang
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
+// GetVarKeywordRange returns the range of the kind keyword (`var`/`let`/`const`/
+// `using` or `await` for `await using`) inside a VariableStatement or
+// VariableDeclarationList. For VariableStatement it skips the modifier list
+// (e.g. `export`/`declare`) so the returned range starts at the actual kind
+// keyword. Used by rules that synthesize fixes around the kind keyword
+// (one-var, no-var, prefer-const, etc.).
+func GetVarKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
+	pos := TrimNodeTextRange(sourceFile, node).Pos()
+	if node.Kind == ast.KindVariableStatement {
+		if mods := node.Modifiers(); mods != nil && len(mods.Nodes) > 0 {
+			pos = mods.End()
+		}
+	}
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, pos)
+}
+
+// GetVarDeclListKind returns the kind keyword for a VariableDeclarationList:
+// "var", "let", "const", "using", "await using", or "" if the node is not a
+// VariableDeclarationList. Uses tsgo's IsVar* helpers (which apply
+// GetCombinedNodeFlags and correctly handle the `NodeFlagsConst|NodeFlagsUsing`
+// encoding of `await using`). Centralizes what was duplicated across no-var,
+// prefer-const, no-loop-func, and one-var.
+func GetVarDeclListKind(node *ast.Node) string {
+	if node == nil || node.Kind != ast.KindVariableDeclarationList {
+		return ""
+	}
+	switch {
+	case ast.IsVarAwaitUsing(node):
+		return "await using"
+	case ast.IsVarUsing(node):
+		return "using"
+	case ast.IsVarConst(node):
+		return "const"
+	case ast.IsVarLet(node):
+		return "let"
+	default:
+		return "var"
+	}
+}
+
 // TrimmedNodeText returns the source text for node over the same span as TrimNodeTextRange.
 func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	r := TrimNodeTextRange(sourceFile, node)
@@ -234,6 +274,45 @@ func IsStrWhiteSpace(r rune) bool {
 	return unicode.Is(unicode.Zs, r)
 }
 
+// IsECMABlankLine reports whether s contains only ECMAScript WhiteSpace /
+// LineTerminator runes — matching JavaScript's `"".trim() === ""` check used
+// by rules like max-lines / max-lines-per-function for `skipBlankLines`.
+// Go's strings.TrimSpace diverges on U+FEFF (BOM) and U+0085 (NEL), so we
+// can't use it directly.
+func IsECMABlankLine(s string) bool {
+	for _, r := range s {
+		if !IsStrWhiteSpace(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// LineContentEnd returns the byte position just past the last character of the
+// line whose successor starts at nextLineStart — i.e. nextLineStart with its
+// immediately-preceding ECMA line terminator (LF, CR, CRLF, LS, PS) stripped.
+// Useful when slicing a single line out of source text without its terminator,
+// matching the behavior of ESLint's SourceCode.lines entries.
+func LineContentEnd(text string, nextLineStart int) int {
+	if nextLineStart >= 2 && text[nextLineStart-2] == '\r' && text[nextLineStart-1] == '\n' {
+		return nextLineStart - 2
+	}
+	if nextLineStart >= 1 {
+		c := text[nextLineStart-1]
+		if c == '\r' || c == '\n' {
+			return nextLineStart - 1
+		}
+		// U+2028 / U+2029 encode as 0xE2 0x80 0xA8 / 0xA9.
+		if nextLineStart >= 3 &&
+			text[nextLineStart-3] == 0xE2 &&
+			text[nextLineStart-2] == 0x80 &&
+			(text[nextLineStart-1] == 0xA8 || text[nextLineStart-1] == 0xA9) {
+			return nextLineStart - 3
+		}
+	}
+	return nextLineStart
+}
+
 // ExcludePaths contains path substrings that should be excluded from linting.
 // Used by RunLinterInProgram to skip files during program source file iteration.
 var ExcludePaths = []string{"/node_modules/", "bundled:"}
@@ -289,6 +368,26 @@ func GetOptionsMap(opts any) map[string]interface{} {
 	}
 
 	return optsMap
+}
+
+// CoerceInt converts a JSON-decoded numeric value to int. JSON numbers come in
+// as float64 from `encoding/json`, but rule_tester / test fixtures may pass
+// raw int / int32 / int64 / float32, so accept all of them. Returns
+// (value, true) on success, (0, false) for non-numeric inputs (including nil).
+func CoerceInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	case float32:
+		return int(n), true
+	}
+	return 0, false
 }
 
 // GetOptionsString extracts a string option from the weakly-typed options parameter.

@@ -1,10 +1,17 @@
 import { describe, test, expect } from '@rstest/core';
 import { runRslint, createTempDir, cleanupTempDir, TS_CONFIG } from './helpers';
 
-// `ignores` must hide files from --type-check, matching ESLint v10 semantics.
+// `ignores` controls the LINT phase only. `--type-check` is program-level
+// and aligned with `tsc --noEmit`: every file that the TypeScript program
+// loads is checked, regardless of rslint's `ignores` configuration. This
+// supersedes the earlier behaviour from PR #681 (where `ignores` also hid
+// type-check diagnostics) — see "Alignment with tsc --noEmit" in
+// website/docs/en/guide/type-checking.md.
+//
 // These tests guard the end-to-end CLI path (config → buildFileFilters →
-// RunLinter). Unit tests inside internal/linter only exercise the filter
-// callback; they cannot catch regressions in the cmd wiring that composes it.
+// RunLinter): config `ignores` continue to remove a file from the lint-rule
+// pass (LintedFileCount, lint-rule diagnostics) while leaving its
+// type-check diagnostics intact.
 
 interface Diagnostic {
   ruleName: string;
@@ -70,67 +77,68 @@ function makeConfigWithIgnores(ignores: string[]): string {
 }
 
 describe('--type-check + config ignores', () => {
-  test('ignored file produces zero diagnostics; non-ignored file still does', async () => {
+  test('ignored file still produces type-check diagnostics; lint-file count excludes it', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': makeConfigWithIgnores(['ignored/**']),
-      // Ignored file: has a TS2322 that would otherwise fire
+      // Ignored file: has a TS2322 — under tsc-aligned semantics this MUST
+      // surface because the file is in the TS program.
       'ignored/bad.ts': "const x: number = 'from-ignored';\n",
-      // Control file: same kind of error, should still fire
+      // Control file: same kind of error, also reported.
       'src/bad.ts': "const y: number = 'from-src';\n",
     });
     try {
       const r = await lintTypeCheck(tempDir);
 
-      // Guard against trivial pass: the non-ignored file MUST produce a TS
-      // diagnostic. If it doesn't, the test setup is broken (e.g. tsconfig
-      // not picked up) and any assertion about the ignored file is vacuous.
+      // Control: the non-ignored file produces a TS diagnostic.
       const srcDiags = r.diagnostics.filter((d) =>
         d.filePath?.includes('src/bad.ts'),
       );
       expect(srcDiags.length).toBeGreaterThan(0);
       expect(srcDiags.some((d) => d.ruleName.includes('TS'))).toBe(true);
 
-      // The actual assertion: zero diagnostics point at the ignored file.
+      // The new contract: the ignored file's type-check diagnostic still
+      // surfaces (program-level check is not gated by ignores).
       const ignoredDiags = r.diagnostics.filter((d) =>
         d.filePath?.includes('ignored/bad.ts'),
       );
-      expect(ignoredDiags).toEqual([]);
+      expect(ignoredDiags.length).toBeGreaterThan(0);
+      expect(ignoredDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(
+        true,
+      );
 
-      // Counts must reflect the filter: exactly one file was linted.
-      // If ignores leaks, count would be 2 (or more if tsgolint pulled extras).
+      // LintedFileCount counts the lint-rule pass only — ignored files do
+      // not contribute. Only src/bad.ts is "linted".
       expect(r.lintedFileCount).toBe(1);
     } finally {
       await cleanupTempDir(tempDir);
     }
   });
 
-  test('ignored file stays in TS program as import context but emits no own diagnostics', async () => {
-    // Scenario: caller.ts imports from util.ts; util.ts is ignored. The TS
-    // compiler must still load util.ts to type-check caller.ts's call site,
-    // but util.ts itself must not emit diagnostics and must not count.
+  test('ignored file as import context: caller is checked AND ignored file own type errors surface', async () => {
+    // Scenario: caller.ts imports from util.ts; util.ts is `ignores`d. The
+    // TypeScript compiler loads util.ts to type-check caller's call site
+    // (proving the import context works). Under the tsc-aligned design,
+    // util.ts's own type errors are also reported.
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': makeConfigWithIgnores(['lib/**']),
-      // Ignored file: exports a typed function. Contains its own TS error
-      // that would fire if it were not ignored.
+      // Ignored file with its own TS error.
       'lib/util.ts': [
         'export function greet(name: string): string {',
         '  return `hi ${name}`;',
         '}',
-        "const shouldBeIgnored: number = 'not a number';", // TS2322 if linted
+        "const shouldBeReported: number = 'not a number';", // TS2322
         '',
       ].join('\n'),
-      // Non-ignored caller passes wrong arg type — TS must still catch this,
+      // Non-ignored caller: passes wrong arg type — TS must catch this,
       // which proves util.ts is loaded into the program as context.
       'src/caller.ts': "import { greet } from '../lib/util';\ngreet(42);\n",
     });
     try {
       const r = await lintTypeCheck(tempDir);
 
-      // Context check: caller.ts must get its TS2345 (wrong arg type). This
-      // only works if util.ts's types were resolved → proves ignored file
-      // stayed in the TS program.
+      // Context check: caller.ts gets its TS2345 (wrong arg type).
       const callerDiags = r.diagnostics.filter((d) =>
         d.filePath?.includes('src/caller.ts'),
       );
@@ -140,23 +148,25 @@ describe('--type-check + config ignores', () => {
       );
       expect(callerTsDiags.length).toBeGreaterThan(0);
 
-      // Assertion: the ignored file's own TS2322 must NOT surface.
+      // New contract: util.ts's own TS2322 surfaces despite `ignores`.
       const utilDiags = r.diagnostics.filter((d) =>
         d.filePath?.includes('lib/util.ts'),
       );
-      expect(utilDiags).toEqual([]);
+      expect(utilDiags.length).toBeGreaterThan(0);
+      expect(utilDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(true);
 
-      // Count: only caller.ts counts as "linted".
+      // Lint-rule pass excludes the ignored file: count is 1 (caller.ts).
       expect(r.lintedFileCount).toBe(1);
     } finally {
       await cleanupTempDir(tempDir);
     }
   });
 
-  test('multi-config: root ignores filter files covered by child tsconfig', async () => {
+  test('multi-config: root ignores excludes files from lint-rule pass but type-check still reports them', async () => {
     // Root rslint.config.mjs globally ignores packages/child/**. The child
     // package has its own tsconfig that includes those files. The ignores
-    // must still win — this is the ESLint v10 "global ignores" semantics.
+    // remove the child files from lint rules, but type-check sees the full
+    // program and reports their type errors — matching `tsc --noEmit`.
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': `export default [
@@ -172,32 +182,33 @@ describe('--type-check + config ignores', () => {
           target: 'ES2020',
           module: 'ESNext',
           strict: true,
-          moduleResolution: 'node',
+          moduleResolution: 'bundler',
         },
         include: ['**/*.ts'],
       }),
-      // File covered by child's tsconfig, but globally ignored
+      // File covered by child's tsconfig, globally ignored.
       'packages/child/a.ts': "const x: number = 'ignored-by-root';\n",
-      // File not covered by the root ignore — must still be linted
+      // File not covered by the root ignore.
       'src/ok.ts': "const y: number = 'from-src';\n",
     });
     try {
       const r = await lintTypeCheck(tempDir);
 
-      // Control: the non-ignored file must still produce diagnostics.
+      // Control: the non-ignored file produces diagnostics.
       const srcDiags = r.diagnostics.filter((d) =>
         d.filePath?.includes('src/ok.ts'),
       );
       expect(srcDiags.length).toBeGreaterThan(0);
 
-      // Assertion: no diagnostic anywhere under packages/child/.
+      // New contract: type-check diagnostics for the ignored child file
+      // still surface.
       const childDiags = r.diagnostics.filter((d) =>
         d.filePath?.includes('packages/child/'),
       );
-      expect(childDiags).toEqual([]);
+      expect(childDiags.length).toBeGreaterThan(0);
+      expect(childDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(true);
 
-      // Count: only src/ok.ts, even though packages/child/a.ts is in the
-      // child's tsconfig include.
+      // Lint-rule pass excludes the ignored child file: count is 1 (src/ok.ts).
       expect(r.lintedFileCount).toBe(1);
     } finally {
       await cleanupTempDir(tempDir);

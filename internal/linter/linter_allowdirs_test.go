@@ -372,7 +372,7 @@ func TestRunLinter_AllowDirsIntegration(t *testing.T) {
 	})
 
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
-	result, err := RunLinter([]*compiler.Program{program}, true, nil, []string{srcDir}, utils.ExcludePaths,
+	result, err := runLinterPositional([]*compiler.Program{program}, true, nil, []string{srcDir}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {}, nil,
 		nil,
@@ -396,7 +396,7 @@ func TestRunLinter_MultiplePrograms(t *testing.T) {
 	})
 
 	lintedFileNames := []string{}
-	result, err := RunLinter(
+	result, err := runLinterPositional(
 		[]*compiler.Program{programA, programB},
 		true,
 		[]string{pathsA["a.ts"], pathsB["b.ts"]},
@@ -431,7 +431,7 @@ func TestRunLinter_MultipleProgramsWithAllowDirs(t *testing.T) {
 	srcDirA := tmpDirPath(t, pathsA, "src/a.ts")
 	srcDirB := tmpDirPath(t, pathsB, "src/b.ts")
 
-	result, err := RunLinter(
+	result, err := runLinterPositional(
 		[]*compiler.Program{programA, programB},
 		true,
 		nil,

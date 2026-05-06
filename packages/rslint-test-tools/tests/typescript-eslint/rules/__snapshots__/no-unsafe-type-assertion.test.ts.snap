@@ -151,7 +151,7 @@ const bar = foo as number;
         ",
   "diagnostics": [
     {
-      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "message": "Unsafe assertion from error typed detected: consider using type guards or a safer assertion.",
       "messageId": "unsafeOfAnyTypeAssertion",
       "range": {
         "end": {

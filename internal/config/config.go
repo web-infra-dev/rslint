@@ -12,7 +12,6 @@ import (
 	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
-	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
@@ -30,6 +29,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/default_param_last"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_function_return_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_member_accessibility"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/member_ordering"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/method_signature_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/naming_convention"
@@ -51,6 +51,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_inferrable_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/max_params"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_magic_numbers"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_meaningless_void_operator"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_misused_new"
@@ -64,6 +66,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_redeclare"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_redundant_type_constituents"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_require_imports"
+	ts_no_restricted_imports "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_restricted_imports"
+	ts_no_shadow "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_shadow"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_condition"
@@ -94,9 +98,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_includes"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_literal_enum_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_namespace_keyword"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_nullish_coalescing"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_optional_chain"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly"
+	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 
 	// "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly_parameter_types" // Temporarily disabled - incomplete implementation
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_reduce_type_parameter"
@@ -119,6 +125,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
+	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
@@ -126,7 +133,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/guard_for_in"
+	"github.com/web-infra-dev/rslint/internal/rules/max_depth"
 	"github.com/web-infra-dev/rslint/internal/rules/max_lines"
+	"github.com/web-infra-dev/rslint/internal/rules/max_lines_per_function"
+	"github.com/web-infra-dev/rslint/internal/rules/max_nested_callbacks"
 	"github.com/web-infra-dev/rslint/internal/rules/no_alert"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
@@ -149,6 +159,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
+	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
@@ -171,9 +182,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_label_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_lone_blocks"
-	"github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
+	core_no_loop_func "github.com/web-infra-dev/rslint/internal/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_misleading_character_class"
+	"github.com/web-infra-dev/rslint/internal/rules/no_multi_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_multi_str"
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new"
@@ -181,6 +193,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
+	"github.com/web-infra-dev/rslint/internal/rules/no_nonoctal_decimal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
@@ -189,6 +202,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_prototype_builtins"
 	"github.com/web-infra-dev/rslint/internal/rules/no_regex_spaces"
 	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_imports"
+	"github.com/web-infra-dev/rslint/internal/rules/no_restricted_syntax"
 	"github.com/web-infra-dev/rslint/internal/rules/no_return_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
@@ -202,6 +216,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
@@ -213,11 +228,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
+	"github.com/web-infra-dev/rslint/internal/rules/one_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	core_prefer_promise_reject_errors "github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
@@ -503,6 +521,8 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/default-param-last", default_param_last.DefaultParamLastRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/dot-notation", dot_notation.DotNotationRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/explicit-function-return-type", explicit_function_return_type.ExplicitFunctionReturnTypeRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/explicit-member-accessibility", explicit_member_accessibility.ExplicitMemberAccessibilityRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/max-params", max_params.MaxParamsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/member-ordering", member_ordering.MemberOrderingRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/method-signature-style", method_signature_style.MethodSignatureStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/naming-convention", naming_convention.NamingConventionRule)
@@ -524,6 +544,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-implied-eval", no_implied_eval.NoImpliedEvalRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-inferrable-types", no_inferrable_types.NoInferrableTypesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-loop-func", no_loop_func.NoLoopFuncRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-magic-numbers", no_magic_numbers.NoMagicNumbersRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-meaningless-void-operator", no_meaningless_void_operator.NoMeaninglessVoidOperatorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-new", no_misused_new.NoMisusedNewRule)
@@ -538,6 +559,8 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-redundant-type-constituents", no_redundant_type_constituents.NoRedundantTypeConstituentsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-this-alias", no_this_alias.NoThisAliasRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-require-imports", no_require_imports.NoRequireImportsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-restricted-imports", ts_no_restricted_imports.NoRestrictedImportsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-shadow", ts_no_shadow.NoShadowRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-boolean-literal-compare", no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-condition", no_unnecessary_condition.NoUnnecessaryConditionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-template-expression", no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule)
@@ -567,6 +590,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-literal-enum-member", prefer_literal_enum_member.PreferLiteralEnumMemberRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-namespace-keyword", prefer_namespace_keyword.PreferNamespaceKeywordRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-for-of", prefer_for_of.PreferForOfRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-nullish-coalescing", prefer_nullish_coalescing.PreferNullishCoalescingRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-optional-chain", prefer_optional_chain.PreferOptionalChainRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-promise-reject-errors", prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-readonly", prefer_readonly.PreferReadonlyRule)
@@ -603,13 +627,17 @@ func registerAllEslintImportPluginRules() {
 func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("accessor-pairs", accessor_pairs.AccessorPairsRule)
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
+	GlobalRuleRegistry.Register("complexity", complexity.ComplexityRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
 	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)
 	GlobalRuleRegistry.Register("default-case-last", default_case_last.DefaultCaseLastRule)
 	GlobalRuleRegistry.Register("for-direction", for_direction.ForDirectionRule)
 	GlobalRuleRegistry.Register("getter-return", getter_return.GetterReturnRule)
 	GlobalRuleRegistry.Register("guard-for-in", guard_for_in.GuardForInRule)
+	GlobalRuleRegistry.Register("max-depth", max_depth.MaxDepthRule)
 	GlobalRuleRegistry.Register("max-lines", max_lines.MaxLinesRule)
+	GlobalRuleRegistry.Register("max-lines-per-function", max_lines_per_function.MaxLinesPerFunctionRule)
+	GlobalRuleRegistry.Register("max-nested-callbacks", max_nested_callbacks.MaxNestedCallbacksRule)
 	GlobalRuleRegistry.Register("no-alert", no_alert.NoAlertRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
 	GlobalRuleRegistry.Register("no-await-in-loop", no_await_in_loop.NoAwaitInLoopRule)
@@ -631,6 +659,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-dupe-class-members", no_dupe_class_members.NoDupeClassMembersRule)
 	GlobalRuleRegistry.Register("no-dupe-keys", no_dupe_keys.NoDupeKeysRule)
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
+	GlobalRuleRegistry.Register("no-duplicate-imports", no_duplicate_imports.NoDuplicateImportsRule)
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-eval", no_eval.NoEvalRule)
@@ -648,15 +677,18 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
 	GlobalRuleRegistry.Register("no-irregular-whitespace", no_irregular_whitespace.NoIrregularWhitespaceRule)
 	GlobalRuleRegistry.Register("no-lone-blocks", no_lone_blocks.NoLoneBlocksRule)
-	GlobalRuleRegistry.Register("no-loop-func", no_loop_func.NoLoopFuncRule)
+	GlobalRuleRegistry.Register("no-loop-func", core_no_loop_func.NoLoopFuncRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-misleading-character-class", no_misleading_character_class.NoMisleadingCharacterClassRule)
 	GlobalRuleRegistry.Register("no-new", no_new.NoNewRule)
 	GlobalRuleRegistry.Register("no-new-func", no_new_func.NoNewFuncRule)
 	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
 	GlobalRuleRegistry.Register("no-restricted-imports", no_restricted_imports.NoRestrictedImportsRule)
+	GlobalRuleRegistry.Register("no-restricted-syntax", no_restricted_syntax.NoRestrictedSyntaxRule)
+	GlobalRuleRegistry.Register("no-multi-assign", no_multi_assign.NoMultiAssignRule)
 	GlobalRuleRegistry.Register("no-multi-str", no_multi_str.NoMultiStrRule)
 	GlobalRuleRegistry.Register("no-nested-ternary", no_nested_ternary.NoNestedTernaryRule)
+	GlobalRuleRegistry.Register("no-nonoctal-decimal-escape", no_nonoctal_decimal_escape.NoNonoctalDecimalEscapeRule)
 	GlobalRuleRegistry.Register("no-octal", no_octal.NoOctalRule)
 	GlobalRuleRegistry.Register("no-octal-escape", no_octal_escape.NoOctalEscapeRule)
 	GlobalRuleRegistry.Register("no-param-reassign", no_param_reassign.NoParamReassignRule)
@@ -705,15 +737,19 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
 	GlobalRuleRegistry.Register("require-atomic-updates", require_atomic_updates.RequireAtomicUpdatesRule)
 	GlobalRuleRegistry.Register("object-shorthand", object_shorthand.ObjectShorthandRule)
+	GlobalRuleRegistry.Register("one-var", one_var.OneVarRule)
 	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 	GlobalRuleRegistry.Register("no-throw-literal", no_throw_literal.NoThrowLiteralRule)
+	GlobalRuleRegistry.Register("no-useless-backreference", no_useless_backreference.NoUselessBackreferenceRule)
 	GlobalRuleRegistry.Register("no-useless-call", no_useless_call.NoUselessCallRule)
 	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
+	GlobalRuleRegistry.Register("no-useless-escape", no_useless_escape.NoUselessEscapeRule)
 	GlobalRuleRegistry.Register("no-useless-rename", no_useless_rename.NoUselessRenameRule)
 	GlobalRuleRegistry.Register("no-useless-constructor", no_useless_constructor.NoUselessConstructorRule)
 	GlobalRuleRegistry.Register("no-prototype-builtins", no_prototype_builtins.NoPrototypeBuiltinsRule)
 	GlobalRuleRegistry.Register("require-yield", require_yield.RequireYieldRule)
 	GlobalRuleRegistry.Register("symbol-description", symbol_description.SymbolDescriptionRule)
+	GlobalRuleRegistry.Register("no-unexpected-multiline", no_unexpected_multiline.NoUnexpectedMultilineRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.

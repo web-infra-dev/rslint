@@ -1,0 +1,800 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-backreference > invalid 1`] = `
+{
+  "code": "new RegExp('(\\\\1)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 2`] = `
+{
+  "code": "/^(a\\1)$/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 3`] = `
+{
+  "code": "/^((a)\\1)$/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '((a)\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 4`] = `
+{
+  "code": "/(b)(\\2a)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\2' will be ignored. It references group '(\\2a)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 5`] = `
+{
+  "code": "/a(?<foo>(.)b\\1)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(?<foo>(.)b\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 6`] = `
+{
+  "code": "/a(?<foo>\\k<foo>)b/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\k<foo>' will be ignored. It references group '(?<foo>\\k<foo>)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 7`] = `
+{
+  "code": "/(?<=(a\\1))b/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a\\1)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 8`] = `
+{
+  "code": "/\\1(a)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 9`] = `
+{
+  "code": "/\\k<foo>(?<foo>bar)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\k<foo>' will be ignored. It references group '(?<foo>bar)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 10`] = `
+{
+  "code": "/(\\2)(a)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\2' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 11`] = `
+{
+  "code": "RegExp('(a)\\\\2(b)')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\2' will be ignored. It references group '(b)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 12`] = `
+{
+  "code": "/\\1(?<=(a))./",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 13`] = `
+{
+  "code": "/(?<=(a)\\1)b/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears before in the same lookbehind.",
+      "messageId": "backward",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 14`] = `
+{
+  "code": "/(?<!(a)\\1)b/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears before in the same lookbehind.",
+      "messageId": "backward",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 15`] = `
+{
+  "code": "/(.)(?<!(b|c)\\2)d/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\2' will be ignored. It references group '(b|c)' which appears before in the same lookbehind.",
+      "messageId": "backward",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 16`] = `
+{
+  "code": "/(a)|\\1b/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which is in another alternative.",
+      "messageId": "disjunctive",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 17`] = `
+{
+  "code": "/^(?:(a)|\\1b)$/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which is in another alternative.",
+      "messageId": "disjunctive",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 18`] = `
+{
+  "code": "RegExp('(a|bc)|\\\\1')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a|bc)' which is in another alternative.",
+      "messageId": "disjunctive",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 19`] = `
+{
+  "code": "/a(?!(b)).\\1/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(b)' which is in a negative lookaround.",
+      "messageId": "intoNegativeLookaround",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 20`] = `
+{
+  "code": "/(?<!(a))b\\1/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which is in a negative lookaround.",
+      "messageId": "intoNegativeLookaround",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 21`] = `
+{
+  "code": "new RegExp('(?!(?<foo>\\\\n))\\\\1')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(?<foo>\\n)' which is in a negative lookaround.",
+      "messageId": "intoNegativeLookaround",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 22`] = `
+{
+  "code": "/\\1(a)\\2(b)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+    {
+      "message": "Backreference '\\2' will be ignored. It references group '(b)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 23`] = `
+{
+  "code": "/\\1.(?<=(a)\\1)/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears before in the same lookbehind.",
+      "messageId": "backward",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 24`] = `
+{
+  "code": "const r = RegExp, p = '\\\\1', s = '(a)'; new r(p + s);",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 25`] = `
+{
+  "code": "RegExp('\\\\1(a){', flags);",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '(a)' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 26`] = `
+{
+  "code": "new RegExp('\\\\1([[A--B]])', 'v')",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\1' will be ignored. It references group '([[A--B]])' which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 27`] = `
+{
+  "code": "/\\k<foo>((?<foo>bar)|(?<foo>baz))/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\k<foo>' will be ignored. It references group '(?<foo>bar)' and another group which appears later in the pattern.",
+      "messageId": "forward",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 28`] = `
+{
+  "code": "/((?<foo>bar)|\\k<foo>|(?<foo>baz))/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\k<foo>' will be ignored. It references group '(?<foo>bar)' and another group which is in another alternative.",
+      "messageId": "disjunctive",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-backreference > invalid 29`] = `
+{
+  "code": "/((?<foo>bar)|(?<foo>baz\\k<foo>)|(?<foo>qux\\k<foo>))/",
+  "diagnostics": [
+    {
+      "message": "Backreference '\\k<foo>' will be ignored. It references group '(?<foo>baz\\k<foo>)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+    {
+      "message": "Backreference '\\k<foo>' will be ignored. It references group '(?<foo>qux\\k<foo>)' from within that group.",
+      "messageId": "nested",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-backreference",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

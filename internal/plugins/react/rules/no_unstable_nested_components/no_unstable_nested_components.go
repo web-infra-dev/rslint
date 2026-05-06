@@ -68,27 +68,6 @@ func unwrap(node *ast.Node) *ast.Node {
 	return reactutil.SkipExpressionWrappers(node)
 }
 
-// isFunctionLike reports whether `node` is a function-shaped node we
-// classify as a "potential component" — covers FunctionDeclaration,
-// FunctionExpression, ArrowFunction, and the object-literal shorthand
-// MethodDeclaration / GetAccessor / SetAccessor (upstream catches these
-// via ESTree's `Property { method: true, value: FunctionExpression }`).
-func isFunctionLike(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration,
-		ast.KindFunctionExpression,
-		ast.KindArrowFunction,
-		ast.KindMethodDeclaration,
-		ast.KindGetAccessor,
-		ast.KindSetAccessor:
-		return true
-	}
-	return false
-}
-
 // componentEnv bundles the per-rule-invocation context every helper needs.
 // Threading a single struct keeps signatures readable and avoids drift when
 // new fields (TypeChecker, settings derivatives) are added later.
@@ -99,255 +78,11 @@ type componentEnv struct {
 	tc          *checker.Checker
 }
 
-// isDetectedComponent reports whether `node` looks like a React component.
-// Mirrors upstream's `components.get(node)` — a node is considered a
-// component when it would be classified by the plugin's Components.detect
-// pipeline. For functions we defer to `IsStatelessReactComponent` (which
-// itself recognizes the default `memo`/`forwardRef` wrapper); when an inner
-// FunctionLike sits inside a configured-but-non-default wrapper from
-// `settings.componentWrapperFunctions`, that fallback is handled here. For
-// classes we check the extends clause. For object literals we recognize the
-// `<createClass>(...)` argument shape (ES5 components). CallExpressions are
-// recognized as components when they match a configured wrapper — that's
-// what lets `validateCall` walk up from a custom `myMemo(fn)` call and find
-// itself as the closest component ancestor.
+// isDetectedComponent is a thin env-aware adapter over
+// reactutil.IsDetectedComponent — see that function's doc for the canonical
+// component-classification semantics.
 func isDetectedComponent(node *ast.Node, env componentEnv) bool {
-	if node == nil {
-		return false
-	}
-	pragma, createClass, wrappers := env.pragma, env.createClass, env.wrappers
-	switch node.Kind {
-	case ast.KindFunctionDeclaration,
-		ast.KindFunctionExpression,
-		ast.KindArrowFunction,
-		ast.KindMethodDeclaration,
-		ast.KindGetAccessor,
-		ast.KindSetAccessor:
-		// Use the wrappers-aware variant so user-configured
-		// `componentWrapperFunctions` entries participate in Branch 11
-		// (the pragma-component-wrapper arm). Without this, a
-		// `myMemo(() => null)` inner arrow would NOT classify as a
-		// stateless component, and `isStatelessComponentReturningNull`
-		// later would not be able to skip it the way upstream does.
-		if reactutil.IsStatelessReactComponentWithWrappers(node, pragma, env.tc, wrappers) {
-			return true
-		}
-		// User-configured wrapper fallback: an arrow / FE wrapped by a
-		// non-default wrapper (`myMemo(fn)` etc.) doesn't get picked up by
-		// IsStatelessReactComponent's hardcoded memo/forwardRef branch, so
-		// we walk paren / TS-wrapper hops up to the enclosing call and
-		// check the configured list. The function still has to return JSX
-		// or null on at least one path, matching upstream's
-		// `isReturningJSXOrNull` gate inside Components.detect's wrapper
-		// arm.
-		parent := reactutil.SkipExpressionWrappersUp(node)
-		if parent != nil && parent.Kind == ast.KindCallExpression &&
-			reactutil.MatchesAnyComponentWrapperWithChecker(parent, node, wrappers, env.pragma, env.tc) &&
-			reactutil.FunctionReturnsJSXOrNullWithChecker(node, pragma, env.tc) {
-			return true
-		}
-		return false
-	case ast.KindClassDeclaration, ast.KindClassExpression:
-		return reactutil.ExtendsReactComponent(node, pragma)
-	case ast.KindObjectLiteralExpression:
-		return reactutil.IsCreateReactClassObjectArg(node, pragma, createClass)
-	case ast.KindCallExpression:
-		// A wrapper call counts as a component when it matches the
-		// configured wrapper list AND its first argument is a
-		// FunctionLike. Upstream's CallExpression visitor in
-		// `Components.detect` registers via
-		// `components.add(call, 2)` whenever
-		// `isPragmaComponentWrapper(node) && isFunctionLikeExpression(arguments[0])`
-		// — note that it does NOT additionally check whether the inner
-		// FunctionLike returns JSX. Tracking that intentional looseness
-		// here keeps the report counts byte-aligned for cases like
-		// `React.memo(() => undefined)` which upstream still flags
-		// despite the inner arrow not returning JSX.
-		call := node.AsCallExpression()
-		if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
-			return false
-		}
-		inner := reactutil.SkipExpressionWrappers(call.Arguments.Nodes[0])
-		if inner == nil || !isFunctionLike(inner) {
-			return false
-		}
-		if !reactutil.MatchesAnyComponentWrapperWithChecker(node, inner, wrappers, env.pragma, env.tc) {
-			return false
-		}
-		// `nodeWrapsComponent` parity: when the wrapper is a
-		// MemberExpression (e.g. `React.memo(...)`) and its
-		// FunctionLike argument's body returns JSX whose root tag
-		// resolves to a sibling/outer detected component
-		// (arrow-assigned-to-VariableDeclarator or ClassDeclaration),
-		// upstream's `isPragmaComponentWrapper` short-circuits to
-		// false and the call is NOT registered as a component. The
-		// bare-callee form (e.g. `memo(...)` after `import { memo }
-		// from 'react'`) does NOT get this gate — see upstream
-		// `Components.js` `isPragmaComponentWrapper`, MemberExpression
-		// branch only.
-		if wrapsKnownSiblingComponent(node, inner) {
-			return false
-		}
-		return true
-	}
-	return false
-}
-
-// wrapsKnownSiblingComponent reports whether `call` is a MemberExpression
-// wrapper (e.g. `React.memo(arrow)`) whose FunctionLike argument's body
-// returns JSX (concise body or first ReturnStatement of a block) whose root
-// tag-name matches a sibling/outer arrow-assigned-to-VariableDeclarator or
-// ClassDeclaration in the same source file. Mirrors upstream's
-// `nodeWrapsComponent` gate, which is intentionally name-based (not symbol-
-// based) and only applied to the MemberExpression form of the wrapper.
-func wrapsKnownSiblingComponent(call *ast.Node, fn *ast.Node) bool {
-	if call == nil || call.Kind != ast.KindCallExpression {
-		return false
-	}
-	expr := call.AsCallExpression().Expression
-	if expr == nil || expr.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-	tag := returnedJSXRootTagName(fn)
-	if tag == "" {
-		return false
-	}
-	src := ast.GetSourceFileOfNode(call)
-	if src == nil {
-		return false
-	}
-	// Position gate matches upstream's order-dependence:
-	// `getDetectedComponents()` only returns components that have been
-	// visited so far in AST walk order, which for non-overlapping
-	// declarations is equivalent to source-position order. A sibling
-	// declared AFTER the wrapper call is invisible to upstream and must
-	// be invisible here too — otherwise we'd skip a wrapper that
-	// upstream reports.
-	return sourceHasComponentNamedBefore(src.AsNode(), tag, call.Pos())
-}
-
-// returnedJSXRootTagName extracts the root JSX tag name from a function's
-// body — covers both the concise-body case (`() => <Foo/>`) and the
-// block-body case where the FIRST top-level ReturnStatement is inspected.
-// Returns empty string when the body doesn't return a JSX element directly.
-func returnedJSXRootTagName(fn *ast.Node) string {
-	if fn == nil {
-		return ""
-	}
-	var body *ast.Node
-	switch fn.Kind {
-	case ast.KindArrowFunction:
-		body = fn.AsArrowFunction().Body
-	case ast.KindFunctionExpression:
-		body = fn.AsFunctionExpression().Body
-	case ast.KindFunctionDeclaration:
-		body = fn.AsFunctionDeclaration().Body
-	default:
-		return ""
-	}
-	if body == nil {
-		return ""
-	}
-	if body.Kind == ast.KindBlock {
-		var ret *ast.Node
-		body.ForEachChild(func(child *ast.Node) bool {
-			if child.Kind == ast.KindReturnStatement {
-				ret = child
-				return true
-			}
-			return false
-		})
-		if ret == nil {
-			return ""
-		}
-		return jsxRootTagName(ret.AsReturnStatement().Expression)
-	}
-	return jsxRootTagName(body)
-}
-
-// jsxRootTagName returns the tag-name of a JsxElement / JsxSelfClosingElement
-// (peeling paren / TS wrappers) when it's a plain identifier, or "" otherwise.
-// Member-expression tag-names (`<Foo.Bar />`) and namespaced names
-// (`<svg:circle/>`) intentionally return "" — upstream's
-// `getComponentNameFromJSXElement` only matches plain identifiers via the
-// detected-components list keyed by the binding's local name.
-func jsxRootTagName(expr *ast.Node) string {
-	expr = reactutil.SkipExpressionWrappers(expr)
-	if expr == nil {
-		return ""
-	}
-	var tag *ast.Node
-	switch expr.Kind {
-	case ast.KindJsxElement:
-		opening := expr.AsJsxElement().OpeningElement
-		if opening != nil {
-			tag = opening.AsJsxOpeningElement().TagName
-		}
-	case ast.KindJsxSelfClosingElement:
-		tag = expr.AsJsxSelfClosingElement().TagName
-	default:
-		return ""
-	}
-	if tag == nil || tag.Kind != ast.KindIdentifier {
-		return ""
-	}
-	return tag.AsIdentifier().Text
-}
-
-// sourceHasComponentNamedBefore scans the source file for a sibling/outer
-// component declaration whose name equals `name` and whose start position
-// precedes `before`. Mirrors upstream's `getDetectedComponents` filter —
-// only `class` declarations and arrow-assigned-to-VariableDeclarator
-// declarations qualify; function declarations do NOT (upstream's filter
-// in `Components.js getDetectedComponents` only retains those two kinds).
-// The position gate replicates upstream's order-dependence: a sibling
-// declared AFTER the use site has not yet been added to the components
-// list when `isPragmaComponentWrapper` runs, so it must not match here
-// either.
-func sourceHasComponentNamedBefore(root *ast.Node, name string, before int) bool {
-	if root == nil || name == "" {
-		return false
-	}
-	var found bool
-	var visit func(n *ast.Node)
-	visit = func(n *ast.Node) {
-		if found || n == nil {
-			return
-		}
-		if n.Pos() >= before {
-			// Subtree starts at or after the use site — upstream's AST
-			// walk wouldn't have reached it yet. Skip the entire subtree.
-			return
-		}
-		switch n.Kind {
-		case ast.KindClassDeclaration:
-			id := n.Name()
-			if id != nil && id.Kind == ast.KindIdentifier && id.AsIdentifier().Text == name {
-				found = true
-				return
-			}
-		case ast.KindVariableDeclaration:
-			vd := n.AsVariableDeclaration()
-			if vd.Initializer == nil {
-				break
-			}
-			init := reactutil.SkipExpressionWrappers(vd.Initializer)
-			if init == nil || init.Kind != ast.KindArrowFunction {
-				break
-			}
-			id := vd.Name()
-			if id != nil && id.Kind == ast.KindIdentifier && id.AsIdentifier().Text == name {
-				found = true
-				return
-			}
-		}
-		n.ForEachChild(func(child *ast.Node) bool {
-			visit(child)
-			return found
-		})
-	}
-	visit(root)
-	return found
+	return reactutil.IsDetectedComponent(node, env.pragma, env.createClass, env.wrappers, env.tc)
 }
 
 // isInsideWrapperCall reports whether `node` is the FunctionLike argument of
@@ -646,7 +381,7 @@ func isStatelessComponentReturningNull(node *ast.Node, env componentEnv) bool {
 // as a "function component inside class component" purely on the basis
 // of returning JSX.
 func isFunctionComponentInsideClassComponent(node *ast.Node, env componentEnv) bool {
-	if !isFunctionLike(node) {
+	if !reactutil.IsFunctionLikeForComponent(node) {
 		return false
 	}
 	parent := getClosestParentComponent(node, env)
@@ -657,7 +392,7 @@ func isFunctionComponentInsideClassComponent(node *ast.Node, env componentEnv) b
 		return false
 	}
 	enclosingFn := ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
-		return isFunctionLike(n)
+		return reactutil.IsFunctionLikeForComponent(n)
 	})
 	if enclosingFn == nil {
 		return false
@@ -817,7 +552,7 @@ var NoUnstableNestedComponentsRule = rule.Rule{
 			// `components.add(call, 2)` registration). Suppress the inner
 			// FunctionLike report so the diagnostic position aligns with
 			// upstream byte-for-byte.
-			if isFunctionLike(node) && isInsideWrapperCall(node, env) {
+			if reactutil.IsFunctionLikeForComponent(node) && isInsideWrapperCall(node, env) {
 				return
 			}
 

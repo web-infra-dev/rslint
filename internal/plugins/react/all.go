@@ -1,7 +1,12 @@
 package react_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_dom_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_elements"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
@@ -19,17 +24,17 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_uses_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_wrap_multilines"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_access_state_in_setstate"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_array_index_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_children_prop"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_danger_with_children"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_deprecated"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_mount_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_did_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_direct_mutation_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_find_dom_node"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_is_mounted"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
-	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_multi_comp"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_redundant_should_component_update"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_render_return_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_string_refs"
@@ -37,6 +42,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unknown_property"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_will_update_set_state"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_es6_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/prefer_stateless_function"
@@ -47,6 +55,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/void_dom_elements_no_children"
 	"github.com/web-infra-dev/rslint/internal/rule"
 
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_child_element_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_curly_brace_presence"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_comment_textnodes"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_leaked_render"
@@ -55,7 +64,12 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
+		forbid_component_props.ForbidComponentPropsRule,
+		forbid_dom_props.ForbidDomPropsRule,
+		forbid_elements.ForbidElementsRule,
+		forbid_prop_types.ForbidPropTypesRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
 		jsx_equals_spacing.JsxEqualsSpacingRule,
@@ -73,14 +87,17 @@ func GetAllRules() []rule.Rule {
 		jsx_uses_vars.JsxUsesVarsRule,
 		jsx_wrap_multilines.JsxWrapMultilinesRule,
 		no_access_state_in_setstate.NoAccessStateInSetstateRule,
+		no_array_index_key.NoArrayIndexKeyRule,
 		no_children_prop.NoChildrenPropRule,
 		no_danger.NoDangerRule,
 		no_danger_with_children.NoDangerWithChildrenRule,
 		no_deprecated.NoDeprecatedRule,
+		no_did_mount_set_state.NoDidMountSetStateRule,
 		no_did_update_set_state.NoDidUpdateSetStateRule,
 		no_direct_mutation_state.NoDirectMutationStateRule,
 		no_find_dom_node.NoFindDomNodeRule,
 		no_is_mounted.NoIsMountedRule,
+		no_multi_comp.NoMultiCompRule,
 		no_unstable_nested_components.NoUnstableNestedComponentsRule,
 		no_unused_class_component_methods.NoUnusedClassComponentMethodsRule,
 		no_unused_state.NoUnusedStateRule,
@@ -99,6 +116,7 @@ func GetAllRules() []rule.Rule {
 		self_closing_comp.SelfClosingCompRule,
 		style_prop_object.StylePropObjectRule,
 		void_dom_elements_no_children.VoidDomElementsNoChildrenRule,
+		jsx_child_element_spacing.JsxChildElementSpacingRule,
 		jsx_curly_brace_presence.JsxCurlyBracePresenceRule,
 		jsx_no_comment_textnodes.JsxNoCommentTextnodesRule,
 		jsx_no_leaked_render.JsxNoLeakedRenderRule,

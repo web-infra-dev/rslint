@@ -48,7 +48,7 @@ var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				typeParam := node.AsTypeParameter()
+				typeParam := node.AsTypeParameterDeclaration()
 				if typeParam == nil || typeParam.Constraint == nil {
 					return
 				}

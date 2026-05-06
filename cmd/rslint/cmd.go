@@ -832,6 +832,7 @@ func runCMD() int {
 	// no type info) and only run non-type-aware rules.
 	var typeInfoFiles map[string]struct{}
 	var capturedGapFiles []string // retained for --fix rebuild
+	fallbackProgramIndex := -1    // index of the gap-file fallback program (if any) within `programs`
 
 	{
 		programFiles := utils.CollectProgramFiles(programs, fs)
@@ -885,40 +886,45 @@ func runCMD() int {
 				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs)
 				if fallback != nil {
 					programs = append(programs, fallback)
+					fallbackProgramIndex = len(programs) - 1
 				}
 			}
 		}
 	}
 
 	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
-	createPrograms := func() ([]*compiler.Program, error) {
+	// Returns the program slice and the index of the fallback gap-file program
+	// (or -1 if none), so callers can mark it skipped during type-check.
+	createPrograms := func() ([]*compiler.Program, int, error) {
 		var baseProgs []*compiler.Program
 		if configMap != nil {
 			seen := make(map[string]struct{})
 			for configDir, entries := range configMap {
 				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen)
 				if exitCode != 0 {
-					return nil, fmt.Errorf("failed to create programs for %s", configDir)
+					return nil, -1, fmt.Errorf("failed to create programs for %s", configDir)
 				}
 				baseProgs = append(baseProgs, progs...)
 			}
 		} else {
 			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
 			if exitCode != 0 {
-				return nil, errors.New("failed to create programs")
+				return nil, -1, errors.New("failed to create programs")
 			}
 			baseProgs = append(baseProgs, progs...)
 		}
 
 		// Rebuild fallback Program for gap files (content may have changed after fixes).
+		fallbackIdx := -1
 		if len(capturedGapFiles) > 0 {
 			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs)
 			if fallback != nil {
 				baseProgs = append(baseProgs, fallback)
+				fallbackIdx = len(baseProgs) - 1
 			}
 		}
 
-		return baseProgs, nil
+		return baseProgs, fallbackIdx, nil
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -953,23 +959,29 @@ func runCMD() int {
 
 	// Build per-program file filters combining:
 	//   - multi-config ownership deduplication (ESLint v10 aligned)
-	//   - config `ignores` exclusion (applies to rules, type-check, and counts)
+	//   - config `ignores` exclusion (applies to rules and counts)
 	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
 
-	lintResult, err := linter.RunLinter(
-		programs,
-		singleThreaded,
-		allowFiles,
-		allowDirs,
-		utils.ExcludePaths,
-		getRulesForFile,
-		typeCheck,
-		func(d rule.RuleDiagnostic) {
+	// fallback gap program (if any) is excluded from --type-check: its
+	// CompilerOptions are synthesized defaults, not the user's tsconfig,
+	// so semantic diagnostics there would be unreliable. This honors the
+	// commitment in website/docs/en/guide/type-checking.md ("Files Without
+	// tsconfig Coverage").
+	skipTypeCheck := buildTypeCheckSkipMask(len(programs), fallbackProgramIndex)
+
+	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+		Programs:              programs,
+		SingleThreaded:        singleThreaded,
+		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+		PerProgramFilter:      toFileFilters(fileFilters),
+		GetRulesForFile:       getRulesForFile,
+		TypeInfoFiles:         typeInfoFiles,
+		TypeCheck:             typeCheck,
+		SkipTypeCheckPrograms: skipTypeCheck,
+		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
-		typeInfoFiles,
-		fileFilters,
-	)
+	})
 
 	close(diagnosticsChan)
 	if err != nil {
@@ -1048,7 +1060,7 @@ func runCMD() int {
 		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
 		// Skip if nothing was fixed in the first pass (no need to re-lint).
 		for pass := 1; pass < maxFixPasses && fixedCount > 0; pass++ {
-			newPrograms, err := createPrograms()
+			newPrograms, newFallbackIdx, err := createPrograms()
 			if err != nil || len(newPrograms) == 0 {
 				break
 			}
@@ -1056,23 +1068,23 @@ func runCMD() int {
 			// Re-lint: collect remaining diagnostics.
 			// Rebuild file filters for the new programs (ownership + ignores).
 			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
+			fixSkipMask := buildTypeCheckSkipMask(len(newPrograms), newFallbackIdx)
 			var passDiags []rule.RuleDiagnostic
-			passResult, _ := linter.RunLinter(
-				newPrograms,
-				singleThreaded,
-				allowFiles,
-				allowDirs,
-				utils.ExcludePaths,
-				getRulesForFile,
-				typeCheck,
-				func(d rule.RuleDiagnostic) {
+			passResult, _ := linter.RunLinter(linter.RunLinterOptions{
+				Programs:              newPrograms,
+				SingleThreaded:        singleThreaded,
+				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+				PerProgramFilter:      toFileFilters(fixFileFilters),
+				GetRulesForFile:       getRulesForFile,
+				TypeInfoFiles:         typeInfoFiles,
+				TypeCheck:             typeCheck,
+				SkipTypeCheckPrograms: fixSkipMask,
+				OnDiagnostic: func(d rule.RuleDiagnostic) {
 					diagsMu.Lock()
 					passDiags = append(passDiags, d)
 					diagsMu.Unlock()
 				},
-				typeInfoFiles,
-				fixFileFilters,
-			)
+			})
 			if passResult != nil {
 				for name := range passResult.ExecutedRules {
 					lintResult.ExecutedRules[name] = struct{}{}

@@ -2,8 +2,6 @@ package prefer_const
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -41,8 +39,12 @@ type candidateInfo struct {
 
 // https://eslint.org/docs/latest/rules/prefer-const
 var PreferConstRule = rule.Rule{
-	Name: "prefer-const",
+	Name:             "prefer-const",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
+		// gap files / inferred-project files, but if a future caller bypasses
+		// the filter we still want to no-op rather than nil-deref.
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}
@@ -160,7 +162,7 @@ var PreferConstRule = rule.Rule{
 						Description: "'" + name + "' is never reassigned. Use 'const' instead.",
 					}
 					if canFix {
-						letRange := getLetKeywordRange(node, ctx.SourceFile)
+						letRange := utils.GetVarKeywordRange(node, ctx.SourceFile)
 						ctx.ReportNodeWithFixes(reportOn, msg,
 							rule.RuleFixReplaceRange(letRange, "const"))
 					} else {
@@ -226,12 +228,6 @@ func collectBindingNames(nameNode *ast.Node, hasInitializer bool) []candidateInf
 		})
 	})
 	return result
-}
-
-// getLetKeywordRange returns the text range of the `let` keyword in a VariableDeclarationList.
-func getLetKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
-	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-	return core.NewTextRange(s.TokenStart(), s.TokenEnd())
 }
 
 // isInForStatement checks if a VariableDeclarationList is the initializer of a regular for statement.
@@ -833,7 +829,6 @@ func hasTargetNotInSet(node *ast.Node, names map[string]bool) bool {
 	})
 	return found
 }
-
 
 // isStandaloneAssignment checks if a write reference identifier is part of an
 // assignment expression that is directly inside an ExpressionStatement.

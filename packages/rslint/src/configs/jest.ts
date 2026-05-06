@@ -9,15 +9,15 @@ const recommended: RslintConfigEntry = {
     'jest/no-alias-methods': 'error',
     // 'jest/no-commented-out-tests': 'warn', // not implemented
     // 'jest/no-conditional-expect': 'error', // not implemented
-    // 'jest/no-deprecated-functions': 'error', // not implemented
+    'jest/no-deprecated-functions': 'error',
     'jest/no-disabled-tests': 'warn',
-    // 'jest/no-done-callback': 'error', // not implemented
+    'jest/no-done-callback': 'error',
     // 'jest/no-export': 'error', // not implemented
     'jest/no-focused-tests': 'error',
     // 'jest/no-identical-title': 'error', // not implemented
     // 'jest/no-interpolation-in-snapshots': 'error', // not implemented
     // 'jest/no-jasmine-globals': 'error', // not implemented
-    // 'jest/no-mocks-import': 'error', // not implemented
+    'jest/no-mocks-import': 'error',
     // 'jest/no-standalone-expect': 'error', // not implemented
     'jest/no-test-prefixes': 'error',
     'jest/valid-describe-callback': 'error',
