@@ -63,6 +63,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_curly_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_comment_textnodes"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_leaked_render"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_literals"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_no_script_url"
 )
 
@@ -128,6 +129,7 @@ func GetAllRules() []rule.Rule {
 		jsx_curly_spacing.JsxCurlySpacingRule,
 		jsx_no_comment_textnodes.JsxNoCommentTextnodesRule,
 		jsx_no_leaked_render.JsxNoLeakedRenderRule,
+		jsx_no_literals.JsxNoLiteralsRule,
 		jsx_no_script_url.JsxNoScriptUrlRule,
 	}
 }
