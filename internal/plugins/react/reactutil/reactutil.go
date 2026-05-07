@@ -24,6 +24,24 @@ const DefaultReactPragma = "React"
 // rule that needs to recognize hook calls re-derives the same predicate.
 var hookNameRegex = regexp.MustCompile(`^use[A-Z0-9].*$`)
 
+// ApplyData expands `{{key}}` placeholders in a message template using the
+// given data map, mirroring ESLint's `RuleMessage.data` interpolation. Keys
+// not present in `data` are left untouched, matching ESLint's behavior of
+// passing through unknown placeholders verbatim. Use this whenever a rule
+// emits a templated `RuleMessage.Description` so the in-rule code reads like
+// the upstream `messages` table instead of hand-rolled `strings.ReplaceAll`
+// loops.
+func ApplyData(template string, data map[string]string) string {
+	if len(data) == 0 {
+		return template
+	}
+	out := template
+	for k, v := range data {
+		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
+	}
+	return out
+}
+
 // IsHookName reports whether `name` matches the React hook naming convention.
 // Returns false for empty input.
 func IsHookName(name string) bool {
@@ -2320,7 +2338,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 		// (`createElement`) / nested Identifiers. We mirror that here:
 		// resolve the initializer one step, accept iff the resolved node
 		// is itself a JSX element/fragment. Anything else returns false.
-		init := resolveIdentifierInitializer(expr, tc)
+		init := ResolveIdentifierInitializer(expr, tc)
 		if init == nil {
 			return false
 		}
@@ -2350,7 +2368,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 	return false
 }
 
-// resolveIdentifierInitializer returns the value-side AST node that an
+// ResolveIdentifierInitializer returns the value-side AST node that an
 // Identifier reference is bound to, or nil when the binding cannot be
 // determined.
 //
@@ -2365,7 +2383,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 //     SourceFile / ModuleBlock / CaseBlock statements for a
 //     `VariableStatement` declaring `name` — catches the common
 //     same-block initializer case without scope analysis.
-func resolveIdentifierInitializer(ident *ast.Node, tc *checker.Checker) *ast.Node {
+func ResolveIdentifierInitializer(ident *ast.Node, tc *checker.Checker) *ast.Node {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return nil
 	}
