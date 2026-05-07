@@ -60,10 +60,28 @@ pub struct NodeReference {
     pub end: u32,
 }
 
+/// Origin of a symbol's `name` field. Lets consumers distinguish user-spelled
+/// identifiers from typescript-go's internal sentinel-prefixed names without
+/// having to inspect the string contents.
+///
+/// Wire format: serialized as a `u8` tag.
+pub mod symbol_name_kind {
+    /// User-spelled identifier or literal.
+    pub const USER: u8 = 0;
+    /// One of TypeScript's `InternalSymbolName` values (e.g. `"index"`,
+    /// `"call"`, `"new"`, `"type"`); the `\xFE` sentinel has been stripped.
+    pub const INTERNAL: u8 = 1;
+    /// Private class member, reported as `"#<class-id>@#<name>"` with the
+    /// `\xFE` sentinel stripped.
+    pub const PRIVATE: u8 = 2;
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct SymbolData {
     #[serde(with = "serde_bytes")]
     pub name: Vec<u8>,
+    #[serde(default)]
+    pub name_kind: u8,
     pub flags: u32,
     pub check_flags: u32,
     #[serde(default)]

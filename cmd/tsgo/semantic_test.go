@@ -230,13 +230,23 @@ func TestSemanticSnapshot_NonBMPCharPositions(t *testing.T) {
 
 func TestSemanticSnapshot_InternalSymbolNameSanitized(t *testing.T) {
 	// Arrow functions produce an internal symbol with name "\xFEfunction".
-	// Verify that the \xFE prefix is sanitized to "__" in the output.
+	// Verify the wire-format strips the sentinel and tags the name kind.
 	fixture := buildSemanticFixture(t, "const f = () => 1;")
 
+	var sawInternal bool
 	for _, sym := range fixture.semantic.Symtab {
 		name := string(sym.Name)
 		if strings.Contains(name, "\xFE") {
-			t.Fatalf("symbol name contains unsanitized \\xFE: %q", name)
+			t.Fatalf("symbol name contains unstripped \\xFE: %q", name)
 		}
+		if sym.NameKind == SymbolNameKindInternal {
+			sawInternal = true
+			if name == "function" && sym.NameKind != SymbolNameKindInternal {
+				t.Fatalf("expected NameKind=Internal for %q, got %d", name, sym.NameKind)
+			}
+		}
+	}
+	if !sawInternal {
+		t.Fatalf("expected at least one Internal-kind symbol from arrow function fixture")
 	}
 }

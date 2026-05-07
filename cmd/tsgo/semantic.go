@@ -10,13 +10,35 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 )
 
-// sanitizeSymbolName replaces the internal symbol name prefix (\xFE) with "__"
-// so that consumers receive valid UTF-8 symbol names.
-func sanitizeSymbolName(name string) []byte {
-	if strings.HasPrefix(name, ast.InternalSymbolNamePrefix) {
-		return []byte("__" + name[len(ast.InternalSymbolNamePrefix):])
+// SymbolNameKind classifies a symbol's name origin so consumers can tell
+// user-spelled identifiers apart from typescript-go's internal sentinel names
+// without having to inspect string prefixes.
+type SymbolNameKind uint8
+
+const (
+	// SymbolNameKindUser is a regular user-spelled identifier or literal.
+	SymbolNameKindUser SymbolNameKind = 0
+	// SymbolNameKindInternal is one of TypeScript's InternalSymbolName values
+	// (e.g. "index", "call", "new", "type"). Reported with the "\xFE"
+	// sentinel stripped.
+	SymbolNameKindInternal SymbolNameKind = 1
+	// SymbolNameKindPrivate is a private class member. Reported in the form
+	// "#<class-id>@#<name>" with the "\xFE" sentinel stripped.
+	SymbolNameKindPrivate SymbolNameKind = 2
+)
+
+// classifySymbolName strips typescript-go's "\xFE" sentinel and tags how the
+// resulting name should be interpreted. The returned bytes are always valid
+// UTF-8 and never re-encode the sentinel.
+func classifySymbolName(name string) (SymbolNameKind, []byte) {
+	rest, ok := strings.CutPrefix(name, ast.InternalSymbolNamePrefix)
+	if !ok {
+		return SymbolNameKindUser, []byte(name)
 	}
-	return []byte(name)
+	if strings.HasPrefix(rest, "#") {
+		return SymbolNameKindPrivate, []byte(rest)
+	}
+	return SymbolNameKindInternal, []byte(rest)
 }
 
 //go:linkname getAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
@@ -32,10 +54,11 @@ type NodeReference struct {
 	End          int          `json:"end"`
 }
 type SymbolInfo struct {
-	Id         ast.SymbolId `json:"id"`
-	Name       CString      `json:"name"`
-	Flags      int          `json:"flags"`
-	CheckFlags int          `json:"check_flags"`
+	Id         ast.SymbolId   `json:"id"`
+	Name       CString        `json:"name"`
+	NameKind   SymbolNameKind `json:"name_kind"`
+	Flags      int            `json:"flags"`
+	CheckFlags int            `json:"check_flags"`
 	// Declaration node reference (if available)
 	Decl *NodeReference `json:"decl,omitempty"`
 }
@@ -218,9 +241,11 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 						}
 					}
 
+					nameKind, name := classifySymbolName(symbol.Name)
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
-						Name:       sanitizeSymbolName(symbol.Name),
+						Name:       name,
+						NameKind:   nameKind,
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
 						Decl:       declRef,
@@ -263,9 +288,11 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 							}
 						}
 
+						nameKind, name := classifySymbolName(valueSymbol.Name)
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
-							Name:       sanitizeSymbolName(valueSymbol.Name),
+							Name:       name,
+							NameKind:   nameKind,
 							Flags:      int(valueSymbol.Flags),
 							CheckFlags: int(valueSymbol.CheckFlags),
 							Decl:       declRef,
