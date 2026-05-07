@@ -44,6 +44,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_typos"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unescaped_entities"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unknown_property"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unsafe"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unstable_nested_components"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_class_component_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/no_unused_state"
@@ -113,6 +114,7 @@ func GetAllRules() []rule.Rule {
 		no_typos.NoTyposRule,
 		no_unescaped_entities.NoUnescapedEntitiesRule,
 		no_unknown_property.NoUnknownPropertyRule,
+		no_unsafe.NoUnsafeRule,
 		no_will_update_set_state.NoWillUpdateSetStateRule,
 		prefer_es6_class.PreferEs6ClassRule,
 		prefer_stateless_function.PreferStatelessFunctionRule,

@@ -137,6 +137,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-unused-class-component-methods.test.ts',
     './tests/eslint-plugin-react/rules/no-unused-state.test.ts',
     './tests/eslint-plugin-react/rules/no-unknown-property.test.ts',
+    './tests/eslint-plugin-react/rules/no-unsafe.test.ts',
     './tests/eslint-plugin-react/rules/no-will-update-set-state.test.ts',
     './tests/eslint-plugin-react/rules/prefer-es6-class.test.ts',
     './tests/eslint-plugin-react/rules/prefer-stateless-function.test.ts',
