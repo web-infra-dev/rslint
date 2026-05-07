@@ -1226,6 +1226,15 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 		return false
 	}
 	expr := ast.SkipParentheses(hc.Expression)
+	// OptionalChain in extends (`extends React?.Component`) is parsed as a
+	// `ChainExpression` upstream, which `componentUtil.isES6Component` does
+	// NOT match (it only inspects `MemberExpression` / `Identifier`). tsgo
+	// flags an OptionalChain via `QuestionDotToken` on the same
+	// PropertyAccessExpression, so we must explicitly reject it here to
+	// stay aligned with upstream's no-match behavior.
+	if ast.IsOptionalChain(expr) {
+		return false
+	}
 	switch expr.Kind {
 	case ast.KindIdentifier:
 		return isComponentName(expr.AsIdentifier().Text)
