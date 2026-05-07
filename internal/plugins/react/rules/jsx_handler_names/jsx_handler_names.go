@@ -343,7 +343,7 @@ var JsxHandlerNamesRule = rule.Rule{
 					}
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "badHandlerName",
-						Description: applyData(msgBadHandlerName, data),
+						Description: reactutil.ApplyData(msgBadHandlerName, data),
 						Data:        data,
 					})
 				case propFnIsNamedCorrectly && opts.propEventHandlerRegex != nil && !propIsEventHandler:
@@ -353,7 +353,7 @@ var JsxHandlerNamesRule = rule.Rule{
 					}
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "badPropKey",
-						Description: applyData(msgBadPropKey, data),
+						Description: reactutil.ApplyData(msgBadPropKey, data),
 						Data:        data,
 					})
 				}
@@ -362,10 +362,3 @@ var JsxHandlerNamesRule = rule.Rule{
 	},
 }
 
-func applyData(template string, data map[string]string) string {
-	out := template
-	for k, v := range data {
-		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
-	}
-	return out
-}
