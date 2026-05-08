@@ -3,6 +3,7 @@ package react_plugin
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/boolean_prop_naming"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/button_has_type"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/display_name"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_component_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_dom_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_elements"
@@ -75,6 +76,7 @@ func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		boolean_prop_naming.BooleanPropNamingRule,
 		button_has_type.ButtonHasTypeRule,
+		display_name.DisplayNameRule,
 		forbid_component_props.ForbidComponentPropsRule,
 		forbid_dom_props.ForbidDomPropsRule,
 		forbid_elements.ForbidElementsRule,
