@@ -1,8 +1,6 @@
 package jsx_indent
 
 import (
-	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -39,104 +37,10 @@ var JsxIndentRule = rule.Rule{
 		text := ctx.SourceFile.Text()
 		lineMap := ctx.SourceFile.ECMALineMap()
 
+		// lineOfPos is the only line-number helper kept local; the indent
+		// / first-in-line / message helpers live in `reactutil`.
 		lineOfPos := func(pos int) int {
 			return scanner.ComputeLineOfPosition(lineMap, pos)
-		}
-
-		// lineStartOfPos returns the byte offset of the first char of the
-		// line containing pos, using the line map.
-		lineStartOfPos := func(pos int) int {
-			line := lineOfPos(pos)
-			return int(lineMap[line])
-		}
-
-		// lineIndentAt returns the count of leading `indentChar` runs at
-		// the start of the line containing pos. Mirrors upstream's
-		// `^[ ]+` / `^[\t]+` slice on `getText(node, node.loc.start.column)`.
-		lineIndentAt := func(pos int) int {
-			start := lineStartOfPos(pos)
-			count := 0
-			for i := start; i < len(text); i++ {
-				if text[i] != indentChar {
-					break
-				}
-				count++
-			}
-			return count
-		}
-
-		nodeStartIndent := func(node *ast.Node) int {
-			trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			return lineIndentAt(trimmed.Pos())
-		}
-		nodeEndIndent := func(node *ast.Node) int {
-			trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			pos := trimmed.End()
-			if pos > 0 {
-				pos--
-			}
-			return lineIndentAt(pos)
-		}
-
-		// isNodeFirstInLine reports whether node is the first non-whitespace
-		// (and non-comma) source character on its line. Walks back from the
-		// trimmed start over spaces, tabs, commas and CR; a leading newline
-		// (or start-of-file) means yes, anything else means no. The comma
-		// skip mirrors upstream's `getFirstNodeInLine` behaviour for
-		// array-literal siblings.
-		isNodeFirstInLine := func(node *ast.Node) bool {
-			trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			i := trimmed.Pos() - 1
-			for i >= 0 {
-				c := text[i]
-				if c == '\n' {
-					return true
-				}
-				if c == ' ' || c == '\t' || c == ',' || c == '\r' {
-					i--
-					continue
-				}
-				return false
-			}
-			return true
-		}
-
-		// makeMsg builds the wrongIndent diagnostic message.
-		makeMsg := func(needed, gotten int) rule.RuleMessage {
-			characters := "characters"
-			if needed == 1 {
-				characters = "character"
-			}
-			return rule.RuleMessage{
-				Id: "wrongIndent",
-				Description: fmt.Sprintf(
-					"Expected indentation of %d %s %s but found %d.",
-					needed, indentType, characters, gotten,
-				),
-				Data: map[string]string{
-					"needed":     strconv.Itoa(needed),
-					"type":       indentType,
-					"characters": characters,
-					"gotten":     strconv.Itoa(gotten),
-				},
-			}
-		}
-
-		// reportIndent emits a wrongIndent diagnostic with the upstream
-		// "default" fix (replace whitespace from start-of-line to node
-		// start with the expected indent). Used for JsxOpeningElement /
-		// JsxClosingElement / JsxExpression. JsxText, ReturnStatement and
-		// JsxAttribute take dedicated paths via reportLiteral /
-		// reportReturn / reportAttribute below.
-		reportIndent := func(node *ast.Node, needed, gotten int) {
-			indent := strings.Repeat(string(indentChar), needed)
-			trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			startCol := trimmed.Pos()
-			lineStart := lineStartOfPos(startCol)
-			ctx.ReportNodeWithFixes(node, makeMsg(needed, gotten), rule.RuleFix{
-				Text:  indent,
-				Range: core.NewTextRange(lineStart, startCol),
-			})
 		}
 
 		// reportLiteral emits one diagnostic per mis-indented line of a
@@ -147,7 +51,7 @@ var JsxIndentRule = rule.Rule{
 		// of the parent's opening tag).
 		reportLiteral := func(node *ast.Node, needed, gotten int, fixed string) {
 			rawRange := core.NewTextRange(node.Pos(), node.End())
-			ctx.ReportRangeWithFixes(rawRange, makeMsg(needed, gotten), rule.RuleFix{
+			ctx.ReportRangeWithFixes(rawRange, reactutil.WrongIndentMessage(needed, gotten, indentType), rule.RuleFix{
 				Text:  fixed,
 				Range: rawRange,
 			})
@@ -163,14 +67,15 @@ var JsxIndentRule = rule.Rule{
 			start := trimmed.Pos()
 			end := trimmed.End()
 			raw := text[start:end]
+			msg := reactutil.WrongIndentMessage(needed, gotten, indentType)
 			if !strings.Contains(raw, "\n") {
-				ctx.ReportNode(node, makeMsg(needed, gotten))
+				ctx.ReportNode(node, msg)
 				return
 			}
 			lastNL := strings.LastIndex(raw, "\n")
 			lastLine := raw[lastNL:]
 			fixedLast := replaceFirstLeadingIndent(lastLine, indent)
-			ctx.ReportNodeWithFixes(node, makeMsg(needed, gotten), rule.RuleFix{
+			ctx.ReportNodeWithFixes(node, msg, rule.RuleFix{
 				Text:  fixedLast,
 				Range: core.NewTextRange(start+lastNL, end),
 			})
@@ -183,7 +88,7 @@ var JsxIndentRule = rule.Rule{
 		// the anchor token, NOT on the JsxAttribute.
 		reportAttribute := func(anchorPos int, needed, gotten int, fixRange core.TextRange, fixText string) {
 			anchorRange := core.NewTextRange(anchorPos, anchorPos+1)
-			ctx.ReportRangeWithFixes(anchorRange, makeMsg(needed, gotten), rule.RuleFix{
+			ctx.ReportRangeWithFixes(anchorRange, reactutil.WrongIndentMessage(needed, gotten, indentType), rule.RuleFix{
 				Text:  fixText,
 				Range: fixRange,
 			})
@@ -284,14 +189,14 @@ var JsxIndentRule = rule.Rule{
 		}
 
 		checkNodesIndent := func(node *ast.Node, indent int) {
-			nodeIndent := nodeStartIndent(node)
+			nodeIndent := reactutil.NodeStartIndent(ctx.SourceFile, node, indentChar)
 			isCorrectRightInLogicalExp := isRightInLogicalExp(node) && (nodeIndent-indent) == indentSize
 			isCorrectAlternateInCondExp := isAlternateInConditionalExp(node) && (nodeIndent-indent) == 0
 			if nodeIndent != indent &&
-				isNodeFirstInLine(node) &&
+				reactutil.IsNodeFirstInLine(ctx.SourceFile, node) &&
 				!isCorrectRightInLogicalExp &&
 				!isCorrectAlternateInCondExp {
-				reportIndent(node, indent, nodeIndent)
+				reactutil.ReportIndentReplaceLeading(ctx, node, indent, nodeIndent, indentChar, indentType)
 			}
 		}
 
@@ -433,7 +338,7 @@ var JsxIndentRule = rule.Rule{
 			if opening := jsxParentOpening(node); opening != nil {
 				openingTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, opening)
 				sameLine := lineOfPos(openingTrimmed.Pos()) == lineOfPos(startPos)
-				return lineIndentAt(openingTrimmed.Pos()), sameLine, true
+				return reactutil.IndentLeading(text, lineMap, openingTrimmed.Pos(), indentChar), sameLine, true
 			}
 
 			i := startPos - 1
@@ -448,7 +353,7 @@ var JsxIndentRule = rule.Rule{
 				if container != nil {
 					containerTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, container)
 					sameLine := lineOfPos(containerTrimmed.Pos()) == lineOfPos(startPos)
-					return lineIndentAt(containerTrimmed.Pos()), sameLine, true
+					return reactutil.IndentLeading(text, lineMap, containerTrimmed.Pos(), indentChar), sameLine, true
 				}
 				i--
 				for i >= 0 && (text[i] == ' ' || text[i] == '\t' || text[i] == '\r' || text[i] == '\n') {
@@ -457,20 +362,20 @@ var JsxIndentRule = rule.Rule{
 				if i < 0 {
 					return 0, false, true
 				}
-				return lineIndentAt(i), false, true
+				return reactutil.IndentLeading(text, lineMap, i, indentChar), false, true
 			}
 			if text[i] == ':' {
 				anchor := colonAnchor(node)
 				if anchor != nil {
 					anchorTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, anchor)
 					sameLine := lineOfPos(anchorTrimmed.Pos()) == lineOfPos(startPos)
-					return lineIndentAt(anchorTrimmed.Pos()), sameLine, true
+					return reactutil.IndentLeading(text, lineMap, anchorTrimmed.Pos(), indentChar), sameLine, true
 				}
 				// Fall through: no enclosing conditional — use the `:`
 				// position.
 			}
 			sameLine := lineOfPos(i) == lineOfPos(startPos)
-			return lineIndentAt(i), sameLine, true
+			return reactutil.IndentLeading(text, lineMap, i, indentChar), sameLine, true
 		}
 
 		handleOpeningElement := func(node *ast.Node) {
@@ -501,7 +406,7 @@ var JsxIndentRule = rule.Rule{
 			default:
 				return
 			}
-			peerIndent := nodeStartIndent(openingNode)
+			peerIndent := reactutil.NodeStartIndent(ctx.SourceFile, openingNode, indentChar)
 			checkNodesIndent(node, peerIndent)
 		}
 
@@ -536,7 +441,7 @@ var JsxIndentRule = rule.Rule{
 				return
 			}
 			anchorPos := i
-			lineStart := lineStartOfPos(anchorPos)
+			lineStart := reactutil.IndentLineStart(lineMap, anchorPos)
 			actualIndent := 0
 			for j := lineStart; j < anchorPos; j++ {
 				if text[j] != indentChar {
@@ -560,7 +465,7 @@ var JsxIndentRule = rule.Rule{
 			}
 			nameLine := lineOfPos(nameNode.Pos())
 			anchorLine := lineOfPos(anchorPos)
-			expectedIndent := nodeStartIndent(nameNode)
+			expectedIndent := reactutil.NodeStartIndent(ctx.SourceFile, nameNode, indentChar)
 			if nameLine == anchorLine {
 				expectedIndent = 0
 			}
@@ -577,7 +482,7 @@ var JsxIndentRule = rule.Rule{
 			if parent == nil {
 				return
 			}
-			parentIndent := nodeStartIndent(parent)
+			parentIndent := reactutil.NodeStartIndent(ctx.SourceFile, parent, indentChar)
 			checkNodesIndent(node, parentIndent+indentSize)
 		}
 
@@ -589,7 +494,7 @@ var JsxIndentRule = rule.Rule{
 			if parent.Kind != ast.KindJsxElement && parent.Kind != ast.KindJsxFragment {
 				return
 			}
-			parentIndent := nodeStartIndent(parent)
+			parentIndent := reactutil.NodeStartIndent(ctx.SourceFile, parent, indentChar)
 			checkLiteralNodeIndent(node, parentIndent+indentSize)
 		}
 
@@ -617,8 +522,8 @@ var JsxIndentRule = rule.Rule{
 			if fn == nil {
 				return
 			}
-			openingIndent := nodeStartIndent(node)
-			closingIndent := nodeEndIndent(node)
+			openingIndent := reactutil.NodeStartIndent(ctx.SourceFile, node, indentChar)
+			closingIndent := reactutil.NodeEndIndent(ctx.SourceFile, node, indentChar)
 			if openingIndent != closingIndent {
 				reportReturn(node, openingIndent, closingIndent)
 			}
