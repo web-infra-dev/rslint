@@ -7,7 +7,7 @@ const recommended: RslintConfigEntry = {
   rules: {
     // 'jest/expect-expect': 'warn', // not implemented
     'jest/no-alias-methods': 'error',
-    // 'jest/no-commented-out-tests': 'warn', // not implemented
+    'jest/no-commented-out-tests': 'warn',
     // 'jest/no-conditional-expect': 'error', // not implemented
     'jest/no-deprecated-functions': 'error',
     'jest/no-disabled-tests': 'warn',
