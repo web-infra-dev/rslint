@@ -6,36 +6,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// getParentStatelessComponent mirrors eslint-plugin-react's
-// `Components.detect`-paired helper of the same name: walk up enclosing
-// FunctionLike scopes from `node` and return the first one classified as a
-// stateless functional component. A non-component function does NOT stop the
-// walk — the next outer FunctionLike still gets a chance, matching upstream's
-// `scope.upper` traversal.
-//
-// ES6 class scopes / class field initializers / module scope are non-FunctionLike
-// nodes that are simply skipped during the walk; `this` inside a class field
-// thus resolves to the nearest enclosing function-like (matching upstream's
-// `getScope` + `scope.upper` chain, which also walks past class scope without
-// classifying it as a component).
-//
-// `wrappers` is the resolved `settings.componentWrapperFunctions` list (plus
-// the built-in `memo` / `forwardRef` defaults) — passing it through to
-// `IsStatelessReactComponentWithWrappers` lets user-configured HOCs be
-// recognized as component-wrapping calls (e.g. `mobx.observer(fn)`,
-// `styled(fn)`).
-func getParentStatelessComponent(node *ast.Node, pragma string, wrappers []reactutil.ComponentWrapperEntry) *ast.Node {
-	for p := node.Parent; p != nil; p = p.Parent {
-		if !ast.IsFunctionLike(p) {
-			continue
-		}
-		if reactutil.IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
-			return p
-		}
-	}
-	return nil
-}
-
 // isPropertyOwnedSFC mirrors upstream's
 // `component.node.parent.type === 'Property'` filter. ESTree wraps every
 // object-literal entry in a `Property` node, so any FunctionExpression /
@@ -90,7 +60,7 @@ var NoThisInSfcRule = rule.Rule{
 			if ast.SkipParentheses(expr).Kind != ast.KindThisKeyword {
 				return
 			}
-			component := getParentStatelessComponent(node, pragma, wrappers)
+			component := reactutil.GetParentStatelessComponent(node, pragma, wrappers)
 			if component == nil {
 				return
 			}
