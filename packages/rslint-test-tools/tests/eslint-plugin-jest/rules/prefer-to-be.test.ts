@@ -18,6 +18,50 @@ ruleTester.run('prefer-to-be', {} as never, {
     { code: 'expect(token).toStrictEqual(/[abc]+/g);' },
     { code: "expect(token).toStrictEqual(new RegExp('[abc]+', 'g'));" },
     { code: 'expect(value).toEqual(dedent`my string`);' },
+
+    // null
+    { code: 'expect(null).toBeNull();' },
+    { code: 'expect(null).not.toBeNull();' },
+    { code: 'expect(null).toBe(1);' },
+    { code: 'expect(obj).toStrictEqual([ x, 1 ]);' },
+    { code: 'expect(obj).toStrictEqual({ x: 1 });' },
+    { code: 'expect(obj).not.toStrictEqual({ x: 1 });' },
+    { code: 'expect(value).toMatchSnapshot();' },
+    { code: "expect(catchError()).toStrictEqual({ message: 'oh noes!' })" },
+    { code: 'expect("something");' },
+    { code: 'expect(null).not.toEqual();' },
+    { code: 'expect(null).toBe();' },
+    { code: 'expect(null).toMatchSnapshot();' },
+    { code: 'expect("a string").toMatchSnapshot(null);' },
+    { code: 'expect("a string").not.toMatchSnapshot();' },
+    { code: 'expect(null).toBe' },
+
+    // undefined
+    { code: 'expect(undefined).toBeUndefined();' },
+    { code: 'expect(true).toBeDefined();' },
+    { code: 'expect({}).toEqual({});' },
+    { code: 'expect(something).toBe()' },
+    { code: 'expect(something).toBe(somethingElse)' },
+    { code: 'expect(something).toEqual(somethingElse)' },
+    { code: 'expect(something).not.toBe(somethingElse)' },
+    { code: 'expect(something).not.toEqual(somethingElse)' },
+    { code: 'expect(undefined).toBe' },
+    { code: 'expect("something");' },
+
+    // NaN
+    { code: 'expect(NaN).toBeNaN();' },
+    { code: 'expect(true).not.toBeNaN();' },
+    { code: 'expect({}).toEqual({});' },
+    { code: 'expect(something).toBe()' },
+    { code: 'expect(something).toBe(somethingElse)' },
+    { code: 'expect(something).toEqual(somethingElse)' },
+    { code: 'expect(something).not.toBe(somethingElse)' },
+    { code: 'expect(something).not.toEqual(somethingElse)' },
+    { code: 'expect(undefined).toBe' },
+    { code: 'expect("something");' },
+
+    // typescript edition
+    { code: "(expect('Model must be bound to an array if the multiple property is true') as any).toHaveBeenTipped()", },
   ],
   invalid: [
     {
@@ -80,29 +124,8 @@ ruleTester.run('prefer-to-be', {} as never, {
       output: 'expect(loadMessage()).resolves.toBe(false);',
       errors: [{ messageId: 'useToBe', column: 32, line: 1 }],
     },
-  ],
-});
 
-ruleTester.run('prefer-to-be: null', {} as never, {
-  valid: [
-    { code: 'expect(null).toBeNull();' },
-    { code: 'expect(null).not.toBeNull();' },
-    { code: 'expect(null).toBe(1);' },
-    { code: 'expect(obj).toStrictEqual([ x, 1 ]);' },
-    { code: 'expect(obj).toStrictEqual({ x: 1 });' },
-    { code: 'expect(obj).not.toStrictEqual({ x: 1 });' },
-    { code: 'expect(value).toMatchSnapshot();' },
-    { code: "expect(catchError()).toStrictEqual({ message: 'oh noes!' })" },
-    { code: 'expect("something");' },
-    //
-    { code: 'expect(null).not.toEqual();' },
-    { code: 'expect(null).toBe();' },
-    { code: 'expect(null).toMatchSnapshot();' },
-    { code: 'expect("a string").toMatchSnapshot(null);' },
-    { code: 'expect("a string").not.toMatchSnapshot();' },
-    { code: 'expect(null).toBe' },
-  ],
-  invalid: [
+    // null
     {
       code: 'expect(null).toBe(null);',
       output: 'expect(null).toBeNull();',
@@ -148,24 +171,8 @@ ruleTester.run('prefer-to-be: null', {} as never, {
       output: 'expect("a string").not.toBeNull();',
       errors: [{ messageId: 'useToBeNull', column: 24, line: 1 }],
     },
-  ],
-});
 
-ruleTester.run('prefer-to-be: undefined', {} as never, {
-  valid: [
-    { code: 'expect(undefined).toBeUndefined();' },
-    { code: 'expect(true).toBeDefined();' },
-    { code: 'expect({}).toEqual({});' },
-    { code: 'expect(something).toBe()' },
-    { code: 'expect(something).toBe(somethingElse)' },
-    { code: 'expect(something).toEqual(somethingElse)' },
-    { code: 'expect(something).not.toBe(somethingElse)' },
-    { code: 'expect(something).not.toEqual(somethingElse)' },
-    { code: 'expect(undefined).toBe' },
-    { code: 'expect("something");' },
-  ],
-
-  invalid: [
+    // undefined
     {
       code: 'expect(undefined).toBe(undefined);',
       output: 'expect(undefined).toBeUndefined();',
@@ -206,23 +213,8 @@ ruleTester.run('prefer-to-be: undefined', {} as never, {
       output: 'expect("a string").toBeDefined();',
       errors: [{ messageId: 'useToBeDefined', column: 24, line: 1 }],
     },
-  ],
-});
 
-ruleTester.run('prefer-to-be: NaN', {} as never, {
-  valid: [
-    { code: 'expect(NaN).toBeNaN();' },
-    { code: 'expect(true).not.toBeNaN();' },
-    { code: 'expect({}).toEqual({});' },
-    { code: 'expect(something).toBe()' },
-    { code: 'expect(something).toBe(somethingElse)' },
-    { code: 'expect(something).toEqual(somethingElse)' },
-    { code: 'expect(something).not.toBe(somethingElse)' },
-    { code: 'expect(something).not.toEqual(somethingElse)' },
-    { code: 'expect(undefined).toBe' },
-    { code: 'expect("something");' },
-  ],
-  invalid: [
+    // NaN
     {
       code: 'expect(NaN).toBe(NaN);',
       output: 'expect(NaN).toBeNaN();',
@@ -263,23 +255,8 @@ ruleTester.run('prefer-to-be: NaN', {} as never, {
       output: 'expect("a string").not.toBeNaN();',
       errors: [{ messageId: 'useToBeNaN', column: 24, line: 1 }],
     },
-  ],
-});
 
-ruleTester.run('prefer-to-be: undefined vs defined', {} as never, {
-  valid: [
-    { code: 'expect(NaN).toBeNaN();' },
-    { code: 'expect(true).not.toBeNaN();' },
-    { code: 'expect({}).toEqual({});' },
-    { code: 'expect(something).toBe()' },
-    { code: 'expect(something).toBe(somethingElse)' },
-    { code: 'expect(something).toEqual(somethingElse)' },
-    { code: 'expect(something).not.toBe(somethingElse)' },
-    { code: 'expect(something).not.toEqual(somethingElse)' },
-    { code: 'expect(undefined).toBe' },
-    { code: 'expect("something");' },
-  ],
-  invalid: [
+    // undefined vs defined
     {
       code: 'expect(undefined).not.toBeDefined();',
       output: 'expect(undefined).toBeUndefined();',
@@ -305,16 +282,8 @@ ruleTester.run('prefer-to-be: undefined vs defined', {} as never, {
       output: 'expect("a string").rejects.toBeDefined();',
       errors: [{ messageId: 'useToBeDefined', column: 32, line: 1 }],
     },
-  ],
-});
 
-ruleTester.run('prefer-to-be: typescript edition', {} as never, {
-  valid: [
-    {
-      code: "(expect('Model must be bound to an array if the multiple property is true') as any).toHaveBeenTipped()",
-    },
-  ],
-  invalid: [
+    // typescript edition
     {
       code: 'expect(null).toEqual(1 as unknown as string as unknown as any);',
       output: 'expect(null).toBe(1 as unknown as string as unknown as any);',
