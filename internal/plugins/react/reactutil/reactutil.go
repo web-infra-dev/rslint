@@ -1686,6 +1686,32 @@ func GetParentReactComponentScopeBasedOrStateless(node *ast.Node, pragma, create
 	return nil
 }
 
+// GetParentStatelessComponent mirrors eslint-plugin-react's
+// `utils.getParentStatelessComponent(node)`: walk up enclosing FunctionLike
+// scopes from `node` and return the first one classified as a stateless
+// functional component. A non-component function does NOT stop the walk —
+// the next outer FunctionLike still gets a chance, matching upstream's
+// `scope.upper` traversal.
+//
+// ES6 class scopes / class field initializers / module scope are
+// non-FunctionLike nodes that are simply skipped during the walk.
+//
+// Pass empty `pragma` to default to `DefaultReactPragma`. `wrappers` should
+// be the resolved `settings.componentWrapperFunctions` list (plus the
+// built-in `memo` / `forwardRef` defaults) so user-configured HOCs are
+// recognized as component-wrapping calls.
+func GetParentStatelessComponent(node *ast.Node, pragma string, wrappers []ComponentWrapperEntry) *ast.Node {
+	for p := node.Parent; p != nil; p = p.Parent {
+		if !ast.IsFunctionLike(p) {
+			continue
+		}
+		if IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+			return p
+		}
+	}
+	return nil
+}
+
 // IsStatelessReactComponent reports whether `fn` (a FunctionLike) looks like a
 // React functional component. Mirrors eslint-plugin-react's
 // `getStatelessComponent` decision tree:
@@ -3089,6 +3115,65 @@ func FunctionParameters(fn *ast.Node) []*ast.Node {
 			return nil
 		}
 		return af.Parameters.Nodes
+	case ast.KindMethodDeclaration:
+		// Object-literal shorthand methods (`{ Foo(props) {...} }`) and class
+		// methods both use this kind in tsgo. ESTree wraps the former as a
+		// `FunctionExpression`, so callers iterating "function-like
+		// components" need MethodDeclaration to participate too.
+		md := fn.AsMethodDeclaration()
+		if md.Parameters == nil {
+			return nil
+		}
+		return md.Parameters.Nodes
+	case ast.KindGetAccessor:
+		ga := fn.AsGetAccessorDeclaration()
+		if ga.Parameters == nil {
+			return nil
+		}
+		return ga.Parameters.Nodes
+	case ast.KindSetAccessor:
+		sa := fn.AsSetAccessorDeclaration()
+		if sa.Parameters == nil {
+			return nil
+		}
+		return sa.Parameters.Nodes
+	case ast.KindConstructor:
+		c := fn.AsConstructorDeclaration()
+		if c.Parameters == nil {
+			return nil
+		}
+		return c.Parameters.Nodes
+	}
+	return nil
+}
+
+// FunctionBody returns the body of a function-like node, mirroring
+// `FunctionParameters`'s coverage. Returns nil when the kind is not
+// function-like, or when the body is absent (overload signatures, abstract
+// methods, ambient declarations).
+//
+// Arrow expression bodies (`() => expr`) are returned as the expression node
+// itself — callers that distinguish block bodies from expression bodies
+// should branch on `body.Kind == ast.KindBlock`.
+func FunctionBody(fn *ast.Node) *ast.Node {
+	if fn == nil {
+		return nil
+	}
+	switch fn.Kind {
+	case ast.KindFunctionDeclaration:
+		return fn.AsFunctionDeclaration().Body
+	case ast.KindFunctionExpression:
+		return fn.AsFunctionExpression().Body
+	case ast.KindArrowFunction:
+		return fn.AsArrowFunction().Body
+	case ast.KindMethodDeclaration:
+		return fn.AsMethodDeclaration().Body
+	case ast.KindGetAccessor:
+		return fn.AsGetAccessorDeclaration().Body
+	case ast.KindSetAccessor:
+		return fn.AsSetAccessorDeclaration().Body
+	case ast.KindConstructor:
+		return fn.AsConstructorDeclaration().Body
 	}
 	return nil
 }

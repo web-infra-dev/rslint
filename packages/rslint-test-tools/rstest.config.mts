@@ -84,6 +84,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
 
     // eslint-plugin-react
+    './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
     './tests/eslint-plugin-react/rules/boolean-prop-naming.test.ts',
     './tests/eslint-plugin-react/rules/button-has-type.test.ts',
     './tests/eslint-plugin-react/rules/forbid-component-props.test.ts',
@@ -124,6 +125,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/no-children-prop.test.ts',
     './tests/eslint-plugin-react/rules/no-danger.test.ts',
     './tests/eslint-plugin-react/rules/no-danger-with-children.test.ts',
+    './tests/eslint-plugin-react/rules/display-name.test.ts',
     './tests/eslint-plugin-react/rules/no-deprecated.test.ts',
     './tests/eslint-plugin-react/rules/no-did-mount-set-state.test.ts',
     './tests/eslint-plugin-react/rules/no-did-update-set-state.test.ts',
