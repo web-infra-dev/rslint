@@ -102,6 +102,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-first-prop-new-line.test.ts',
     './tests/eslint-plugin-react/rules/jsx-handler-names.test.ts',
     './tests/eslint-plugin-react/rules/jsx-indent.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-indent-props.test.ts',
     './tests/eslint-plugin-react/rules/jsx-key.test.ts',
     './tests/eslint-plugin-react/rules/jsx-max-depth.test.ts',
     './tests/eslint-plugin-react/rules/jsx-max-props-per-line.test.ts',
