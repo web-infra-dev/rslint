@@ -88,10 +88,13 @@ instane
 IPC
 isnan
 jakebailey
+jsnum
 jsonc
 jsonline
+jsxa
 justforcheck
 keygen
+labelledby
 ldflags
 ldquo
 libsyncrpc
@@ -352,3 +355,4 @@ recognises
 recognisable
 clsx
 unshift
+yutil
