@@ -384,10 +384,12 @@ export default defineConfig({
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
+    './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-done-callback.test.ts',
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
+    './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
     './tests/eslint-plugin-jest/rules/no-mocks-import.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',

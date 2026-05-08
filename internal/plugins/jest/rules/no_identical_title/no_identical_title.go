@@ -45,12 +45,6 @@ func staticJestTitleValue(arg *ast.Node) (string, bool) {
 		return arg.AsStringLiteral().Text, true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return arg.AsNoSubstitutionTemplateLiteral().Text, true
-	case ast.KindTemplateExpression:
-		te := arg.AsTemplateExpression()
-		if te == nil || te.TemplateSpans == nil || len(te.TemplateSpans.Nodes) != 0 || te.Head == nil {
-			return "", false
-		}
-		return te.Head.Text(), true
 	default:
 		return "", false
 	}
