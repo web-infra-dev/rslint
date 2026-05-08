@@ -602,6 +602,22 @@ func TestDestructuringAssignmentRule(t *testing.T) {
         }
       `, Tsx: true, Options: []interface{}{"always", map[string]interface{}{"destructureInSignature": "always"}}},
 
+		// ---- Lock (destructureInSignature scope guard): when the SFC's
+		// first parameter is renamed and the body destructures from an
+		// outer `props` (different binding), upstream's scope manager
+		// returns undefined for `getScope().set.get('props')` and stays
+		// silent. We mirror that with a name guard on the parameter so an
+		// autofix never rewrites a param it doesn't actually own.
+		// Verified against eslint-plugin-react@7.37.5: silent on this
+		// snippet under the same options. ----
+		{Code: `
+        const props: any = { b: 1 };
+        function Foo(myProps: any) {
+          const {b} = props;
+          return <p>{b}</p>;
+        }
+      `, Tsx: true, Options: []interface{}{"always", map[string]interface{}{"destructureInSignature": "always"}}},
+
 		// ---- Lock (custom HOC parity): a function wrapped by a user-defined
 		// HOC that is NOT in the built-in wrapper list (memo / forwardRef) and
 		// not configured via `settings.componentWrapperFunctions` is treated

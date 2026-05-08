@@ -705,7 +705,17 @@ var DestructuringAssignmentRule = rule.Rule{
 					}
 					pd := param.AsParameterDeclaration()
 					paramName := pd.Name()
-					if paramName == nil {
+					// SFC's first parameter must be an Identifier literally
+					// named `props` for this gate to apply. Mirrors upstream's
+					// `getScope(node).set.get('props')` lookup, which only
+					// succeeds when `props` is bound in the enclosing function
+					// scope. Without this guard, an SFC whose parameter is
+					// renamed (e.g. `function Foo(myProps)`) but whose body
+					// references an outer `props` would trigger an autofix
+					// that rewrites the parameter and silently changes the
+					// reference target.
+					if paramName == nil || paramName.Kind != ast.KindIdentifier ||
+						paramName.AsIdentifier().Text != "props" {
 						return
 					}
 					// Use TypeChecker Symbol comparison when available so
