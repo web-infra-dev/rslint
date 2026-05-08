@@ -3073,6 +3073,97 @@ func EnclosingClass(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// ClassKeywordStart returns the report-anchor start position for a
+// ClassDeclaration / ClassExpression aligned with ESLint's `node.loc.start`
+// for that class.
+//
+// ESTree wraps `export class …` and `export default class …` in
+// `ExportNamedDeclaration` / `ExportDefaultDeclaration` and exposes the
+// inner `ClassDeclaration` starting at the `class` keyword. tsgo flattens
+// these — `export` / `default` end up as Modifier kinds on the class node
+// itself, shifting `node.Pos()` to the `export` token. We trim those two
+// modifier kinds back out to recover the upstream-aligned start.
+//
+// Decorators (`@dec`), TS `abstract` / `declare` / accessibility modifiers
+// are PART of the class's range upstream — TSESTree keeps them on the
+// ClassDeclaration. We stop trimming the moment a non-export/default
+// modifier appears so the report range still spans those.
+//
+// Pass `sourceFile.Text()` as `text` so trailing trivia after the
+// modifier list is properly skipped.
+func ClassKeywordStart(text string, node *ast.Node) int {
+	mods := node.Modifiers()
+	pos := node.Pos()
+	if mods != nil {
+		for _, mod := range mods.Nodes {
+			switch mod.Kind {
+			case ast.KindExportKeyword, ast.KindDefaultKeyword:
+				pos = mod.End()
+			default:
+				return scanner.SkipTrivia(text, mod.Pos())
+			}
+		}
+	}
+	return scanner.SkipTrivia(text, pos)
+}
+
+// IdentifierOrPrivateName mirrors ESLint's `node.name` lookup over a key /
+// member-name node: returns the Identifier text directly, or the
+// PrivateIdentifier text with the leading `#` stripped (per ESTree spec
+// `PrivateIdentifier.name` excludes the `#`). Returns "" for any other Kind
+// (StringLiteral, NumericLiteral, ComputedPropertyName, …) — those never
+// populate `.name` upstream and never match upstream's `key.name === 'X'`
+// gate.
+//
+// Use this when a rule's upstream form is `X.name === 'Y'`. tsgo's
+// PrivateIdentifier.Text retains the `#`, so a naive `.Text` compare would
+// require the caller to know which input is private — this helper hides
+// that.
+func IdentifierOrPrivateName(name *ast.Node) string {
+	if name == nil {
+		return ""
+	}
+	switch name.Kind {
+	case ast.KindIdentifier:
+		return name.AsIdentifier().Text
+	case ast.KindPrivateIdentifier:
+		return strings.TrimPrefix(name.AsPrivateIdentifier().Text, "#")
+	}
+	return ""
+}
+
+// ClassHasMethodNamed reports whether `classNode` has a method (regular
+// MethodDeclaration, GetAccessor, SetAccessor, or Constructor) whose key
+// resolves via IdentifierOrPrivateName to `methodName`. PropertyDeclaration
+// (class-field assignment like `name = () => {}`) does NOT count — upstream's
+// MethodDefinition listeners fire on real methods only, not class fields.
+//
+// Mirrors upstream `astUtil.getComponentProperties(node).some(p => getPropertyName(p) === '<methodName>')`
+// for the subset of properties that have method semantics.
+func ClassHasMethodNamed(classNode *ast.Node, methodName string) bool {
+	if classNode == nil {
+		return false
+	}
+	for _, m := range classNode.Members() {
+		if m == nil {
+			continue
+		}
+		switch m.Kind {
+		case ast.KindMethodDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor,
+			ast.KindConstructor:
+			// continue
+		default:
+			continue
+		}
+		if IdentifierOrPrivateName(m.Name()) == methodName {
+			return true
+		}
+	}
+	return false
+}
+
 // BindingIdentifierName returns the identifier text of a named declaration's
 // binding, or "" when the declaration is anonymous, the binding is a pattern
 // rather than a bare Identifier, or `n` is nil.
