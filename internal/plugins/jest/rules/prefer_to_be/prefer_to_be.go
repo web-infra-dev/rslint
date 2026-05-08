@@ -129,6 +129,9 @@ func shouldUseToBe(arg *ast.Node) bool {
 }
 
 func modifierReceiverParent(modEntry utils.ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
+	if modEntry.Node == nil || modEntry.Node.Parent == nil {
+		return nil, nil
+	}
 	parent := modEntry.Node.Parent
 	switch parent.Kind {
 	case ast.KindPropertyAccessExpression:
