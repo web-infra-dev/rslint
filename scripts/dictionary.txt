@@ -140,6 +140,7 @@ preact
 Prag
 Prettier
 propertyassignment
+proptypes
 Ptrs
 quasis
 quxx
