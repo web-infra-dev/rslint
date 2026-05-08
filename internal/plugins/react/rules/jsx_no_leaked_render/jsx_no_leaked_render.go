@@ -496,7 +496,7 @@ func buildFix(
 		lines := strings.Split(rightInnerText, "\n")
 		if len(lines) > 1 {
 			lastLine := lines[len(lines)-1]
-			indent := leadingWhitespaceLen(lastLine)
+			indent := len(reactutil.HorizontalWhitespacePrefix(lastLine))
 			indentStart := strings.Repeat(" ", indent)
 			closeIndent := indent - 2
 			if closeIndent < 0 {
@@ -562,11 +562,3 @@ func isLiteralLike(n *ast.Node) bool {
 	return false
 }
 
-func leadingWhitespaceLen(s string) int {
-	for i, r := range s {
-		if r != ' ' && r != '\t' {
-			return i
-		}
-	}
-	return len(s)
-}

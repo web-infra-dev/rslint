@@ -348,6 +348,41 @@ func TestNoAccessStateInSetstateRule(t *testing.T) {
           }
         }
       `, Tsx: true},
+
+		// ---- Cross-helper lock: scope-based vs free-walk divergence.
+		// `setState` at top-level property of createReactClass arg —
+		// no FunctionLike ancestor between setState call and the
+		// ObjectLit, so ES5 detection's per-FunctionLike walk finds
+		// nothing. Result: NOT reported (no-access-state-in-setstate
+		// uses scope-based detection only). This contrasts with
+		// no-set-state which uses Components.set's free AST walk and
+		// DOES report this case. Empirically verified against ESLint master. ----
+		{Code: `
+var Hello = createReactClass({
+  config: this.setState({ value: this.state.foo }),
+  render: function() { return <div/>; }
+});
+`, Tsx: true},
+
+		// ---- Cross-helper lock: nested non-React class inside an ES6
+		// React component. Upstream's `getParentES6Component` finds
+		// the inner non-React Helper class and returns null (stops
+		// at first class scope). `getParentES5Component` walks each
+		// FunctionLike scope; none reach a createReactClass arg in
+		// this case. Total: NOT reported. Empirically verified
+		// against ESLint master. ----
+		{Code: `
+        class Outer extends React.Component {
+          render() {
+            class Helper {
+              doStuff() {
+                this.setState({ next: this.state.value + 1 });
+              }
+            }
+            return <div/>;
+          }
+        }
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream #1: direct this.state inside setState first arg ----
 		{
@@ -773,6 +808,36 @@ func TestNoAccessStateInSetstateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "useCallback", Line: 4, Column: 36},
+			},
+		},
+
+		// ---- Cross-helper lock: nested non-React class inside
+		// createReactClass arg. Upstream's `getParentES6Component`
+		// finds the inner non-React Helper class and returns null
+		// (stops at first class scope). `getParentES5Component`
+		// walks each FunctionLike scope: when it reaches `someMethod`
+		// (FE inside the createReactClass arg), block.parent.parent
+		// = ObjectLiteralExpression which IS the createReactClass
+		// arg, so isES5Component returns true. The inner setState's
+		// first-arg `this.state.value` access reports. Empirically
+		// verified against ESLint master (line=5 col=31 in
+		// `var Hello = createReactClass({...` form). ----
+		{
+			Code: `
+var Hello = createReactClass({
+  someMethod: function() {
+    class Helper {
+      doStuff() {
+        this.setState({ next: this.state.value + 1 });
+      }
+    }
+  },
+  render: function() { return <div/>; }
+});
+`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useCallback", Line: 6, Column: 31},
 			},
 		},
 	})

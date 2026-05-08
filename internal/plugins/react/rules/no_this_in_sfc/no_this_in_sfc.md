@@ -80,15 +80,6 @@ const Foo = createReactClass({
 });
 ```
 
-## Differences from ESLint
-
-- A function wrapped in a custom higher-order component (configured via
-  `settings.componentWrapperFunctions` in ESLint) is not treated as a
-  stateless component. For example, given `wrap(() => <div>{this.props.x}</div>)`,
-  ESLint reports the `this` access while rslint does not. Only `memo` and
-  `forwardRef` wrappers (bare, or qualified by the configured React pragma)
-  are recognized.
-
 ## Original Documentation
 
 - [eslint-plugin-react `no-this-in-sfc`](https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/no-this-in-sfc.md)

@@ -249,8 +249,9 @@ func TestTypeCheck_SkipTypeCheckProgramsHonored(t *testing.T) {
 }
 
 // (6) TS2578 ("unused @ts-expect-error") surfaces under the new path.
-// Verifies that GetDiagnosticsOfAnyProgram emits this when the directive
-// turns out unused.
+// Verifies that the noEmit-aligned aggregator (collectNoEmitDiagnostics)
+// emits this when the directive turns out unused, matching upstream
+// GetDiagnosticsOfAnyProgram behaviour.
 func TestTypeCheck_UnusedTsExpectErrorStillReportsTS2578(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{

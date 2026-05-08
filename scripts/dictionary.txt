@@ -48,6 +48,7 @@ exclam
 execdir
 fatih
 fdescribe
+fileless
 fixall
 flaggable
 fltr
@@ -139,6 +140,7 @@ preact
 Prag
 Prettier
 propertyassignment
+proptypes
 Ptrs
 quasis
 quxx
@@ -335,3 +337,17 @@ unrepresentable
 fluentui
 callsite
 Reactlike
+nomatch
+Fooa
+Fooab
+Foox
+Testaa
+Testab
+Testabab
+Buttom
+autobinding
+handl
+ZWNBSP
+recognises
+recognisable
+clsx

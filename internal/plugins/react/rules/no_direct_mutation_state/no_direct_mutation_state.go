@@ -85,6 +85,7 @@ var NoDirectMutationStateRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
+		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)
 
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
@@ -116,7 +117,16 @@ var NoDirectMutationStateRule = rule.Rule{
 			if !isThisStateMember(innermost) {
 				return
 			}
-			component := reactutil.GetEnclosingReactComponentOrStateless(node, pragma, createClass)
+			// Upstream `no-direct-mutation-state` uses
+			// `Components.detect` but in its AssignmentExpression /
+			// UpdateExpression listeners gates on
+			// `components.get(utils.getParentComponent(node))` —
+			// `getParentComponent` is ES6||ES5||stateless detection,
+			// NOT `components.set`'s free AST walk. When that
+			// detection returns null, the listener early-returns via
+			// `shouldIgnoreComponent`. Mirror with the scope-based
+			// helper.
+			component := reactutil.GetParentReactComponentScopeBasedOrStateless(node, pragma, createClass, wrappers)
 			if component == nil {
 				return
 			}
