@@ -59,6 +59,7 @@ require (
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
+	github.com/mackerelio/go-osstat v0.2.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
@@ -70,6 +71,6 @@ require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
-	github.com/microsoft/typescript-go v0.0.0-20260313230633-c0e5d35a6f8f // indirect
+	github.com/microsoft/typescript-go v0.0.0-20260508030928-dcc16d931446 // indirect
 	golang.org/x/text v0.36.0
 )
