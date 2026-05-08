@@ -383,10 +383,12 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 // opts.Scope, opts.PerProgramFilter and the program's own owned-file set.
 //
 // Phase 2 — type-check (skipped when opts.TypeCheck is false): each
-// non-skipped program is handed to runTypeCheckAcrossPrograms, which calls
-// compiler.GetDiagnosticsOfAnyProgram(file=nil). Type-check is NOT
-// constrained by Scope / PerProgramFilter / ExcludePaths — it covers the
-// full program just like tsc.
+// non-skipped program is handed to runTypeCheckAcrossPrograms, which
+// aggregates diagnostics through collectNoEmitDiagnostics — a helper that
+// mirrors compiler.GetDiagnosticsOfAnyProgram(file=nil) but enforces
+// `tsc --noEmit` semantics regardless of whether the user's tsconfig
+// sets noEmit. Type-check is NOT constrained by Scope / PerProgramFilter
+// / ExcludePaths — it covers the full program just like tsc.
 //
 // See RunLinterOptions for each field's zero-value semantics.
 func RunLinter(opts RunLinterOptions) (*LintResult, error) {

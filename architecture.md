@@ -486,7 +486,7 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
 4. **Program Creation**: Go builds one or more tsconfig-backed Programs, plus optional no-tsconfig or gap-file fallback Programs
 5. **Ownership Filtering**: multi-config mode computes nearest-config ownership so files are linted once
 6. **Rule Resolution**: `getRulesForFile` resolves enabled rules per file
-7. **Rule Execution**: `RunLinter()` schedules per-Program work and `RunLinterInProgram()` does the actual file traversal
+7. **Rule Execution**: `RunLinter()` schedules per-Program work; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a second program-level pass runs after Phase 1 and aggregates `tsc --noEmit`-aligned diagnostics through the internal `collectNoEmitDiagnostics()` helper
 8. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
 9. **Fix Passes**: when enabled, fixes are applied and Programs can be rebuilt for another pass
 10. **Output Formatting**: default, JSON line, and GitHub workflow formats are supported
@@ -565,7 +565,7 @@ those typescript-go itself creates for syntactic / semantic work.
 
 - **Native Go Implementation**: Eliminates JavaScript runtime overhead
 - **Direct TypeScript AST**: No AST conversion between parsers
-- **Shared Type Checker**: `RunLinterInProgram` acquires one checker for the lint phase and reuses it across files and rules in the same `Program`
+- **Shared Type Checker**: `runLintRulesInProgram` acquires one checker for the lint phase and reuses it across files and rules in the same `Program`. The subsequent type-check phase (when `--type-check` is enabled) lets `GetSemanticDiagnostics` reacquire its own checker so the lint-phase checker can be released first
 - **Checker Phase Separation**: the checker is released before TypeScript semantic diagnostics run, so `GetSemanticDiagnostics` can reacquire its own checker cleanly
 - **File Filtering**: Skip node_modules and bundled files automatically
 - **Gap-File Degradation**: fallback gap-file Programs skip type-aware rules and semantic diagnostics instead of paying unreliable semantic costs
@@ -757,7 +757,7 @@ If the rule-porting workflow changes, update the material under `agents/port-rul
 │  internal/lsp + ts-go project.Session                                        │
 │     │                                                                        │
 │     ▼                                                                        │
-│  RunLinterInProgram on session Program                                       │
+│  LintSingleFile on session Program (per-file LSP path)                       │
 │     │                                                                        │
 │     ▼                                                                        │
 │  LSP Diagnostics / Quick Fix / Fix All                                       │

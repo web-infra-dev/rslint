@@ -43,7 +43,7 @@ type NoMethodSetStateConfig struct {
 // Mirrors upstream's `makeNoMethodSetStateRule` 1:1 in semantics — including
 // the innermost-stopper search (`findLast(ancestors, ...)`), the
 // function-depth counter that gates `disallow-in-func`, and the ESTree-shaped
-// `'name' in callee.property` test (which we model with [esTreeName]: any
+// `'name' in callee.property` test (which we model with [EsTreeName]: any
 // non-Identifier / non-PrivateIdentifier key yields "" and never matches).
 //
 // All three of `no-did-mount-set-state`, `no-did-update-set-state`, and
@@ -74,10 +74,10 @@ func MakeNoMethodSetStateRule(cfg NoMethodSetStateConfig) rule.Rule {
 						return
 					}
 					// Upstream: `'name' in callee.property && callee.property.name
-					// === 'setState'`. esTreeName yields "" for non-name shapes
+					// === 'setState'`. EsTreeName yields "" for non-name shapes
 					// (string/numeric/computed keys), so the equality check
 					// below correctly rejects them.
-					if esTreeName(prop.Name()) != "setState" {
+					if EsTreeName(prop.Name()) != "setState" {
 						return
 					}
 
@@ -150,12 +150,12 @@ func isMethodSetStateStopper(node *ast.Node) bool {
 }
 
 // stopperName returns the ESTree-visible name of a stopper node's key.
-// See [esTreeName] for the aliasing rationale.
+// See [EsTreeName] for the aliasing rationale.
 func stopperName(node *ast.Node) string {
-	return esTreeName(node.Name())
+	return EsTreeName(node.Name())
 }
 
-// esTreeName returns the string an ESTree consumer would read from
+// EsTreeName returns the string an ESTree consumer would read from
 // `node.name` for an Identifier / PrivateIdentifier. PrivateIdentifier
 // strips the leading `#` per spec (tsgo retains it, so we trim). Any other
 // node kind — ComputedPropertyName, StringLiteral, NumericLiteral, etc. —
@@ -170,7 +170,7 @@ func stopperName(node *ast.Node) string {
 // `'name' in callee.property` is false), so reusing
 // `utils.GetStaticPropertyName` here would be incorrect (it resolves
 // string literals as static names).
-func esTreeName(nameNode *ast.Node) string {
+func EsTreeName(nameNode *ast.Node) string {
 	if nameNode == nil {
 		return ""
 	}

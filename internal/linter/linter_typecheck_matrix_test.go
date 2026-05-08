@@ -7,9 +7,15 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tsoptions"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Cross-matrix tests for --type-check semantics.
@@ -584,4 +590,122 @@ func TestMatrix_NoImplicitAny_HonoredByProgram(t *testing.T) {
 	// `export function fn(x) {...}` — parameter `x` at col 20.
 	assertOneDiag(t, strict, "TS7006", "a.ts", 1, 20)
 	assertExactDiagCount(t, strict, 1)
+}
+
+// === noEmit-equivalent semantics for --type-check ===
+//
+// rslint --type-check must align with `tsc --noEmit`. Real tsc injects
+// noEmit at the command-line layer, so noEmit-gated option errors (TS5096
+// for allowImportingTsExtensions, TS5055 for outFile-vs-input collisions,
+// etc.) never enter the program's diagnostic cache. rslint receives the
+// user's tsconfig as-is, so those option errors do enter the cache —
+// anchored to tsconfig.json (or to no file). The previous implementation
+// then dropped them downstream and short-circuited semantic collection,
+// silently masking real type errors. These tests pin the fix.
+
+// reviewer's reproduction case: allowImportingTsExtensions:true without
+// noEmit:true. tsc --noEmit reports the in-source TS2322 because --noEmit
+// suppresses TS5096; rslint --type-check must do the same.
+func TestMatrix_NoEmitSemantics_AllowImportingTsExtensionsWithoutNoEmit(t *testing.T) {
+	const aSrc = "import { y } from './b.ts';\nconst x: number = 'oops';\nexport const z = y + x.length;\n"
+	const bSrc = "export const y = 1;\n"
+	build := func(opts string) []rule.RuleDiagnostic {
+		dir := t.TempDir()
+		writeFiles(t, dir, map[string]string{
+			"a.ts":          aSrc,
+			"b.ts":          bSrc,
+			"tsconfig.json": `{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","allowImportingTsExtensions":true,` + opts + `},"include":["a.ts","b.ts"]}`,
+		})
+		return runProgramTypeCheck(t, createProgramFromTsconfigDir(t, dir))
+	}
+
+	// Without noEmit: typecheck must still report the file-anchored TS2322
+	// at a.ts:2:7. Before the fix, the TS5096 fileless option error would
+	// short-circuit semantic collection and this returned 0 diagnostics.
+	withoutNoEmit := build(``)
+	assertOneDiag(t, withoutNoEmit, "TS2322", "a.ts", 2, 7)
+	assertExactCodeCount(t, withoutNoEmit, "TS2322", 1)
+
+	// Control: explicit noEmit:true must produce the SAME diagnostics, so
+	// the noEmit-aligned path is symmetric with respect to the user's
+	// configuration. (Equality of code+location, not raw equality.)
+	withNoEmit := build(`"noEmit":true`)
+	assertOneDiag(t, withNoEmit, "TS2322", "a.ts", 2, 7)
+	assertExactCodeCount(t, withNoEmit, "TS2322", 1)
+	if len(withoutNoEmit) != len(withNoEmit) {
+		t.Errorf("expected identical diagnostic counts with and without noEmit, got %d vs %d. without=%s with=%s",
+			len(withoutNoEmit), len(withNoEmit), dumpDiags(withoutNoEmit), dumpDiags(withNoEmit))
+	}
+}
+
+// File-anchored syntactic errors must still short-circuit semantic
+// collection — that is tsc's behaviour and the noEmit-alignment fix must
+// preserve it. We assert the syntactic error is reported and the (would-be
+// downstream) TS2322 from the same file is NOT reported, matching tsc.
+func TestMatrix_NoEmitSemantics_SyntacticErrorStillShortCircuits(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		// Trailing `=` is a hard parse error; line 2 has a clear type error.
+		"a.ts":          "const x: number = ;\nconst y: number = 'oops';\n",
+		"tsconfig.json": `{"include":["a.ts"]}`,
+	})
+	// createProgramFromTsconfigDir surfaces syntactic errors via
+	// utils.CreateProgram and would fail the test, so build the program
+	// directly instead.
+	dirAbs, _ := filepath.Abs(dir)
+	host := utils.CreateCompilerHost(dirAbs, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	configParse, _ := tsoptions.GetParsedCommandLineOfConfigFile(
+		filepath.Join(dirAbs, "tsconfig.json"), &core.CompilerOptions{}, nil, host, nil)
+	program := compiler.NewProgram(compiler.ProgramOptions{
+		Config:         configParse,
+		SingleThreaded: core.TSTrue,
+		Host:           host,
+	})
+	if program == nil {
+		t.Fatal("could not build program")
+	}
+
+	diags := runProgramTypeCheck(t, program)
+
+	// At least one syntactic error from a.ts (TS1109 "Expression expected"
+	// or similar) must be reported.
+	hasSyntactic := false
+	for _, d := range diags {
+		if strings.HasPrefix(d.RuleName, "TypeScript(TS1") && strings.HasSuffix(d.SourceFile.FileName(), "a.ts") {
+			hasSyntactic = true
+			break
+		}
+	}
+	if !hasSyntactic {
+		t.Errorf("expected at least one syntactic TS1xxx diag in a.ts, got %s", dumpDiags(diags))
+	}
+
+	// The would-be TS2322 from line 2 must NOT be reported — tsc skips
+	// semantic checking when syntactic errors are present.
+	for _, d := range diags {
+		if d.RuleName == "TypeScript(TS2322)" {
+			t.Errorf("expected no TS2322 (semantic short-circuit), got %s", dumpDiags(diags))
+			break
+		}
+	}
+}
+
+// SkippedOnNoEmit emit-only checks (e.g. __esModule reservation, TS18027)
+// must drop out under --type-check, matching tsc --noEmit. Re-using
+// __esModule as a top-level export name triggers TS18027; tsc --noEmit
+// suppresses it.
+func TestMatrix_NoEmitSemantics_SkippedOnNoEmitFiltered(t *testing.T) {
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		// `__esModule` is reserved when emitting ESM/commonjs; tsc surfaces
+		// TS18027 only when emitting. With --noEmit, the diagnostic is
+		// suppressed.
+		"a.ts":          "export const __esModule = true;\nexport const __esModule2: number = 'wrong';\n",
+		"tsconfig.json": `{"compilerOptions":{"module":"commonjs"},"include":["a.ts"]}`,
+	})
+	diags := runProgramTypeCheck(t, createProgramFromTsconfigDir(t, dir))
+	// Real type error at line 2 must reach the user.
+	assertOneDiag(t, diags, "TS2322", "a.ts", 2, 14)
+	// SkippedOnNoEmit code (TS18027) must NOT.
+	assertExactCodeCount(t, diags, "TS18027", 0)
 }

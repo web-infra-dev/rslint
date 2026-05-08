@@ -24,6 +24,24 @@ const DefaultReactPragma = "React"
 // rule that needs to recognize hook calls re-derives the same predicate.
 var hookNameRegex = regexp.MustCompile(`^use[A-Z0-9].*$`)
 
+// ApplyData expands `{{key}}` placeholders in a message template using the
+// given data map, mirroring ESLint's `RuleMessage.data` interpolation. Keys
+// not present in `data` are left untouched, matching ESLint's behavior of
+// passing through unknown placeholders verbatim. Use this whenever a rule
+// emits a templated `RuleMessage.Description` so the in-rule code reads like
+// the upstream `messages` table instead of hand-rolled `strings.ReplaceAll`
+// loops.
+func ApplyData(template string, data map[string]string) string {
+	if len(data) == 0 {
+		return template
+	}
+	out := template
+	for k, v := range data {
+		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
+	}
+	return out
+}
+
 // IsHookName reports whether `name` matches the React hook naming convention.
 // Returns false for empty input.
 func IsHookName(name string) bool {
@@ -33,56 +51,294 @@ func IsHookName(name string) bool {
 	return hookNameRegex.MatchString(name)
 }
 
-// GlobToRegex converts a minimatch-style glob (only `*` and `?` wildcards
-// recognized; every other regex metacharacter is literally escaped) into a
-// fully anchored regular expression. Mirrors the subset of minimatch
-// behavior eslint-plugin-react relies on for `propNamePattern`-style options
-// — sufficient for `render*`, `*Renderer`, etc.
+// HorizontalWhitespacePrefix returns the longest prefix of s consisting of
+// ECMA WhiteSpace characters (excluding LineTerminators). It matches the
+// behavior of `/^\s*/` applied to a single line — used by JSX layout rules
+// that compute "indent of line N" without crossing into the next line.
+//
+// LineTerminators (\n, \r,  ,  ) are NOT consumed, so passing a
+// multi-line string only ever returns the indent of the first line.
+func HorizontalWhitespacePrefix(s string) string {
+	for i, r := range s {
+		if !isHorizontalWhitespace(r) {
+			return s[:i]
+		}
+	}
+	return s
+}
+
+func isHorizontalWhitespace(r rune) bool {
+	switch r {
+	case ' ', '\t', '\v', '\f', 0xFEFF:
+		return true
+	}
+	return unicode.Is(unicode.Zs, r)
+}
+
+// UTF16Length returns the number of UTF-16 code units required to encode s.
+// ASCII / BMP runes count as 1; runes outside the BMP (>= U+10000) count as
+// 2 (surrogate pair). Use this when computing column positions that must
+// agree with ESLint's `loc.column` semantics — Go's `len(s)` is byte length
+// (UTF-8), which can over-count for multi-byte characters.
+func UTF16Length(s string) int {
+	n := 0
+	for _, r := range s {
+		if r < 0x10000 {
+			n++
+		} else {
+			n += 2
+		}
+	}
+	return n
+}
+
+// GlobToRegex converts a minimatch-style glob into a fully anchored
+// regular expression. Supports the subset of minimatch syntax the
+// eslint-plugin-react ecosystem relies on:
+//
+//   - `*`             — any run of characters (`**` collapses to `*`)
+//   - `?`             — a single character
+//   - `[abc]`         — character class
+//   - `[!abc]` / `[^abc]` — negated character class
+//   - `{a,b,c}`       — brace expansion (nestable)
+//   - `?(a|b)`        — zero or one of alternatives (extglob)
+//   - `*(a|b)`        — zero or more of alternatives (extglob)
+//   - `+(a|b)`        — one or more of alternatives (extglob)
+//   - `@(a|b)`        — exactly one of alternatives (extglob)
+//   - `!(a|b)`        — extglob negation (RE2 lacks lookarounds; approximated
+//                       as "zero or one" — exact-match semantics not supported)
+//   - `\X`            — literal X
+//
+// Leading `!` (whole-pattern negation) is intentionally NOT handled here:
+// it inverts the whole-pattern match result and so cannot be expressed in
+// a single anchored regex. Callers that need it should use `MatchGlob`,
+// which special-cases the `!` prefix.
 //
 // Compilation is cached per-pattern; the returned `*regexp.Regexp` is
-// safe to share across goroutines.
+// safe to share across goroutines. Returns nil only on malformed `[...]`
+// classes that would produce a regex RE2 rejects (callers treat nil as
+// "exact-match-only fallback"); upstream minimatch never throws here, so
+// nil should not arise for any real-world glob.
 func GlobToRegex(pattern string) *regexp.Regexp {
 	if v, ok := globToRegexCache.Load(pattern); ok {
-		// Cache values are always `*regexp.Regexp` — `Store` is the
-		// only writer below and writes only this type. The check is
-		// kept for `forcetypeassert` lint hygiene; a failed assertion
-		// would indicate a programming error elsewhere in this file.
 		if re, ok := v.(*regexp.Regexp); ok {
 			return re
 		}
 	}
-	var b strings.Builder
-	b.Grow(len(pattern) + 4)
-	b.WriteByte('^')
-	for _, r := range pattern {
-		switch r {
-		case '*':
-			b.WriteString(".*")
-		case '?':
-			b.WriteByte('.')
-		case '.', '+', '(', ')', '|', '^', '$', '{', '}', '[', ']', '\\':
-			b.WriteByte('\\')
-			b.WriteRune(r)
-		default:
-			b.WriteRune(r)
-		}
+	body := globBody([]rune(pattern))
+	re, err := regexp.Compile("^" + body + "$")
+	if err != nil {
+		// Pattern was malformed enough to produce an invalid regex (e.g. a
+		// `[...]` body the converter couldn't repair). Cache nil so we do
+		// not retry on subsequent matches; callers fall back to "no match".
+		globToRegexCache.Store(pattern, (*regexp.Regexp)(nil))
+		return nil
 	}
-	b.WriteByte('$')
-	re := regexp.MustCompile(b.String())
 	globToRegexCache.Store(pattern, re)
 	return re
 }
 
-// MatchGlob is the fast path equivalent of `GlobToRegex(pattern).MatchString(text)`,
-// returning false for empty `text`.
+// MatchGlob reports whether `text` matches the minimatch-style `pattern`.
+// Returns false for empty `text`. Supports leading `!` whole-pattern
+// negation: a pattern of `!X` matches everything except what `X` matches.
+// `!!X` is treated as a literal pattern starting with `!` (matches `!X`),
+// mirroring minimatch's odd-count-of-`!` rule.
 func MatchGlob(text, pattern string) bool {
 	if text == "" {
 		return false
 	}
-	return GlobToRegex(pattern).MatchString(text)
+	negate := false
+	for strings.HasPrefix(pattern, "!") {
+		negate = !negate
+		pattern = pattern[1:]
+	}
+	re := GlobToRegex(pattern)
+	if re == nil {
+		return false
+	}
+	matched := re.MatchString(text)
+	if negate {
+		return !matched
+	}
+	return matched
 }
 
 var globToRegexCache sync.Map
+
+// globBody recursively translates a glob fragment (already split on rune
+// boundaries) into a regex body. Operates on `[]rune` so indices and
+// slicing are codepoint-aligned — essential when patterns contain
+// multi-byte characters (CJK, emoji); mixing rune indices with `string`
+// byte offsets would misalign after the first multi-byte rune.
+func globBody(runes []rune) string {
+	var sb strings.Builder
+	i := 0
+	for i < len(runes) {
+		r := runes[i]
+		// Extglob: ?(...), *(...), +(...), @(...), !(...). Each is
+		// `<sigil>(<alt>|<alt>|...)` — split on top-level `|` and
+		// recursively convert each alternative.
+		if i+1 < len(runes) && runes[i+1] == '(' && strings.ContainsRune("?*+@!", r) {
+			if end, ok := findMatchingParen(runes, i+2); ok {
+				alts := splitTopLevel(runes[i+2:end], '|', '(', ')')
+				parts := make([]string, len(alts))
+				for j, a := range alts {
+					parts[j] = globBody(a)
+				}
+				body := strings.Join(parts, "|")
+				switch r {
+				case '?':
+					sb.WriteString("(?:" + body + ")?")
+				case '*':
+					sb.WriteString("(?:" + body + ")*")
+				case '+':
+					sb.WriteString("(?:" + body + ")+")
+				case '@':
+					sb.WriteString("(?:" + body + ")")
+				case '!':
+					// RE2 lacks lookarounds; approximate as "zero or one"
+					// so the pattern still compiles. Exact extglob `!(...)`
+					// negation cannot be modeled in RE2.
+					sb.WriteString("(?:" + body + ")?")
+				}
+				i = end + 1
+				continue
+			}
+		}
+		// Brace expansion: `{a,b,c}` (nestable). Split on top-level `,`
+		// and recursively convert each branch.
+		if r == '{' {
+			if end, ok := findMatchingBrace(runes, i+1); ok {
+				alts := splitTopLevel(runes[i+1:end], ',', '{', '}')
+				// Single-branch braces (no `,`) are NOT brace expansion in
+				// minimatch — they're treated as literal `{x}`. Mirror that.
+				if len(alts) <= 1 {
+					sb.WriteString(regexp.QuoteMeta("{"))
+					i++
+					continue
+				}
+				parts := make([]string, len(alts))
+				for j, a := range alts {
+					parts[j] = globBody(a)
+				}
+				sb.WriteString("(?:" + strings.Join(parts, "|") + ")")
+				i = end + 1
+				continue
+			}
+		}
+		switch r {
+		case '*':
+			// Collapse `**` and longer runs to a single `.*`. Default
+			// minimatch on this codebase runs with `noglobstar: true`
+			// (see jsx_pascal_case docs); upstream eslint-plugin-react
+			// matches that since component-name patterns never contain
+			// path separators anyway.
+			for i < len(runes) && runes[i] == '*' {
+				i++
+			}
+			sb.WriteString(".*")
+		case '?':
+			sb.WriteString(".")
+			i++
+		case '[':
+			// Character class. Find the matching `]` (don't escape inner
+			// content beyond `!`/`^` negation, since the glob class syntax
+			// is a strict subset of regex class syntax).
+			closeIdx := -1
+			for j := i + 1; j < len(runes); j++ {
+				if runes[j] == ']' {
+					closeIdx = j
+					break
+				}
+			}
+			// At least two chars between `[` and `]` so `[^x]` / `[!x]`
+			// negation doesn't collapse to an empty inverted class (`[^]`),
+			// which RE2 rejects.
+			if closeIdx > i+1 {
+				body := string(runes[i+1 : closeIdx])
+				if len(body) > 1 && (body[0] == '!' || body[0] == '^') {
+					body = "^" + body[1:]
+				}
+				sb.WriteString("[" + body + "]")
+				i = closeIdx + 1
+			} else {
+				// Unbalanced `[`: treat as literal.
+				sb.WriteString("\\[")
+				i++
+			}
+		case '\\':
+			// Escape the next character as a literal.
+			if i+1 < len(runes) {
+				sb.WriteString(regexp.QuoteMeta(string(runes[i+1])))
+				i += 2
+			} else {
+				sb.WriteString("\\\\")
+				i++
+			}
+		default:
+			sb.WriteString(regexp.QuoteMeta(string(r)))
+			i++
+		}
+	}
+	return sb.String()
+}
+
+func findMatchingParen(runes []rune, start int) (int, bool) {
+	depth := 1
+	for j := start; j < len(runes); j++ {
+		switch runes[j] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return j, true
+			}
+		}
+	}
+	return -1, false
+}
+
+func findMatchingBrace(runes []rune, start int) (int, bool) {
+	depth := 1
+	for j := start; j < len(runes); j++ {
+		switch runes[j] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return j, true
+			}
+		}
+	}
+	return -1, false
+}
+
+// splitTopLevel splits `runes` on every `sep` that is at top level —
+// ignoring separators inside paired `openCh`/`closeCh` delimiters. Used
+// for brace alternatives (`,` outside nested `{...}`) and extglob
+// alternatives (`|` outside nested `(...)`).
+func splitTopLevel(runes []rune, sep, openCh, closeCh rune) [][]rune {
+	var parts [][]rune
+	depth := 0
+	start := 0
+	for i := range runes {
+		switch runes[i] {
+		case openCh:
+			depth++
+		case closeCh:
+			depth--
+		case sep:
+			if depth == 0 {
+				parts = append(parts, runes[start:i])
+				start = i + 1
+			}
+		}
+	}
+	parts = append(parts, runes[start:])
+	return parts
+}
 
 // SkipExpressionWrappers is a paren-and-TS-type-wrapper-transparent variant
 // of `ast.SkipParentheses`. It additionally peels back tsgo's TS-only
@@ -1029,6 +1285,15 @@ func ExtendsReactComponent(classNode *ast.Node, pragma string) bool {
 		return false
 	}
 	expr := ast.SkipParentheses(hc.Expression)
+	// OptionalChain in extends (`extends React?.Component`) is parsed as a
+	// `ChainExpression` upstream, which `componentUtil.isES6Component` does
+	// NOT match (it only inspects `MemberExpression` / `Identifier`). tsgo
+	// flags an OptionalChain via `QuestionDotToken` on the same
+	// PropertyAccessExpression, so we must explicitly reject it here to
+	// stay aligned with upstream's no-match behavior.
+	if ast.IsOptionalChain(expr) {
+		return false
+	}
 	switch expr.Kind {
 	case ast.KindIdentifier:
 		return isComponentName(expr.AsIdentifier().Text)
@@ -1131,32 +1396,123 @@ func GetJsxTagBaseIdentifier(tagName *ast.Node) *ast.Node {
 	return nil
 }
 
-// IsInsideReactComponent reports whether `node` is lexically contained within
-// a React component — either an ES5 component (object literal passed as an
-// argument to `<createClass>(...)` / `<pragma>.<createClass>(...)`) or an
-// ES6 component (ClassDeclaration / ClassExpression extending Component or
-// PureComponent, optionally qualified by pragma).
+// IsInsideReactComponent reports whether `node` is lexically inside a
+// React component, applying the SCOPE-BASED detection semantic that
+// upstream's `componentUtil.getParentES6Component(...) ||
+// componentUtil.getParentES5Component(...)` use directly (the pattern
+// of `no-string-refs` and `no-access-state-in-setstate`).
 //
-// Pass the empty string for pragma/createClass to fall back to
-// `DefaultReactPragma` / `DefaultReactCreateClass`.
+// **NOT equivalent to `GetEnclosingReactComponent != nil`**: the latter
+// mimics `Components.set`'s free AST ancestor walk that crosses any
+// non-React class. This helper applies the stricter ES6-stops-at-first-
+// class rule. Pick based on the upstream rule's pattern:
 //
-// Mirrors eslint-plugin-react's componentUtil:
+//   - Rule uses `Components.detect((context, components, utils) => ...)`
+//     and calls `components.set(node, ...)` / `components.get(...)` →
+//     use `GetEnclosingReactComponent`.
 //
-//   - ES6 path: only the nearest enclosing class decides component status
-//     (matching `getParentES6Component`'s `while scope.type !== 'class'`).
-//     A non-component class does not "pass through" to let an outer component
-//     class match — this prevents false positives like a non-React inner
-//     class nested inside a React class.
+//   - Rule calls `componentUtil.getParentES6Component` /
+//     `componentUtil.getParentES5Component` directly → use this helper
+//     (or `GetParentReactComponentScopeBased` for the node).
 //
-//   - ES5 path: `this` / `this.refs` must occur inside some function, whose
-//     ObjectExpression parent is the argument to `<createClass>(...)`. We
-//     approximate this by requiring that an enclosing function has been
-//     passed on the walk up before an ObjectExpression is accepted — which
-//     rules out pathological cases like `createReactClass({ x: this.refs.y })`
-//     where `this` is not inside any function (ESLint's scope walk returns
-//     null for that too).
+// Pass empty strings for pragma/createClass to fall back to defaults.
 func IsInsideReactComponent(node *ast.Node, pragma, createClass string) bool {
-	return GetEnclosingReactComponent(node, pragma, createClass) != nil
+	return GetParentReactComponentScopeBased(node, pragma, createClass) != nil
+}
+
+// GetParentReactComponentScopeBased mirrors upstream's
+// `componentUtil.getParentES6Component(context, node) ||
+// componentUtil.getParentES5Component(context, node)` exactly — the
+// helper used directly by `no-string-refs` and `no-access-state-in-setstate`.
+//
+// **NOT equivalent to `GetEnclosingReactComponent`**: that one mimics
+// `Components.set`'s free AST ancestor walk; this one applies the
+// stricter scope-based rules:
+//
+//   - **ES6 path**: finds the FIRST enclosing class (innermost). If it
+//     extends `Component` / `PureComponent` (bare or pragma-qualified),
+//     returns it; otherwise stops searching outer classes (mirrors
+//     upstream's `while scope.type !== 'class'` loop).
+//
+//   - **ES5 path**: walks each enclosing FunctionLike scope. For each,
+//     checks whether its parent.parent reaches a `createReactClass(...)`
+//     argument ObjectLiteralExpression. This crosses non-React classes
+//     freely — only function-like scopes are inspected.
+//
+// Empirically verified equivalent to ESLint output. Pass empty strings
+// for pragma/createClass to fall back to defaults.
+func GetParentReactComponentScopeBased(node *ast.Node, pragma, createClass string) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	if pragma == "" {
+		pragma = DefaultReactPragma
+	}
+	if createClass == "" {
+		createClass = DefaultReactCreateClass
+	}
+
+	// ES6 path: find FIRST enclosing class. If React, return; else
+	// remember that ES6 has decided "not a React class" and don't
+	// search outer classes (matches upstream's `while scope.type !==
+	// 'class'` loop that stops at the first class scope).
+	for p := node.Parent; p != nil; p = p.Parent {
+		if p.Kind == ast.KindClassDeclaration || p.Kind == ast.KindClassExpression {
+			if ExtendsReactComponent(p, pragma) {
+				return p
+			}
+			// First class is not React → ES6 detection returns null.
+			// Fall through to ES5 detection below.
+			break
+		}
+	}
+
+	// ES5 path: walk each enclosing FunctionLike. For each, check
+	// whether its parent / parent.parent is a createReactClass(...)
+	// arg ObjectLiteralExpression. Mirrors upstream's per-scope walk:
+	//   `node = scope.block && scope.block.parent && scope.block.parent.parent`
+	// where scope.block is the FunctionLike.
+	for p := node.Parent; p != nil; p = p.Parent {
+		if !ast.IsFunctionLike(p) {
+			continue
+		}
+		// `key: function() {...}` — FE wrapped in PropertyAssignment;
+		// its parent is the ObjectLiteralExpression.
+		// `key() {...}` shorthand — MethodDeclaration / GetAccessor /
+		// SetAccessor directly inside ObjectLiteralExpression.
+		var objLit *ast.Node
+		switch p.Kind {
+		case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+			objLit = p.Parent
+		default:
+			propEntry := p.Parent
+			if propEntry == nil || propEntry.Kind != ast.KindPropertyAssignment {
+				continue
+			}
+			objLit = propEntry.Parent
+		}
+		if objLit == nil || objLit.Kind != ast.KindObjectLiteralExpression {
+			continue
+		}
+		// Unwrap parens and verify createReactClass call.
+		arg := objLit
+		for arg.Parent != nil && arg.Parent.Kind == ast.KindParenthesizedExpression {
+			arg = arg.Parent
+		}
+		callExpr := arg.Parent
+		if callExpr == nil || callExpr.Kind != ast.KindCallExpression {
+			continue
+		}
+		call := callExpr.AsCallExpression()
+		if !isObjectArgumentOf(call, arg) {
+			continue
+		}
+		if IsCreateClassCall(call, pragma, createClass) {
+			return objLit
+		}
+	}
+
+	return nil
 }
 
 // GetEnclosingReactComponent is IsInsideReactComponent's sibling that returns
@@ -1174,28 +1530,29 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 	if createClass == "" {
 		createClass = DefaultReactCreateClass
 	}
-	seenNearestClass := false
-	seenEnclosingFunction := false
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) {
-			seenEnclosingFunction = true
-		}
 		switch p.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression:
-			if seenNearestClass {
-				// The nearest class already decided ES6 classification;
-				// outer classes do not get a second chance (matches ESLint's
-				// scope-walk that stops at the first class scope).
-				continue
-			}
-			seenNearestClass = true
+			// Mirror upstream's `Components.set` behavior: it walks
+			// `node.parent` looking for any node in the `_list` of
+			// already-detected components. Non-React classes are NOT
+			// in that list — Components.detect only registers classes
+			// that extend `Component` / `PureComponent` (or pragma-
+			// qualified) — so an inner non-React class does NOT block
+			// the walk from reaching an outer React component or a
+			// `createReactClass({...})` arg above.
+			//
+			// Concretely: a `this.setState({})` inside `class Helper {
+			// foo() {...} }`, where Helper is itself nested inside
+			// `class Outer extends React.Component { render() {...} }`
+			// or inside `createReactClass({ method: function() {
+			// class Helper {...} } })`, MUST attribute to the outer
+			// detected component. Both upstream eslint-plugin-react
+			// and rslint match here.
 			if ExtendsReactComponent(p, pragma) {
 				return p
 			}
 		case ast.KindObjectLiteralExpression:
-			if !seenEnclosingFunction {
-				continue
-			}
 			// The ObjectLiteralExpression may be wrapped in one or more
 			// ParenthesizedExpressions before reaching the CallExpression
 			// (ESTree would flatten these; tsgo preserves them), e.g.
@@ -1214,6 +1571,12 @@ func GetEnclosingReactComponent(node *ast.Node, pragma, createClass string) *ast
 				continue
 			}
 			if IsCreateClassCall(call, pragma, createClass) {
+				// Empirically verified against ESLint master:
+				// `createReactClass({ key: this.setState({}) })` —
+				// even a setState call at the TOP-LEVEL property
+				// position (not inside any method/function) attributes
+				// to the createReactClass arg via Components.set's
+				// free parent walk and reports.
 				return p
 			}
 		}
@@ -1284,12 +1647,39 @@ func IsCreateReactClassObjectArg(obj *ast.Node, pragma, createClass string) bool
 // approximate match). This is intentionally conservative: missed detection
 // causes a rule miss, over-detection would cause false-positive reports in
 // non-component functions.
-func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string) *ast.Node {
+func GetEnclosingReactComponentOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry) *ast.Node {
 	if comp := GetEnclosingReactComponent(node, pragma, createClass); comp != nil {
 		return comp
 	}
 	for p := node.Parent; p != nil; p = p.Parent {
-		if ast.IsFunctionLike(p) && IsStatelessReactComponent(p, pragma) {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
+			return p
+		}
+	}
+	return nil
+}
+
+// GetParentReactComponentScopeBasedOrStateless mirrors upstream's
+// `utils.getParentComponent(node)` =
+// `getParentES6Component || getParentES5Component || getParentStatelessComponent`.
+//
+// **NOT equivalent to `GetEnclosingReactComponentOrStateless`**: that one
+// uses `Components.set`'s free AST ancestor walk. This helper applies
+// the stricter scope-based ES6+ES5 detection (see
+// `GetParentReactComponentScopeBased`) and falls back to stateless
+// component detection. Use this for rules that call
+// `utils.getParentComponent(node)` directly inside a listener and gate
+// their report on the result being non-null — e.g.
+// `no-direct-mutation-state`'s `shouldIgnoreComponent(component)`
+// check, which bails when the result is undefined.
+//
+// Pass empty strings for pragma/createClass to fall back to defaults.
+func GetParentReactComponentScopeBasedOrStateless(node *ast.Node, pragma, createClass string, wrappers []ComponentWrapperEntry) *ast.Node {
+	if comp := GetParentReactComponentScopeBased(node, pragma, createClass); comp != nil {
+		return comp
+	}
+	for p := node.Parent; p != nil; p = p.Parent {
+		if ast.IsFunctionLike(p) && IsStatelessReactComponentWithWrappers(p, pragma, nil, wrappers) {
 			return p
 		}
 	}
@@ -1989,7 +2379,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 		// (`createElement`) / nested Identifiers. We mirror that here:
 		// resolve the initializer one step, accept iff the resolved node
 		// is itself a JSX element/fragment. Anything else returns false.
-		init := resolveIdentifierInitializer(expr, tc)
+		init := ResolveIdentifierInitializer(expr, tc)
 		if init == nil {
 			return false
 		}
@@ -2019,7 +2409,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 	return false
 }
 
-// resolveIdentifierInitializer returns the value-side AST node that an
+// ResolveIdentifierInitializer returns the value-side AST node that an
 // Identifier reference is bound to, or nil when the binding cannot be
 // determined.
 //
@@ -2034,7 +2424,7 @@ func isJSXExpression(expr *ast.Node, acceptNull bool, pragma string, tc *checker
 //     SourceFile / ModuleBlock / CaseBlock statements for a
 //     `VariableStatement` declaring `name` — catches the common
 //     same-block initializer case without scope analysis.
-func resolveIdentifierInitializer(ident *ast.Node, tc *checker.Checker) *ast.Node {
+func ResolveIdentifierInitializer(ident *ast.Node, tc *checker.Checker) *ast.Node {
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return nil
 	}

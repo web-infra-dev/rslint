@@ -523,6 +523,26 @@ func TestNoDirectMutationStateRule(t *testing.T) {
           },
         };
       `, Tsx: true},
+
+		// ---- Cross-helper lock: nested non-React class inside an ES6
+		// React component. Upstream's `no-direct-mutation-state` gates
+		// reporting on `utils.getParentComponent(node)` (ES6||ES5||
+		// stateless detection); ES6 finds the inner non-React Helper
+		// class and stops; ES5 finds nothing; stateless finds nothing.
+		// Result: NOT reported. Empirically verified against ESLint
+		// master. ----
+		{Code: `
+        class Outer extends React.Component {
+          render() {
+            class Helper {
+              doStuff() {
+                this.state.x = 1;
+              }
+            }
+            return <div/>;
+          }
+        }
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: createReactClass — simple mutation ----
 		{
@@ -1321,8 +1341,13 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 		},
 
 		// ---- Edge: bare `memo(...)` (destructured from React) ----
+		// Same pragma-import gate as the bare `forwardRef(...)` case
+		// above: without the explicit `import { memo } from 'react'`,
+		// upstream's `isDestructuredFromPragmaImport` returns false and
+		// the call is NOT recognized as a wrapper.
 		{
 			Code: `
+        import { memo } from 'react';
         export default memo(() => {
           this.state.x = 1;
           return <div/>;
@@ -1330,7 +1355,7 @@ func TestNoDirectMutationStateRule(t *testing.T) {
       `,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+				{MessageId: "noDirectMutation", Line: 4, Column: 11},
 			},
 		},
 
@@ -1349,8 +1374,13 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 		},
 
 		// ---- Edge: bare `forwardRef(...)` ----
+		// Upstream gates bare `forwardRef` / `memo` callees on
+		// `isDestructuredFromPragmaImport` — without an import binding
+		// the call is NOT recognized as a wrapper. Locked here with
+		// the explicit import to mirror that gate.
 		{
 			Code: `
+        import { forwardRef } from 'react';
         const Hello = forwardRef((props, ref) => {
           this.state.x = 1;
           return <div ref={ref}/>;
@@ -1358,7 +1388,7 @@ func TestNoDirectMutationStateRule(t *testing.T) {
       `,
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "noDirectMutation", Line: 3, Column: 11},
+				{MessageId: "noDirectMutation", Line: 4, Column: 11},
 			},
 		},
 
@@ -1852,6 +1882,47 @@ func TestNoDirectMutationStateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noDirectMutation", Line: 4, Column: 13},
+			},
+		},
+
+		// ---- Cross-helper lock: nested non-React class inside createReactClass
+		// arg — empirically verified against ESLint. Walk passes through
+		// the non-React inner class (not in detected-component list) and
+		// reaches the outer createReactClass arg, attributing the mutation. ----
+		{
+			Code: `
+var Hello = createReactClass({
+  someMethod: function() {
+    class Helper {
+      doStuff() {
+        this.state.x = 1;
+      }
+    }
+  },
+  render: function() { return <div/>; }
+});
+`,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 6, Column: 9},
+			},
+		},
+
+		// ---- Cross-helper lock (Helper-B): settings.componentWrapperFunctions
+		// — a user-configured HOC like `myObserver` is recognized as a
+		// component-wrapping call, so the inner arrow is treated as a
+		// stateless component and `this.state.x = 1` reports. ----
+		{
+			Code: `
+        const Hello = myObserver((props) => {
+          this.state.x = 1;
+          return <div/>;
+        });
+      `,
+			Tsx:      true,
+			Settings: map[string]interface{}{"componentWrapperFunctions": []interface{}{"myObserver"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noDirectMutation", Line: 3, Column: 11},
 			},
 		},
 	})
