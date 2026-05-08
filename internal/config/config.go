@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
+	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
 	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
@@ -30,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/dot_notation"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_function_return_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_member_accessibility"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/member_ordering"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/method_signature_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/naming_convention"
@@ -51,7 +53,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_inferrable_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_magic_numbers"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_meaningless_void_operator"
@@ -216,19 +217,19 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
-	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unneeded_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_computed_key"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_concat"
-	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_constructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_rename"
@@ -378,6 +379,11 @@ var KnownPlugins = []PluginInfo{
 		getAllRules: func() []rule.Rule { return jestPlugin.GetAllRules() },
 	},
 	{
+		RulePrefix:  "jsx-a11y",
+		DeclNames:   []string{"eslint-plugin-jsx-a11y", "jsx-a11y"},
+		getAllRules: func() []rule.Rule { return jsxA11yPlugin.GetAllRules() },
+	},
+	{
 		RulePrefix:  "promise",
 		DeclNames:   []string{"eslint-plugin-promise", "promise"},
 		getAllRules: func() []rule.Rule { return promisePlugin.GetAllRules() },
@@ -466,6 +472,7 @@ func RegisterAllRules() {
 		registerAllReactPluginRules()
 		registerAllReactHooksPluginRules()
 		registerAllJestPluginRules()
+		registerAllJsxA11yPluginRules()
 		registerAllPromisePluginRules()
 		registerAllUnicornPluginRules()
 		registerAllCoreEslintRules()
@@ -486,6 +493,12 @@ func registerAllReactHooksPluginRules() {
 
 func registerAllJestPluginRules() {
 	for _, rule := range jestPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
+}
+
+func registerAllJsxA11yPluginRules() {
+	for _, rule := range jsxA11yPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }

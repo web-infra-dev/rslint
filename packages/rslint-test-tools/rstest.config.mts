@@ -156,6 +156,9 @@ export default defineConfig({
     './tests/eslint-plugin-react-hooks/rules/rules-of-hooks.test.ts',
     './tests/eslint-plugin-react-hooks/rules/exhaustive-deps.test.ts',
 
+    // eslint-plugin-jsx-a11y
+    './tests/eslint-plugin-jsx-a11y/rules/alt-text.test.ts',
+
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
