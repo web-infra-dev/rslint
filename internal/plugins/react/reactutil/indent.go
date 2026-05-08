@@ -56,6 +56,18 @@ func NodeEndIndent(sf *ast.SourceFile, node *ast.Node, indentChar byte) int {
 	return IndentLeading(sf.Text(), sf.ECMALineMap(), pos, indentChar)
 }
 
+// NodeStartUTF16Column returns the 0-based UTF-16 character column of
+// the trimmed start of `node`. Used by indent-style rules whose option
+// semantics are character-based (e.g. eslint-plugin-react's
+// `jsx-indent-props` `'first'` mode, which aligns to the visual column of
+// the first prop). Counting bytes here would diverge from upstream ESLint
+// when the source contains multi-byte characters before the node.
+func NodeStartUTF16Column(sf *ast.SourceFile, node *ast.Node) int {
+	trimmed := utils.TrimNodeTextRange(sf, node)
+	_, char := scanner.GetECMALineAndUTF16CharacterOfPosition(sf, trimmed.Pos())
+	return int(char)
+}
+
 // IsNodeFirstInLine reports whether node is the first non-whitespace
 // (and non-comma) source character on its line. Walks back from the
 // trimmed start over spaces, tabs, commas and CR; a leading newline (or
@@ -113,12 +125,26 @@ func WrongIndentMessage(needed, gotten int, indentType string) rule.RuleMessage 
 // upstream's
 // `replaceTextRange([node.range[0] - node.loc.start.column, node.range[0]], …)`
 // pattern.
+//
+// When `needed` is negative (only reachable via a negative `indentSize`
+// option such as `[-2]`), the diagnostic is emitted WITHOUT a fix. The
+// message still reports the negative `needed` verbatim — that matches
+// upstream ESLint, which calls `' '.repeat(needed)` inside its fix
+// lambda; the lambda throws `RangeError`, ESLint discards the fix but
+// keeps the diagnostic intact. Skipping the fix here avoids the
+// `strings: negative Repeat count` panic in Go (which would crash the
+// whole linter, not just this one rule).
 func ReportIndentReplaceLeading(ctx rule.RuleContext, node *ast.Node, needed, gotten int, indentChar byte, indentType string) {
+	msg := WrongIndentMessage(needed, gotten, indentType)
+	if needed < 0 {
+		ctx.ReportNode(node, msg)
+		return
+	}
 	indent := strings.Repeat(string(indentChar), needed)
 	trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
 	startPos := trimmed.Pos()
 	lineStart := IndentLineStart(ctx.SourceFile.ECMALineMap(), startPos)
-	ctx.ReportNodeWithFixes(node, WrongIndentMessage(needed, gotten, indentType), rule.RuleFix{
+	ctx.ReportNodeWithFixes(node, msg, rule.RuleFix{
 		Text:  indent,
 		Range: core.NewTextRange(lineStart, startPos),
 	})

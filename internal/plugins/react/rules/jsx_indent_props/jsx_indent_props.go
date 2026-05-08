@@ -117,8 +117,12 @@ var JsxIndentPropsRule = rule.Rule{
 
 			var propIndent int
 			if indentIsFirst {
-				firstPropTrimmed := utils.TrimNodeTextRange(ctx.SourceFile, props[0])
-				propIndent = firstPropTrimmed.Pos() - reactutil.IndentLineStart(lineMap, firstPropTrimmed.Pos())
+				// 'first' mode aligns to the visual column of the
+				// first prop. Use UTF-16 character column (matches
+				// ESLint's `loc.start.column`) instead of byte
+				// offset so multi-byte characters preceding the
+				// first prop don't inflate the expected indent.
+				propIndent = reactutil.NodeStartUTF16Column(ctx.SourceFile, props[0])
 			} else {
 				propIndent = elementIndent + indentSize
 			}

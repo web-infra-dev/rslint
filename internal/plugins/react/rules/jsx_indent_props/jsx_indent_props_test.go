@@ -741,5 +741,74 @@ func TestJsxIndentPropsRule(t *testing.T) {
 				{MessageId: "wrongIndent", Line: 5, Column: 12},
 			},
 		},
+
+		// Negative indent option — `[-2]` makes propIndent < 0. Locks in:
+		//   1. The rule MUST NOT panic (early `strings.Repeat(' ', -2)`
+		//      crash before fix). The omitted `Output` field asserts no
+		//      fix was applied (matching upstream ESLint, whose `repeat()`
+		//      throws and is silently dropped).
+		//   2. The diagnostic message preserves the negative `needed`
+		//      verbatim — same shape upstream produces before its fix
+		//      lambda blows up.
+		{
+			Code:    "<App\nfoo\n/>",
+			Tsx:     true,
+			Options: []interface{}{float64(-2)},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "wrongIndent",
+					Message:   "Expected indentation of -2 space characters but found 0.",
+					Line:      2,
+					Column:    1,
+					EndLine:   2,
+					EndColumn: 4,
+				},
+			},
+		},
+
+		// Multi-byte tag name in `'first'` mode — `<中Foo>` adds 1 UTF-16
+		// code unit but 3 UTF-8 bytes. Locks in that propIndent uses
+		// UTF-16 character column (matches ESLint's `loc.start.column`),
+		// not byte offset. Without the UTF-16 fix, this case would
+		// erroneously expect indent 16 (byte offset) instead of 14.
+		{
+			Code:    "\n        <中Foo a=\"x\"\n           b=\"y\"\n        />\n      ",
+			Output:  []string{"\n        <中Foo a=\"x\"\n              b=\"y\"\n        />\n      "},
+			Tsx:     true,
+			Options: []interface{}{"first"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "wrongIndent",
+					Message:   "Expected indentation of 14 space characters but found 11.",
+					Line:      3,
+					Column:    12,
+					EndLine:   3,
+					EndColumn: 17,
+				},
+			},
+		},
+
+		// Multi-line attribute value position assertion (PORT_RULE.md
+		// Phase 4 Step 6 requires ≥1 multi-line case with full
+		// Line+Column+EndLine+EndColumn). The `beforeNav` attribute
+		// spans 4 lines; the diagnostic's end-of-range must land on the
+		// CLOSING line/column of the JsxAttribute, not on its first line.
+		{
+			Code: "\n        <BaseLayout\n          beforeNav={\n            <Banner />\n          }\n        />\n      ",
+			Output: []string{
+				"\n        <BaseLayout\n            beforeNav={\n            <Banner />\n          }\n        />\n      ",
+			},
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "wrongIndent",
+					Message:   "Expected indentation of 12 space characters but found 10.",
+					Line:      3,
+					Column:    11,
+					EndLine:   5,
+					EndColumn: 12,
+				},
+			},
+		},
 	})
 }
