@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_filename_extension"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_first_prop_new_line"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_handler_names"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_indent"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_depth"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_max_props_per_line"
@@ -84,6 +85,7 @@ func GetAllRules() []rule.Rule {
 		jsx_filename_extension.JsxFilenameExtensionRule,
 		jsx_first_prop_new_line.JsxFirstPropNewLineRule,
 		jsx_handler_names.JsxHandlerNamesRule,
+		jsx_indent.JsxIndentRule,
 		jsx_key.JsxKeyRule,
 		jsx_max_depth.JsxMaxDepthRule,
 		jsx_max_props_per_line.JsxMaxPropsPerLineRule,
