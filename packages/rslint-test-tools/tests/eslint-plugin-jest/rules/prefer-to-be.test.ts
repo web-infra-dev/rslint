@@ -61,7 +61,9 @@ ruleTester.run('prefer-to-be', {} as never, {
     { code: 'expect("something");' },
 
     // typescript edition
-    { code: "(expect('Model must be bound to an array if the multiple property is true') as any).toHaveBeenTipped()", },
+    {
+      code: "(expect('Model must be bound to an array if the multiple property is true') as any).toHaveBeenTipped()",
+    },
   ],
   invalid: [
     {
