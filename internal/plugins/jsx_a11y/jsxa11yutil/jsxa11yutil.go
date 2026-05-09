@@ -19,6 +19,41 @@ import (
 // extracting prop values; we mirror that with the standard rslint helper.
 const skipTransparent = ast.OEKParentheses | ast.OEKAssertions
 
+// StringSliceOption coerces a JSON-decoded option value into `[]string`,
+// silently dropping any non-string entries. It is the standard helper for
+// the `components: string[]` / `elements: string[]` / `specialLink:
+// string[]` / `<element>: string[]` shapes that appear across jsx-a11y
+// rule options (anchor-has-content, anchor-is-valid, alt-text, …).
+//
+// Returns:
+//   - `nil` when `v` is not a `[]interface{}` (absent option, wrong type).
+//     Callers should treat `nil` the same as upstream's `||` fallback —
+//     i.e. apply the rule's default. An EXPLICIT empty array is a
+//     deliberate "disable all" signal and is returned as a non-nil
+//     zero-length slice; this matters for rules whose semantics differ
+//     between "absent" and "explicit []".
+//   - a freshly-allocated `[]string` containing only the string entries
+//     of `v`, in order. Non-string entries (numbers, nested arrays,
+//     objects) are dropped — upstream's options validate via JSON schema
+//     so we only see well-typed values in practice; the filter is purely
+//     defensive.
+//
+// Single source of truth for this pattern; do NOT inline-loop a fresh copy
+// in a new rule.
+func StringSliceOption(v interface{}) []string {
+	arr, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 // FindAttributeByName returns the first JsxAttribute whose name matches `name`
 // case-insensitively, mirroring jsx-ast-utils' `getProp` with its default
 // `{ ignoreCase: true }`.
@@ -378,6 +413,50 @@ func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 		return v.Str, true
 	}
 	return "", false
+}
+
+// PropValueIsNullish mirrors the upstream `getPropValue(prop) == null` check
+// (loose equality with `null`, true for both `null` and `undefined`). Used by
+// rules that distinguish "no usable href" (absent prop, `prop={null}`,
+// `prop={undefined}`) from "href provided" (anything else, including boolean
+// `<a href />`, `prop={true}`, `prop={"foo"}`, `prop={someVar}`, calls,
+// member access, etc.).
+//
+// Returns true when:
+//   - `attr` is nil — `getProp` would have returned a missing prop, and
+//     `getPropValue(undefined)` evaluates to `undefined`.
+//   - the prop's value statically resolves to `null` or `undefined`. This
+//     covers `prop={null}`, `prop={undefined}`, and the TS-wrapped variants
+//     `prop={null as any}` / `prop={undefined!}` (skipTransparent unwraps
+//     parens + assertion wrappers per jsx-ast-utils' extract loop).
+//
+// Returns false for:
+//   - boolean form `<a prop />` — upstream maps the null-attribute-value to
+//     boolean `true`, which is `!= null`.
+//   - any non-nullish static value (string, number, boolean, function,
+//     truthy synthesized strings for member access / calls, etc.).
+//   - any expression staticEval can't resolve — these get jvUnknown, which
+//     upstream's getPropValue would have approximated with a non-null
+//     synthesized string. Treating jvUnknown as non-nullish matches the
+//     "value != null" branch upstream would take.
+func PropValueIsNullish(attr *ast.Node) bool {
+	if attr == nil {
+		return true
+	}
+	if AttributeIsBooleanForm(attr) {
+		return false
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		// Empty `{}` JsxExpression — tsgo synthesizes this only for malformed
+		// source. Upstream's parser would have errored out earlier; we treat
+		// it conservatively as non-nullish so the element still routes
+		// through the hasAnyHref branch (matches the "we don't know, but
+		// the developer wrote SOMETHING" default of staticEval's jvUnknown).
+		return false
+	}
+	v := staticEval(inner)
+	return v.Kind == jvNull || v.Kind == jvUndef
 }
 
 // LiteralPropTruthy mirrors `!!getLiteralPropValue(prop)`. Returns true when

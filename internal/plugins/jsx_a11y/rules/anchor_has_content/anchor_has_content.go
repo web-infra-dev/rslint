@@ -31,17 +31,7 @@ func parseOptions(raw any) options {
 	if m == nil {
 		return opts
 	}
-	if rawComponents, ok := m["components"]; ok {
-		if arr, ok := rawComponents.([]interface{}); ok {
-			comps := make([]string, 0, len(arr))
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					comps = append(comps, s)
-				}
-			}
-			opts.components = comps
-		}
-	}
+	opts.components = jsxa11yutil.StringSliceOption(m["components"])
 	return opts
 }
 

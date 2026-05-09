@@ -136,6 +136,7 @@ NOTX
 Nullishness
 objectbindingpattern
 objectliteralexpression
+onclick
 optionable
 osvfs
 parenless
