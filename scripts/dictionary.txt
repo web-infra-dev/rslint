@@ -389,3 +389,7 @@ valuemax
 valuemin
 valuenow
 valuetext
+WHATWG
+tabindex
+webauthn
+xoff

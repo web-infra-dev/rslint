@@ -315,6 +315,46 @@ func PropStaticStringValue(attr *ast.Node) (string, bool) {
 	return "", false
 }
 
+// LiteralPropStringValue mirrors `getLiteralPropValue(prop)` filtered to the
+// string-typed result. Returns ("", false) when the prop's literal-typed
+// value isn't a string under jsx-ast-utils' LITERAL_TYPES rules:
+//
+//   - Boolean attribute form (`<input autocomplete />`) → upstream returns
+//     boolean true, not a string → ("", false).
+//   - Identifier (`<input autocomplete={x} />`) → noop in LITERAL_TYPES → null
+//     → ("", false).
+//   - LogicalExpression / ConditionalExpression / CallExpression /
+//     MemberExpression / BinaryExpression — all noop in LITERAL_TYPES → null
+//     → ("", false).
+//
+// Differs from LiteralStringValue (which only handles direct StringLiteral
+// / NoSubstitutionTemplateLiteral) in two ways:
+//  1. Routes through literalPropValue, which special-cases the `null`
+//     literal to the string `"null"` (LITERAL_TYPES.Literal override).
+//  2. Synthesizes a placeholder string for TemplateExpression with
+//     substitutions (matches jsx-ast-utils' TemplateLiteral extractor).
+//
+// Used by autocomplete-valid (upstream calls `getLiteralPropValue` and gates
+// on `typeof === 'string'`) — anything other than a literal-typed string
+// makes the rule return early without checking validity.
+func LiteralPropStringValue(attr *ast.Node) (string, bool) {
+	if attr == nil {
+		return "", false
+	}
+	if AttributeIsBooleanForm(attr) {
+		return "", false
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		return "", false
+	}
+	v := literalPropValue(inner)
+	if v.Kind == jvString {
+		return v.Str, true
+	}
+	return "", false
+}
+
 // LiteralPropTruthy mirrors `!!getLiteralPropValue(prop)`. Returns true when
 // the attribute's value is a JS-truthy *literal*. Crucial differences from
 // PropStaticStringValue / staticEval-based truthiness:
