@@ -539,19 +539,29 @@ func staticEvalTemplate(tpl *ast.TemplateExpression) jsValue {
 			sp := span.AsTemplateSpan()
 			if sp.Expression != nil {
 				expr := ast.SkipOuterExpressions(sp.Expression, skipTransparent)
+				// Upstream wraps every substitution in `${<value>}` (the
+				// inner template literal `\${${getValue(expr)}}` evaluates
+				// to literal `"${" + String(getValue(expr)) + "}"`). The
+				// `$` prefix is load-bearing for autocomplete-valid: without
+				// it, `<input autocomplete={`${undefined}`} />` would
+				// synthesize the bare string "undefined", which matches
+				// axe-core's extended `stateTerms` and produces a false
+				// "valid" verdict. Mirror the `${...}` wrapping verbatim.
 				switch {
 				case utils.IsUndefinedIdentifier(expr):
-					sb.WriteString("undefined")
+					sb.WriteString("${undefined}")
 				case expr.Kind == ast.KindIdentifier:
-					sb.WriteString("{")
+					sb.WriteString("${")
 					sb.WriteString(expr.AsIdentifier().Text)
 					sb.WriteString("}")
 				default:
-					// Upstream: any non-Identifier / non-TemplateElement gets
-					// `{<type>}`. We don't have a stable type-name string in
-					// tsgo, so we just emit a placeholder — the result is
-					// still a truthy string, which is all alt-text needs.
-					sb.WriteString("{Expression}")
+					// Upstream computes `getValue(expr)` and JS-coerces to
+					// string. We don't replicate every TYPES branch; a
+					// placeholder is sufficient because alt-text only needs
+					// truthiness and autocomplete-valid only checks that
+					// the synthesized string isn't a known token (the `$`
+					// prefix guarantees no accidental token match).
+					sb.WriteString("${Expression}")
 				}
 			}
 			if sp.Literal != nil {
