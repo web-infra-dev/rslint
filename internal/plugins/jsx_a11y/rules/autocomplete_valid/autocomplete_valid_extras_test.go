@@ -195,8 +195,14 @@ func TestAutocompleteValidExtras(t *testing.T) {
 		// LITERAL_TYPES.Literal extraction.
 		{Code: `<input type={"hidden"} autocomplete="foo" />;`, Tsx: true},
 		{Code: "<input type={`hidden`} autocomplete=\"foo\" />;", Tsx: true},
-		// TS wrappers around the literal type: stripped before comparison.
-		{Code: `<input type={"hidden" as const} autocomplete="foo" />;`, Tsx: true},
+		// TS-wrapped autocomplete value — jsx-ast-utils' LITERAL_TYPES maps
+		// TSAsExpression / TSSatisfiesExpression to noop → null. The rule
+		// gates on `typeof === 'string'`, so anything wrapped in `as` /
+		// `satisfies` is opaque and the rule returns early → valid.
+		// (Locks alignment with eslint-plugin-jsx-a11y; matching invalid
+		// case for `type={"hidden" as const}` lives in the invalid list.)
+		{Code: `<input autocomplete={"foo" satisfies string} />`, Tsx: true},
+		{Code: `<input {...{autocomplete: "foo" as const}} />`, Tsx: true},
 		// Custom inputComponent with excluded type — the ESLint plugin
 		// hardcodes `nodeName: 'input'` in runVirtualRule so the type
 		// filter applies to inputComponents too.
@@ -869,22 +875,12 @@ func TestAutocompleteValidExtras(t *testing.T) {
 				Message:   failMessage,
 			}},
 		},
-		// `satisfies` in attribute initializer — OEKAssertions includes
-		// the satisfies bit (probed empirically: `OEKAssertions = 38 = 32
-		// + 4 + 2`, where bit 5 is satisfies). Locks that satisfies is
-		// transparent in our extractor.
+		// `<input type={"hidden" as const} autocomplete="foo" />` —
+		// upstream's LITERAL_TYPES.TSAsExpression = noop → type unknown
+		// → autocomplete="foo" gets validated → reported. Locked here
+		// to keep the rule aligned with eslint-plugin-jsx-a11y.
 		{
-			Code: `<input autocomplete={"foo" satisfies string} />`,
-			Tsx:  true,
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "autocompleteValid",
-				Message:   failMessage,
-			}},
-		},
-		// Spread-of-literal with TS-wrapped value — wrapper stripped at
-		// the value, "foo" extracted via PropertyAssignment path.
-		{
-			Code: `<input {...{autocomplete: "foo" as const}} />`,
+			Code: `<input type={"hidden" as const} autocomplete="foo" />;`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "autocompleteValid",

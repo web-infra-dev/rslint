@@ -56,7 +56,15 @@ func FindAttributeByName(attrs []*ast.Node, name string) *ast.Node {
 			if spread.Expression == nil {
 				continue
 			}
-			expr := ast.SkipOuterExpressions(spread.Expression, skipTransparent)
+			// jsx-ast-utils' getProp checks `attribute.argument.type ===
+			// 'ObjectExpression'` strictly — no TS-wrapper unwrap. ESTree
+			// folds parentheses at parse time so `({...})` shows up as a
+			// bare ObjectExpression, but tsgo preserves the
+			// ParenthesizedExpression node, so we must strip parens (and
+			// only parens) to recover the same shape. TS-wrapper kinds
+			// (`as`, `!`, `satisfies`) MUST stay opaque — upstream skips
+			// `{...({alt: "x"})!}` and we mirror.
+			expr := ast.SkipOuterExpressions(spread.Expression, ast.OEKParentheses)
 			if expr.Kind != ast.KindObjectLiteralExpression {
 				continue
 			}
@@ -195,9 +203,19 @@ func LiteralStringValue(attr *ast.Node) (string, bool) {
 //   - PropertyAssignment from spread (returns the initializer expression)
 //   - ShorthandPropertyAssignment from spread (returns the bound identifier)
 //
-// Parentheses + TS assertion wrappers are stripped on the result, so callers
-// can pattern-match `.Kind` directly against semantic kinds (StringLiteral,
-// Identifier, BinaryExpression, …) without re-walking wrappers.
+// Only parentheses are stripped — TS assertion wrappers (`as`, `!`, `<T>`,
+// `satisfies`) are LEFT IN PLACE so downstream extractors can decide whether
+// to unwrap them. This matters because jsx-ast-utils' two extractors disagree
+// on TS-wrapper handling:
+//
+//   - `extract()` / getPropValue: while-loops past TSAsExpression, returns
+//     the inner value (so `{"x" as string}` → "x").
+//   - `extractLiteral()` / getLiteralPropValue: maps TSAsExpression /
+//     TSNonNullExpression / TypeCastExpression to noop → null (so
+//     `{"x" as string}` → null).
+//
+// staticEval mirrors getPropValue and re-strips TS wrappers internally;
+// literalPropValue mirrors getLiteralPropValue and DOES NOT.
 //
 // Returns nil for the boolean attribute form (`<img alt />`) and for
 // `{ /* empty */ }` JsxExpression containers.
@@ -211,9 +229,9 @@ func attributeInnerExpression(attr *ast.Node) *ast.Node {
 		if expr == nil {
 			return nil
 		}
-		return ast.SkipOuterExpressions(expr, skipTransparent)
+		return ast.SkipOuterExpressions(expr, ast.OEKParentheses)
 	}
-	return ast.SkipOuterExpressions(init, skipTransparent)
+	return ast.SkipOuterExpressions(init, ast.OEKParentheses)
 }
 
 // AttributeIsExplicitUndefined reports whether the attribute value is an
@@ -319,13 +337,20 @@ func PropStaticStringValue(attr *ast.Node) (string, bool) {
 // string-typed result. Returns ("", false) when the prop's literal-typed
 // value isn't a string under jsx-ast-utils' LITERAL_TYPES rules:
 //
-//   - Boolean attribute form (`<input autocomplete />`) → upstream returns
-//     boolean true, not a string → ("", false).
-//   - Identifier (`<input autocomplete={x} />`) → noop in LITERAL_TYPES → null
-//     → ("", false).
+//   - Boolean attribute form (`<input autocomplete />`, `<img alt />`) →
+//     upstream returns boolean true, not a string → ("", false).
+//   - Identifier (`<input autocomplete={x} />`, `<img alt={someAlt} />`) →
+//     noop in LITERAL_TYPES → null → ("", false).
 //   - LogicalExpression / ConditionalExpression / CallExpression /
 //     MemberExpression / BinaryExpression — all noop in LITERAL_TYPES → null
 //     → ("", false).
+//   - String literals "true" / "false" coerce to booleans (NOT strings) →
+//     ("", false).
+//   - null literal returns the magic string "null" — upstream
+//     LITERAL_TYPES.Literal special-case.
+//   - TemplateExpression with substitutions becomes "head{Identifier}tail"
+//     style placeholder strings — non-empty and matches upstream's
+//     extractValueFromTemplateLiteral output exactly.
 //
 // Differs from LiteralStringValue (which only handles direct StringLiteral
 // / NoSubstitutionTemplateLiteral) in two ways:
@@ -334,9 +359,9 @@ func PropStaticStringValue(attr *ast.Node) (string, bool) {
 //  2. Synthesizes a placeholder string for TemplateExpression with
 //     substitutions (matches jsx-ast-utils' TemplateLiteral extractor).
 //
-// Used by autocomplete-valid (upstream calls `getLiteralPropValue` and gates
-// on `typeof === 'string'`) — anything other than a literal-typed string
-// makes the rule return early without checking validity.
+// Used by rules whose upstream implementation calls `getLiteralPropValue` and
+// gates on `typeof === 'string'` (autocomplete-valid, img-redundant-alt) —
+// anything other than a literal-typed string makes the rule return early.
 func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 	if attr == nil {
 		return "", false
@@ -601,11 +626,11 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 			// Matches upstream's `elementType(child.openingElement)` and
 			// `child.openingElement.attributes`.
 			opening := child.AsJsxElement().OpeningElement
-			if opening != nil && !isHiddenFromScreenReader(opening, getElementType) {
+			if opening != nil && !IsHiddenFromScreenReader(opening, getElementType) {
 				return true
 			}
 		case ast.KindJsxSelfClosingElement:
-			if !isHiddenFromScreenReader(child, getElementType) {
+			if !IsHiddenFromScreenReader(child, getElementType) {
 				return true
 			}
 		case ast.KindJsxExpression:
@@ -641,7 +666,7 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 	return false
 }
 
-// isHiddenFromScreenReader mirrors upstream's `isHiddenFromScreenReader`:
+// IsHiddenFromScreenReader mirrors upstream's `isHiddenFromScreenReader`:
 //
 //	if (type.toUpperCase() === 'INPUT') {
 //	  const hidden = getLiteralPropValue(getProp(attrs, 'type'));
@@ -656,7 +681,11 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 // handle the wrapper unwrapping and "true"/"false" string normalization
 // transparently, so e.g. `aria-hidden="true"` and `aria-hidden={cond ? true : false}`
 // both classify correctly.
-func isHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) string) bool {
+//
+// `child` is the JsxOpeningElement / JsxSelfClosingElement to inspect;
+// `getElementType` is the per-context resolver (use a closure that calls
+// GetElementType with `ctx.Settings` already bound).
+func IsHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) string) bool {
 	tag := strings.ToUpper(getElementType(child))
 	attrs := reactutil.GetJsxElementAttributes(child)
 	if tag == "INPUT" {
