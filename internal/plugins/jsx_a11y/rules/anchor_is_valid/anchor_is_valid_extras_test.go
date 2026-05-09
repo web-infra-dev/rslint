@@ -482,6 +482,16 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      handling. ----
 		{Code: `<a href={undefined} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
 
+		// ---- Empty JsxExpression `<a href={}/>` — tsgo accepts this for
+		//      error-recovery; jsx-ast-utils routes JSXEmptyExpression
+		//      through its `TYPES[type] === undefined → return null`
+		//      fallback. `null != null` is false → no href → noHref. Locks
+		//      in PropValueIsNullish's `inner == nil` branch alignment. ----
+		{Code: `<a href={} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		// JsxExpression containing only a comment is the same shape as
+		// empty: tsgo strips trivia, leaving Expression nil. Same outcome.
+		{Code: `<a href={/* todo */} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+
 		// ---- onClick prop case-insensitive lookup. With no href, the
 		//      lowercase legacy HTML attribute should still trigger
 		//      preferButton (per jsx-ast-utils ignoreCase=true). ----

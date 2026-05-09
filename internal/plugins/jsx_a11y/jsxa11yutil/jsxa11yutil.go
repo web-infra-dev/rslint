@@ -425,20 +425,25 @@ func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 // Returns true when:
 //   - `attr` is nil — `getProp` would have returned a missing prop, and
 //     `getPropValue(undefined)` evaluates to `undefined`.
+//   - the prop's value is an empty JsxExpression (`prop={}`) — tsgo accepts
+//     this for error-recovery, but jsx-ast-utils' expressions extractor has
+//     no entry for `JSXEmptyExpression` and falls through to its
+//     `TYPES[type] === undefined → return null` path, which is `== null`.
 //   - the prop's value statically resolves to `null` or `undefined`. This
 //     covers `prop={null}`, `prop={undefined}`, and the TS-wrapped variants
 //     `prop={null as any}` / `prop={undefined!}` (skipTransparent unwraps
 //     parens + assertion wrappers per jsx-ast-utils' extract loop).
+//   - staticEval cannot resolve the expression at all (`jvUnknown`). This
+//     mirrors jsx-ast-utils returning `null` for unrecognized expression
+//     types via the same fallback path. Producing this state is rare in
+//     practice (most "I don't know" arms in staticEval fall through to
+//     jsNull explicitly); kept here for defensive parity.
 //
 // Returns false for:
 //   - boolean form `<a prop />` — upstream maps the null-attribute-value to
 //     boolean `true`, which is `!= null`.
 //   - any non-nullish static value (string, number, boolean, function,
 //     truthy synthesized strings for member access / calls, etc.).
-//   - any expression staticEval can't resolve — these get jvUnknown, which
-//     upstream's getPropValue would have approximated with a non-null
-//     synthesized string. Treating jvUnknown as non-nullish matches the
-//     "value != null" branch upstream would take.
 func PropValueIsNullish(attr *ast.Node) bool {
 	if attr == nil {
 		return true
@@ -448,15 +453,15 @@ func PropValueIsNullish(attr *ast.Node) bool {
 	}
 	inner := attributeInnerExpression(attr)
 	if inner == nil {
-		// Empty `{}` JsxExpression — tsgo synthesizes this only for malformed
-		// source. Upstream's parser would have errored out earlier; we treat
-		// it conservatively as non-nullish so the element still routes
-		// through the hasAnyHref branch (matches the "we don't know, but
-		// the developer wrote SOMETHING" default of staticEval's jvUnknown).
-		return false
+		// Empty `{}` JsxExpression (or expression-container holding only
+		// trivia). jsx-ast-utils routes JSXEmptyExpression through its
+		// "type not in TYPES" fallback → returns null. We mirror that —
+		// `null != null` is false, so the prop contributes nothing to
+		// `hasAnyHref` and the element correctly trips the noHref aspect.
+		return true
 	}
 	v := staticEval(inner)
-	return v.Kind == jvNull || v.Kind == jvUndef
+	return v.Kind == jvNull || v.Kind == jvUndef || v.Kind == jvUnknown
 }
 
 // LiteralPropTruthy mirrors `!!getLiteralPropValue(prop)`. Returns true when
