@@ -320,9 +320,11 @@ func TestAltTextExtras(t *testing.T) {
 		// the `=== true` check in upstream's isHiddenFromScreenReader.
 		{Code: `<object><div aria-hidden={someVar}>x</div></object>`, Tsx: true},
 
-		// ---- TS-only wrappers (`as` / `!` / `satisfies`) — Go-impl specific ----
+		// ---- TS-only wrappers (`as` / `!`) — Go-impl specific ----
 		// Verified via real rslint binary. Each shape unwraps to its inner
-		// expression via OEKParentheses|OEKAssertions.
+		// expression via skipTransparent (parens + type assertions +
+		// non-null assertions). `satisfies` is intentionally EXCLUDED — see
+		// the invalid section below for the lock-in.
 		// `altText!` — non-null assertion on a value-bearing identifier.
 		{Code: `<img alt={altText!} />`, Tsx: true},
 		// `altText as string` — type assertion.
@@ -333,8 +335,6 @@ func TestAltTextExtras(t *testing.T) {
 		{Code: `<img alt={"foo" as string} />`, Tsx: true},
 		// Empty string under `as` — extracts to "" → valid via `=== ''`.
 		{Code: `<img alt={"" as string} />`, Tsx: true},
-		// `satisfies` wrapping a string literal.
-		{Code: `<img alt={"foo" satisfies string} />`, Tsx: true},
 		// `as const` on a literal — still a literal "x" → valid.
 		{Code: `<img alt="" role={"presentation" as const} />`, Tsx: true},
 
@@ -812,6 +812,19 @@ func TestAltTextExtras(t *testing.T) {
 		// `undefined satisfies undefined` — same.
 		{
 			Code: `<img alt={undefined satisfies undefined} />`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
+			},
+		},
+		// `"foo" satisfies string` — even a truthy literal under `satisfies`
+		// is null per upstream's TYPES table (no `TSSatisfiesExpression`
+		// extractor). staticEval excludes `OEKSatisfies` from
+		// skipTransparent, so satisfies-wrapped values fall to the default
+		// `jsNull` arm. Locks in alignment after the satisfies-stripping
+		// fix.
+		{
+			Code: `<img alt={"foo" satisfies string} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},

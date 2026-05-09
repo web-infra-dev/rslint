@@ -159,6 +159,7 @@ export default defineConfig({
     // eslint-plugin-jsx-a11y
     './tests/eslint-plugin-jsx-a11y/rules/alt-text.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/anchor-has-content.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/anchor-is-valid.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/aria-unsupported-elements.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/autocomplete-valid.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/img-redundant-alt.test.ts',

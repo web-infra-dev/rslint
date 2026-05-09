@@ -13,11 +13,61 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// skipTransparent unwraps parentheses + TS assertion wrappers (`as`, `!`,
-// `<T>`, `satisfies`). Upstream's jsx-ast-utils explicitly walks past
-// `TSAsExpression` and TSNonNullExpression / TSSatisfies wrappers when
-// extracting prop values; we mirror that with the standard rslint helper.
-const skipTransparent = ast.OEKParentheses | ast.OEKAssertions
+// skipTransparent is the wrapper mask used by `staticEval` (the
+// `getPropValue` / TYPES path). Strips parentheses, type assertions
+// (`as` / `<T>x` / `TypeCastExpression`), and non-null assertions (`!`),
+// because upstream's jsx-ast-utils does the equivalent:
+//
+//   - parens are flattened by ESTree's parser; tsgo preserves them, so
+//     stripping is needed for parity.
+//   - `TSAsExpression` is unwrapped via the while-loop in
+//     `extractValueFromExpression`.
+//   - `TSNonNullExpression` has its own TYPES extractor that recurses
+//     into `.expression`, equivalent to stripping.
+//
+// `OEKSatisfies` is INTENTIONALLY EXCLUDED. Upstream's `TYPES` table has
+// no entry for `TSSatisfiesExpression`, so it falls to the
+// `TYPES[type] === undefined → return null` branch. Keeping satisfies
+// opaque here makes it land on `staticEval`'s default `jsNull` arm,
+// matching upstream's null exactly. Used only by `staticEval`; the
+// `getLiteralPropValue` (`literalPropValue`) and `getProp` paths strip
+// parens only — see those callers.
+const skipTransparent = ast.OEKParentheses | ast.OEKTypeAssertions | ast.OEKNonNullAssertions
+
+// StringSliceOption coerces a JSON-decoded option value into `[]string`,
+// silently dropping any non-string entries. It is the standard helper for
+// the `components: string[]` / `elements: string[]` / `specialLink:
+// string[]` / `<element>: string[]` shapes that appear across jsx-a11y
+// rule options (anchor-has-content, anchor-is-valid, alt-text, …).
+//
+// Returns:
+//   - `nil` when `v` is not a `[]interface{}` (absent option, wrong type).
+//     Callers should treat `nil` the same as upstream's `||` fallback —
+//     i.e. apply the rule's default. An EXPLICIT empty array is a
+//     deliberate "disable all" signal and is returned as a non-nil
+//     zero-length slice; this matters for rules whose semantics differ
+//     between "absent" and "explicit []".
+//   - a freshly-allocated `[]string` containing only the string entries
+//     of `v`, in order. Non-string entries (numbers, nested arrays,
+//     objects) are dropped — upstream's options validate via JSON schema
+//     so we only see well-typed values in practice; the filter is purely
+//     defensive.
+//
+// Single source of truth for this pattern; do NOT inline-loop a fresh copy
+// in a new rule.
+func StringSliceOption(v interface{}) []string {
+	arr, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
 
 // FindAttributeByName returns the first JsxAttribute whose name matches `name`
 // case-insensitively, mirroring jsx-ast-utils' `getProp` with its default
@@ -378,6 +428,55 @@ func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 		return v.Str, true
 	}
 	return "", false
+}
+
+// PropValueIsNullish mirrors the upstream `getPropValue(prop) == null` check
+// (loose equality with `null`, true for both `null` and `undefined`). Used by
+// rules that distinguish "no usable href" (absent prop, `prop={null}`,
+// `prop={undefined}`) from "href provided" (anything else, including boolean
+// `<a href />`, `prop={true}`, `prop={"foo"}`, `prop={someVar}`, calls,
+// member access, etc.).
+//
+// Returns true when:
+//   - `attr` is nil — `getProp` would have returned a missing prop, and
+//     `getPropValue(undefined)` evaluates to `undefined`.
+//   - the prop's value is an empty JsxExpression (`prop={}`) — tsgo accepts
+//     this for error-recovery, but jsx-ast-utils' expressions extractor has
+//     no entry for `JSXEmptyExpression` and falls through to its
+//     `TYPES[type] === undefined → return null` path, which is `== null`.
+//   - the prop's value statically resolves to `null` or `undefined`. This
+//     covers `prop={null}`, `prop={undefined}`, and the TS-wrapped variants
+//     `prop={null as any}` / `prop={undefined!}` (skipTransparent unwraps
+//     parens + assertion wrappers per jsx-ast-utils' extract loop).
+//   - staticEval cannot resolve the expression at all (`jvUnknown`). This
+//     mirrors jsx-ast-utils returning `null` for unrecognized expression
+//     types via the same fallback path. Producing this state is rare in
+//     practice (most "I don't know" arms in staticEval fall through to
+//     jsNull explicitly); kept here for defensive parity.
+//
+// Returns false for:
+//   - boolean form `<a prop />` — upstream maps the null-attribute-value to
+//     boolean `true`, which is `!= null`.
+//   - any non-nullish static value (string, number, boolean, function,
+//     truthy synthesized strings for member access / calls, etc.).
+func PropValueIsNullish(attr *ast.Node) bool {
+	if attr == nil {
+		return true
+	}
+	if AttributeIsBooleanForm(attr) {
+		return false
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		// Empty `{}` JsxExpression (or expression-container holding only
+		// trivia). jsx-ast-utils routes JSXEmptyExpression through its
+		// "type not in TYPES" fallback → returns null. We mirror that —
+		// `null != null` is false, so the prop contributes nothing to
+		// `hasAnyHref` and the element correctly trips the noHref aspect.
+		return true
+	}
+	v := staticEval(inner)
+	return v.Kind == jvNull || v.Kind == jvUndef || v.Kind == jvUnknown
 }
 
 // LiteralPropTruthy mirrors `!!getLiteralPropValue(prop)`. Returns true when

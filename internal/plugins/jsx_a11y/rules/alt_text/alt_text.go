@@ -61,35 +61,21 @@ func parseOptions(raw any) options {
 	}
 
 	if rawElements, ok := m["elements"]; ok {
-		if arr, ok := rawElements.([]interface{}); ok {
-			elements := make([]string, 0, len(arr))
-			for _, v := range arr {
-				if s, ok := v.(string); ok {
-					elements = append(elements, s)
-				}
-			}
-			// Upstream falls through to DEFAULT_ELEMENTS via `||` only when
-			// `options.elements` is falsy (undefined / null / "" / []). An
-			// explicitly-empty array therefore disables ALL element checks —
-			// match that semantic.
+		// Upstream falls through to DEFAULT_ELEMENTS via `||` only when
+		// `options.elements` is falsy (undefined / null / "" / []). An
+		// explicitly-empty array IS truthy in JS, so it replaces the
+		// default and disables ALL element checks. The `ok` guard is the
+		// "absent vs present" distinction; StringSliceOption returns a
+		// (possibly empty) `[]string` for any present `[]interface{}`.
+		if elements := jsxa11yutil.StringSliceOption(rawElements); elements != nil {
 			opts.elements = elements
 		}
 	}
 
 	opts.customComponents = make(map[string][]string)
 	for _, element := range opts.elements {
-		if rawList, ok := m[element]; ok {
-			if arr, ok := rawList.([]interface{}); ok {
-				list := make([]string, 0, len(arr))
-				for _, v := range arr {
-					if s, ok := v.(string); ok {
-						list = append(list, s)
-					}
-				}
-				if len(list) > 0 {
-					opts.customComponents[element] = list
-				}
-			}
+		if list := jsxa11yutil.StringSliceOption(m[element]); len(list) > 0 {
+			opts.customComponents[element] = list
 		}
 	}
 	return opts
