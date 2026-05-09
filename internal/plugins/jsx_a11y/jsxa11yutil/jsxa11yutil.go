@@ -86,6 +86,38 @@ func FindAttributeByName(attrs []*ast.Node, name string) *ast.Node {
 	return nil
 }
 
+// HasAnyJsxPropStrict mirrors jsx-ast-utils' `hasAnyProp` with default
+// options (`spreadStrict: true`, `ignoreCase: true`). Returns true iff any
+// of the given names is present as a DIRECT JsxAttribute (case-insensitive).
+//
+// Spread attributes — even literal ObjectLiteral spreads — are opaque under
+// the strict default, so `<a {...{title: 'x'}} />` returns false here. This
+// is the upstream-correct semantic for rules that explicitly use `hasProp`
+// / `hasAnyProp` (e.g. anchor-has-content, hasAccessibleChild's fallback
+// `dangerouslySetInnerHTML`/`children` lookup).
+//
+// Use this helper when porting upstream code that calls `hasProp` /
+// `hasAnyProp`. Use FindAttributeByName instead when porting `getProp` /
+// `getPropValue` / `getLiteralPropValue` call sites — those walk literal
+// spreads.
+func HasAnyJsxPropStrict(attrs []*ast.Node, names ...string) bool {
+	for _, attr := range attrs {
+		if attr.Kind != ast.KindJsxAttribute {
+			// JsxSpreadAttribute is opaque under the strict default,
+			// regardless of whether the spread argument is a literal
+			// ObjectLiteralExpression.
+			continue
+		}
+		propName := reactutil.GetJsxPropName(attr)
+		for _, name := range names {
+			if strings.EqualFold(propName, name) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // AttributeInitializer returns the value-bearing child of an attribute-like
 // node returned by FindAttributeByName. For a JsxAttribute this is its
 // `Initializer` (StringLiteral or JsxExpression). For a PropertyAssignment
@@ -542,7 +574,15 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 				// `{}` empty container — matches upstream `default: false`.
 				continue
 			}
-			inner := ast.SkipOuterExpressions(expr, skipTransparent)
+			// Upstream's switch checks `child.expression.type === 'Identifier'`
+			// DIRECTLY without unwrapping. In typescript-eslint's AST, TS
+			// wrappers (`as` / `!` / `satisfies` / `<T>x`) are exposed as
+			// their own AST nodes whose `.type` is not 'Identifier' — so
+			// they fall through to `return true` (= accessible). Parens are
+			// auto-flattened by ESTree's parser, so `<a>{(undefined)}</a>`
+			// is reported but `<a>{undefined as any}</a>` is not. Mirror
+			// that by stripping parens only (NOT TS assertion wrappers).
+			inner := ast.SkipParentheses(expr)
 			if utils.IsUndefinedIdentifier(inner) {
 				continue
 			}
@@ -550,10 +590,13 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 		}
 	}
 	// Fallback: opening element declares dangerouslySetInnerHTML or children.
-	for _, name := range []string{"dangerouslySetInnerHTML", "children"} {
-		if FindAttributeByName(openingAttrs, name) != nil {
-			return true
-		}
+	// Upstream calls `hasAnyProp(attrs, ['dangerouslySetInnerHTML', 'children'])`
+	// — `hasAnyProp`'s default `spreadStrict: true` makes every spread
+	// (literal or not) opaque, so we use HasAnyJsxPropStrict here. Walking
+	// literal spreads via FindAttributeByName would diverge from upstream
+	// for `<a {...{children: 'x'}} />`-style synthetic shapes.
+	if HasAnyJsxPropStrict(openingAttrs, "dangerouslySetInnerHTML", "children") {
+		return true
 	}
 	return false
 }
