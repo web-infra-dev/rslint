@@ -13,11 +13,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// skipTransparent unwraps parentheses + TS assertion wrappers (`as`, `!`,
-// `<T>`, `satisfies`). Upstream's jsx-ast-utils explicitly walks past
-// `TSAsExpression` and TSNonNullExpression / TSSatisfies wrappers when
-// extracting prop values; we mirror that with the standard rslint helper.
-const skipTransparent = ast.OEKParentheses | ast.OEKAssertions
+// skipTransparent is the wrapper mask used by `staticEval` (the
+// `getPropValue` / TYPES path). Strips parentheses, type assertions
+// (`as` / `<T>x` / `TypeCastExpression`), and non-null assertions (`!`),
+// because upstream's jsx-ast-utils does the equivalent:
+//
+//   - parens are flattened by ESTree's parser; tsgo preserves them, so
+//     stripping is needed for parity.
+//   - `TSAsExpression` is unwrapped via the while-loop in
+//     `extractValueFromExpression`.
+//   - `TSNonNullExpression` has its own TYPES extractor that recurses
+//     into `.expression`, equivalent to stripping.
+//
+// `OEKSatisfies` is INTENTIONALLY EXCLUDED. Upstream's `TYPES` table has
+// no entry for `TSSatisfiesExpression`, so it falls to the
+// `TYPES[type] === undefined → return null` branch. Keeping satisfies
+// opaque here makes it land on `staticEval`'s default `jsNull` arm,
+// matching upstream's null exactly. Used only by `staticEval`; the
+// `getLiteralPropValue` (`literalPropValue`) and `getProp` paths strip
+// parens only — see those callers.
+const skipTransparent = ast.OEKParentheses | ast.OEKTypeAssertions | ast.OEKNonNullAssertions
 
 // StringSliceOption coerces a JSON-decoded option value into `[]string`,
 // silently dropping any non-string entries. It is the standard helper for

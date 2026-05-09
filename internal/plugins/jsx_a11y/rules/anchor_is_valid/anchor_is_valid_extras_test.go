@@ -56,14 +56,15 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		{Code: `<a href />`, Tsx: true},
 
 		// ---- Dimension 4: TS expression wrappers on the value (parens +
-		//      `as` + `!`). attributeInnerExpression strips these via
-		//      ast.SkipOuterExpressions(skipTransparent), so the inner
-		//      string literal "foo" is what staticEval sees. ----
+		//      `as` + `!`). staticEval strips these via skipTransparent
+		//      (parens + type assertions + non-null), so the inner string
+		//      literal "foo" is what staticEval sees. NOTE: `satisfies` is
+		//      intentionally NOT in skipTransparent — see the satisfies
+		//      lock-in in the invalid section below. ----
 		{Code: `<a href={("foo")} />`, Tsx: true},
 		{Code: `<a href={"foo" as string} />`, Tsx: true},
 		{Code: `<a href={"foo" as const} />`, Tsx: true},
 		{Code: `<a href={"foo"!} />`, Tsx: true},
-		{Code: `<a href={"foo" satisfies string} />`, Tsx: true},
 
 		// ---- Dimension 4: spread attribute — non-literal spread is opaque,
 		//      hasSpread=true suppresses the noHref/preferButton branches. ----
@@ -488,6 +489,16 @@ func TestAnchorIsValidExtras(t *testing.T) {
 		//      fallback. `null != null` is false → no href → noHref. Locks
 		//      in PropValueIsNullish's `inner == nil` branch alignment. ----
 		{Code: `<a href={} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+
+		// ---- TS `satisfies` wrapper — upstream's TYPES table has NO
+		//      `TSSatisfiesExpression` extractor, so `getPropValue` returns
+		//      null for `<a href={"foo" satisfies string}/>`. staticEval
+		//      mirrors by EXCLUDING `OEKSatisfies` from skipTransparent;
+		//      satisfies-wrapped values land on the default `jsNull` arm
+		//      and PropValueIsNullish reports nullish → noHref. Catches
+		//      what would otherwise be silent under-reporting. ----
+		{Code: `<a href={"foo" satisfies string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
+		{Code: `<a href={"javascript:void(0)" satisfies string} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
 		// JsxExpression containing only a comment is the same shape as
 		// empty: tsgo strips trivia, leaving Expression nil. Same outcome.
 		{Code: `<a href={/* todo */} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noHref", Message: noHrefErrorMessage, Line: 1, Column: 1}}},
