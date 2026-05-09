@@ -25,6 +25,11 @@ let pendingMessages = new Map<
 /**
  * Decompress gzip data using DecompressionStream API
  */
+function isGzipData(data: ArrayBuffer): boolean {
+  const bytes = new Uint8Array(data);
+  return bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b;
+}
+
 async function decompressGzip(
   compressedData: ArrayBuffer,
 ): Promise<ArrayBuffer> {
@@ -66,11 +71,14 @@ async function initializeRslint(wasmURL: string): Promise<void> {
 
     let wasmSource: BufferSource | WebAssembly.Module;
 
-    // Check if the URL is a gzip file
+    // Some static servers/CDNs automatically decompress .gz assets before
+    // returning the response body. In that case the URL still ends with .gz,
+    // but the bytes are already plain wasm. Check the gzip magic header before
+    // manually decompressing to avoid double-gunzip failures.
     if (wasmURL.endsWith('.gz')) {
       const response = await fetch(wasmURL);
-      const compressedData = await response.arrayBuffer();
-      wasmSource = await decompressGzip(compressedData);
+      const data = await response.arrayBuffer();
+      wasmSource = isGzipData(data) ? await decompressGzip(data) : data;
       const result = await WebAssembly.instantiate(wasmSource, go.importObject);
       go.run(result.instance);
     } else {
