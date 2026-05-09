@@ -158,6 +158,7 @@ export default defineConfig({
 
     // eslint-plugin-jsx-a11y
     './tests/eslint-plugin-jsx-a11y/rules/alt-text.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/aria-unsupported-elements.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
