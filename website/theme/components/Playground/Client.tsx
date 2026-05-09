@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as Rslint from '@rslint/wasm';
 import { EditorTabs, EditorTabsRef } from './EditorTabs';
 import { ResultPanel, Diagnostic } from './ResultPanel';
-import './index.css';
+import './Client.css';
 import { RemoteSourceFile, type Node, SyntaxKind } from '@rslint/api';
 import { ResizableSplitPane, type GetAstInfoResponse } from './ast';
 
