@@ -30,14 +30,7 @@ export default defineConfig({
     exclude: ['**/zh/shared/**', '**/en/shared/**', './theme'],
   },
   globalStyles: path.join(__dirname, 'styles/index.css'),
-  llms: {
-    remarkSplitMdxOptions: {
-      excludes: [[['Playground'], '@/theme/components/Playground']],
-    },
-  },
-  ssg: {
-    experimentalExcludeRoutePaths: ['/playground/'],
-  },
+  llms: true,
   themeConfig: {
     socialLinks: [
       {
