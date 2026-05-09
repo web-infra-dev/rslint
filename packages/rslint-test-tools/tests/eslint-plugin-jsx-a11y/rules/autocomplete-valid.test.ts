@@ -143,7 +143,11 @@ new RuleTester().run('autocomplete-valid', null as never, {
     // Literal type via JsxExpression / template.
     { code: '<input type={"hidden"} autocomplete="foo" />;' },
     { code: '<input type={`hidden`} autocomplete="foo" />;' },
-    { code: '<input type={"hidden" as const} autocomplete="foo" />;' },
+    // TS-wrapped autocomplete value: jsx-ast-utils' LITERAL_TYPES maps
+    // TSAsExpression / TSSatisfiesExpression to noop → null, so the rule
+    // returns early without checking the value.
+    { code: '<input autocomplete={"foo" satisfies string} />' },
+    { code: '<input {...{autocomplete: "foo" as const}} />' },
     // Custom inputComponent with excluded type.
     {
       code: '<MyInput type="hidden" autocomplete="foo" />;',
@@ -523,12 +527,11 @@ new RuleTester().run('autocomplete-valid', null as never, {
       code: '<input autocomplete={/* leading */ "foo" /* trailing */} />',
       errors: [{ message: failMessage }],
     },
+    // `type={"hidden" as const}` — jsx-ast-utils' LITERAL_TYPES maps
+    // TSAsExpression to noop → null, so the type is unknown and the
+    // autocomplete value gets validated → reported.
     {
-      code: '<input autocomplete={"foo" satisfies string} />',
-      errors: [{ message: failMessage }],
-    },
-    {
-      code: '<input {...{autocomplete: "foo" as const}} />',
+      code: '<input type={"hidden" as const} autocomplete="foo" />;',
       errors: [{ message: failMessage }],
     },
   ],

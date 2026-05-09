@@ -661,7 +661,13 @@ func literalPropValue(node *ast.Node) jsValue {
 	if node == nil {
 		return jsUnknown
 	}
-	node = ast.SkipOuterExpressions(node, skipTransparent)
+	// Only strip parentheses — TS-wrapper kinds (TSAsExpression /
+	// TSNonNullExpression / TypeCastExpression / SatisfiesExpression) MUST
+	// fall through to the default branch below and return jvNull, mirroring
+	// jsx-ast-utils' LITERAL_TYPES which maps each of those to `noop` → null.
+	// staticEval is the engine for the getPropValue path; this one is for the
+	// getLiteralPropValue path, which deliberately rejects TS wrappers.
+	node = ast.SkipOuterExpressions(node, ast.OEKParentheses)
 	switch node.Kind {
 	case ast.KindStringLiteral:
 		return jsxAstUtilsLiteralCoerce(node.AsStringLiteral().Text)
@@ -702,6 +708,62 @@ func literalPropValue(node *ast.Node) jsValue {
 		// a string — non-empty since at least one quasi or placeholder
 		// always renders.
 		return staticEvalTemplate(node.AsTemplateExpression())
+	case ast.KindTaggedTemplateExpression:
+		// LITERAL_TYPES.TaggedTemplateExpression is NOT overridden — it
+		// inherits TYPES.TaggedTemplateExpression, which forwards to
+		// TemplateLiteral on `value.quasi`. So `tag` + redundant template
+		// content (e.g. `tag`photo`` ) DOES get extracted as a string and
+		// the rule reports. We mirror by digging into the inner Template.
+		tt := node.AsTaggedTemplateExpression()
+		if tt == nil || tt.Template == nil {
+			return jsNull
+		}
+		switch tt.Template.Kind {
+		case ast.KindNoSubstitutionTemplateLiteral:
+			return jsxAstUtilsLiteralCoerce(tt.Template.AsNoSubstitutionTemplateLiteral().Text)
+		case ast.KindTemplateExpression:
+			return staticEvalTemplate(tt.Template.AsTemplateExpression())
+		}
+		return jsNull
+	case ast.KindBinaryExpression:
+		// LITERAL_TYPES.AssignmentExpression is NOT overridden — it inherits
+		// TYPES.AssignmentExpression, which formats `${left} ${op} ${right}`
+		// using TYPES (i.e. the getPropValue path) on each side. tsgo
+		// collapses ESTree's AssignmentExpression into BinaryExpression with
+		// an assignment operator, so we detect it here. Non-assignment
+		// BinaryExpressions stay LITERAL_TYPES.BinaryExpression = noop →
+		// null.
+		bin := node.AsBinaryExpression()
+		if bin == nil || bin.OperatorToken == nil {
+			return jsNull
+		}
+		switch bin.OperatorToken.Kind {
+		case ast.KindEqualsToken,
+			ast.KindPlusEqualsToken,
+			ast.KindMinusEqualsToken,
+			ast.KindAsteriskEqualsToken,
+			ast.KindSlashEqualsToken,
+			ast.KindPercentEqualsToken,
+			ast.KindAsteriskAsteriskEqualsToken,
+			ast.KindAmpersandAmpersandEqualsToken,
+			ast.KindBarBarEqualsToken,
+			ast.KindQuestionQuestionEqualsToken,
+			ast.KindAmpersandEqualsToken,
+			ast.KindBarEqualsToken,
+			ast.KindCaretEqualsToken,
+			ast.KindLessThanLessThanEqualsToken,
+			ast.KindGreaterThanGreaterThanEqualsToken,
+			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken:
+			// Format `${getValue(left)} ${operator} ${getValue(right)}`
+			// using staticEval on each side (mirrors jsx-ast-utils'
+			// `require('.').default` which is the TYPES extract, NOT the
+			// literal path). Identifier sides stringify to their name;
+			// literals stringify to their values.
+			leftStr := jsToString(staticEval(bin.Left))
+			rightStr := jsToString(staticEval(bin.Right))
+			return jsValue{Kind: jvString, Str: leftStr + " " + assignmentOperatorText(bin.OperatorToken.Kind) + " " + rightStr}
+		}
+		return jsNull
 	case ast.KindPrefixUnaryExpression:
 		// LITERAL_TYPES.UnaryExpression: same as TYPES but undefined → null.
 		v := staticEvalUnary(node.AsPrefixUnaryExpression())
@@ -719,6 +781,47 @@ func literalPropValue(node *ast.Node) jsValue {
 	// → noop → null per LITERAL_TYPES. Returning jvNull marks them as falsy
 	// without claiming any specific identity.
 	return jsNull
+}
+
+// assignmentOperatorText returns the textual form of an assignment-operator
+// kind. Used by literalPropValue's AssignmentExpression branch to mirror
+// jsx-ast-utils' `${left} ${operator} ${right}` synthesis.
+func assignmentOperatorText(k ast.Kind) string {
+	switch k {
+	case ast.KindEqualsToken:
+		return "="
+	case ast.KindPlusEqualsToken:
+		return "+="
+	case ast.KindMinusEqualsToken:
+		return "-="
+	case ast.KindAsteriskEqualsToken:
+		return "*="
+	case ast.KindSlashEqualsToken:
+		return "/="
+	case ast.KindPercentEqualsToken:
+		return "%="
+	case ast.KindAsteriskAsteriskEqualsToken:
+		return "**="
+	case ast.KindAmpersandAmpersandEqualsToken:
+		return "&&="
+	case ast.KindBarBarEqualsToken:
+		return "||="
+	case ast.KindQuestionQuestionEqualsToken:
+		return "??="
+	case ast.KindAmpersandEqualsToken:
+		return "&="
+	case ast.KindBarEqualsToken:
+		return "|="
+	case ast.KindCaretEqualsToken:
+		return "^="
+	case ast.KindLessThanLessThanEqualsToken:
+		return "<<="
+	case ast.KindGreaterThanGreaterThanEqualsToken:
+		return ">>="
+	case ast.KindGreaterThanGreaterThanGreaterThanEqualsToken:
+		return ">>>="
+	}
+	return "="
 }
 
 // jsxAstUtilsLiteralCoerce mirrors jsx-ast-utils' string-literal extractor,

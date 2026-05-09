@@ -393,3 +393,5 @@ WHATWG
 tabindex
 webauthn
 xoff
+Bild
+Foto
