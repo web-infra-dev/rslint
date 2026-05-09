@@ -6,7 +6,7 @@ type PlaygroundComponent = React.ComponentType;
 const PLAYGROUND_SSG_MARKDOWN = `
 # Playground
 
-The rslint Playground is an interactive browser-only tool for trying rules, editing configuration, viewing diagnostics, and inspecting AST output.
+The Rslint Playground is an interactive browser-only tool for trying rules, editing configuration, viewing diagnostics, and inspecting AST output.
 
 Open this page in a browser to use the editor and result panels.
 `;
