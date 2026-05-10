@@ -132,6 +132,31 @@ func FindAttributeByName(attrs []*ast.Node, name string) *ast.Node {
 				default:
 					continue
 				}
+				// jsx-ast-utils' getProp checks `property.key.type === 'Identifier'`
+				// without inspecting ESTree's `computed` flag, so `{[title]: "x"}`
+				// (a computed key whose inner expression is the bare Identifier
+				// `title`) matches the same as the non-computed `{title: "x"}`
+				// form. tsgo wraps the computed key in a ComputedPropertyName
+				// node, so unwrap one layer here to mirror upstream's
+				// quirky-but-load-bearing behavior. Computed keys whose inner
+				// expression is anything other than Identifier (StringLiteral,
+				// NumericLiteral, TemplateExpression, MemberExpression, …) keep
+				// the `keyNode.Kind != ast.KindIdentifier` rejection below,
+				// matching upstream which only treats Identifier-typed keys as
+				// matchable.
+				//
+				// Parens inside computed brackets are flattened by ESTree's
+				// parser, so `{[(title)]: "x"}` exposes Identifier "title"
+				// directly upstream. tsgo preserves Parens; strip them here
+				// to match. TS wrappers (`as` / `!` / `satisfies`) are NOT
+				// stripped — upstream's strict `key.type === 'Identifier'`
+				// guard rejects them, and so do we.
+				if keyNode != nil && keyNode.Kind == ast.KindComputedPropertyName {
+					keyNode = keyNode.AsComputedPropertyName().Expression
+					if keyNode != nil {
+						keyNode = ast.SkipParentheses(keyNode)
+					}
+				}
 				if keyNode == nil || keyNode.Kind != ast.KindIdentifier {
 					continue
 				}
@@ -555,6 +580,45 @@ func PropValueIsTruthy(attr *ast.Node) bool {
 		return false
 	}
 	return jsTruthy_(staticEval(inner))
+}
+
+// PropValueIsTruthyString mirrors the upstream check
+// `getPropValue(prop) && typeof getPropValue(prop) === 'string'`.
+// Used by iframe-has-title — `if (title && typeof title === 'string') return;`
+// — and by any future rule whose upstream form requires a non-empty string
+// value (not merely truthy).
+//
+// Returns true iff the static value is a non-empty string. False for:
+//   - nil attr
+//   - boolean-attribute form (`<iframe title />` → upstream returns boolean
+//     true → typeof "boolean")
+//   - empty `{}` JsxExpression (upstream's "type not in TYPES" → null)
+//   - explicitly empty string (`title=""`, `title={""}`, `title={``}`)
+//   - non-string truthy shapes: Object / Array / New / RegExp / function
+//     (Arrow / Function / Class) / Number / BigInt / Boolean / null /
+//     undefined / typeof / void / delete / SequenceExpression
+//
+// Returns true for the upstream-string shapes — string-coerced via
+// staticEval (Call / Member / JsxElement / JsxFragment / TaggedTemplate
+// kinds are modeled as jvString so they classify as string here, matching
+// upstream's synthesized-string output).
+func PropValueIsTruthyString(attr *ast.Node) bool {
+	if attr == nil {
+		return false
+	}
+	if AttributeIsBooleanForm(attr) {
+		// `<iframe title />` — upstream's null-attribute-value path returns
+		// boolean true. typeof "boolean", not "string" → false.
+		return false
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		// Empty JsxExpression `{}` — upstream's "type not in TYPES" → null
+		// → falsy and not a string.
+		return false
+	}
+	v := staticEval(inner)
+	return v.Kind == jvString && v.Str != ""
 }
 
 // LiteralPropIsExactlyTrue mirrors upstream's `getLiteralPropValue(prop) === true`
