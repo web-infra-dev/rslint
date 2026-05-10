@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/html_has_lang"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/img_redundant_alt"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_autofocus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_distracting_elements"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -25,6 +26,7 @@ func GetAllRules() []rule.Rule {
 		html_has_lang.HtmlHasLangRule,
 		img_redundant_alt.ImgRedundantAltRule,
 		no_access_key.NoAccessKeyRule,
+		no_autofocus.NoAutofocusRule,
 		no_distracting_elements.NoDistractingElementsRule,
 	}
 }
