@@ -170,6 +170,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-autofocus.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-distracting-elements.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/no-noninteractive-tabindex.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
