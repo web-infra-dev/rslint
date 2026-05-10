@@ -557,6 +557,48 @@ func PropValueIsTruthy(attr *ast.Node) bool {
 	return jsTruthy_(staticEval(inner))
 }
 
+// LiteralPropIsExactlyTrue mirrors upstream's `getLiteralPropValue(prop) === true`
+// — strict boolean-true equality on the LITERAL_TYPES extraction. Differs from
+// LiteralPropTruthy: only the actual boolean `true` matches, not the magic
+// "null"/"undefined" strings or non-empty strings that LITERAL_TYPES happens
+// to synthesize. Used by media-has-caption's `muted={true}` exemption check,
+// where upstream gates on `mutedPropVal === true` and any other literal value
+// (including `false`, `"true"`-coerced-from-string when not strict, `null`,
+// numbers, identifiers) must NOT skip the rule.
+//
+// Behavior table (mirrors jsx-ast-utils' getLiteralPropValue then `=== true`):
+//
+//   - Boolean form `<X muted />`         → true (extractValue null-attr → true)
+//   - `<X muted={true}>`                 → true
+//   - `<X muted="true">`                 → true (jsxAstUtilsLiteralCoerce → bool)
+//   - `<X muted={false}>`                → false
+//   - `<X muted="false">`                → false (coerced to bool false)
+//   - `<X muted="anything">`             → false (string ≠ bool true)
+//   - `<X muted={null}>`                 → false ("null" string ≠ bool true)
+//   - `<X muted={undefined}>`            → false (jvUndef)
+//   - `<X muted={someVar}>`              → false (Identifier → null)
+//   - `<X muted={1}>`                    → false (number ≠ bool true)
+//   - `<X muted={cond ? true : false}>`  → false (Conditional noop → null)
+//
+// Returns false when `attr` is nil — callers should test for the attribute's
+// existence first; a nil attr has no literal value to compare.
+func LiteralPropIsExactlyTrue(attr *ast.Node) bool {
+	if attr == nil {
+		return false
+	}
+	if AttributeIsBooleanForm(attr) {
+		// `<X muted />` — extractValue's null-attribute-value path returns
+		// boolean true; true === true → matches.
+		return true
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		return false
+	}
+	v := literalPropValue(inner)
+	return v.Kind == jvBool && v.Bool
+}
+
 // LiteralPropTruthy mirrors `!!getLiteralPropValue(prop)`. Returns true when
 // the attribute's value is a JS-truthy *literal*. Crucial differences from
 // PropStaticStringValue / staticEval-based truthiness:
