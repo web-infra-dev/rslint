@@ -330,11 +330,11 @@ func AttributeIsExplicitUndefined(attr *ast.Node) bool {
 // follow:
 //
 //  1. The boolean attribute form (`<img alt />`) has altValue === true and
-//     isNullValued === true, so the LHS is false and the RHS is `true === ''`
+//     isNullValued === true, so the LHS is false and the RHS is `true === ”`
 //     (false) → invalid.
 //  2. An empty-string altValue is valid via the RHS regardless of how it's
 //     produced — `alt=""`, `alt={""}`, `alt={"" && x}`, `alt={x && ""}` all
-//     reach `=== ''` and pass. truthy/falsy heuristics are NOT enough; we
+//     reach `=== ”` and pass. truthy/falsy heuristics are NOT enough; we
 //     must compute the actual static value via [staticEval].
 //  3. Anything else uses the LHS — truthy after JS coercion.
 func AltAttributeIsValid(attr *ast.Node) bool {

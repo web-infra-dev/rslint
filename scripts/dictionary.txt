@@ -397,3 +397,8 @@ webauthn
 xoff
 Bild
 Foto
+WCAG
+subtag
+macrolanguage
+rozaj
+biske

@@ -100,6 +100,13 @@ func TestAutocompleteValidExtras(t *testing.T) {
 		// inside a JsxExpression must resolve via LiteralPropStringValue.
 		{Code: `<input autocomplete={"name"} />;`, Tsx: true},
 		{Code: "<input autocomplete={`name`} />;", Tsx: true},
+		// Template with `${undefined}` substitution: jsx-ast-utils'
+		// TemplateLiteral.js special-cases the literal `undefined`
+		// Identifier and emits the bare string "undefined". axe-core's
+		// extended stateTerms (autocomplete-valid.json) includes
+		// "undefined" as a valid state term — so the value passes the
+		// grammar check. Aligned with upstream verbatim.
+		{Code: "<input autocomplete={`${undefined}`} />;", Tsx: true},
 		// TS wrappers around the autocomplete literal. literalPropValue
 		// goes through SkipOuterExpressions which strips parens / `as` / `!`.
 		{Code: `<input autocomplete={"name" as const} />;`, Tsx: true},
@@ -667,21 +674,11 @@ func TestAutocompleteValidExtras(t *testing.T) {
 				Message:   failMessage,
 			}},
 		},
-		// CRITICAL alignment lock: `<input autocomplete={`${undefined}`} />`.
-		// Pre-fix the synthesized text was bare "undefined" which is in
-		// axe-core's extended stateTerms — would have falsely passed.
-		// Post-fix the synthesized text is "${undefined}" which fails the
-		// token grammar → invalid → reported. Same as upstream.
-		{
-			Code: "<input autocomplete={`${undefined}`} />",
-			Tsx:  true,
-			Errors: []rule_tester.InvalidTestCaseError{{
-				MessageId: "autocompleteValid",
-				Message:   failMessage,
-			}},
-		},
 		// Template substitution with a non-undefined identifier —
-		// synthesizes "${name}" → not a token → invalid. Mirrors upstream.
+		// staticEvalTemplate synthesizes `{name}` (single curly,
+		// mirroring jsx-ast-utils TemplateLiteral.js Identifier
+		// branch). axe-core's token grammar rejects "{dynVar}" →
+		// invalid → reported. Mirrors upstream.
 		{
 			Code: "<input autocomplete={`${dynVar}`} />",
 			Tsx:  true,

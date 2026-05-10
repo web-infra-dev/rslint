@@ -524,16 +524,27 @@ func staticEvalUnary(un *ast.PrefixUnaryExpression) jsValue {
 	return jsNull
 }
 
-// staticEvalTemplate mirrors jsx-ast-utils' TemplateLiteral extractor:
-// concatenates raw quasi text with placeholders for substitutions:
+// staticEvalTemplate mirrors jsx-ast-utils' TemplateLiteral.js extractor
+// byte-for-byte. The upstream logic is, per substitution node:
 //
-//	Identifier `undefined`              → "undefined"
-//	other Identifier `name`             → "{name}"
-//	other expression of type `T`        → "{T}"
-//	TemplateElement                     → cooked text
+//	type === 'TemplateElement'                → raw text
+//	type === 'Identifier', name === 'undefined' → "undefined" (literal)
+//	type === 'Identifier'                     → "{name}" (single curly)
+//	type.indexOf('Expression') > -1           → "{TypeName}" (single curly)
+//	otherwise                                 → ""  (load-bearing!)
 //
-// For our purposes, the result is always a truthy string (templates are never
-// empty after substitution placeholders are rendered).
+// The `otherwise → ""` branch is the load-bearing quirk: jsx-ast-utils does
+// NOT recursively extract substitution values. Anything whose ESTree type
+// name is `Literal` / `JSXElement` / `JSXFragment` / `TemplateLiteral` /
+// `Super` / `SpreadElement` / `MetaProperty` / `TSTypeAssertion` etc.
+// contributes the empty string. So `\`${"en"}\`` → `""` (falsy), NOT `"en"`.
+//
+// We previously used `${name}` / `${Expression}` (with a `$` prefix) and
+// always returned a truthy non-empty string for non-Identifier substitutions.
+// That diverged from upstream for templates with literal-only substitutions,
+// flipping `<html lang={\`${"en"}\`} />` from REPORT to no-report. This
+// implementation uses single-curly wrapping and returns `""` for the
+// non-`*Expression` branch to match upstream exactly.
 func staticEvalTemplate(tpl *ast.TemplateExpression) jsValue {
 	var sb strings.Builder
 	if tpl.Head != nil {
@@ -546,31 +557,15 @@ func staticEvalTemplate(tpl *ast.TemplateExpression) jsValue {
 			}
 			sp := span.AsTemplateSpan()
 			if sp.Expression != nil {
-				expr := ast.SkipOuterExpressions(sp.Expression, skipTransparent)
-				// Upstream wraps every substitution in `${<value>}` (the
-				// inner template literal `\${${getValue(expr)}}` evaluates
-				// to literal `"${" + String(getValue(expr)) + "}"`). The
-				// `$` prefix is load-bearing for autocomplete-valid: without
-				// it, `<input autocomplete={`${undefined}`} />` would
-				// synthesize the bare string "undefined", which matches
-				// axe-core's extended `stateTerms` and produces a false
-				// "valid" verdict. Mirror the `${...}` wrapping verbatim.
-				switch {
-				case utils.IsUndefinedIdentifier(expr):
-					sb.WriteString("${undefined}")
-				case expr.Kind == ast.KindIdentifier:
-					sb.WriteString("${")
-					sb.WriteString(expr.AsIdentifier().Text)
-					sb.WriteString("}")
-				default:
-					// Upstream computes `getValue(expr)` and JS-coerces to
-					// string. We don't replicate every TYPES branch; a
-					// placeholder is sufficient because alt-text only needs
-					// truthiness and autocomplete-valid only checks that
-					// the synthesized string isn't a known token (the `$`
-					// prefix guarantees no accidental token match).
-					sb.WriteString("${Expression}")
-				}
+				// ESTree flattens parens at parse time, so a parenthesized
+				// substitution `${(x)}` reaches TemplateLiteral.js with the
+				// inner expression directly. Strip parens here to match.
+				// TS wrappers (TSAsExpression / TSNonNullExpression /
+				// TSSatisfiesExpression / TSTypeAssertion) are PRESERVED —
+				// they show up in ESTree as their own nodes and upstream
+				// classifies each by its `.type` name string.
+				expr := ast.SkipOuterExpressions(sp.Expression, ast.OEKParentheses)
+				sb.WriteString(extractTemplateSubstitutionPlaceholder(expr))
 			}
 			if sp.Literal != nil {
 				switch sp.Literal.Kind {
@@ -583,6 +578,90 @@ func staticEvalTemplate(tpl *ast.TemplateExpression) jsValue {
 		}
 	}
 	return jsValue{Kind: jvString, Str: sb.String()}
+}
+
+// extractTemplateSubstitutionPlaceholder mirrors the inline substitution
+// classification in jsx-ast-utils' TemplateLiteral.js. See
+// staticEvalTemplate for the upstream algorithm and the load-bearing
+// `otherwise → ""` quirk.
+func extractTemplateSubstitutionPlaceholder(expr *ast.Node) string {
+	if expr == nil {
+		return ""
+	}
+	if expr.Kind == ast.KindIdentifier {
+		name := expr.AsIdentifier().Text
+		if name == "undefined" {
+			// Upstream: `name === 'undefined' ? name : ...` → bare string.
+			return "undefined"
+		}
+		return "{" + name + "}"
+	}
+	if t := tsgoKindToESTreeExpressionTypeName(expr.Kind); t != "" {
+		return "{" + t + "}"
+	}
+	return ""
+}
+
+// tsgoKindToESTreeExpressionTypeName maps tsgo Kinds to their ESTree
+// type-name string, but ONLY for kinds whose ESTree type name contains the
+// substring "Expression" (the only branch in TemplateLiteral.js that
+// produces a non-empty placeholder for non-Identifier substitutions).
+//
+// Returns "" for kinds whose ESTree type does NOT contain "Expression" —
+// `Literal` (StringLiteral / NumericLiteral / BigIntLiteral / true / false /
+// null / RegExp), `JSXElement` / `JSXFragment`, `TemplateLiteral`, `Super`,
+// `MetaProperty`, `SpreadElement`, `TSTypeAssertion`, etc. Those callers
+// receive `""` from extractTemplateSubstitutionPlaceholder.
+func tsgoKindToESTreeExpressionTypeName(k ast.Kind) string {
+	switch k {
+	case ast.KindBinaryExpression:
+		// Covers ESTree's BinaryExpression / LogicalExpression /
+		// AssignmentExpression / SequenceExpression — all contain
+		// "Expression". Upstream's TemplateLiteral.js doesn't differentiate
+		// by operator; it just reads `.type`. Returning "BinaryExpression"
+		// preserves the truthy-non-empty placeholder regardless of operator.
+		return "BinaryExpression"
+	case ast.KindCallExpression:
+		return "CallExpression"
+	case ast.KindNewExpression:
+		return "NewExpression"
+	case ast.KindConditionalExpression:
+		return "ConditionalExpression"
+	case ast.KindArrowFunction:
+		return "ArrowFunctionExpression"
+	case ast.KindFunctionExpression:
+		return "FunctionExpression"
+	case ast.KindClassExpression:
+		return "ClassExpression"
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return "MemberExpression"
+	case ast.KindObjectLiteralExpression:
+		return "ObjectExpression"
+	case ast.KindArrayLiteralExpression:
+		return "ArrayExpression"
+	case ast.KindTaggedTemplateExpression:
+		return "TaggedTemplateExpression"
+	case ast.KindThisKeyword:
+		return "ThisExpression"
+	case ast.KindPrefixUnaryExpression,
+		ast.KindTypeOfExpression,
+		ast.KindVoidExpression,
+		ast.KindDeleteExpression:
+		return "UnaryExpression"
+	case ast.KindPostfixUnaryExpression:
+		return "UpdateExpression"
+	case ast.KindAwaitExpression:
+		return "AwaitExpression"
+	case ast.KindYieldExpression:
+		return "YieldExpression"
+	case ast.KindAsExpression:
+		return "TSAsExpression"
+	case ast.KindNonNullExpression:
+		return "TSNonNullExpression"
+	case ast.KindSatisfiesExpression:
+		return "TSSatisfiesExpression"
+	}
+	return ""
 }
 
 // jsTruthy_ replicates JS truthiness on a jsValue.

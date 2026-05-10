@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_unsupported_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/autocomplete_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/heading_has_content"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/html_has_lang"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/img_redundant_alt"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -20,6 +21,7 @@ func GetAllRules() []rule.Rule {
 		aria_unsupported_elements.AriaUnsupportedElementsRule,
 		autocomplete_valid.AutocompleteValidRule,
 		heading_has_content.HeadingHasContentRule,
+		html_has_lang.HtmlHasLangRule,
 		img_redundant_alt.ImgRedundantAltRule,
 		no_access_key.NoAccessKeyRule,
 	}

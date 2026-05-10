@@ -100,6 +100,10 @@ new RuleTester().run('autocomplete-valid', null as never, {
     // JsxExpression wrapping a literal.
     { code: '<input autocomplete={"name"} />;' },
     { code: '<input autocomplete={`name`} />;' },
+    // jsx-ast-utils' TemplateLiteral.js extracts `${undefined}` as the
+    // bare string "undefined", which axe-core's extended stateTerms
+    // accepts as a valid state term. Aligned with upstream verbatim.
+    { code: '<input autocomplete={`${undefined}`} />;' },
     // TS wrappers.
     { code: '<input autocomplete={"name" as const} />;' },
     { code: '<input autocomplete={("name")} />;' },
@@ -425,13 +429,6 @@ new RuleTester().run('autocomplete-valid', null as never, {
     // TemplateExpression with substitutions — synthesized placeholder string fails grammar.
     {
       code: '<input autocomplete={`name${suffix}`} />',
-      errors: [{ message: failMessage }],
-    },
-    // CRITICAL alignment lock: `${undefined}` template substitution.
-    // Pre-fix would synthesize bare "undefined" → match extended stateTerm
-    // → false valid. Post-fix synthesizes "${undefined}" → invalid.
-    {
-      code: '<input autocomplete={`${undefined}`} />',
       errors: [{ message: failMessage }],
     },
     {
