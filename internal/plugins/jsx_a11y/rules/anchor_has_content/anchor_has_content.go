@@ -54,22 +54,10 @@ var AnchorHasContentRule = rule.Rule{
 				return
 			}
 			// Upstream calls `hasAccessibleChild(node.parent, elementType)`.
-			// In ESTree every JSXOpeningElement (including self-closing) is
-			// wrapped in a JSXElement that owns the children list. tsgo
-			// doesn't wrap JsxSelfClosingElement in a JsxElement — the
-			// self-closing node carries attributes directly. Normalize:
-			// pass the JsxElement when present, else the self-closing node
-			// itself. HasAccessibleChild handles both shapes.
-			//
-			// `KindJsxOpeningElement` is always parented by `KindJsxElement`
-			// in tsgo (fragments use `KindJsxOpeningFragment`, a different
-			// kind). The Parent != nil guard is defensive only.
-			jsxRoot := node
-			if node.Kind == ast.KindJsxOpeningElement && node.Parent != nil &&
-				node.Parent.Kind == ast.KindJsxElement {
-				jsxRoot = node.Parent
-			}
-			if jsxa11yutil.HasAccessibleChild(jsxRoot, elementType) {
+			// JsxAccessibleChildRoot normalizes the paired-vs-self-closing
+			// AST split so HasAccessibleChild sees the same surface upstream
+			// does, regardless of form.
+			if jsxa11yutil.HasAccessibleChild(jsxa11yutil.JsxAccessibleChildRoot(node), elementType) {
 				return
 			}
 			attrs := reactutil.GetJsxElementAttributes(node)
