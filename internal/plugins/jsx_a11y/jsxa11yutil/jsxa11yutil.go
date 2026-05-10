@@ -383,6 +383,44 @@ func PropStaticStringValue(attr *ast.Node) (string, bool) {
 	return "", false
 }
 
+// PropStaticBoolValue mirrors `getPropValue(prop)` for callers that need to
+// compare against a JS boolean. Returns (value, true) when the prop's static
+// value is a JS boolean — including string literals "true" / "false" that
+// jsxAstUtilsLiteralCoerce normalizes to booleans, and the boolean attribute
+// form (`<div autoFocus />` → upstream's null-attribute-value path → true).
+// Returns (false, false) for every other shape (undefined, null, numbers,
+// non-coerced strings, identifiers, calls, etc.).
+//
+// Use this for upstream call sites that pass `getPropValue(...) === false`
+// or `=== true` — e.g. `no-autofocus`'s `getPropValue(attribute) !== false`
+// gate, where upstream applies real JS `===` semantics against the coerced
+// static value.
+//
+// Differs from PropValueIsTruthy: that one returns the JS-truthiness of the
+// extracted value (so `null`, `0`, `""` all return false). This one
+// distinguishes "exactly the boolean false" from "a different falsy value"
+// — required when the upstream check uses `===` rather than `!`.
+func PropStaticBoolValue(attr *ast.Node) (bool, bool) {
+	if attr == nil {
+		return false, false
+	}
+	if AttributeIsBooleanForm(attr) {
+		// `<div autoFocus />` — extractValue's null-attr-value path returns
+		// JS boolean true. Mirrors upstream `getPropValue(<div autoFocus />)
+		// === true`.
+		return true, true
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		return false, false
+	}
+	v := staticEval(inner)
+	if v.Kind == jvBool {
+		return v.Bool, true
+	}
+	return false, false
+}
+
 // LiteralPropStringValue mirrors `getLiteralPropValue(prop)` filtered to the
 // string-typed result. Returns ("", false) when the prop's literal-typed
 // value isn't a string under jsx-ast-utils' LITERAL_TYPES rules:
