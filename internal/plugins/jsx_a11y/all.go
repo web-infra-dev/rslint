@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/autocomplete_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/heading_has_content"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/html_has_lang"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/iframe_has_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/img_redundant_alt"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/media_has_caption"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
@@ -25,6 +26,7 @@ func GetAllRules() []rule.Rule {
 		autocomplete_valid.AutocompleteValidRule,
 		heading_has_content.HeadingHasContentRule,
 		html_has_lang.HtmlHasLangRule,
+		iframe_has_title.IframeHasTitleRule,
 		img_redundant_alt.ImgRedundantAltRule,
 		media_has_caption.MediaHasCaptionRule,
 		no_access_key.NoAccessKeyRule,

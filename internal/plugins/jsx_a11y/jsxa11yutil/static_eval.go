@@ -193,29 +193,54 @@ func staticEval(node *ast.Node) jsValue {
 		// literals (truthy) for safer behavior. Documented divergence.
 		return jsFn
 	case ast.KindCallExpression:
-		// Upstream synthesizes a non-empty string like "callee(args)" — we
-		// don't need the exact text, just the truthy classification.
-		// Optional-chain calls (`obj?.()`) hit the same kind in tsgo (with
-		// the optional flag) and upstream's OptionalCallExpression
-		// extractor returns a similarly truthy string.
-		return jsTruthy
+		// Upstream's CallExpression / OptionalCallExpression extractor
+		// synthesizes a non-empty string `${callee}${optional?"?.":""}(${args})`.
+		// We model it as a jvString (typeof "string") rather than the
+		// jvTruthy sentinel because rules like iframe-has-title gate on
+		// `typeof === 'string'` and need to distinguish synthesized-string
+		// shapes (Call / Member / JSX / TaggedTemplate) from genuine
+		// non-string truthy values (Object / Array / New / RegExp).
+		// The exact text isn't observed by any rule — only its non-emptiness
+		// — so a stable placeholder suffices.
+		return jsValue{Kind: jvString, Str: "(call)"}
 	case ast.KindNewExpression:
-		// Upstream NewExpression returns `{}` (empty object) — truthy.
+		// Upstream NewExpression returns `new Object()` → empty object →
+		// truthy but typeof "object". Keep as jvTruthy sentinel so it
+		// classifies as truthy without tripping the typeof-string gate.
 		return jsTruthy
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-		// Upstream synthesizes "obj.prop" / "obj[key]" — non-empty truthy.
-		// Optional access (`obj?.prop`) is the same kind in tsgo with a flag.
-		return jsTruthy
+		// Upstream's MemberExpression / OptionalMemberExpression extractor
+		// synthesizes a non-empty string ("obj.prop" / "obj?.prop" /
+		// "obj[key]"). Modeled as jvString (typeof "string") for the same
+		// reason as CallExpression above. Optional access (`obj?.prop`)
+		// is the same kind in tsgo with a flag — both forms upstream
+		// return strings.
+		return jsValue{Kind: jvString, Str: "(member)"}
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression:
+		// Upstream returns the actual object/array → typeof "object".
+		// Truthy but not string.
 		return jsTruthy
 	case ast.KindRegularExpressionLiteral:
+		// Upstream's Literal extractor returns the RegExp object → typeof
+		// "object". Truthy but not string.
 		return jsTruthy
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement, ast.KindJsxFragment:
-		return jsTruthy
+		// Upstream's JSXElement / JSXFragment extractor synthesizes a
+		// non-empty string like "<Tag />" / "<></>". Modeled as jvString
+		// so iframe-has-title's typeof-string check passes for
+		// `<iframe title={<X />} />`-style inputs.
+		return jsValue{Kind: jvString, Str: "(jsx)"}
 	case ast.KindTaggedTemplateExpression:
-		// Upstream redirects to TemplateLiteral on the inner quasi — always
-		// produces a non-empty string, so truthy.
-		return jsTruthy
+		// Upstream's TaggedTemplateExpression extractor delegates to
+		// TemplateLiteral on the inner quasi. Recurse into the inner
+		// template to preserve the exact extracted text — including the
+		// (rare) empty-tag-empty-template `` tag`` `` case which upstream
+		// returns as "" and we must report.
+		tt := node.AsTaggedTemplateExpression()
+		if tt == nil || tt.Template == nil {
+			return jsValue{Kind: jvString, Str: ""}
+		}
+		return staticEval(tt.Template)
 	case ast.KindPostfixUnaryExpression:
 		// `x++` / `x--` — UpdateExpression. Upstream computes `val++` /
 		// `val--` after coercing the operand to a number; for non-numeric
