@@ -165,6 +165,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/heading-has-content.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/html-has-lang.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/img-redundant-alt.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/media-has-caption.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-autofocus.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-distracting-elements.test.ts',
