@@ -252,6 +252,20 @@ func TestAnchorHasContentExtras(t *testing.T) {
 		//      with non-empty Text). ----
 		{Code: `<a>{" "}</a>`, Tsx: true},
 
+		// ---- Empty JsxExpression / pure-comment expression. Upstream's
+		//      `case 'JSXExpressionContainer'` only short-circuits on
+		//      `child.expression.type === 'Identifier'`; ESTree's
+		//      `JSXEmptyExpression` is NOT an Identifier, so the switch
+		//      falls through to `return true` (= accessible). tsgo emits
+		//      a JsxExpression with no Expression for both `{}` and
+		//      `{/* comment */}`; HasAccessibleChild mirrors upstream by
+		//      treating that as accessible. Locks in the empty-container
+		//      arm — these were historically reported in error and have
+		//      been re-aligned to upstream. ----
+		{Code: `<a>{}</a>`, Tsx: true},
+		{Code: `<a>{/* a comment */}</a>`, Tsx: true},
+		{Code: `<a>{/* lots */ /* of */ /* comments */}</a>`, Tsx: true},
+
 		// ---- JSX comment children: pure-comment JsxExpression has no
 		//      meaningful payload — but text/whitespace siblings keep the
 		//      anchor accessible. (Pure-comment-only case is below in INVALID.) ----
@@ -322,18 +336,6 @@ func TestAnchorHasContentExtras(t *testing.T) {
 		// ---- input[type="hidden"] is hidden; no other children → invalid ----
 		{
 			Code: `<a><input type="hidden" /></a>`,
-			Tsx:  true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
-			},
-		},
-
-		// ---- JsxExpression with nothing inside (`{}` empty container) → no
-		//      accessible content. Upstream's switch hits JSXExpressionContainer
-		//      with no expression, which doesn't return early, but child.expression
-		//      is undefined; in tsgo we synthesize an empty JsxExpression. ----
-		{
-			Code: `<a>{}</a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
@@ -466,17 +468,6 @@ func TestAnchorHasContentExtras(t *testing.T) {
 		//      classes them as hidden per upstream isHiddenFromScreenReader. ----
 		{
 			Code: `<a href="/"><input type="hidden" /></a>`,
-			Tsx:  true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},
-			},
-		},
-
-		// ---- Pure JSX comment child: `<a>{/* xx */}</a>` — JsxExpression
-		//      with no expression payload. Not accessible. Locks in the
-		//      `expr == nil` branch in HasAccessibleChild. ----
-		{
-			Code: `<a>{/* a comment */}</a>`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "anchorHasContent", Message: errorMessage, Line: 1, Column: 1},

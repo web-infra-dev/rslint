@@ -655,6 +655,38 @@ func IsPresentationRole(attrs []*ast.Node) bool {
 	return value == "presentation" || value == "none"
 }
 
+// JsxAccessibleChildRoot returns the JSX root node to feed into
+// HasAccessibleChild, mirroring upstream's `node.parent` access on a
+// JSXOpeningElement.
+//
+// In ESTree, every JSXOpeningElement (paired or self-closing) is wrapped
+// in a JSXElement that owns the children list, so upstream rules write
+// `hasAccessibleChild(node.parent, …)` regardless of form. tsgo splits
+// the two forms: paired `<a>x</a>` produces a KindJsxElement that
+// contains a KindJsxOpeningElement, while self-closing `<a />` is a
+// top-level KindJsxSelfClosingElement with no wrapper. To present the
+// same "children + opening attributes" surface to HasAccessibleChild
+// regardless of form, we return:
+//
+//   - the parent KindJsxElement when the listener fired on a
+//     KindJsxOpeningElement (paired form)
+//   - the node itself otherwise (self-closing form, where the node is a
+//     KindJsxSelfClosingElement and HasAccessibleChild handles it via
+//     its dedicated arm)
+//
+// Use this exactly once per listener invocation, before calling
+// HasAccessibleChild. Without this normalization, a listener that fires
+// on KindJsxOpeningElement would pass the opening element directly,
+// which HasAccessibleChild's switch handles by falling to default-false
+// — silently misreporting paired forms.
+func JsxAccessibleChildRoot(node *ast.Node) *ast.Node {
+	if node.Kind == ast.KindJsxOpeningElement && node.Parent != nil &&
+		node.Parent.Kind == ast.KindJsxElement {
+		return node.Parent
+	}
+	return node
+}
+
 // HasAccessibleChild reports whether a JSX element provides a text
 // alternative for assistive technology via children or the
 // `dangerouslySetInnerHTML` / `children` attribute fallback. Mirrors
@@ -735,8 +767,15 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 		case ast.KindJsxExpression:
 			expr := child.AsJsxExpression().Expression
 			if expr == nil {
-				// `{}` empty container — matches upstream `default: false`.
-				continue
+				// `{}` and `{/* comment */}` — tsgo emits a JsxExpression
+				// with no Expression. ESTree, by contrast, emits a
+				// `JSXExpressionContainer` whose `expression` is a
+				// `JSXEmptyExpression` node. Upstream's switch only
+				// special-cases `child.expression.type === 'Identifier'`;
+				// `JSXEmptyExpression` is NOT an Identifier, so it falls
+				// through to the `return true` arm. Mirror that —
+				// empty-container children count as accessible content.
+				return true
 			}
 			// Upstream's switch checks `child.expression.type === 'Identifier'`
 			// DIRECTLY without unwrapping. In typescript-eslint's AST, TS
