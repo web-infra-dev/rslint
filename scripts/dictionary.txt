@@ -1,5 +1,6 @@
 # Custom Dictionary Words
 aavascript
+accesskey
 apos
 accum
 afoob
