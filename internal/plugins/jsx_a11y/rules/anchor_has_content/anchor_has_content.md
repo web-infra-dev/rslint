@@ -35,7 +35,7 @@ Examples of **correct** code for this rule:
 <a aria-label="Some content" />
 ```
 
-## Rule options
+## Rule Options
 
 The rule accepts an options object with the following properties:
 
