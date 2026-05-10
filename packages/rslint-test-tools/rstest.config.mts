@@ -163,6 +163,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/aria-unsupported-elements.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/autocomplete-valid.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/img-redundant-alt.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',

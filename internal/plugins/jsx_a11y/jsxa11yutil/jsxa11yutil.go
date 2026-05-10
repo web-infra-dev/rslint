@@ -479,6 +479,46 @@ func PropValueIsNullish(attr *ast.Node) bool {
 	return v.Kind == jvNull || v.Kind == jvUndef || v.Kind == jvUnknown
 }
 
+// PropValueIsTruthy mirrors `!!getPropValue(prop)` — the truthy classification
+// of upstream's full TYPES extractor. Used by rules whose upstream form is
+// `if (prop && getPropValue(prop)) ...` (e.g. no-access-key).
+//
+// Differs from LiteralPropTruthy (which uses the LITERAL_TYPES path):
+//
+//   - Identifier (other than `undefined`) here returns the identifier name as
+//     a non-empty string → truthy. Under LiteralPropTruthy non-undefined
+//     identifiers map to null → falsy.
+//   - CallExpression / MemberExpression / Conditional / Logical / Binary
+//     resolve via staticEval (truthy synthesis or genuine evaluation) here;
+//     all noop → null (falsy) under LiteralPropTruthy.
+//   - String literals "true" / "false" coerce to booleans on both paths;
+//     `<div accessKey="false" />` is therefore falsy → not reported.
+//
+// Boolean attribute form (`<div accessKey />`) maps to upstream's
+// null-attribute-value path → boolean `true` → truthy, matching
+// jsx-ast-utils' getPropValue(`<div accessKey />`).
+//
+// Returns false when `attr` is nil — callers are expected to test for the
+// attribute's existence first; a nil attr has no value to coerce.
+func PropValueIsTruthy(attr *ast.Node) bool {
+	if attr == nil {
+		return false
+	}
+	if AttributeIsBooleanForm(attr) {
+		// `<div accessKey />` — extractValue's null-attr-value path returns
+		// boolean true; `!!true` == true.
+		return true
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		// Empty `{}` JsxExpression. tsgo synthesizes this only for malformed
+		// source; getPropValue would route through "type not in TYPES" → null
+		// → falsy.
+		return false
+	}
+	return jsTruthy_(staticEval(inner))
+}
+
 // LiteralPropTruthy mirrors `!!getLiteralPropValue(prop)`. Returns true when
 // the attribute's value is a JS-truthy *literal*. Crucial differences from
 // PropStaticStringValue / staticEval-based truthiness:

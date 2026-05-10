@@ -117,9 +117,17 @@ func staticEval(node *ast.Node) jsValue {
 		// normalization the rule would incorrectly accept `alt="false"`.
 		return jsxAstUtilsLiteralCoerce(node.AsStringLiteral().Text)
 	case ast.KindNoSubstitutionTemplateLiteral:
-		// NoSubTemplate is treated as a string literal by jsx-ast-utils, so
-		// the same "true" / "false" coercion applies.
-		return jsxAstUtilsLiteralCoerce(node.AsNoSubstitutionTemplateLiteral().Text)
+		// `` `text` `` parses as a TemplateLiteral with no expressions in
+		// ESTree, so jsx-ast-utils routes it through extractValueFromTemplateLiteral
+		// — which simply joins the quasi text and returns the raw string.
+		// Crucially, the "true" / "false" → boolean coercion in
+		// extractValueFromLiteral applies ONLY to ESTree's `Literal` (string)
+		// type, NOT to `TemplateLiteral`. So `` `false` `` evaluates to the
+		// non-empty string "false" (truthy), not boolean false. Confirmed via
+		// differential against eslint-plugin-jsx-a11y v6.10.2 with
+		// `<div accessKey={`false`} />`: ESLint reports, rslint pre-fix did
+		// not. Do NOT pipe through jsxAstUtilsLiteralCoerce here.
+		return jsValue{Kind: jvString, Str: node.AsNoSubstitutionTemplateLiteral().Text}
 	case ast.KindTrueKeyword:
 		return jsValue{Kind: jvBool, Bool: true}
 	case ast.KindFalseKeyword:
@@ -672,7 +680,10 @@ func literalPropValue(node *ast.Node) jsValue {
 	case ast.KindStringLiteral:
 		return jsxAstUtilsLiteralCoerce(node.AsStringLiteral().Text)
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return jsxAstUtilsLiteralCoerce(node.AsNoSubstitutionTemplateLiteral().Text)
+		// See the staticEval comment for the same case: jsx-ast-utils treats
+		// `` `text` `` as a TemplateLiteral and does NOT apply the
+		// "true"/"false" → boolean coercion that the Literal extractor uses.
+		return jsValue{Kind: jvString, Str: node.AsNoSubstitutionTemplateLiteral().Text}
 	case ast.KindTrueKeyword:
 		return jsValue{Kind: jvBool, Bool: true}
 	case ast.KindFalseKeyword:
