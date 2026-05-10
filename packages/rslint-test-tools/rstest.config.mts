@@ -166,6 +166,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/html-has-lang.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/img-redundant-alt.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/no-distracting-elements.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
