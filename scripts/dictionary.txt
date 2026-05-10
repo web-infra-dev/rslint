@@ -402,3 +402,4 @@ subtag
 macrolanguage
 rozaj
 biske
+Deque
