@@ -493,6 +493,66 @@ func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 	return "", false
 }
 
+// LiteralPropJSNumber mirrors `Number(getLiteralPropValue(prop))` — the
+// literal-typed extraction routed through JS's ToNumber coercion. Used by
+// rules whose upstream form is `getLiteralPropValue(prop) > N` /
+// `getLiteralPropValue(prop) < N` (e.g. select's `size > 1` listbox
+// heuristic, where `<select size="0x10" />` resolves to 16, not NaN).
+//
+// Behavior table (mirrors jsx-ast-utils' getLiteralPropValue then JS Number):
+//
+//	<X size />            → boolean-form → true → 1     → (1,  true)
+//	<X size="" />         → ""  → Number("") = 0       → (0,  true)
+//	<X size="3" />        → "3" → 3                    → (3,  true)
+//	<X size=" 3 " />      → trim → "3" → 3             → (3,  true)
+//	<X size="0x10" />     → 16  → Number("0x10") = 16  → (16, true)
+//	<X size="0o10" />     → 8   → Number("0o10") = 8   → (8,  true)
+//	<X size="0b10" />     → 2   → Number("0b10") = 2   → (2,  true)
+//	<X size="1.5" />      → 1.5 → Number("1.5") = 1.5  → (1.5,true)
+//	<X size="null" />     → NaN → Number("null") = NaN → (0,  false)
+//	<X size={3} />        → 3                          → (3,  true)
+//	<X size={1.5} />      → 1.5                        → (1.5,true)
+//	<X size={null} />     → upstream literal "null"    → (0,  false)
+//	<X size={undefined} />→ undef → Number(undef) NaN  → (0,  false)
+//	<X size={true} />     → true → 1                   → (1,  true)
+//	<X size={false} />    → false → 0                  → (0,  true)
+//	<X size={someVar} />  → null → Number(null)=0 …    → (0,  false)*
+//
+// *Note: upstream actually returns `null` from LITERAL_TYPES.Identifier for
+// non-`undefined` identifiers, and `Number(null) = 0`. But the upstream
+// downstream `> N` comparison treats this null result as falsy via the
+// preceding `size && getLiteralPropValue(size)` short-circuit — so the
+// caller never reaches the `> N` for Identifier inputs. Returning
+// (0, false) here matches the effective semantics (downstream "skip"
+// branch) and avoids accidentally classifying `<select size={x} />` as
+// listbox.
+//
+// Returns (0, false) for:
+//   - nil attr
+//   - empty `{}` JsxExpression
+//   - any literal value that isn't directly numeric, boolean, or a
+//     number-coercible string (Identifier non-undefined, CallExpression,
+//     MemberExpression, Conditional, Logical, Binary, ObjectLiteral,
+//     ArrayLiteral, etc.)
+func LiteralPropJSNumber(attr *ast.Node) (float64, bool) {
+	if attr == nil {
+		return 0, false
+	}
+	if AttributeIsBooleanForm(attr) {
+		// Boolean attribute form → extractValue's null-attr-value path
+		// returns JS boolean true → Number(true) = 1.
+		return 1, true
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		return 0, false
+	}
+	// Reuse the tabindex package-internal ToNumber engine — same JS
+	// semantics (trim, hex/oct/bin, empty→0) without the integer-only
+	// filter that step-1 `parseLiteralTabIndex*` would impose.
+	return staticEvalToTabIndex(literalPropValue(inner))
+}
+
 // PropValueIsNullish mirrors the upstream `getPropValue(prop) == null` check
 // (loose equality with `null`, true for both `null` and `undefined`). Used by
 // rules that distinguish "no usable href" (absent prop, `prop={null}`,

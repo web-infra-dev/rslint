@@ -429,3 +429,5 @@ macrolanguage
 rozaj
 biske
 Deque
+roletype
+sectionhead
