@@ -35,63 +35,16 @@ var reservedElements = map[string]struct{}{
 
 // invalidAttributes is the set of attribute names that must not appear on
 // reserved elements. Mirrors `aria.keys().concat('role')` from aria-query —
-// every defined ARIA state/property plus the `role` attribute.
-//
-// Source: https://github.com/A11yance/aria-query/blob/main/src/ariaPropsMap.js
-var invalidAttributes = map[string]struct{}{
-	"role":                        {},
-	"aria-activedescendant":       {},
-	"aria-atomic":                 {},
-	"aria-autocomplete":           {},
-	"aria-braillelabel":           {},
-	"aria-brailleroledescription": {},
-	"aria-busy":                   {},
-	"aria-checked":                {},
-	"aria-colcount":               {},
-	"aria-colindex":               {},
-	"aria-colspan":                {},
-	"aria-controls":               {},
-	"aria-current":                {},
-	"aria-describedby":            {},
-	"aria-description":            {},
-	"aria-details":                {},
-	"aria-disabled":               {},
-	"aria-dropeffect":             {},
-	"aria-errormessage":           {},
-	"aria-expanded":               {},
-	"aria-flowto":                 {},
-	"aria-grabbed":                {},
-	"aria-haspopup":               {},
-	"aria-hidden":                 {},
-	"aria-invalid":                {},
-	"aria-keyshortcuts":           {},
-	"aria-label":                  {},
-	"aria-labelledby":             {},
-	"aria-level":                  {},
-	"aria-live":                   {},
-	"aria-modal":                  {},
-	"aria-multiline":              {},
-	"aria-multiselectable":        {},
-	"aria-orientation":            {},
-	"aria-owns":                   {},
-	"aria-placeholder":            {},
-	"aria-posinset":               {},
-	"aria-pressed":                {},
-	"aria-readonly":               {},
-	"aria-relevant":               {},
-	"aria-required":               {},
-	"aria-roledescription":        {},
-	"aria-rowcount":               {},
-	"aria-rowindex":               {},
-	"aria-rowspan":                {},
-	"aria-selected":               {},
-	"aria-setsize":                {},
-	"aria-sort":                   {},
-	"aria-valuemax":               {},
-	"aria-valuemin":               {},
-	"aria-valuenow":               {},
-	"aria-valuetext":              {},
-}
+// every defined ARIA state/property (sourced from jsxa11yutil.AriaPropertySet)
+// plus the `role` attribute.
+var invalidAttributes = func() map[string]struct{} {
+	out := make(map[string]struct{}, len(jsxa11yutil.AriaPropertySet)+1)
+	for k := range jsxa11yutil.AriaPropertySet {
+		out[k] = struct{}{}
+	}
+	out["role"] = struct{}{}
+	return out
+}()
 
 func errorMessage(invalidProp string) string {
 	return "This element does not support ARIA roles, states and properties. Try removing the prop '" + invalidProp + "'."
