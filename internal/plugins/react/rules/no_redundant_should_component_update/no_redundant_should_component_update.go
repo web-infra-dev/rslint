@@ -1,8 +1,6 @@
 package no_redundant_should_component_update
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -11,30 +9,16 @@ import (
 // hasShouldComponentUpdate mirrors upstream's
 // `astUtil.getComponentProperties(node).some(p => getPropertyName(p) === 'shouldComponentUpdate')`.
 //
-// Upstream `getPropertyName` returns `nameNode.name`, which is populated for
-// Identifier and PrivateIdentifier (per spec, PrivateIdentifier exposes its
-// name without the leading `#`) — so `#shouldComponentUpdate` also matches,
-// matching upstream. Other key shapes (StringLiteral / NumericLiteral /
-// ComputedPropertyName) yield undefined `.name` upstream and never match.
+// Includes PropertyDeclaration (class field arrow `shouldComponentUpdate = () => {}`)
+// because upstream's `getComponentProperties` returns class fields too.
+// Contrast `reactutil.ClassHasMethodNamed`, which excludes PropertyDeclaration
+// to match MethodDefinition-listener semantics — wrong oracle for this rule.
 func hasShouldComponentUpdate(members []*ast.Node) bool {
 	for _, m := range members {
 		if m == nil {
 			continue
 		}
-		key := m.Name()
-		if key == nil {
-			continue
-		}
-		var name string
-		switch key.Kind {
-		case ast.KindIdentifier:
-			name = key.AsIdentifier().Text
-		case ast.KindPrivateIdentifier:
-			name = strings.TrimPrefix(key.AsPrivateIdentifier().Text, "#")
-		default:
-			continue
-		}
-		if name == "shouldComponentUpdate" {
+		if reactutil.IdentifierOrPrivateName(m.Name()) == "shouldComponentUpdate" {
 			return true
 		}
 	}

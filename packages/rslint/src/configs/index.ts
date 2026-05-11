@@ -7,6 +7,7 @@ import { recommended as importRecommended } from './import.js';
 import { recommended as promiseRecommended } from './promise.js';
 import { recommended as jestRecommended } from './jest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
+import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
 
 interface PluginExport {
   configs: { recommended: RslintConfigEntry };
@@ -42,4 +43,8 @@ export const jestPlugin: PluginExport = {
 
 export const unicornPlugin: PluginExport = {
   configs: { recommended: unicornRecommended },
+};
+
+export const jsxA11yPlugin: PluginExport = {
+  configs: { recommended: jsxA11yRecommended },
 };

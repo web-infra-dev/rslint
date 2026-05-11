@@ -11,6 +11,7 @@ export type KnownPlugin =
   | '@typescript-eslint'
   | 'import'
   | 'jest'
+  | 'jsx-a11y'
   | 'promise'
   | 'react'
   | 'react-hooks'
@@ -103,6 +104,7 @@ export interface RslintConfigEntry {
    * - `'@typescript-eslint'` → `@typescript-eslint/eslint-plugin`
    * - `'import'`             → `eslint-plugin-import`
    * - `'jest'`               → `eslint-plugin-jest`
+   * - `'jsx-a11y'`           → `eslint-plugin-jsx-a11y`
    * - `'promise'`            → `eslint-plugin-promise`
    * - `'react'`              → `eslint-plugin-react`
    * - `'react-hooks'`        → `eslint-plugin-react-hooks`

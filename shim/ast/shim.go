@@ -421,6 +421,8 @@ func GetNameOfDeclaration(declaration *ast.Node) *ast.Node
 func GetNamespaceDeclarationNode(node *ast.Node) *ast.Node
 //go:linkname GetNewTargetContainer github.com/microsoft/typescript-go/internal/ast.GetNewTargetContainer
 func GetNewTargetContainer(node *ast.Node) *ast.Node
+//go:linkname GetNextJSDocCommentLocation github.com/microsoft/typescript-go/internal/ast.GetNextJSDocCommentLocation
+func GetNextJSDocCommentLocation(node *ast.Node) *ast.Node
 //go:linkname GetNodeAtPosition github.com/microsoft/typescript-go/internal/ast.GetNodeAtPosition
 func GetNodeAtPosition(file *ast.SourceFile, position int, includeJSDoc bool) *ast.Node
 //go:linkname GetNodeId github.com/microsoft/typescript-go/internal/ast.GetNodeId
@@ -578,6 +580,8 @@ func IsAdditiveOperatorOrHigher(kind ast.Kind) bool
 func IsAliasSymbolDeclaration(node *ast.Node) bool
 //go:linkname IsAmbientModule github.com/microsoft/typescript-go/internal/ast.IsAmbientModule
 func IsAmbientModule(node *ast.Node) bool
+//go:linkname IsAmbientModuleSymbolName github.com/microsoft/typescript-go/internal/ast.IsAmbientModuleSymbolName
+func IsAmbientModuleSymbolName(s string) bool
 //go:linkname IsAnyExportAssignment github.com/microsoft/typescript-go/internal/ast.IsAnyExportAssignment
 func IsAnyExportAssignment(node *ast.Node) bool
 //go:linkname IsAnyImportOrReExport github.com/microsoft/typescript-go/internal/ast.IsAnyImportOrReExport
