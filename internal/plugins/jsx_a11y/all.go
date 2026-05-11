@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_autofocus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_distracting_elements"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_tabindex"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -32,5 +33,6 @@ func GetAllRules() []rule.Rule {
 		no_access_key.NoAccessKeyRule,
 		no_autofocus.NoAutofocusRule,
 		no_distracting_elements.NoDistractingElementsRule,
+		no_noninteractive_tabindex.NoNoninteractiveTabindexRule,
 	}
 }
