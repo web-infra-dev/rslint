@@ -11,7 +11,14 @@ const config = {
 
   sourcemap: true,
   platform: 'node',
-  external: ['@rslint/core', 'vscode'],
+  // @rslint/eslint-plugin-runner is intentionally external:
+  //   - it's ESM ("type": "module"); bundling it into our CJS output
+  //     would break the worker_threads boot path (the worker entry
+  //     file must be a real `.js` file on disk, not part of main.js)
+  //   - keeping it external means the runner's own dist/ ships
+  //     alongside extension's dist/ in the .vsix and the runtime
+  //     `import()` resolves through Node's normal module loader
+  external: ['@rslint/core', '@rslint/eslint-plugin-runner', 'vscode'],
   loader: {
     '': 'file',
   },

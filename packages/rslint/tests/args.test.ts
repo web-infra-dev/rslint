@@ -451,3 +451,25 @@ describe('parseArgs option-terminator (--)', () => {
     expect(result.positionals).toEqual(['src/a.ts', '--', 'src/b.ts']);
   });
 });
+
+describe('parseArgs --help / -h', () => {
+  test('--help sets help:true', () => {
+    expect(parseArgs(['--help']).help).toBe(true);
+  });
+
+  test('-h sets help:true', () => {
+    expect(parseArgs(['-h']).help).toBe(true);
+  });
+
+  test('absent → help:false', () => {
+    expect(parseArgs(['src/a.ts']).help).toBe(false);
+  });
+
+  // Unlike --init/--config/--start-time, --help is NOT stripped from rest:
+  // the Node entry skips config discovery on it (so a broken rslint.config.*
+  // cannot block usage output), but Go owns the actual usage text, so --help
+  // must still reach Go.
+  test('--help is forwarded to Go via rest', () => {
+    expect(parseArgs(['--help']).rest).toContain('--help');
+  });
+});

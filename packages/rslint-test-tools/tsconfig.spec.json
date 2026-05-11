@@ -1,6 +1,6 @@
 {
   "extends": ["../../tsconfig.spec.json"],
-  "include": ["tests/**/*.ts"],
+  "include": ["tests/**/*.ts", "src/**/*.ts"],
   "compilerOptions": {
     "moduleResolution": "bundler",
     "module": "preserve"

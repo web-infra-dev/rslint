@@ -363,6 +363,51 @@ describe('JSON config regression', () => {
   });
 });
 
+describe('CLI fail-fast on JS config load failure', () => {
+  // Regression for A11. Previous behaviour silently fell back to the
+  // JSON/no-config path when the user's JS config failed to load —
+  // CI runs would exit 0 even though plugin rules / overrides never
+  // executed. fail-fast ensures the user sees the error and CI breaks.
+
+  test('single rslint.config.js with syntax error exits non-zero', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'test.ts': 'const x = 1;\n',
+      // Deliberately broken — missing closing brace.
+      'rslint.config.js': 'export default [{ rules: { "no-console": "error"',
+    });
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).not.toBe(0);
+      // The stderr should name the failing config so the user can find it.
+      expect(result.stderr).toMatch(/rslint\.config\.js/);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('single TS config with normalize-time error exits non-zero', async () => {
+    // A normalizeConfig throw (e.g. invalid eslintPlugins shape) is a
+    // different failure path than loadConfigFile parse error — exercise
+    // it independently.
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'test.ts': 'const x = 1;\n',
+      'rslint.config.js': `export default [{
+        // plugins must be string[] or object; number is rejected by normalizeConfig.
+        plugins: 42,
+        rules: {},
+      }];`,
+    });
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).not.toBe(0);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+});
+
 describe('CLI config directory resolution', () => {
   test('src/**/*.ts pattern should match when cwd equals config directory', async () => {
     const tempDir = await createTempDir({

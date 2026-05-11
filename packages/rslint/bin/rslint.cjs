@@ -25,7 +25,16 @@ async function main() {
     pathToFileURL(path.resolve(__dirname, '../dist/cli.js')).href
   );
   const exitCode = await run(binPath, process.argv.slice(2), startTime);
-  process.exit(exitCode);
+  // Do NOT call process.exit(): a piped `process.stdout` is async, and a
+  // hard exit discards Node's still-unflushed buffer, silently truncating
+  // large lint output (`| jq`, `| tee`, CI capturing stdout). Setting
+  // `exitCode` lets the event loop drain stdout (pending writes keep the
+  // loop alive until the bytes are handed to the OS), then the process
+  // exits naturally. This is sound only because runEngine returns after the
+  // Go child has exited, the worker pool is terminated, and IPC is closed
+  // (engine.ts §5-6) — i.e. no leaked handle keeps the loop alive past the
+  // flush. (Verified: a `--start-time`-only run exits promptly.)
+  process.exitCode = exitCode;
 }
 
 main().catch((err) => {

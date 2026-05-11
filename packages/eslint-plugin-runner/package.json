@@ -6,7 +6,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/web-infra-dev/rslint.git",
-    "directory": "packages/rslint-eslint-plugin-runner"
+    "directory": "packages/eslint-plugin-runner"
   },
   "license": "MIT",
   "publisher": "rslint",
@@ -29,6 +29,10 @@
     "./types": {
       "@typescript/source": "./src/types.ts",
       "default": "./dist/types.js"
+    },
+    "./plugin-source": {
+      "@typescript/source": "./src/plugin-source.ts",
+      "default": "./dist/plugin-source.js"
     }
   },
   "files": [

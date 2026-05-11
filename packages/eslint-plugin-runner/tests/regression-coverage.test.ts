@@ -173,7 +173,7 @@ describe('SourceCode scope-factory throw propagates on every access', () => {
     //   after the throw `_scope` stays `null` and subsequent accesses
     //   short-circuit on `_scopeInit && true`, silently returning the
     //   null `_scope`. Downstream `getScopeForNode(null, ...)` returns
-    //   null (source-code-helpers.ts:198), so scope-dependent rules
+    //   null (source-code-helpers.ts), so scope-dependent rules
     //   silently degrade with no error recorded.
     //
     // Post-fix: the throw must propagate again so every consumer
@@ -237,7 +237,7 @@ describe('diagnostic-builder array-fix validates per element', () => {
     };
 
     // Pre-fix: lintFile throws `Cannot read properties of undefined
-    //   (reading '0')` from ecma-language-plugin.ts:598 (`f.range[0]`).
+    //   (reading '0')` from ecma-language-plugin.ts (`f.range[0]`).
     //   The throw escapes lintFile because the diagnostic post-
     //   processing loop has no try/catch.
     //
@@ -1834,7 +1834,7 @@ describe('line-comment eslint-disable / eslint-enable are NOT directives', () =>
   });
 });
 
-// worker-pool.ts:793 — drainQueueIfAllSlotsDegraded mis-fires
+// worker-pool.ts — drainQueueIfAllSlotsDegraded mis-fires
 //        during multi-worker mid-respawn (treats a transient
 //        ready=false slot as permanently dead).
 describe('drainQueueIfAllSlotsDegraded does not fire during mid-respawn', () => {
@@ -1951,7 +1951,7 @@ describe('drainQueueIfAllSlotsDegraded does not fire during mid-respawn', () => 
   }, 30_000);
 });
 
-// diagnostic-builder.ts:412 — iterable branch of materializeFixes
+// diagnostic-builder.ts — iterable branch of materializeFixes
 //        skips per-element isFix filtering.
 describe('materializeFixes iterable branch validates per element', () => {
   test('Set([junk, validFix]) returned by fix() does not crash; valid fix survives', () => {
@@ -2064,7 +2064,7 @@ describe('materializeFixes iterable branch validates per element', () => {
   });
 });
 
-// listener-merge.ts:623,668 — byType and wildcard listeners
+// listener-merge.ts — byType and wildcard listeners
 //        fire in two separate passes; ESLint v10 specificity-sorts them
 //        as ONE list per node.
 describe('byType and wildcard listeners interleave by specificity', () => {
@@ -2134,7 +2134,7 @@ describe('byType and wildcard listeners interleave by specificity', () => {
   });
 });
 
-// listener-merge.ts:460 — `analyzeSpecificity` recurses through
+// listener-merge.ts — `analyzeSpecificity` recurses through
 //        `:has()` and double-counts identifiers; ESLint v10 does NOT
 //        recurse into `:has()`.
 describe('analyzeSpecificity does NOT recurse into :has()', () => {
@@ -2243,7 +2243,7 @@ describe('getInlineConfigNodes recognises eslint-env and skips Shebang', () => {
   });
 });
 
-// tokenizer.ts:767 — `couldStartRegex` treats `)` and `}` as
+// tokenizer.ts — `couldStartRegex` treats `)` and `}` as
 //        always closing an expression (→ next `/` is division).
 //        ESLint v10 uses parser state to know `if (x) /re/` is regex.
 describe('regex after control-flow `)` and statement `}` is recognised', () => {
@@ -2283,7 +2283,7 @@ describe('regex after control-flow `)` and statement `}` is recognised', () => {
   test('control: `{a: 1} / 2` — `/` after object-literal `}` stays division', () => {
     // In expression position `{a:1}` is an object literal; `/` after
     // it is division. This is the case the existing test at
-    // `tokenizer-edge-cases.test.ts:61` accidentally claimed to test.
+    // `tokenizer-edge-cases.test.ts` accidentally claimed to test.
     const src = 'const k = ({a: 1} / 2);\n';
     const { tokens } = tokenize(src, buildLineStartOffsets(src));
     expect(tokens.find((t) => t.type === 'RegularExpression')).toBeUndefined();
@@ -2294,7 +2294,7 @@ describe('regex after control-flow `)` and statement `}` is recognised', () => {
   });
 });
 
-// tokenizer.ts:502 — Unicode-escaped identifiers (a)
+// tokenizer.ts — Unicode-escaped identifiers (a)
 //        fall to the unknown-char skip branch; identifier scan misses
 //        the leading `\`. value and range both wrong.
 describe('Unicode-escape-prefixed identifier tokenizes correctly', () => {
@@ -2314,7 +2314,7 @@ describe('Unicode-escape-prefixed identifier tokenizes correctly', () => {
   });
 });
 
-// source-code.ts:379 — text retains BOM byte; all downstream
+// source-code.ts — text retains BOM byte; all downstream
 //        offsets are +1 UTF-16 / +3 UTF-8 shifted from ESLint.
 describe('leading BOM is stripped before parsing / SourceCode.text', () => {
   test('`<BOM>var x = 1` — diagnostic startPos matches ESLint (BOM-free)', () => {
@@ -2428,7 +2428,7 @@ describe('leading BOM is stripped before parsing / SourceCode.text', () => {
   });
 });
 
-// source-code-helpers.ts:206 — `sourceCode.getScope()` with no
+// source-code-helpers.ts — `sourceCode.getScope()` with no
 //        node argument returns globalScope; ESLint v10 throws
 //        TypeError. Aligns the strictness so plugin bugs surface
 //        loudly instead of silently picking the wrong scope.

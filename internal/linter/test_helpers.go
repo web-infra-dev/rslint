@@ -97,7 +97,7 @@ func RunLinterInProgram(
 		}
 		return res.LintedFileCount
 	}
-	return runLintRulesInProgram(runProgramOptions{
+	n, _ := runLintRulesInProgram(runProgramOptions{
 		Program:         program,
 		Scope:           FileScope{Files: allowFiles, Dirs: allowDirs},
 		ExcludePaths:    excludes,
@@ -106,4 +106,5 @@ func RunLinterInProgram(
 		TypeInfoFiles:   typeInfoFiles,
 		OnDiagnostic:    onDiagnostic,
 	})
+	return n
 }

@@ -85,7 +85,14 @@ type RuleListeners map[ast.Kind](func(node *ast.Node))
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
-	Run              func(ctx RuleContext, options any) RuleListeners
+	// IsEslintPluginRule marks rules that are placeholders for ESLint plugins
+	// running in a Node WorkerPool — hosted by the parent process on the
+	// CLI path (engine.ts) or by the LSP client on the LSP path (extension's
+	// CompatPool). Their Run is a no-op; actual execution is dispatched at
+	// the Program level via IPC / LSP custom request. The linter uses this
+	// flag to defer execution and skip Run() in the normal listener pipeline.
+	IsEslintPluginRule bool
+	Run                func(ctx RuleContext, options any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
@@ -157,8 +164,19 @@ type RuleDiagnostic struct {
 	FixesPtr *[]RuleFix
 	// nil if no suggestions were provided
 	Suggestions *[]RuleSuggestion
-	SourceFile  *ast.SourceFile
-	Severity    DiagnosticSeverity
+	// FilePath is the diagnostic's owning file path (formerly accessed
+	// via SourceFile.FileName()). Required because SourceFile is now an
+	// interface — FileName() isn't part of SourceFileLike. Native rule
+	// reports set this from `ctx.SourceFile.FileName()`; the compat
+	// path sets it from the worker-returned `fileResult.FilePath`.
+	FilePath string
+	// SourceFile carries the source text + line-start map for the file.
+	// Type is the SourceFileLike interface so both ts-go's full
+	// `*ast.SourceFile` (used by native rules and type-check) and the
+	// runner's per-file lightweight surface (used by compat-only path
+	// to avoid building a full ts-go Program) can satisfy it.
+	SourceFile ast.SourceFileLike
+	Severity   DiagnosticSeverity
 	// PreFormatted indicates that Message.Description already contains
 	// structured formatting (e.g. indented continuation lines from tsc diagnostics).
 	// The renderer will use a simple 2-space indent instead of the │ border style.

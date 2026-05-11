@@ -717,7 +717,7 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
         if (cur.range[0] <= index && index < cur.range[1]) {
           best = cur;
           // Mirror the main visitor's child enumeration (see
-          // `listener-merge.ts:520`): consult `visitorKeys[type]` so the
+          // `listener-merge.ts:759`): consult `visitorKeys[type]` so the
           // recursion set matches ESLint / espree / typescript-eslint
           // exactly. A prior `Object.keys + parent/loc/range blacklist`
           // recursed into non-AST properties and allocated a fresh keys
@@ -727,8 +727,8 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
           // on an offset inside a TS construct stopped at the wrapper
           // node instead of descending to the actual child.
           // Fall back to `getVisitorKeys` for types not in the static
-          // table — same convention as `listener-merge.ts:644` and
-          // `normalize-ast.ts:300`. The static table covers the common
+          // table — same convention as `listener-merge.ts:760` and
+          // `normalize-ast.ts:359`. The static table covers the common
           // case path; the helper handles parser-specific node types
           // that may not be enumerated upfront (oxc-specific extensions,
           // future TS additions). Pre-fix the bare `?? []` made the

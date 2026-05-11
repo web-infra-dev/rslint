@@ -19,6 +19,9 @@ func runLSP(args []string) int {
 	defaultLibraryPath := bundled.LibPath()
 	typingsLocation := getGlobalTypingsCacheLocation()
 
+	// ESLint-plugin rule execution is delegated to the LSP client over
+	// `rslint/lintCompatBatch` (see internal/lsp/lintcompat_dispatcher.go).
+	// The Go server itself never spawns Node — no sidecar to configure.
 	s := lsp.NewServer(&lsp.ServerOptions{
 		In:                 lsp.ToReader(os.Stdin),
 		Out:                lsp.ToWriter(os.Stdout),

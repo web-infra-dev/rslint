@@ -201,10 +201,12 @@ export function lintFile(
     cancelled: false,
   };
 
-  // Worker reads the source from disk by default — text is NOT in the
-  // IPC payload. See LintFileRequest's doc comment for the multi-pass
-  // --fix coherence rationale. The `req.text` override is for in-process
-  // unit tests only.
+  // Source resolution: prefer req.text when present, else read disk.
+  // req.text carries an unsaved editor buffer's content on the LSP / --api
+  // path (finding #3) — and synthetic source for in-process callers. On the
+  // CLI path it's absent and the worker reads disk via readFileSync (disk
+  // is authoritative there; see LintFileRequest's doc comment for the
+  // multi-pass --fix coherence rationale).
   let sourceText: string;
   if (req.text !== undefined) {
     sourceText = req.text;

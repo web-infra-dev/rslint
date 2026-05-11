@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"testing"
 )
 
@@ -272,6 +273,262 @@ func TestMergeLanguageOptions(t *testing.T) {
 			t.Error("Expected ProjectService to be preserved from base")
 		}
 	})
+
+	// Opaque-compat merge pinning. Verifies that arbitrary ESLint
+	// flat-config fields stashed in `Compat` deep-merge the same way
+	// the pre-refactor typed Globals/EcmaVersion/etc. did — without
+	// Go needing to know individual field names.
+
+	t.Run("opaque compat: globals deep-merge across entries", func(t *testing.T) {
+		base := &LanguageOptions{
+			Compat: map[string]any{
+				"globals": map[string]any{"Foo": "readonly", "Bar": "readonly"},
+			},
+		}
+		override := &LanguageOptions{
+			Compat: map[string]any{
+				"globals": map[string]any{"Bar": "writable", "Baz": "readonly"},
+			},
+		}
+		result := mergeLanguageOptions(base, override)
+		g := result.Compat["globals"].(map[string]any)
+		// Base-only key survives.
+		if g["Foo"] != "readonly" {
+			t.Errorf("expected Foo readonly survives, got %v", g["Foo"])
+		}
+		// Conflict: override wins.
+		if g["Bar"] != "writable" {
+			t.Errorf("expected Bar overridden to writable, got %v", g["Bar"])
+		}
+		// Override-only key included.
+		if g["Baz"] != "readonly" {
+			t.Errorf("expected Baz readonly, got %v", g["Baz"])
+		}
+	})
+
+	t.Run("opaque compat: parserOptions deep-merge under parserOptions key", func(t *testing.T) {
+		// Even though parserOptions.{Project,ProjectService} are typed
+		// fields, OTHER parserOptions fields (ecmaVersion, sourceType,
+		// ecmaFeatures, ...) flow through ParserOptions.Compat. Their
+		// merge happens via the same deepMergeMap.
+		base := &LanguageOptions{
+			ParserOptions: &ParserOptions{
+				Compat: map[string]any{
+					"ecmaVersion":  2020,
+					"sourceType":   "module",
+					"ecmaFeatures": map[string]any{"jsx": true},
+				},
+			},
+		}
+		override := &LanguageOptions{
+			ParserOptions: &ParserOptions{
+				Compat: map[string]any{
+					"ecmaVersion":  2024,
+					"ecmaFeatures": map[string]any{"globalReturn": true},
+				},
+			},
+		}
+		result := mergeLanguageOptions(base, override)
+		po := result.ParserOptions
+		// Scalar override wins.
+		if po.Compat["ecmaVersion"] != 2024 {
+			t.Errorf("expected ecmaVersion=2024, got %v", po.Compat["ecmaVersion"])
+		}
+		// Base-only key survives (override didn't declare).
+		if po.Compat["sourceType"] != "module" {
+			t.Errorf("expected sourceType=module, got %v", po.Compat["sourceType"])
+		}
+		// Nested map deep-merge.
+		feats := po.Compat["ecmaFeatures"].(map[string]any)
+		if feats["jsx"] != true {
+			t.Errorf("expected ecmaFeatures.jsx=true survives, got %v", feats["jsx"])
+		}
+		if feats["globalReturn"] != true {
+			t.Errorf("expected ecmaFeatures.globalReturn=true, got %v", feats["globalReturn"])
+		}
+	})
+
+	t.Run("opaque compat: unknown future field flows through unchanged", func(t *testing.T) {
+		// The whole point of the refactor: a brand-new ESLint flat-config
+		// field that Go knows NOTHING about still merges correctly.
+		base := &LanguageOptions{
+			Compat: map[string]any{"newField": map[string]any{"a": 1, "b": 2}},
+		}
+		override := &LanguageOptions{
+			Compat: map[string]any{"newField": map[string]any{"b": 99, "c": 3}},
+		}
+		result := mergeLanguageOptions(base, override)
+		nf := result.Compat["newField"].(map[string]any)
+		if nf["a"] != 1 || nf["b"] != 99 || nf["c"] != 3 {
+			t.Errorf("unexpected merged shape: %v", nf)
+		}
+	})
+}
+
+// JSON round-trip pinning. The typed+opaque split MUST be transparent
+// to JSON in both directions — what the user wrote == what comes out of
+// MarshalJSON (modulo key order). And `parserOptions.project` /
+// `projectService` lift into typed fields while everything else lands in
+// Compat.
+func TestLanguageOptionsJSONRoundTrip(t *testing.T) {
+	t.Run("unmarshal splits typed from compat", func(t *testing.T) {
+		input := []byte(`{
+			"parserOptions": {
+				"project": ["./tsconfig.json"],
+				"projectService": true,
+				"ecmaVersion": 2024,
+				"sourceType": "module",
+				"ecmaFeatures": {"jsx": true}
+			},
+			"globals": {"Foo": "readonly"},
+			"futureField": "anything"
+		}`)
+		var lo LanguageOptions
+		if err := json.Unmarshal(input, &lo); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		// Typed native fields.
+		if lo.ParserOptions == nil || len(lo.ParserOptions.Project) != 1 ||
+			lo.ParserOptions.Project[0] != "./tsconfig.json" {
+			t.Errorf("project not extracted: %+v", lo.ParserOptions)
+		}
+		if lo.ParserOptions.ProjectService == nil || !*lo.ParserOptions.ProjectService {
+			t.Error("projectService not extracted")
+		}
+		// Opaque parserOptions compat.
+		if lo.ParserOptions.Compat["ecmaVersion"] != float64(2024) {
+			t.Errorf("ecmaVersion stayed in Compat: %v", lo.ParserOptions.Compat["ecmaVersion"])
+		}
+		if lo.ParserOptions.Compat["sourceType"] != "module" {
+			t.Errorf("sourceType stayed in Compat: %v", lo.ParserOptions.Compat["sourceType"])
+		}
+		// Top-level opaque.
+		globals := lo.Compat["globals"].(map[string]any)
+		if globals["Foo"] != "readonly" {
+			t.Errorf("globals.Foo not captured: %v", globals)
+		}
+		if lo.Compat["futureField"] != "anything" {
+			t.Errorf("futureField dropped: %v", lo.Compat["futureField"])
+		}
+	})
+
+	t.Run("ToCompatWire excludes native fields", func(t *testing.T) {
+		ps := true
+		lo := &LanguageOptions{
+			ParserOptions: &ParserOptions{
+				ProjectService: &ps,
+				Project:        ProjectPaths{"./t.json"},
+				Compat:         map[string]any{"ecmaVersion": 2024},
+			},
+			Compat: map[string]any{"globals": map[string]any{"X": "readonly"}},
+		}
+		wire := lo.ToCompatWire()
+		// Native fields MUST NOT be on the wire — the runner has no
+		// business seeing them.
+		po := wire["parserOptions"].(map[string]any)
+		if _, found := po["project"]; found {
+			t.Error("project leaked onto wire")
+		}
+		if _, found := po["projectService"]; found {
+			t.Error("projectService leaked onto wire")
+		}
+		// Compat fields present.
+		if po["ecmaVersion"] != 2024 {
+			t.Errorf("ecmaVersion missing from wire: %v", po)
+		}
+		globals := wire["globals"].(map[string]any)
+		if globals["X"] != "readonly" {
+			t.Errorf("globals.X missing from wire: %v", globals)
+		}
+	})
+
+	t.Run("ToCompatWire returns nil when nothing compat-relevant", func(t *testing.T) {
+		ps := true
+		lo := &LanguageOptions{
+			// Native-only: project + projectService. No compat.
+			ParserOptions: &ParserOptions{
+				ProjectService: &ps,
+				Project:        ProjectPaths{"./t.json"},
+			},
+		}
+		if wire := lo.ToCompatWire(); wire != nil {
+			t.Errorf("expected nil wire for native-only config, got %v", wire)
+		}
+	})
+}
+
+// Direct deepMergeMap unit tests — independent of LanguageOptions
+// wrappers so the merge algorithm is testable in isolation.
+func TestDeepMergeMap(t *testing.T) {
+	t.Run("nil base returns clone of override", func(t *testing.T) {
+		out := deepMergeMap(nil, map[string]any{"a": 1})
+		if out["a"] != 1 {
+			t.Errorf("expected a=1, got %v", out["a"])
+		}
+		out["a"] = 999
+		// out is a fresh allocation, not aliasing override.
+	})
+
+	t.Run("nil override returns clone of base", func(t *testing.T) {
+		base := map[string]any{"a": 1}
+		out := deepMergeMap(base, nil)
+		if out["a"] != 1 {
+			t.Errorf("expected a=1, got %v", out["a"])
+		}
+		// Ensure freshly allocated (cloneAnyMap doesn't alias).
+		out["a"] = 999
+		if base["a"] == 999 {
+			t.Error("base was mutated — cloneAnyMap must allocate")
+		}
+	})
+
+	t.Run("scalar conflict: later wins", func(t *testing.T) {
+		out := deepMergeMap(
+			map[string]any{"a": 1, "b": "old"},
+			map[string]any{"b": "new", "c": true},
+		)
+		if out["a"] != 1 {
+			t.Errorf("a not preserved: %v", out["a"])
+		}
+		if out["b"] != "new" {
+			t.Errorf("b not overridden: %v", out["b"])
+		}
+		if out["c"] != true {
+			t.Errorf("c not added: %v", out["c"])
+		}
+	})
+
+	t.Run("object values merge recursively", func(t *testing.T) {
+		out := deepMergeMap(
+			map[string]any{"x": map[string]any{"a": 1, "b": 2}},
+			map[string]any{"x": map[string]any{"b": 99, "c": 3}},
+		)
+		x := out["x"].(map[string]any)
+		if x["a"] != 1 || x["b"] != 99 || x["c"] != 3 {
+			t.Errorf("nested merge wrong: %v", x)
+		}
+	})
+
+	t.Run("type mismatch: later wins (replace, no merge)", func(t *testing.T) {
+		// base has map, override has scalar. Override wins, not merged.
+		out := deepMergeMap(
+			map[string]any{"x": map[string]any{"a": 1}},
+			map[string]any{"x": "replaced"},
+		)
+		if out["x"] != "replaced" {
+			t.Errorf("type mismatch should replace, got %v", out["x"])
+		}
+	})
+
+	t.Run("does not mutate inputs", func(t *testing.T) {
+		base := map[string]any{"x": map[string]any{"a": 1}}
+		override := map[string]any{"x": map[string]any{"b": 2}}
+		deepMergeMap(base, override)
+		baseX := base["x"].(map[string]any)
+		if _, found := baseX["b"]; found {
+			t.Error("base['x'] was mutated to include override's 'b'")
+		}
+	})
 }
 
 func TestIsGlobalIgnoreEntry(t *testing.T) {
@@ -350,9 +607,53 @@ func TestGetConfigForFile_ArrayRuleConfig(t *testing.T) {
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn', got %q", rc.Level)
 	}
-	optsMap, _ := rc.Options.(map[string]interface{})
+	// rc.Options is the ESLint-aligned positional options array; the lone
+	// object option lives at [0] (#5 — config.go no longer unwraps it).
+	optsArr, _ := rc.Options.([]interface{})
+	if len(optsArr) != 1 {
+		t.Fatalf("Expected 1 positional option, got %v", rc.Options)
+	}
+	optsMap, _ := optsArr[0].(map[string]interface{})
 	if optsMap == nil || optsMap["default"] != "array-simple" {
-		t.Error("Expected options to contain default: array-simple")
+		t.Error("Expected options[0] to contain default: array-simple")
+	}
+}
+
+func TestGetConfigForFile_SingleArrayOption_NotUnwrapped(t *testing.T) {
+	// #5: a single ARRAY-valued option must stay wrapped in the positional
+	// options array (ESLint's context.options shape). Pre-fix, config.go
+	// unwrapped the lone element, so `["error", ["asc","desc"]]` collapsed
+	// to options ["asc","desc"] (two scalar options) instead of
+	// [["asc","desc"]] (one array option) — corrupting the compat layer's
+	// context.options.
+	config := RslintConfig{
+		{
+			Rules: Rules{
+				"sort-keys": []interface{}{"error", []interface{}{"asc", "desc"}},
+			},
+		},
+	}
+	merged := config.GetConfigForFile("src/app.ts", "")
+	if merged == nil {
+		t.Fatal("Expected non-nil config")
+	}
+	rc := merged.Rules["sort-keys"]
+	if rc == nil {
+		t.Fatal("Expected sort-keys rule present")
+	}
+	optsArr, _ := rc.Options.([]interface{})
+	if len(optsArr) != 1 {
+		t.Fatalf("Expected ONE positional option (the array), got %v", rc.Options)
+	}
+	inner, ok := optsArr[0].([]interface{})
+	if !ok || len(inner) != 2 || inner[0] != "asc" || inner[1] != "desc" {
+		t.Errorf("Expected options[0] == [asc desc], got %v", optsArr[0])
+	}
+	// Native rules still receive the historic unwrapped shape (the lone
+	// option, not wrapped) via rule_registry's nativeRuleOptions.
+	got, ok := nativeRuleOptions(rc.Options).([]interface{})
+	if !ok || len(got) != 2 || got[0] != "asc" || got[1] != "desc" {
+		t.Errorf("nativeRuleOptions should unwrap to [asc desc], got %v", nativeRuleOptions(rc.Options))
 	}
 }
 
@@ -652,9 +953,15 @@ func TestGetConfigForFile_MultipleEntries_ArrayRuleOverridesString(t *testing.T)
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn' from array override, got %q", rc.Level)
 	}
-	optsMap2, _ := rc.Options.(map[string]interface{})
+	// rc.Options is the ESLint-aligned positional options array; the lone
+	// object option lives at [0] (#5 — config.go no longer unwraps it).
+	optsArr2, _ := rc.Options.([]interface{})
+	if len(optsArr2) != 1 {
+		t.Fatalf("Expected 1 positional option from array config, got %v", rc.Options)
+	}
+	optsMap2, _ := optsArr2[0].(map[string]interface{})
 	if optsMap2 == nil {
-		t.Fatal("Expected options from array config")
+		t.Fatal("Expected options[0] from array config")
 		return
 	}
 	allow, ok := optsMap2["allow"].([]interface{})

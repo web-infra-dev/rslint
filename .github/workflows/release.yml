@@ -97,7 +97,11 @@ jobs:
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
       - name: Build @rslint/core dist
-        run: pnpm --filter @rslint/core build:js
+        # `@rslint/core...` includes transitive deps, so the runner
+        # package (a runtime dep of @rslint/core) gets built too.
+        # Without this the runner's `dist/` would be empty and the
+        # published tarball would ship no JavaScript.
+        run: pnpm --filter '@rslint/core...' build:js
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |

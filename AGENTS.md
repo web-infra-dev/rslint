@@ -25,9 +25,18 @@ This document summarizes how to work on rslint effectively and consistently.
 - Lint Go: `pnpm run lint:go`
 - Lint JS: `pnpm run lint`
 - Format JS/TS/MD: `pnpm run format`
-- CLI: `go run ./cmd/rslint --help`
-  - Examples: `go run ./cmd/rslint --config rslint.jsonc`, `--fix`, `--format default|jsonline|github`, `--quiet`, `--max-warnings 0`
-- LSP: `go run ./cmd/rslint --lsp` | IPC API: `go run ./cmd/rslint --api`
+- CLI: invoke the Node wrapper, not the Go binary directly — the Go
+  binary requires an IPC handshake from a Node parent and will time
+  out otherwise. Use `pnpm --filter @rslint/core dev -- --help` or run
+  `node packages/rslint/bin/rslint.js --help` after `pnpm build`.
+  - Examples: append `--config rslint.config.ts`, `--fix`, `--format default|jsonline|github`, `--quiet`, `--max-warnings 0`.
+- LSP: started by editors (e.g. VS Code extension) via
+  `node packages/vscode-extension/dist/main.js` after `pnpm build`;
+  the extension spawns the Go binary with `--lsp` for you.
+- IPC API mode: `go run ./cmd/rslint --api` is fine — `--api` and
+  `--lsp` are the only flags the Go binary self-services without the
+  Node wrapper. The default (no-flag) path always expects an IPC
+  parent and is not a useful target for direct `go run` invocations.
 
 ## Coding Style & Naming Conventions
 

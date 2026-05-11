@@ -34,6 +34,19 @@ import (
 // Returns: (augmentedConfig, programs, exitCode). On non-zero exitCode,
 // augmentedConfig and programs may be nil/partial — caller should propagate
 // exitCode without using them.
+// readGitignoreOnly performs just the gitignore-merge half of
+// parallelGitignoreAndPrograms — useful when the program-build half is
+// skipped (e.g. compat-only fast path: no ts-go program is needed but
+// DiscoverGapFiles still consults the merged ignore set downstream).
+func readGitignoreOnly(rslintConfig rslintconfig.RslintConfig, configDir string, fsys vfs.FS) rslintconfig.RslintConfig {
+	configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
+	gitGlobs := rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
+	if len(gitGlobs) > 0 {
+		return append(rslintconfig.RslintConfig{{Ignores: gitGlobs}}, rslintConfig...)
+	}
+	return rslintConfig
+}
+
 func parallelGitignoreAndPrograms(
 	rslintConfig rslintconfig.RslintConfig,
 	configDir string,

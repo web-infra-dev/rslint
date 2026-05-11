@@ -196,7 +196,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			RuleName:  d.RuleName,
 			MessageId: d.Message.Id,
 			Message:   d.Message.Description,
-			FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+			FilePath:  tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
 			Range: api.Range{
 				Start: api.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
@@ -236,6 +236,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		Programs:       programs,
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Scope:          linter.FileScope{Files: allowedFiles},
+		// Ship overlay text to the compat worker only when the request
+		// carried unsaved buffer contents; otherwise the worker reads disk
+		// (bounded payload). See #3.
+		SendCompatFileText: len(req.FileContents) > 0,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()

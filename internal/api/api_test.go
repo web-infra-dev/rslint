@@ -1,9 +1,51 @@
 package ipc
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
+	"strings"
 	"testing"
 )
+
+// api-mode readMessage must reject an oversized frame header rather
+// than allocating gigabytes. Mirrors the bidirectional readFrame fix —
+// same OOM-on-stream-desync hazard would otherwise apply to wasm /
+// programmatic API callers.
+func TestAPIReadMessage_RejectsOversizedHeader(t *testing.T) {
+	var header [4]byte
+	binary.LittleEndian.PutUint32(header[:], maxFrameSize+1)
+	s := &Service{reader: bufio.NewReader(bytes.NewReader(header[:]))}
+
+	_, err := s.readMessage()
+	if err == nil {
+		t.Fatal("expected error for oversized header, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeds cap") {
+		t.Errorf("expected cap-exceeded error, got: %v", err)
+	}
+}
+
+// A header at exactly the cap must NOT be rejected (cap is inclusive).
+// Read will fail with "missing body" since we didn't supply the body,
+// but that's a different error class than "exceeds cap".
+func TestAPIReadMessage_AcceptsMaxSizedHeader(t *testing.T) {
+	var header [4]byte
+	binary.LittleEndian.PutUint32(header[:], maxFrameSize)
+	s := &Service{reader: bufio.NewReader(bytes.NewReader(header[:]))}
+
+	_, err := s.readMessage()
+	if err == nil {
+		t.Fatal("expected error reading missing body, got nil")
+	}
+	if strings.Contains(err.Error(), "exceeds cap") {
+		t.Errorf("max-sized header should NOT be cap-rejected: %v", err)
+	}
+	if !strings.Contains(err.Error(), "body") {
+		t.Errorf("expected body-read error, got: %v", err)
+	}
+}
 
 func TestAPIProjectPathsUnmarshalJSON(t *testing.T) {
 	tests := []struct {

@@ -24,6 +24,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"golang.org/x/sync/errgroup"
 )
@@ -45,7 +46,7 @@ func NewServer(opts *ServerOptions) *Server {
 	if opts.Cwd == "" {
 		panic("Cwd is required")
 	}
-	return &Server{
+	s := &Server{
 		r:                     opts.In,
 		w:                     opts.Out,
 		stderr:                opts.Err,
@@ -65,6 +66,20 @@ func NewServer(opts *ServerOptions) *Server {
 		debounceCh:            make(chan struct{}, 1),
 		pendingLintURIs:       make(map[lsproto.DocumentUri]struct{}),
 	}
+	// Install the LSP-based ESLint-plugin dispatcher. It sends every
+	// compat batch back to the LSP client as a `rslint/lintCompatBatch`
+	// request; the client (typically the VS Code extension) runs the
+	// rules in its own WorkerPool and returns diagnostics. This
+	// replaces the legacy sidecar-process architecture.
+	//
+	// Installed at construction time and never swapped out — the
+	// dispatcher itself is stateless. Whether plugin rules actually
+	// run is decided by the linter (whether any ConfiguredRule has
+	// IsEslintPluginRule=true for the current file) and by the
+	// client (whether it has any plugin entries configured); the Go
+	// server doesn't need to know.
+	s.compatDispatcher = newLintCompatLSPDispatcher(s)
+	return s
 }
 
 var (
@@ -149,8 +164,8 @@ type Server struct {
 	backgroundCtx    context.Context
 	initializeParams *lsproto.InitializeParams
 	positionEncoding lsproto.PositionEncodingKind
-	watchEnabled bool
-	watchers     collections.SyncSet[project.WatcherID]
+	watchEnabled     bool
+	watchers         collections.SyncSet[project.WatcherID]
 
 	session *project.Session
 
@@ -161,18 +176,18 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	jsConfigs        map[string]config.RslintConfig                // configDirectory URI -> config entries (from JS/TS configs)
-	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
-	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
+	jsConfigs        map[string]config.RslintConfig // configDirectory URI -> config entries (from JS/TS configs)
+	jsonConfig       config.RslintConfig            // fallback JSON config (rslint.json/rslint.jsonc)
+	rslintConfigPath string                         // path to rslint.json/rslint.jsonc, empty if not found
 	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
 	// For the JSON-config path this is a single global list.
 	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
 	// which keys per-config-directory so a nested config with no tsconfig
 	// does not disable filtering for files under other configs.
 	tsConfigPaths         []string
-	tsConfigPathsByConfig map[string][]string // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
-	documents        map[lsproto.DocumentUri]string                // URI -> content
-	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	tsConfigPathsByConfig map[string][]string                           // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
+	documents             map[lsproto.DocumentUri]string                // URI -> content
+	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
 	// refreshCh receives signals from RefreshDiagnostics (called by Session's
 	// background goroutine) and is consumed by the main dispatch loop so that
@@ -184,6 +199,16 @@ type Server struct {
 	debounceCh      chan struct{}
 	pendingLintURIs map[lsproto.DocumentUri]struct{}
 	lintTimer       *time.Timer
+
+	// compatDispatcher is set once in NewServer to the LSP-based
+	// dispatcher (see lintcompat_dispatcher.go). Every batch travels
+	// from here through `rslint/lintCompatBatch` to the client; the
+	// client (extension) runs the rules in its own WorkerPool and
+	// returns diagnostics. The Go server itself never spawns Node.
+	//
+	// Stateless: capture-only over `*Server`; no per-request mutable
+	// state.
+	compatDispatcher linter.CompatBatchHandler
 }
 
 // FS implements project.ServiceHost.
@@ -309,10 +334,17 @@ func (s *Server) SendTelemetry(ctx context.Context, telemetry lsproto.TelemetryE
 func (s *Server) IsActive() bool { return s.session != nil }
 
 func (s *Server) Run() error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	// Signals: os.Interrupt (SIGINT) + SIGTERM are the LSP supervisor's
+	// standard "shut down" signals. SIGHUP catches the controlling-
+	// terminal-disconnect case (rare for LSP, but if the editor exits
+	// without cleanly closing stdin or sends SIGHUP — some unusual
+	// terminal hosts do — we want graceful session teardown). On
+	// Windows SIGHUP is a no-op for signal.Notify; the registration
+	// is portable.
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, ctx := errgroup.WithContext(sigCtx)
 	s.backgroundCtx = ctx
 	g.Go(func() error { return s.dispatchLoop(ctx) })
 	g.Go(func() error { return s.writeLoop(ctx) })
@@ -329,7 +361,30 @@ func (s *Server) Run() error {
 	})
 	go func() { readLoopErr <- s.readLoop(ctx) }()
 
-	if err := g.Wait(); err != nil && !errors.Is(err, io.EOF) && ctx.Err() != nil {
+	// Propagate a real error only when no shutdown signal fired. We MUST
+	// test the SIGNAL context (sigCtx), not the errgroup-derived ctx:
+	// errgroup cancels the derived ctx before Wait() returns, so ctx.Err()
+	// is ALWAYS non-nil here — gating on `ctx.Err() != nil` (as the prior
+	// code did) is therefore always true and propagates even a clean
+	// shutdown's spurious context.Canceled as a fatal error (non-zero exit
+	// on graceful stop). sigCtx is cancelled only by SIGINT/SIGTERM/SIGHUP,
+	// so sigCtx.Err() != nil means the server was asked to stop and the
+	// g.Wait() error is expected fallout. io.EOF is benign (client
+	// disconnected).
+	if err := runLoopError(g.Wait(), sigCtx.Err() != nil); err != nil {
+		return err
+	}
+	return nil
+}
+
+// runLoopError decides whether g.Wait()'s result is a real failure to
+// propagate from Run, vs expected shutdown fallout. `signalled` is the
+// SIGNAL context's cancellation state — NOT the errgroup-derived ctx,
+// which errgroup cancels before Wait() returns (so it is always cancelled
+// here, and gating on it would always be true — propagating even a clean
+// shutdown's spurious context.Canceled).
+func runLoopError(err error, signalled bool) error {
+	if err != nil && !errors.Is(err, io.EOF) && !signalled {
 		return err
 	}
 	return nil
@@ -504,7 +559,17 @@ func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params 
 	s.pendingServerRequests[*id] = responseChan
 	s.pendingServerRequestsMu.Unlock()
 
-	s.outgoingQueue <- req.Message()
+	// Enqueue with ctx-awareness. Without this, a full outgoingQueue
+	// (writer wedged on a slow / unresponsive client) would block the
+	// caller indefinitely even when ctx is already cancelled.
+	select {
+	case s.outgoingQueue <- req.Message():
+	case <-ctx.Done():
+		s.pendingServerRequestsMu.Lock()
+		delete(s.pendingServerRequests, *id)
+		s.pendingServerRequestsMu.Unlock()
+		return nil, ctx.Err()
+	}
 
 	select {
 	case <-ctx.Done():
@@ -518,6 +583,147 @@ func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params 
 	case resp := <-responseChan:
 		if resp.Error != nil {
 			return nil, fmt.Errorf("request failed: %s", resp.Error.String())
+		}
+		return resp.Result, nil
+	}
+}
+
+// sendRequestWithClientCancel is sendRequest plus a `$/cancelRequest`
+// notification on ctx cancellation. Use it for server→client requests
+// that participate in lint-level cancellation (LSP supersession,
+// per-file ctx). Standard `sendRequest` does NOT notify the client on
+// ctx cancel — its caller only sees the local pending entry get cleared,
+// which is fine for short capability-registration requests but wrong
+// for long-running custom requests where the client should bail too.
+//
+// Behavior on ctx.Done:
+//
+//   - Delete the local pending entry and close the response channel
+//     (same as sendRequest's existing behavior).
+//   - Send a `$/cancelRequest` notification to the client carrying the
+//     same id. The client's vscode-jsonrpc layer then cancels the
+//     handler's CancellationToken, so a well-behaved handler aborts
+//     its work and returns either an error or a partial result.
+//
+// We INTENTIONALLY do not wait for the client's response after sending
+// the cancel. The LSP cancel protocol is fire-and-forget; the client
+// MAY still reply, MAY reply with an error, or MAY drop the request.
+// We surface ctx.Err() to our caller either way — a stale response
+// arriving later finds no pending entry and is silently dropped.
+func (s *Server) sendRequestWithClientCancel(ctx context.Context, method lsproto.Method, params any) (any, error) {
+	id := jsonrpc.NewIDString(fmt.Sprintf("ts%d", s.clientSeq.Add(1)))
+	req := &lsproto.RequestMessage{
+		ID:     id,
+		Method: method,
+		Params: params,
+	}
+
+	responseChan := make(chan *lsproto.ResponseMessage, 1)
+	s.pendingServerRequestsMu.Lock()
+	s.pendingServerRequests[*id] = responseChan
+	s.pendingServerRequestsMu.Unlock()
+
+	// Enqueue to the writer with ctx-awareness. A wedged writer (slow
+	// client, network stall) can fill outgoingQueue (cap 100); without
+	// the ctx case here, an already-cancelled or about-to-be-cancelled
+	// ctx couldn't unblock the caller — the send would wait
+	// indefinitely. We also surface a clean ctx.Err() instead of the
+	// previous "request silently hangs" symptom.
+	select {
+	case s.outgoingQueue <- req.Message():
+	case <-ctx.Done():
+		s.pendingServerRequestsMu.Lock()
+		delete(s.pendingServerRequests, *id)
+		s.pendingServerRequestsMu.Unlock()
+		// No $/cancelRequest sent: the peer never observed our request,
+		// so there's nothing on the client side to cancel.
+		return nil, ctx.Err()
+	}
+
+	select {
+	case <-ctx.Done():
+		// Last-second arrival check: ctx and response can race when a
+		// reply lands at almost the same moment ctx fires. Go's `select`
+		// picks fairly between ready cases — it MAY pick ctx.Done even
+		// when responseChan already has a value. To avoid dropping that
+		// response (and incidentally sending a spurious $/cancelRequest
+		// to the client for a request the client already finished), we
+		// take the pending-map lock to serialize against readerLoop and
+		// then attempt a non-blocking drain of responseChan.
+		//
+		// CRITICAL: drain `responseChan` (the local variable), NOT a
+		// fresh map lookup. readerLoop's three-step sequence under the
+		// same mutex is `respChan <- resp; close(respChan);
+		// delete(map)`. If readerLoop wins the lock first, the map
+		// entry is gone but the buffered value still sits in
+		// responseChan — its memory survives map deletion because we
+		// hold a stack reference. A `map[id]` lookup here would return
+		// the channel zero-value (nil), and a `<-nil` non-blocking
+		// recv silently selects `default:`, dropping the response. The
+		// previous version had exactly that bug and surfaced as ESLint
+		// diagnostic flicker under fast keystroke / debounce supersession.
+		s.pendingServerRequestsMu.Lock()
+		_, stillPending := s.pendingServerRequests[*id]
+		if stillPending {
+			delete(s.pendingServerRequests, *id)
+		}
+		s.pendingServerRequestsMu.Unlock()
+
+		// Case A: response was already delivered while we held nothing.
+		// readerLoop deleted the pending entry → `stillPending` is
+		// false here, but the value is sitting in responseChan
+		// (buffer=1, value persisted from `respChan <- resp`). Drain
+		// it from the local variable.
+		//
+		// Case B: pending entry was still there → readerLoop hasn't
+		// delivered. The non-blocking recv finds an empty channel and
+		// falls through to the cancel-notify path below.
+		select {
+		case resp := <-responseChan:
+			if resp != nil {
+				if resp.Error != nil {
+					return nil, fmt.Errorf("server request %s: %s", method, resp.Error.String())
+				}
+				return resp.Result, nil
+			}
+		default:
+		}
+
+		// No response was available — notify the client to cancel.
+		// `$/cancelRequest` is a JSON-RPC notification (no ID);
+		// vscode-jsonrpc handles cancel-token bookkeeping on the client
+		// side. We tolerate a full outgoing queue: if the writer is
+		// wedged we'd rather return ctx.Err() now than block here. The
+		// client may not see the cancel — at worst it runs the handler
+		// to completion and replies with results we silently drop.
+		//
+		// We always mint string-flavored IDs above (jsonrpc.NewIDString),
+		// so `id.String()` round-trips losslessly into the String arm
+		// of IntegerOrString. If the ID minting ever changes to integer
+		// IDs, CancelParams.Id construction below must change too.
+		idStr := id.String()
+		cancelMsg := (&lsproto.RequestMessage{
+			Method: lsproto.MethodCancelRequest,
+			Params: &lsproto.CancelParams{
+				Id: lsproto.IntegerOrString{String: &idStr},
+			},
+		}).Message()
+		select {
+		case s.outgoingQueue <- cancelMsg:
+		default:
+			// queue full — best-effort drop; client still survives,
+			// we just don't preempt its handler. Logged so a wedged
+			// outgoing path is visible.
+			log.Printf("[rslint] sendRequestWithClientCancel: outgoingQueue full, dropping $/cancelRequest for id=%v", *id)
+		}
+
+		return nil, ctx.Err()
+	case resp := <-responseChan:
+		if resp == nil {
+			return nil, fmt.Errorf("server request %s: response channel closed without value", method)
+		}
+		if resp.Error != nil {
+			return nil, fmt.Errorf("server request %s: %s", method, resp.Error.String())
 		}
 		return resp.Result, nil
 	}

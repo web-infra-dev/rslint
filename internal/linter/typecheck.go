@@ -101,6 +101,7 @@ func runTypeCheckForProgram(prog *compiler.Program, seen *sync.Map, typeInfoFile
 			RuleName:     fmt.Sprintf("TypeScript(TS%d)", d.Code()),
 			Range:        d.Loc(),
 			Message:      rule.RuleMessage{Description: flattenDiagnosticMessage(d)},
+			FilePath:     file.FileName(),
 			SourceFile:   file,
 			Severity:     rule.SeverityError,
 			PreFormatted: true,

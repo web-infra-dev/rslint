@@ -21,6 +21,11 @@
   },
   {
     "type": "file",
+    "name": "eslint-plugin-compat",
+    "label": "ESLint Plugin Compatibility"
+  },
+  {
+    "type": "file",
     "name": "cli",
     "label": "CLI Reference"
   },

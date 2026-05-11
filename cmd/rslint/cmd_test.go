@@ -182,8 +182,17 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 		t.Fatal("Source file not found")
 	}
 
+	// `FilePath` must be set explicitly: this branch changed
+	// `groupDiagsByFile` (cmd.go:482) and the LSP wire format to key
+	// diagnostics by `RuleDiagnostic.FilePath` rather than walking
+	// through `SourceFile.FileName()`. Real lint paths (native
+	// runner, syntax-error, type-check, compat dispatcher) all set
+	// the field; only this test helper was missed, which silently
+	// made every test diagnostic group under the empty-string key
+	// and broke `TestGroupDiagsByFile_MultipleFiles`.
 	diagnostic := rule.RuleDiagnostic{
 		RuleName:   "test-rule",
+		FilePath:   sourceFile.FileName(),
 		SourceFile: sourceFile,
 		Range:      core.NewTextRange(startOffset, endOffset),
 		Message:    rule.RuleMessage{Id: "test", Description: "Test diagnostic"},
@@ -211,7 +220,7 @@ func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePa
 func TestPrintDiagnosticFold(t *testing.T) {
 	// Generate a source file with many lines
 	var sb strings.Builder
-	sb.WriteString("const a = 1;\n")                // line 1
+	sb.WriteString("const a = 1;\n") // line 1
 	for i := 2; i <= 20; i++ {
 		fmt.Fprintf(&sb, "const v%d = %d;\n", i, i) // lines 2-20
 	}
@@ -913,11 +922,11 @@ func TestFormatAllowFileWarning_UnknownKindIsEmpty(t *testing.T) {
 func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 	// No allowFiles → no work, no warnings. Important so callers can rely
 	// on a non-nil result implying actual user-specified files.
-	got := collectAllowFileWarnings(nil, nil, nil, nil, "/work")
+	got := collectAllowFileWarnings(nil, nil, nil, nil, nil, "/work")
 	if got != nil {
 		t.Errorf("empty allowFiles should produce nil, got %+v", got)
 	}
-	got = collectAllowFileWarnings([]string{}, nil, nil, nil, "/work")
+	got = collectAllowFileWarnings([]string{}, nil, nil, nil, nil, "/work")
 	if got != nil {
 		t.Errorf("empty allowFiles (non-nil slice) should still produce nil, got %+v", got)
 	}

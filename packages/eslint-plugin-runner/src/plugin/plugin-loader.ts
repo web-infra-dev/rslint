@@ -31,6 +31,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
+import { selectPluginSource } from '../plugin-source.js';
 
 /**
  * Extension-aware config loader for worker init. Mirrors the strategy
@@ -155,7 +156,6 @@ export class PluginLoaderError extends Error {
 }
 
 /**
- * Load every plugin in `entries` and return them keyed by prefix, with a
  * Import the user's rslint config file directly and extract plugin
  * instances from its `eslintPlugins` (or object-form `plugins`)
  * map(s). Each worker calls this through {@link loadPluginsFromConfigs}
@@ -202,35 +202,18 @@ export async function loadPluginsFromConfigFile(
   // packages/rslint/src/config-loader.ts).
   const seenPrefix = new Set<string>();
 
-  // Source precedence per entry: explicit `eslintPlugins` overrides
-  // the object-form `plugins`. This mirrors `normalizeConfig` in
-  // packages/rslint/src/config-loader.ts — both paths must extract
-  // plugins from the same source, or the worker holds a plugin set
-  // that doesn't match what the main thread (or `loadPluginsFromConfigFile`
-  // alternative) believed was active. The object-form `plugins`
-  // fallback is critical: standard ESLint flat-config users set
-  // `plugins: { uc: unicornPlugin }` and never touch `eslintPlugins`
-  // — without folding, the worker would import zero plugins.
+  // Per-entry plugin source selection is delegated to the shared
+  // `selectPluginSource` (../plugin-source.ts) so the host
+  // (normalizeConfig) and this worker path can't drift in precedence:
+  // both extract from the same source (explicit `eslintPlugins` over
+  // object-form `plugins`). The object-form fallback is what lets
+  // standard ESLint flat-config users (`plugins: { uc: unicornPlugin }`,
+  // never touching `eslintPlugins`) load plugins at all.
   for (const entry of configArray) {
     if (entry == null || typeof entry !== 'object') continue;
-    const e = entry as {
-      eslintPlugins?: unknown;
-      plugins?: unknown;
-    };
-    let source: Record<string, unknown> | null = null;
-    if (
-      e.eslintPlugins != null &&
-      typeof e.eslintPlugins === 'object' &&
-      !Array.isArray(e.eslintPlugins)
-    ) {
-      source = e.eslintPlugins as Record<string, unknown>;
-    } else if (
-      e.plugins != null &&
-      typeof e.plugins === 'object' &&
-      !Array.isArray(e.plugins)
-    ) {
-      source = e.plugins as Record<string, unknown>;
-    }
+    const source = selectPluginSource(
+      entry as { eslintPlugins?: unknown; plugins?: unknown },
+    );
     if (source == null) continue;
     for (const prefix of Object.keys(source)) {
       const pluginObj = source[prefix];

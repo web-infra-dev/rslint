@@ -16,10 +16,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
-// isFileAllowed checks if fileName matches any path in allowFiles.
+// IsFileAllowed checks if fileName matches any path in allowFiles.
 // It first tries fast string equality, then falls back to os.SameFile
 // (using pre-computed FileInfo) to handle symlinks (e.g. /var vs /private/var on macOS).
-func isFileAllowed(fileName string, allowFiles []string, allowFileInfos []os.FileInfo) bool {
+func IsFileAllowed(fileName string, allowFiles []string, allowFileInfos []os.FileInfo) bool {
 	for _, filePath := range allowFiles {
 		if filePath == fileName {
 			return true
@@ -38,10 +38,10 @@ func isFileAllowed(fileName string, allowFiles []string, allowFileInfos []os.Fil
 	return false
 }
 
-// precomputeAllowFileInfos collects os.FileInfo for each allowFile once,
-// so that isFileAllowed can use os.SameFile without repeated os.Stat calls.
+// PrecomputeAllowFileInfos collects os.FileInfo for each allowFile once,
+// so that IsFileAllowed can use os.SameFile without repeated os.Stat calls.
 // Files that do not exist are silently skipped.
-func precomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
+func PrecomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
 	infos := make([]os.FileInfo, 0, len(allowFiles))
 	for _, f := range allowFiles {
 		if info, err := os.Stat(f); err == nil {
@@ -51,11 +51,14 @@ func precomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
 	return infos
 }
 
-// isDirAllowed checks if fileName is inside any directory in allowDirs.
+// IsDirAllowed checks if fileName is inside any directory in allowDirs.
 // Uses tspath.StartsWithDirectory to correctly handle src/ vs src-other/.
-func isDirAllowed(fileName string, allowDirs []string) bool {
+// caseSensitive is the filesystem's case sensitivity — callers pass
+// fsys.UseCaseSensitiveFileNames(); the in-Program RunLinter path passes
+// true to preserve its prior behavior.
+func IsDirAllowed(fileName string, allowDirs []string, caseSensitive bool) bool {
 	for _, dirPath := range allowDirs {
-		if tspath.StartsWithDirectory(fileName, dirPath, true) {
+		if tspath.StartsWithDirectory(fileName, dirPath, caseSensitive) {
 			return true
 		}
 	}
@@ -75,29 +78,71 @@ type runProgramOptions struct {
 	// out by GetRulesForFile, this just guards rules with optional
 	// TypeChecker usage. nil = no gap-file distinction.
 	TypeInfoFiles map[string]struct{}
-	OnDiagnostic DiagnosticHandler
+	OnDiagnostic  DiagnosticHandler
+
+	// CompatRuleDispatcher is the eslint-plugin hook (see RunLinterOptions doc).
+	// When non-nil, runLintRulesInProgram will collect compat rules per file,
+	// invoke this dispatcher with one batch per program, and stream the
+	// resulting diagnostics into OnDiagnostic alongside native ones.
+	CompatRuleDispatcher CompatBatchHandler
+	// SendCompatFileText ships each file's overlay text in the compat batch
+	// (CompatLintFile.Text) instead of the worker re-reading disk — see
+	// RunLinterOptions.SendCompatFileText (#3).
+	SendCompatFileText bool
+	// CollectFixes controls whether the runner materialises plugin
+	// `descriptor.fix(fixer)` into per-diagnostic fixes. See
+	// RunLinterOptions.CollectFixes for full semantics.
+	CollectFixes bool
+	// SuggestionsMode is "off" or "eager"; controls whether the runner
+	// invokes plugin `descriptor.suggest[i].fix(fixer)` to materialize
+	// suggestion text/fixes (off skips the work, eager runs it).
+	SuggestionsMode string
+
+	// Ctx propagated from RunLinterOptions.Ctx. nil = uncancellable.
+	Ctx context.Context
 }
 
 // runLintRulesInProgram lints files in a single Program. Files are filtered
 // through ExcludePaths, Scope (Files+Dirs), and FileFilter before rule
 // execution. Pass FileFilter=nil to disable that layer.
 //
+// Returns the lintedFileCount and a "compat dispatch failed" flag. The
+// flag is true when the program had compat rules to dispatch and the
+// dispatcher returned an error — callers aggregate this to surface a
+// runner-failure exit code.
+//
 // This is the post-refactor internal implementation behind both RunLinter and
 // LintSingleFile. It does NOT run type-check — type-check is a program-level
 // concern handled by RunLinter directly.
-func runLintRulesInProgram(opts runProgramOptions) int32 {
+func runLintRulesInProgram(opts runProgramOptions) (lintedFileCount int32, compatDispatchFailed bool) {
 	if opts.OnDiagnostic == nil {
 		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
 	}
 	getRulesForFile := opts.GetRulesForFile
 	if getRulesForFile == nil {
-		return 0
+		return 0, false
+	}
+
+	// ctxCancelled is consulted at the top of each file iteration below;
+	// pulling it out here avoids the per-file Done() channel allocation
+	// when no Ctx was supplied.
+	ctxCancelled := func() bool { return false }
+	if opts.Ctx != nil {
+		ctxDone := opts.Ctx.Done()
+		ctxCancelled = func() bool {
+			select {
+			case <-ctxDone:
+				return true
+			default:
+				return false
+			}
+		}
 	}
 
 	// Pre-compute FileInfo for Scope.Files once to avoid N×M stat calls in the loop.
 	var allowFileInfos []os.FileInfo
 	if opts.Scope.Files != nil {
-		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
+		allowFileInfos = PrecomputeAllowFileInfos(opts.Scope.Files)
 	}
 
 	// Collect files to lint (applying all filters).
@@ -118,8 +163,8 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		}
 		// Filter by Scope.Files / Scope.Dirs (OR logic: match either one).
 		if opts.Scope.Files != nil || opts.Scope.Dirs != nil {
-			fileAllowed := opts.Scope.Files != nil && isFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
-			dirAllowed := opts.Scope.Dirs != nil && isDirAllowed(file.FileName(), opts.Scope.Dirs)
+			fileAllowed := opts.Scope.Files != nil && IsFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
+			dirAllowed := opts.Scope.Dirs != nil && IsDirAllowed(file.FileName(), opts.Scope.Dirs, true)
 			if !fileAllowed && !dirAllowed {
 				continue
 			}
@@ -131,30 +176,91 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		filesToLint = append(filesToLint, file)
 	}
 
-	lintedFileCount := int32(len(filesToLint))
+	lintedFileCount = int32(len(filesToLint))
 
 	// Early-out: if every file in this program was filtered, do not pay the
 	// cost of acquiring a TypeChecker (which forces program binding and is
 	// non-trivial when the checker hasn't been created yet).
 	if lintedFileCount == 0 {
-		return 0
+		return 0, false
 	}
 
 	// Run lint rules. Acquires a checker from the pool for type-aware rules.
 	checker, done := opts.Program.GetTypeChecker(context.Background())
+
+	// ── eslint-plugin compat-rule plumbing ─────────────────────────
+	// Collected during the per-file native loop, dispatched at the end
+	// of this program (one batch per rule-config-signature bucket — see
+	// groupCompatByRuleSig).
+	var compatPerFile []CompatFileEntry
+
 	for _, file := range filesToLint {
+		// Cancellation poll at the file boundary. The user-visible
+		// promise is "SIGINT exits within one file's rule traversal";
+		// we don't try to interrupt mid-AST-walk because that requires
+		// threading the ctx through every rule's listener (huge surface).
+		if ctxCancelled() {
+			break
+		}
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
+		filePath := file.FileName()
 
 		rules := getRulesForFile(file)
 		if len(rules) == 0 {
 			continue
 		}
 
-		comments := make([]*ast.CommentRange, 0)
-		utils.ForEachComment(&file.Node, func(comment *ast.CommentRange) { comments = append(comments, comment) }, file)
+		// Pre-scan rules: separate native vs compat. Compat rules have a
+		// placeholder Run (returns nil); skipping their Run() avoids a
+		// no-op call per rule per file. Their dispatch happens after the
+		// native loop completes for the program.
+		var nativeRules []ConfiguredRule
+		var compatRules []ConfiguredRule
+		for _, r := range rules {
+			if r.IsEslintPluginRule {
+				compatRules = append(compatRules, r)
+			} else {
+				nativeRules = append(nativeRules, r)
+			}
+		}
 
-		// Create disable manager for this file
-		disableManager := rule.NewDisableManager(file, comments)
+		// Build disable manager only when native rules need it. The
+		// compat worker (packages/eslint-plugin-runner) runs its
+		// own `applyDisableDirectives` (see apply-disable-directives.ts)
+		// over the same source it parses, so Go side doesn't need to
+		// re-derive comment positions for the compat path. Empirically
+		// (cpuprof on the vscode bench) this saves ~9.6s wall on
+		// compat-only configurations — the unconditional ForEachComment
+		// + DisableManager build had 0 effect on output for those configs
+		// (no `eslint-disable tse-js/*` directives in the source).
+		var disableManager *rule.DisableManager
+		if len(nativeRules) > 0 {
+			comments := make([]*ast.CommentRange, 0)
+			utils.ForEachComment(&file.Node, func(comment *ast.CommentRange) { comments = append(comments, comment) }, file)
+			disableManager = rule.NewDisableManager(file, comments)
+		}
+
+		if len(compatRules) > 0 && opts.CompatRuleDispatcher != nil {
+			// Project compat rules into the per-file maps (shared with the
+			// CLI ingest path). ok is guaranteed by the enclosing
+			// len(compatRules) > 0 guard.
+			ruleMap, sevMap, langOpts, settings, configKey, _ :=
+				CompatRuleMaps(compatRules)
+			compatPerFile = append(compatPerFile, CompatFileEntry{
+				Path:            filePath,
+				Text:            file.Text(),
+				SourceFile:      file,
+				Rules:           ruleMap,
+				Severity:        sevMap,
+				LanguageOptions: langOpts,
+				Settings:        settings,
+				ConfigKey:       configKey,
+			})
+		}
+
+		// Replace the rules slice with native-only for the listener registration
+		// phase below.
+		rules = nativeRules
 
 		// For gap files (not in caller's TypeInfoFiles), pass nil TypeChecker
 		// as defense-in-depth. Type-aware rules are already filtered out by
@@ -182,6 +288,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						RuleName:   r.Name,
 						Range:      textRange,
 						Message:    msg,
+						FilePath:   filePath,
 						SourceFile: file,
 						Severity:   r.Severity,
 					})
@@ -195,6 +302,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:      textRange,
 						Message:    msg,
 						FixesPtr:   &fixes,
+						FilePath:   filePath,
 						SourceFile: file,
 						Severity:   r.Severity,
 					})
@@ -208,6 +316,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:       textRange,
 						Message:     msg,
 						Suggestions: &suggestions,
+						FilePath:    filePath,
 						SourceFile:  file,
 						Severity:    r.Severity,
 					})
@@ -221,6 +330,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						RuleName:   r.Name,
 						Range:      trimmedRange,
 						Message:    msg,
+						FilePath:   filePath,
 						SourceFile: file,
 						Severity:   r.Severity,
 					})
@@ -235,6 +345,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:      trimmedRange,
 						Message:    msg,
 						FixesPtr:   &fixes,
+						FilePath:   filePath,
 						SourceFile: file,
 						Severity:   r.Severity,
 					})
@@ -249,6 +360,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:       trimmedRange,
 						Message:     msg,
 						Suggestions: &suggestions,
+						FilePath:    filePath,
 						SourceFile:  file,
 						Severity:    r.Severity,
 					})
@@ -264,6 +376,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:     msg,
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
+						FilePath:    filePath,
 						SourceFile:  file,
 						Severity:    r.Severity,
 					})
@@ -278,6 +391,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:     msg,
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
+						FilePath:    filePath,
 						SourceFile:  file,
 						Severity:    r.Severity,
 					})
@@ -366,12 +480,50 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 
 			return false
 		}
-		file.Node.ForEachChild(childVisitor)
+		// Only walk the AST when native rules registered listeners.
+		// Compat-only files have an empty listener set (compat rules
+		// dispatch separately, after this loop), so the walk would visit
+		// every node for zero effect — skip it.
+		if len(nativeRules) > 0 {
+			file.Node.ForEachChild(childVisitor)
+		}
 		clear(registeredListeners)
 	}
 	done()
 
-	return lintedFileCount
+	// ── eslint-plugin compat dispatch ─────────────────────────────
+	// All native rules have completed for this program. Now hand off
+	// to the compat dispatcher.
+	//
+	// Files in the same Program can have DIFFERENT effective rule
+	// configurations: (1) multi-config monorepo where a shared tsconfig
+	// includes files from multiple configs, (2) a single config that
+	// uses ESLint's `overrides` mechanism to vary rules per file.
+	// Pre-fix we built one batch with a single `unionRules` map keyed
+	// by rule name — last-file-wins overwrote per-file options, so
+	// every file in such a Program was linted with the LAST file's
+	// options. Bucket by (rule-options + severity) signature so each
+	// emitted batch is homogeneous; the typical single-config case
+	// still emits one batch (one bucket).
+	if len(compatPerFile) > 0 && opts.CompatRuleDispatcher != nil {
+		// Delegate to the shared compat dispatch entry — same code path
+		// the cmd-side compat-only fast path uses. See compat_runner.go
+		// for bucketing / batching / diagnostic shaping.
+		subRes, _ := DispatchCompat(DispatchCompatOptions{
+			Files:           compatPerFile,
+			Dispatcher:      opts.CompatRuleDispatcher,
+			OnDiagnostic:    opts.OnDiagnostic,
+			CollectFixes:    opts.CollectFixes,
+			SuggestionsMode: opts.SuggestionsMode,
+			Ctx:             opts.Ctx,
+			IncludeFileText: opts.SendCompatFileText,
+		})
+		if subRes != nil && subRes.CompatDispatchErrors > 0 {
+			compatDispatchFailed = true
+		}
+	}
+
+	return lintedFileCount, compatDispatchFailed
 }
 
 // RunLinter runs all configured lint rules across the given programs in
@@ -405,6 +557,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 
 	var executedRules sync.Map
 	var lintedFileCount atomic.Int32
+	var compatDispatchErrors atomic.Int32
 
 	// Phase 1: lint rules per program (parallel). Skipped when no rule
 	// handler was supplied — see doc above.
@@ -428,24 +581,36 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			filter := composeOwnedFilter(perProgramFilter, ownedFiles)
 
 			programOpts := runProgramOptions{
-				Program:         program,
-				Scope:           opts.Scope,
-				ExcludePaths:    opts.ExcludePaths,
-				FileFilter:      filter,
-				GetRulesForFile: trackedGetRules,
-				TypeInfoFiles:   opts.TypeInfoFiles,
-				OnDiagnostic:    opts.OnDiagnostic,
+				Program:              program,
+				Scope:                opts.Scope,
+				ExcludePaths:         opts.ExcludePaths,
+				FileFilter:           filter,
+				GetRulesForFile:      trackedGetRules,
+				TypeInfoFiles:        opts.TypeInfoFiles,
+				OnDiagnostic:         opts.OnDiagnostic,
+				CompatRuleDispatcher: opts.CompatRuleDispatcher,
+				SendCompatFileText:   opts.SendCompatFileText,
+				CollectFixes:         opts.CollectFixes,
+				SuggestionsMode:      opts.SuggestionsMode,
+				Ctx:                  opts.Ctx,
 			}
 			wg.Queue(func() {
-				n := runLintRulesInProgram(programOpts)
+				n, dispatchFailed := runLintRulesInProgram(programOpts)
 				lintedFileCount.Add(n)
+				if dispatchFailed {
+					compatDispatchErrors.Add(1)
+				}
 			})
 		}
 		wg.RunAndWait()
 	}
 
-	// Phase 2: program-level type-check (tsc-aligned).
-	if opts.TypeCheck {
+	// Phase 2: program-level type-check (tsc-aligned). Skip when the
+	// lint-level ctx has been cancelled — type-check is expensive and
+	// not currently ctx-aware itself, so without this gate a SIGINT
+	// during Phase 1 leaves the user waiting for full type-check
+	// completion (typically seconds, can be minutes on big projects).
+	if opts.TypeCheck && (opts.Ctx == nil || opts.Ctx.Err() == nil) {
 		runTypeCheckAcrossPrograms(typeCheckRequest{
 			Programs:       opts.Programs,
 			Skip:           opts.SkipTypeCheckPrograms,
@@ -455,10 +620,18 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		})
 	}
 
-	return &LintResult{
-		LintedFileCount: lintedFileCount.Load(),
-		ExecutedRules:   collectMapKeys(&executedRules),
-	}, nil
+	result := &LintResult{
+		LintedFileCount:      lintedFileCount.Load(),
+		ExecutedRules:        collectMapKeys(&executedRules),
+		CompatDispatchErrors: compatDispatchErrors.Load(),
+	}
+	// Surface cancellation to the caller. Diagnostics that were already
+	// streamed via OnDiagnostic stay; partial-result + ctx.Err() lets
+	// callers distinguish "incomplete" from "complete with zero files".
+	if opts.Ctx != nil && opts.Ctx.Err() != nil {
+		return result, opts.Ctx.Err()
+	}
+	return result, nil
 }
 
 // LintSingleFile runs lint rules against a single file in a single program.
@@ -471,11 +644,18 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
 	}
 	runLintRulesInProgram(runProgramOptions{
-		Program:         opts.Program,
-		Scope:           FileScope{Files: []string{opts.File}},
-		ExcludePaths:    opts.ExcludePaths,
-		GetRulesForFile: opts.GetRulesForFile,
-		OnDiagnostic:    opts.OnDiagnostic,
+		Program:              opts.Program,
+		Scope:                FileScope{Files: []string{opts.File}},
+		ExcludePaths:         opts.ExcludePaths,
+		GetRulesForFile:      opts.GetRulesForFile,
+		OnDiagnostic:         opts.OnDiagnostic,
+		CompatRuleDispatcher: opts.CompatRuleDispatcher,
+		// LintSingleFile is the IDE/LSP single-file path — always an editor
+		// buffer that may be unsaved, so ship its text (#3).
+		SendCompatFileText: true,
+		CollectFixes:       opts.CollectFixes,
+		SuggestionsMode:    opts.SuggestionsMode,
+		Ctx:                opts.Ctx,
 	})
 }
 

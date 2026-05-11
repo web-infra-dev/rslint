@@ -14,6 +14,11 @@ export function parseArgs(argv: string[]) {
     options: {
       config: { type: 'string' },
       init: { type: 'boolean' },
+      // Parsed so the Node entry can skip config discovery for `--help`/`-h`
+      // (a broken rslint.config.* must not block usage output). NOT added to
+      // the continue-list below, so it is still forwarded to Go, which prints
+      // the actual usage text.
+      help: { type: 'boolean', short: 'h' },
       // Register known Go string-valued flags so their values are not
       // mistaken for positional file/dir arguments.
       format: { type: 'string' },
@@ -72,6 +77,8 @@ export function parseArgs(argv: string[]) {
     config: (values.config as string) ?? null,
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     init: (values.init as boolean) ?? false,
+    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    help: (values.help as boolean) ?? false,
     rest,
     positionals,
   };

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -32,14 +33,115 @@ type ConfigEntry struct {
 	Rules           Rules            `json:"rules"`
 	Plugins         []string         `json:"plugins,omitempty"`
 	Settings        Settings         `json:"settings,omitempty"`
+	// EslintPlugins carries user-supplied ESLint-compat plugin entries.
+	// Orthogonal to Plugins (which gates native rules by name only).
+	// Each entry's Prefix becomes the rule namespace ("uc/no-null"); the
+	// runner imports the plugin from ResolvedPath at lint time.
+	// Populated Node-side from the JS config's `eslintPlugins: { ns: pluginObj }`.
+	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
 }
 
 // Settings represents shared settings accessible to rules
 type Settings map[string]interface{}
 
-// LanguageOptions contains language-specific configuration options
+// LanguageOptions contains language-specific configuration options.
+//
+// Architecture (typed-native + opaque-compat):
+//
+//   - `ParserOptions.Project` / `ParserOptions.ProjectService` are typed
+//     because Go internals read them directly (ts-go Program creation,
+//     tsconfig discovery).
+//   - Every OTHER `languageOptions.*` field — `globals`, `parser`, future
+//     ESLint flat-config additions — flows through `Compat` opaquely.
+//     Go never introspects this map; the field-merge semantics fall out
+//     of generic JSON deep-merge (object keys later-win at each path);
+//     the worker decodes the fields it consumes (globals → scope-manager,
+//     parserOptions.ecmaVersion → oxc-parser, etc.).
+//
+// This decouples the wire / runner contract from Go-side knowledge of
+// individual ESLint compat fields. New flat-config fields land in the
+// runner alongside the TS type signature; Go needs ZERO changes.
 type LanguageOptions struct {
-	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+	// Typed: native consumers read this struct directly.
+	ParserOptions *ParserOptions `json:"-"`
+
+	// Opaque: all non-`parserOptions` top-level fields the user wrote.
+	// Generic deep-merged across config entries; forwarded to the worker
+	// as part of the wire payload. Never introspected by Go.
+	Compat map[string]any `json:"-"`
+}
+
+// UnmarshalJSON splits the incoming user JSON into the typed
+// `ParserOptions` (when present) and the rest into `Compat`. Custom
+// because the standard struct decoder would silently drop any field
+// outside the typed set — which is the whole opacity-loss problem
+// we're avoiding here.
+func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if po, ok := raw["parserOptions"]; ok {
+		delete(raw, "parserOptions")
+		lo.ParserOptions = &ParserOptions{}
+		if err := json.Unmarshal(po, lo.ParserOptions); err != nil {
+			return err
+		}
+	}
+	if len(raw) > 0 {
+		lo.Compat = make(map[string]any, len(raw))
+		for k, v := range raw {
+			var val any
+			if err := json.Unmarshal(v, &val); err != nil {
+				return err
+			}
+			lo.Compat[k] = val
+		}
+	}
+	return nil
+}
+
+// MarshalJSON inverts UnmarshalJSON: emits a flat object that mirrors
+// what the user originally wrote, so downstream JSON consumers (wire,
+// `config_init` formatting, debug printing) see a single canonical shape.
+func (lo LanguageOptions) MarshalJSON() ([]byte, error) {
+	out := make(map[string]any, len(lo.Compat)+1)
+	for k, v := range lo.Compat {
+		out[k] = v
+	}
+	if lo.ParserOptions != nil {
+		out["parserOptions"] = lo.ParserOptions
+	}
+	return json.Marshal(out)
+}
+
+// ToCompatWire serializes LanguageOptions into the flat shape the
+// runner consumes — EXCLUDING the native-only fields
+// (`parserOptions.project`, `parserOptions.projectService`) which the
+// worker has no business seeing. The result is the exact `map[string]any`
+// that lands in `linter.CompatLintFile.LanguageOptions`.
+//
+// Returns nil when nothing compat-relevant is present, so JSON
+// omitempty on the wire field actually drops it.
+func (lo *LanguageOptions) ToCompatWire() map[string]any {
+	if lo == nil {
+		return nil
+	}
+	out := make(map[string]any, len(lo.Compat)+1)
+	for k, v := range lo.Compat {
+		out[k] = v
+	}
+	if lo.ParserOptions != nil && len(lo.ParserOptions.Compat) > 0 {
+		nested := make(map[string]any, len(lo.ParserOptions.Compat))
+		for k, v := range lo.ParserOptions.Compat {
+			nested[k] = v
+		}
+		out["parserOptions"] = nested
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // ProjectPaths represents project paths that can be either a single string or an array of strings
@@ -64,10 +166,77 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 }
 
 // ParserOptions contains parser-specific configuration.
-// ProjectService uses *bool to distinguish "not set" (nil) from "explicitly false".
+//
+// Typed fields (`Project` / `ProjectService`) drive ts-go's Program
+// creation and tsconfig discovery — Go reads them directly.
+//
+// `Compat` captures every other parserOptions field the user wrote
+// (`ecmaVersion`, `sourceType`, `ecmaFeatures`, `parser`, future flat-
+// config additions). Generic deep-merged across config entries; opaque
+// to Go. The worker decodes the fields it consumes when shaping the
+// LintTask request.
 type ParserOptions struct {
-	ProjectService *bool        `json:"projectService,omitempty"`
-	Project        ProjectPaths `json:"project,omitempty"`
+	ProjectService *bool        `json:"-"`
+	Project        ProjectPaths `json:"-"`
+
+	// Opaque: all non-`project` / non-`projectService` parserOptions
+	// fields. Forwarded to the runner; never read by Go.
+	Compat map[string]any `json:"-"`
+}
+
+// UnmarshalJSON extracts the typed fields (`project`, `projectService`)
+// from the user's parserOptions blob and stashes everything else in
+// `Compat`. Same rationale as `LanguageOptions.UnmarshalJSON`: a plain
+// struct decode would silently drop unknown fields.
+func (po *ParserOptions) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	if v, ok := raw["projectService"]; ok {
+		delete(raw, "projectService")
+		var b bool
+		if err := json.Unmarshal(v, &b); err != nil {
+			return fmt.Errorf("parserOptions.projectService: %w", err)
+		}
+		po.ProjectService = &b
+	}
+	if v, ok := raw["project"]; ok {
+		delete(raw, "project")
+		if err := json.Unmarshal(v, &po.Project); err != nil {
+			return fmt.Errorf("parserOptions.project: %w", err)
+		}
+	}
+	if len(raw) > 0 {
+		po.Compat = make(map[string]any, len(raw))
+		for k, v := range raw {
+			var val any
+			if err := json.Unmarshal(v, &val); err != nil {
+				return err
+			}
+			po.Compat[k] = val
+		}
+	}
+	return nil
+}
+
+// MarshalJSON emits the flat shape that mirrors what the user wrote —
+// typed fields ride alongside Compat. Used for debug printing and any
+// internal callers that re-serialize the struct (config_init's
+// formatter, etc.); the WIRE shape goes through ToCompatWire above and
+// intentionally excludes the typed native fields.
+func (po ParserOptions) MarshalJSON() ([]byte, error) {
+	out := make(map[string]any, len(po.Compat)+2)
+	for k, v := range po.Compat {
+		out[k] = v
+	}
+	if po.ProjectService != nil {
+		out["projectService"] = *po.ProjectService
+	}
+	if len(po.Project) > 0 {
+		out["project"] = po.Project
+	}
+	return json.Marshal(out)
 }
 
 // BoolPtr returns a pointer to the given bool value.
@@ -225,14 +394,14 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 	// Remaining elements are rule options — pass them through to the rule's
 	// option parser which knows how to interpret its own format.
 	if len(ruleArray) > 1 {
-		remaining := ruleArray[1:]
-		if len(remaining) == 1 {
-			// Single option element: pass directly (string, map, etc.)
-			ruleConfig.Options = remaining[0]
-		} else {
-			// Multiple option elements: pass as array (e.g. ["both", {blockScopedFunctions: "disallow"}])
-			ruleConfig.Options = remaining
-		}
+		// Store the FULL positional options array — ESLint's
+		// `context.options` shape. Do NOT unwrap a single element here:
+		// a single ARRAY-valued option (`['error', ['a', 'b']]`) would be
+		// mangled into the options list, so the compat layer's
+		// context.options came out as `['a','b']` instead of `[['a','b']]`.
+		// The native path unwraps a lone option itself (rule_registry's
+		// nativeRuleOptions) to preserve its legacy single-value shape.
+		ruleConfig.Options = ruleArray[1:]
 	}
 
 	return ruleConfig
@@ -463,6 +632,16 @@ type MergedConfig struct {
 	Settings        Settings
 	LanguageOptions *LanguageOptions
 	Plugins         map[string]struct{}
+	// EslintPlugins is the per-file union of every matching ConfigEntry's
+	// EslintPlugins, in the order matching entries appeared. The Node side
+	// has already done any plugin-level merging / validation before
+	// sending entries over IPC, so Go neither coalesces nor deduplicates
+	// here — the same prefix may appear twice when two configs share a
+	// prefix at different resolvedPaths, which is intentional for
+	// monorepo multi-version setups (per-file dispatch picks the right
+	// plugin instance using the file's ConfigKey).
+	// Nil when no matching entry contributed eslintPlugins.
+	EslintPlugins []EslintPluginEntry
 }
 
 // IsFileIgnored reports whether filePath is excluded by the config's global
@@ -570,6 +749,16 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 
 		// 7. LanguageOptions: deep merge
 		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
+
+		// 8. EslintPlugins: append across matching entries. The Node side
+		//    coalesces per-prefix rule names across configs in
+		//    `cli.ts::runViaEngine` before sending entries over IPC, so
+		//    Go just unions them here. Same prefix appearing twice is OK
+		//    — the placeholder rule registry deduplicates by full rule
+		//    name, and the runner uses ConfigKey, not prefix, for dispatch.
+		if len(entry.EslintPlugins) > 0 {
+			merged.EslintPlugins = append(merged.EslintPlugins, entry.EslintPlugins...)
+		}
 	}
 
 	// No entry matched this file — do not lint it
@@ -586,6 +775,7 @@ func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 	return len(entry.Files) == 0 &&
 		len(entry.Rules) == 0 &&
 		len(entry.Plugins) == 0 &&
+		len(entry.EslintPlugins) == 0 &&
 		entry.Settings == nil &&
 		entry.LanguageOptions == nil &&
 		len(entry.Ignores) > 0
@@ -621,7 +811,24 @@ func isFileMatched(filePath string, patterns []string, cwd string) bool {
 	return false
 }
 
-// mergeLanguageOptions deep-merges two LanguageOptions, with override taking precedence
+// mergeLanguageOptions merges two LanguageOptions, with `override`
+// winning on conflict. The merge has two halves:
+//
+//   - Typed native fields (`Project`, `ProjectService`): replaced
+//     per-field. `override`'s non-empty value wins; empty
+//     value leaves base intact (matches v9 flat-config semantics where
+//     later entries only override what they explicitly declare).
+//   - Opaque compat blob (`Compat`): generic JSON deep-merge —
+//     objects merge their keys recursively, scalars / arrays / type
+//     mismatches use later-wins replace. This matches ESLint's own
+//     `languageOptions` merge for every field family currently in the
+//     flat-config spec (`globals`, `parserOptions.ecmaVersion`,
+//     `parserOptions.ecmaFeatures.*`, etc.) without Go having to know
+//     each field's individual semantics.
+//
+// The Compat side is the load-bearing piece: new ESLint compat fields
+// (parser, allowImportExportEverywhere, ...) flow through without ANY
+// Go change because they land in the same opaque map.
 func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 	if override == nil {
 		return base
@@ -629,22 +836,95 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 	if base == nil {
 		return override
 	}
-	merged := *base
-	if override.ParserOptions != nil {
-		if merged.ParserOptions == nil {
-			merged.ParserOptions = override.ParserOptions
-		} else {
-			po := *merged.ParserOptions
-			if override.ParserOptions.ProjectService != nil {
-				po.ProjectService = override.ParserOptions.ProjectService
-			}
-			if len(override.ParserOptions.Project) > 0 {
-				po.Project = override.ParserOptions.Project
-			}
-			merged.ParserOptions = &po
-		}
+	merged := &LanguageOptions{
+		ParserOptions: mergeParserOptions(base.ParserOptions, override.ParserOptions),
+		Compat:        deepMergeMap(base.Compat, override.Compat),
 	}
-	return &merged
+	return merged
+}
+
+// mergeParserOptions does the same typed+opaque split for the nested
+// `parserOptions` block. Typed fields (`Project`, `ProjectService`)
+// are per-field overrides; everything else flows through `Compat` via
+// generic deep-merge.
+func mergeParserOptions(base, override *ParserOptions) *ParserOptions {
+	if override == nil {
+		return base
+	}
+	if base == nil {
+		return override
+	}
+	merged := &ParserOptions{
+		ProjectService: base.ProjectService,
+		Project:        base.Project,
+		Compat:         deepMergeMap(base.Compat, override.Compat),
+	}
+	if override.ProjectService != nil {
+		merged.ProjectService = override.ProjectService
+	}
+	if len(override.Project) > 0 {
+		merged.Project = override.Project
+	}
+	return merged
+}
+
+// deepMergeMap is a generic JSON-shaped deep-merge: object values at
+// the same path get merged recursively; everything else (scalars,
+// arrays, type mismatches) uses later-wins replace. The input maps are
+// never mutated — the result is a freshly allocated copy.
+//
+// This is the canonical merge for opaque ESLint-compat config blobs.
+// The semantics happen to match ESLint v9's own
+// `lib/config/flat-config-helpers.js` mergeOption logic for every
+// `languageOptions.*` field family in the current flat-config spec:
+//
+//   - `globals` (map) — object keys merge, later-wins per-key.
+//   - `parserOptions.ecmaVersion` (scalar) — same key, later-wins.
+//   - `parserOptions.sourceType` (scalar) — same.
+//   - `parserOptions.ecmaFeatures` (map) — keys merge, later-wins.
+//   - `parserOptions.parser` (object|string) — later-wins replace.
+//
+// Future ESLint additions that introduce array semantics here would
+// need special-cased rules; we'd carve a typed exception OR replicate
+// the field via TS-side merge before sending to Go. For now, the spec
+// has no such case.
+func deepMergeMap(base, override map[string]any) map[string]any {
+	if override == nil {
+		return cloneAnyMap(base)
+	}
+	if base == nil {
+		return cloneAnyMap(override)
+	}
+	out := make(map[string]any, len(base)+len(override))
+	for k, v := range base {
+		out[k] = v
+	}
+	for k, ov := range override {
+		if bv, exists := out[k]; exists {
+			if bm, ok1 := bv.(map[string]any); ok1 {
+				if om, ok2 := ov.(map[string]any); ok2 {
+					out[k] = deepMergeMap(bm, om)
+					continue
+				}
+			}
+		}
+		out[k] = ov
+	}
+	return out
+}
+
+// cloneAnyMap returns a shallow copy of m (never mutating the input).
+// Nested objects keep their original references — deepMergeMap reads
+// them but never mutates, so sharing is safe.
+func cloneAnyMap(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	out := make(map[string]any, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // RulePluginPrefix extracts the plugin prefix from a rule name.

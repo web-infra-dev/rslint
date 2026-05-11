@@ -71,7 +71,7 @@ func fingerprint(d rule.RuleDiagnostic) diagFingerprint {
 	if d.SourceFile != nil {
 		// 0-based from typescript-go → +1 to match user-visible line/col
 		line, char := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, d.Range.Pos())
-		fp.suffix = d.SourceFile.FileName()
+		fp.suffix = d.FilePath
 		fp.line = line + 1
 		fp.col = int(char) + 1
 	}
@@ -101,7 +101,7 @@ func assertOneDiag(t *testing.T, diags []rule.RuleDiagnostic, code, fileSuffix s
 func assertNoDiagInFile(t *testing.T, diags []rule.RuleDiagnostic, fileSuffix string) {
 	t.Helper()
 	for _, d := range diags {
-		if d.SourceFile != nil && strings.HasSuffix(d.SourceFile.FileName(), fileSuffix) {
+		if d.SourceFile != nil && strings.HasSuffix(d.FilePath, fileSuffix) {
 			t.Errorf("expected no diagnostic in %s, got %s at line %d. all diags: %s",
 				fileSuffix, d.RuleName, fingerprint(d).line, dumpDiags(diags))
 		}
@@ -305,8 +305,8 @@ export type T = typeof M;
 
 // Inverse control: BOTH programs skipLibCheck:true → ZERO TS2307 reported.
 // Together with the previous test this proves:
-//   1. the d.ts genuinely has the error (program A in the previous test reported it),
-//   2. when ALL programs containing it have skipLibCheck:true, none reports.
+//  1. the d.ts genuinely has the error (program A in the previous test reported it),
+//  2. when ALL programs containing it have skipLibCheck:true, none reports.
 func TestMatrix_MultiProgram_BothSkipLibCheck_NoDtsErrors(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -490,6 +490,7 @@ func TestMatrix_TypeInfoFiles_GateActsAsBackstopForGapFiles(t *testing.T) {
 // Same source loaded by two programs with different strictness:
 //   - strict program reports TS7006 (param `x` implicitly any) at col 21
 //   - loose program reports nothing
+//
 // Across both, exactly 1 TS7006 should reach the consumer. Asserts the
 // dedup keeps strict's report and that the loose program's silence does
 // not override it.
@@ -671,7 +672,7 @@ func TestMatrix_NoEmitSemantics_SyntacticErrorStillShortCircuits(t *testing.T) {
 	// or similar) must be reported.
 	hasSyntactic := false
 	for _, d := range diags {
-		if strings.HasPrefix(d.RuleName, "TypeScript(TS1") && strings.HasSuffix(d.SourceFile.FileName(), "a.ts") {
+		if strings.HasPrefix(d.RuleName, "TypeScript(TS1") && strings.HasSuffix(d.FilePath, "a.ts") {
 			hasSyntactic = true
 			break
 		}

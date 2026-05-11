@@ -142,6 +142,84 @@ func TestGetEnabledRules_EnforcePlugins_AllowsDeclaredPlugin(t *testing.T) {
 	}
 }
 
+// Regression for the silently-filtered-eslintPlugins bug. Users who
+// follow the documented minimal example —
+//
+//	eslintPlugins: { uc: unicornPlugin },
+//	rules: { 'uc/no-null': 'error' }
+//
+// — without also writing plugins: ['uc'] previously had the rule
+// dropped by the enforcePlugins gate. The fix accepts prefixes
+// declared in either `plugins` (string form) OR `eslintPlugins`
+// (object form); this test pins that contract.
+func TestGetEnabledRules_EnforcePlugins_EslintPluginsOnly(t *testing.T) {
+	RegisterAllRules()
+	// Register a placeholder eslint-plugin rule so the registry exposes
+	// it under the prefixed name; without registration the rule wouldn't
+	// be enabled even with the gate fixed.
+	RegisterEslintPluginRules([]EslintPluginEntry{{
+		Prefix:    "uc",
+		Specifier: "eslint-plugin-unicorn",
+		RuleNames: []string{"no-null"},
+	}})
+
+	// JS config: declared ONLY via eslintPlugins, no string-form plugins.
+	config := RslintConfig{
+		{
+			EslintPlugins: []EslintPluginEntry{{
+				Prefix:    "uc",
+				Specifier: "eslint-plugin-unicorn",
+				RuleNames: []string{"no-null"},
+			}},
+			Rules: Rules{
+				"uc/no-null": "error",
+			},
+		},
+	}
+
+	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	if mergedConfig == nil {
+		t.Fatal("expected non-nil merged config")
+	}
+
+	ruleMap := make(map[string]linter.ConfiguredRule)
+	for _, r := range rules {
+		ruleMap[r.Name] = r
+	}
+	if _, ok := ruleMap["uc/no-null"]; !ok {
+		t.Errorf("uc/no-null must be enabled when its plugin is declared via eslintPlugins; got rules %v", ruleNames(rules))
+	}
+}
+
+// Negative: a rule whose prefix is neither in `plugins` nor in
+// `eslintPlugins` is still blocked by the gate. Same behavior as
+// before the fix — guards against the gate accidentally degrading
+// to "let everything through".
+func TestGetEnabledRules_EnforcePlugins_BlocksUndeclaredEvenWithEslintPluginsOnAnotherPrefix(t *testing.T) {
+	RegisterAllRules()
+
+	config := RslintConfig{
+		{
+			EslintPlugins: []EslintPluginEntry{{
+				Prefix:    "uc",
+				Specifier: "eslint-plugin-unicorn",
+				RuleNames: []string{"no-null"},
+			}},
+			Rules: Rules{
+				// Rule from a DIFFERENT prefix that wasn't declared.
+				"@typescript-eslint/no-explicit-any": "error",
+			},
+		},
+	}
+
+	rules, _ := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "", true)
+	for _, r := range rules {
+		if r.Name == "@typescript-eslint/no-explicit-any" {
+			t.Error("expected @typescript-eslint/no-explicit-any to be blocked (prefix not declared anywhere)")
+		}
+	}
+}
+
 func TestGetEnabledRules_EnforcePlugins_EslintPluginPrefix(t *testing.T) {
 	RegisterAllRules()
 
@@ -338,7 +416,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 			Rules: Rules{
 				"@typescript-eslint/no-explicit-any": "error",
 				"react/jsx-uses-react":               "error",
-				"import/no-self-import":               "error", // import plugin NOT in plugins array
+				"import/no-self-import":              "error", // import plugin NOT in plugins array
 			},
 		},
 	}
@@ -446,7 +524,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 			Files:   []string{"**/*.tsx"},
 			Plugins: []string{"react"},
 			Rules: Rules{
-				"react/jsx-uses-react":             "error",
+				"react/jsx-uses-react":              "error",
 				"@typescript-eslint/ban-ts-comment": "error", // TS rule in react entry
 			},
 		},

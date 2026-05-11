@@ -37,8 +37,10 @@ import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { StringDecoder } from 'node:string_decoder';
+import { cpus } from 'node:os';
 
 import { CancelFlagPool } from './cancel-flag.js';
+import { WorkerClosedError } from './errors.js';
 import type {
   LintFileRequest,
   LintFileResult,
@@ -126,7 +128,7 @@ interface PendingTask {
    *                     in-flight — not a real crash)
    *
    * Distinguishing these matters to consumers: 'crash' triggers
-   * compat-dispatch error counters / strict-runner exit codes,
+   * compat-dispatch error counters / runner-failure exit codes,
    * 'shutdown' is the user/runtime expectedly tearing down the
    * pool and shouldn't be reported as a fault.
    */
@@ -242,15 +244,7 @@ export class WorkerPool {
   private readonly respawns = new Set<Promise<void>>();
 
   constructor(opts: WorkerPoolOptions) {
-    const cpuCount = (() => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-var-requires -- ESM lazy resolve of a Node builtin via createRequire; static import would force `node:os` to load even when the try/catch fallback is taken.
-        const os = require('node:os') as { cpus(): unknown[] };
-        return Math.max(1, Math.min(8, os.cpus().length));
-      } catch {
-        return 4;
-      }
-    })();
+    const cpuCount = Math.max(1, Math.min(8, cpus().length));
     this.opts = {
       configs: opts.configs,
       // Empty `configs` ⇒ no plugin work. Force the effective worker
@@ -410,19 +404,15 @@ export class WorkerPool {
     tasks: LintTask[],
     onTaskDispatched?: (taskId: number) => void,
   ): Promise<LintFileResult[]> {
-    if (this.closed) throw new Error('WorkerPool: closed');
+    // Typed error (code, not message text) so callers across the ESM/CJS
+    // boundary can detect a concurrently-closed pool — see #11.
+    if (this.closed) throw new WorkerClosedError('WorkerPool: closed');
     if (this.opts.workerCount === 0) {
       // Empty pool: should not normally be invoked (Go side has no compat
       // rules to batch when entries=[]), but tolerate it gracefully so a
       // misconfigured caller doesn't crash. Each task gets a fully
       // populated empty result so downstream merge code is unchanged.
-      return tasks.map((t) => ({
-        filePath: t.filePath,
-        diagnostics: [],
-        fixes: [],
-        suggestionsCount: 0,
-        cancelled: false,
-      }));
+      return tasks.map((t) => emptyLintResult(t.filePath));
     }
     if (this.workers.length === 0)
       throw new Error('WorkerPool: not initialized');
@@ -514,13 +504,7 @@ export class WorkerPool {
         const q = this.pendingQueue.shift()!;
         if (q.cancelled) {
           this.cancelPool.release(q.cancelSlot);
-          q.resolve({
-            filePath: q.task.filePath,
-            diagnostics: [],
-            fixes: [],
-            suggestionsCount: 0,
-            cancelled: true,
-          });
+          q.resolve(emptyLintResult(q.task.filePath, { cancelled: true }));
           continue;
         }
         this.dispatchToWorker(slot, q);
@@ -574,7 +558,7 @@ export class WorkerPool {
     }
     // Reject any still-pending tasks so callers don't hang. The
     // 'shutdown' kind keeps the resolver from labelling these as
-    // worker crashes (which would inflate strict-runner counters and
+    // worker crashes (which would inflate runner-failure counters and
     // mislead operators).
     const reason = new Error('WorkerPool: shutdown requested');
     for (const w of this.workers) {
@@ -602,24 +586,11 @@ export class WorkerPool {
         // User called `cancelTask(taskId)` between enqueue and drain.
         // Surface it as a cancellation (matches the kickQueue path
         // for queued+cancelled entries) instead of mislabelling as a
-        // shutdown failure — host strict-runner counters and LSP
+        // shutdown failure — host runner-failure counters and LSP
         // result categorisation distinguish the two.
-        q.resolve({
-          filePath: q.task.filePath,
-          diagnostics: [],
-          fixes: [],
-          suggestionsCount: 0,
-          cancelled: true,
-        });
+        q.resolve(emptyLintResult(q.task.filePath, { cancelled: true }));
       } else {
-        q.resolve({
-          filePath: q.task.filePath,
-          diagnostics: [],
-          fixes: [],
-          suggestionsCount: 0,
-          cancelled: false,
-          parseError: 'shutdown',
-        });
+        q.resolve(emptyLintResult(q.task.filePath, { parseError: 'shutdown' }));
       }
     }
     this.pendingQueue = [];
@@ -1028,14 +999,9 @@ export class WorkerPool {
     if (this.pendingQueue.length === 0) return;
     for (const q of this.pendingQueue) {
       this.cancelPool.release(q.cancelSlot);
-      q.resolve({
-        filePath: q.task.filePath,
-        diagnostics: [],
-        fixes: [],
-        suggestionsCount: 0,
-        cancelled: false,
-        parseError: 'pool_degraded',
-      });
+      q.resolve(
+        emptyLintResult(q.task.filePath, { parseError: 'pool_degraded' }),
+      );
     }
     this.pendingQueue = [];
   }
@@ -1097,14 +1063,7 @@ export class WorkerPool {
         text: `task ${taskId} on worker ${slot.id} timed out after ${this.opts.taskTimeoutMs}ms; terminating worker`,
       });
       // Reject this task with a "compat-failed"-shaped result.
-      resolveOk({
-        filePath: task.filePath,
-        diagnostics: [],
-        fixes: [],
-        suggestionsCount: 0,
-        cancelled: false,
-        parseError: 'task_timeout',
-      });
+      resolveOk(emptyLintResult(task.filePath, { parseError: 'task_timeout' }));
       // Force termination — exit handler respawns.
       void terminateWorker(slot.worker);
     }, this.opts.taskTimeoutMs);
@@ -1121,17 +1080,10 @@ export class WorkerPool {
         //
         // `parseError` prefix encodes the kind so consumers can
         // distinguish: a 'shutdown' is not a crash — counting it
-        // toward strict-runner thresholds would be wrong.
+        // toward runner-failure counters would be wrong.
         const parseError =
           kind === 'shutdown' ? 'shutdown' : `worker_crashed: ${err.message}`;
-        resolveOk({
-          filePath: task.filePath,
-          diagnostics: [],
-          fixes: [],
-          suggestionsCount: 0,
-          cancelled: false,
-          parseError,
-        });
+        resolveOk(emptyLintResult(task.filePath, { parseError }));
       },
       timer,
     };
@@ -1187,14 +1139,11 @@ export class WorkerPool {
       if (errName !== 'DataCloneError') {
         slot.ready = false;
       }
-      resolveOk({
-        filePath: task.filePath,
-        diagnostics: [],
-        fixes: [],
-        suggestionsCount: 0,
-        cancelled: false,
-        parseError: `postMessage_failed: ${(err as Error).message}`,
-      });
+      resolveOk(
+        emptyLintResult(task.filePath, {
+          parseError: `postMessage_failed: ${(err as Error).message}`,
+        }),
+      );
       // Re-drain the queue, DEFERRED via `queueMicrotask` rather than a
       // direct call (#2). For DataCloneError the slot stays ready and
       // kickQueue re-dispatches the next queued task here; if that task is
@@ -1212,6 +1161,22 @@ export class WorkerPool {
   }
 }
 
-// require for cpus() — in ESM context we use createRequire.
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
+/**
+ * Build a fully-populated empty LintFileResult for a file the pool can't
+ * actually run (empty pool, cancelled, shutdown, crash, timeout, degraded).
+ * Centralizing the shape keeps the wire contract in ONE place — adding a
+ * LintFileResult field no longer means editing every early-return site.
+ */
+function emptyLintResult(
+  filePath: string,
+  opts?: { cancelled?: boolean; parseError?: string },
+): LintFileResult {
+  return {
+    filePath,
+    diagnostics: [],
+    fixes: [],
+    suggestionsCount: 0,
+    cancelled: opts?.cancelled ?? false,
+    ...(opts?.parseError !== undefined ? { parseError: opts.parseError } : {}),
+  };
+}

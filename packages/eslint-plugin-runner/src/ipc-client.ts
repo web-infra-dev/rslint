@@ -47,6 +47,7 @@ import type {
   NotificationHandler,
   ErrorResponseData,
 } from './types.js';
+import { WorkerClosedError } from './errors.js';
 
 /** Internal record for a request awaiting its response. */
 interface PendingRequest {
@@ -162,24 +163,41 @@ export class IpcClient {
   }
 
   /**
-   * Stop listening. Pending outbound requests are rejected with a
-   * stable error so callers' `await sendRequest(...)` resolves rather
-   * than hanging forever. Idempotent.
+   * Detach all stream listeners. Idempotent — `off` is a no-op when the
+   * listener isn't attached.
    */
-  close(): void {
-    if (this.closed) return;
-    this.closed = true;
-
+  private detachListeners(): void {
     this.input.off('data', this.onChunk);
     this.input.off('end', this.onEnd);
     this.input.off('error', this.onStreamError);
     this.output.off('error', this.onOutputError);
     this.output.off('close', this.onOutputClose);
     this.output.off('finish', this.onOutputClose);
+  }
 
-    const err = new Error('IpcClient: closed');
+  /**
+   * Mark closed, detach listeners, and reject every pending request with
+   * `err` so awaiting callers get a deterministic error instead of hanging
+   * forever. Callers guard with `if (this.closed) return` for idempotency.
+   */
+  private teardown(err: Error): void {
+    this.closed = true;
+    this.detachListeners();
     for (const [, p] of this.pending) p.reject(err);
     this.pending.clear();
+  }
+
+  /**
+   * Stop listening. Pending outbound requests are rejected with a stable
+   * error so callers' `await sendRequest(...)` resolves rather than hanging
+   * forever. Idempotent.
+   */
+  close(): void {
+    if (this.closed) return;
+    // Same WorkerClosedError type as WorkerPool — to a caller like
+    // CompatPool both mean "the worker subsystem closed mid-request" and
+    // degrade identically (#11).
+    this.teardown(new WorkerClosedError('IpcClient: closed'));
   }
 
   /**
@@ -277,19 +295,7 @@ export class IpcClient {
   private readonly onOutputError = (err: Error): void => {
     if (this.closed) return;
     process.stderr.write(`[ipc-client] output write error: ${err.message}\n`);
-    const wrapped = new Error(`IpcClient: output write failed: ${err.message}`);
-    for (const [, p] of this.pending) p.reject(wrapped);
-    this.pending.clear();
-    this.closed = true;
-    // Detach listeners to mirror close() — close() itself is a no-op
-    // now (closed=true) but we should not leave the input listeners
-    // dangling.
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    this.teardown(new Error(`IpcClient: output write failed: ${err.message}`));
   };
 
   /**
@@ -303,18 +309,9 @@ export class IpcClient {
    */
   private readonly onOutputClose = (): void => {
     if (this.closed) return;
-    const err = new Error(
-      'IpcClient: output stream closed before response received',
+    this.teardown(
+      new Error('IpcClient: output stream closed before response received'),
     );
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
-    this.closed = true;
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
   };
 
   /**
@@ -463,20 +460,7 @@ export class IpcClient {
     // surface "closed" so callers get a deterministic error
     // immediately instead of an indefinite hang.
     if (this.closed) return;
-    this.closed = true;
-    const err = new Error('IpcClient: peer closed input stream');
-    for (const [, p] of this.pending) p.reject(err);
-    this.pending.clear();
-    this.input.off('data', this.onChunk);
-    this.input.off('end', this.onEnd);
-    this.input.off('error', this.onStreamError);
-    this.output.off('error', this.onOutputError);
-    // Mirror close(): also detach the output 'close'/'finish' listeners
-    // (added for the Windows clean-close fix). onStreamError delegates
-    // here, so without this both teardown paths would leak the
-    // onOutputClose listener on the output stream.
-    this.output.off('close', this.onOutputClose);
-    this.output.off('finish', this.onOutputClose);
+    this.teardown(new Error('IpcClient: peer closed input stream'));
   };
 
   private readonly onStreamError = (err: Error): void => {
@@ -579,7 +563,7 @@ export function decodeFrame(
 ): { msg: IpcMessage; consumed: number } | null {
   if (buf.length < HEADER_BYTES) return null;
   const len = buf.readUInt32LE(0);
-  // Enforce the same cap as the streaming path (ipc-client.ts:290).
+  // Enforce the same cap as the streaming path (ipc-client.ts:347).
   // Without this guard an attacker who can write to a buffer this
   // helper consumes (test harnesses that wire arbitrary streams, or
   // callers that misuse decodeFrame on untrusted input) could pin

@@ -54,16 +54,45 @@ func TestParseConfigPayload_SingleConfig(t *testing.T) {
 	}
 }
 
-func TestParseConfigPayload_EmptyConfigs(t *testing.T) {
-	// Empty configs array → falls back to legacy parsing
+func TestParseConfigPayload_EmptyConfigsArrayIsExplicitMulti(t *testing.T) {
+	// Regression for M1: an explicit `{"configs":[]}` from the host
+	// means "multi-config mode with zero configs" — it must NOT fall
+	// through to the legacy single-config decoder (which would parse
+	// the same bytes again and produce a hollow single-config). The
+	// fix distinguishes nil (missing key) from empty (explicit clear)
+	// via the JSON layer's slice nullness signal.
 	data := []byte(`{"configs": []}`)
 
 	result, err := parseConfigPayload(data)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
+	if !result.IsMultiConfig {
+		t.Errorf("Expected IsMultiConfig=true for explicit empty configs array (got false)")
+	}
+	if len(result.ConfigMap) != 0 {
+		t.Errorf("Expected empty ConfigMap, got %d entries", len(result.ConfigMap))
+	}
+	if result.SingleConfig != nil {
+		t.Errorf("SingleConfig must be nil in multi-config mode, got %#v", result.SingleConfig)
+	}
+}
+
+func TestParseConfigPayload_MissingConfigsIsLegacySingle(t *testing.T) {
+	// Counterpart to the regression test above: a payload WITHOUT the
+	// `configs` key must still flow through the legacy single-config
+	// decoder. Distinguishing nil vs empty is the whole point.
+	data := []byte(`{"configDirectory": "/p", "entries": [{"rules": {"x": "off"}}]}`)
+
+	result, err := parseConfigPayload(data)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	if result.IsMultiConfig {
-		t.Error("Expected IsMultiConfig=false for empty configs array")
+		t.Errorf("Expected IsMultiConfig=false when `configs` key is absent")
+	}
+	if result.SingleConfigDir != "/p" {
+		t.Errorf("Expected SingleConfigDir=/p, got %q", result.SingleConfigDir)
 	}
 }
 

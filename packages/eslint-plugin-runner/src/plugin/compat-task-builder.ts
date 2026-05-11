@@ -38,13 +38,14 @@ export interface CompatBatchInput {
   files: ReadonlyArray<{
     path: string;
     /**
-     * Optional file content override. Go's `CompatLintFile`
-     * (internal/linter/types.go) does NOT include a `text` field —
-     * Go never sends it over the wire. The worker reads file content
-     * from disk via `readFileSync(req.filePath, 'utf8')` when this is
-     * absent. The field is kept here purely for in-process callers
-     * (test harnesses) that want to feed synthetic source without
-     * touching the filesystem.
+     * Optional source override. Go's `CompatLintFile`
+     * (internal/linter/types.go) sends this ONLY on the LSP / `--api` path,
+     * where the file may be an unsaved editor buffer whose content differs
+     * from disk — the worker then lints this exact text instead of
+     * re-reading disk. Absent on the CLI path (disk is authoritative),
+     * where the worker reads via `readFileSync(req.filePath, 'utf8')`. Also
+     * usable by in-process callers to feed synthetic source. See finding #3
+     * / linter.SendCompatFileText.
      */
     text?: string;
     languageOptions?: unknown;

@@ -193,10 +193,10 @@ func TestTypeCheck_NotConstrainedByAllowFiles(t *testing.T) {
 
 	gotA, gotB := false, false
 	for _, d := range diagnostics {
-		if d.SourceFile.FileName() == paths["a.ts"] {
+		if d.FilePath == paths["a.ts"] {
 			gotA = true
 		}
-		if d.SourceFile.FileName() == paths["b.ts"] {
+		if d.FilePath == paths["b.ts"] {
 			gotB = true
 		}
 	}
@@ -226,10 +226,10 @@ func TestTypeCheck_NotConstrainedByAllowDirs(t *testing.T) {
 
 	gotSrc, gotLib := false, false
 	for _, d := range diagnostics {
-		if strings.Contains(d.SourceFile.FileName(), "/src/") {
+		if strings.Contains(d.FilePath, "/src/") {
 			gotSrc = true
 		}
-		if strings.Contains(d.SourceFile.FileName(), "/lib/") {
+		if strings.Contains(d.FilePath, "/lib/") {
 			gotLib = true
 		}
 	}
@@ -515,7 +515,7 @@ func TestTypeCheck_MultipleFiles(t *testing.T) {
 		true,
 		func(d rule.RuleDiagnostic) {
 			if strings.HasPrefix(d.RuleName, "TypeScript(") {
-				filesWithErrors[d.SourceFile.FileName()] = true
+				filesWithErrors[d.FilePath] = true
 			}
 		}, nil,
 		nil,
@@ -589,7 +589,7 @@ func TestTypeCheck_NodeModulesIncludedWhenInProgram(t *testing.T) {
 	var aDiags, bDiags int
 	for _, d := range diagnostics {
 		if strings.HasPrefix(d.RuleName, "TypeScript(") {
-			if strings.Contains(d.SourceFile.FileName(), "node_modules") {
+			if strings.Contains(d.FilePath, "node_modules") {
 				bDiags++
 			} else {
 				aDiags++
@@ -769,8 +769,8 @@ func TestTypeCheck_SourceFileMatchesDiagnosticOrigin(t *testing.T) {
 
 	for _, d := range diagnostics {
 		if strings.HasPrefix(d.RuleName, "TypeScript(") {
-			if d.SourceFile.FileName() != paths["a.ts"] {
-				t.Errorf("Expected TS diagnostic from a.ts, got from %s", d.SourceFile.FileName())
+			if d.FilePath != paths["a.ts"] {
+				t.Errorf("Expected TS diagnostic from a.ts, got from %s", d.FilePath)
 			}
 		}
 	}
@@ -797,7 +797,7 @@ const x: string = value;
 
 	found := false
 	for _, d := range diagnostics {
-		if strings.HasPrefix(d.RuleName, "TypeScript(") && strings.Contains(d.SourceFile.FileName(), "main.ts") {
+		if strings.HasPrefix(d.RuleName, "TypeScript(") && strings.Contains(d.FilePath, "main.ts") {
 			found = true
 			break
 		}
@@ -1015,10 +1015,10 @@ func TestTypeCheck_NoDuplicateDiagnostics(t *testing.T) {
 			ruleName: d.RuleName,
 			pos:      d.Range.Pos(),
 			end:      d.Range.End(),
-			file:     d.SourceFile.FileName(),
+			file:     d.FilePath,
 		}
 		if seen[key] {
-			t.Errorf("Duplicate diagnostic: %s at %d-%d in %s", d.RuleName, d.Range.Pos(), d.Range.End(), d.SourceFile.FileName())
+			t.Errorf("Duplicate diagnostic: %s at %d-%d in %s", d.RuleName, d.Range.Pos(), d.Range.End(), d.FilePath)
 		}
 		seen[key] = true
 	}
@@ -1327,7 +1327,7 @@ func TestTypeCheck_FileFilterSuppressesLintRulesOnly(t *testing.T) {
 		if !strings.HasPrefix(d.RuleName, "TypeScript(") {
 			continue
 		}
-		switch d.SourceFile.FileName() {
+		switch d.FilePath {
 		case keptPath:
 			keptDiags++
 		case ignoredPath:

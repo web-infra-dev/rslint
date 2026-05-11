@@ -143,6 +143,41 @@ ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are
 
 Presets like `ts.configs.recommended` already include their own `plugins` entry, so you only need this field when configuring plugin rules outside a preset.
 
+### eslintPlugins
+
+- **Type:** `Record<string, ESLintPlugin>`
+
+Third-party ESLint plugins to run alongside rslint's native rules. The key is the prefix used in `rules`; the value is the plugin module's default export (or whatever shape the plugin documents).
+
+```ts
+import { defineConfig, ts } from '@rslint/core';
+import unicorn from 'eslint-plugin-unicorn';
+import importPlugin from 'eslint-plugin-import';
+
+export default defineConfig([
+  ts.configs.recommended,
+  {
+    files: ['**/*.ts'],
+    eslintPlugins: {
+      unicorn,
+      import: importPlugin,
+    },
+    rules: {
+      'unicorn/no-null': 'error',
+      'import/no-empty-named-blocks': 'warn',
+    },
+  },
+]);
+```
+
+Plugin rules execute inside an embedded Node.js worker pool, so plugins authored against the ESLint v10 rule API work without modification. When a plugin rule and a native rslint rule share the same name (e.g. both implement `@typescript-eslint/no-shadow`), the native rule wins — see [ESLint Plugin Compatibility](/guide/eslint-plugin-compat) for the full behavior, supported APIs, limitations, and troubleshooting.
+
+Object-form `plugins` (ESLint flat config's `plugins: { unicorn }`) is also accepted as a fallback when `eslintPlugins` is absent for the same entry.
+
+:::tip
+Type-aware plugin rules (those that call `context.parserServices.program` or `getTypeChecker()`) are **not** supported. Run them through ESLint directly if needed. See [ESLint Plugin Compatibility › Limitations](/guide/eslint-plugin-compat#limitations) for the full non-goal list.
+:::
+
 ### languageOptions
 
 - **Type:** `object`

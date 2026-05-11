@@ -33,7 +33,7 @@ const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.r
 
 // ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
 // source file's line map for position encoding.
-func ruleFixToTextEdit(sourceFile *ast.SourceFile, fix rule.RuleFix) *lsproto.TextEdit {
+func ruleFixToTextEdit(sourceFile ast.SourceFileLike, fix rule.RuleFix) *lsproto.TextEdit {
 	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.Pos())
 	endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.End())
 	return &lsproto.TextEdit{
@@ -103,6 +103,10 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		s.watchEnabled = true
 	}
 
+	// Register all rules before loading config so that the rule resolver
+	// finds them when the config (JSON fallback OR the JS/TS configs sent
+	// via rslint/configUpdate later) references them. RegisterAllRules
+	// is itself idempotent via sync.Once.
 	config.RegisterAllRules()
 
 	s.session = project.NewSession(&project.SessionInit{
@@ -186,12 +190,63 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	for _, cfg := range payload.Configs {
 		s.jsConfigs[cfg.ConfigDirectory] = cfg.Entries
 	}
-	// Clear the JSON config path so that a subsequent JSON file-watcher event
-	// does not silently overwrite the JS/TS configs.
-	s.rslintConfigPath = ""
+
+	if len(payload.Configs) == 0 {
+		// All JS/TS configs were deleted — fall back to JSON config.
+		//
+		// Re-discover from disk first. Re-running findRslintConfig +
+		// reloadConfig here is the only way to pick up a `rslint.json`
+		// that may have been added or edited WHILE the JS configs were
+		// in effect: during that window `reloadConfigAndRelint`
+		// short-circuits on the `len(s.jsConfigs) > 0` guard, so the
+		// in-memory `s.jsonConfig` snapshot otherwise stays frozen
+		// at startup state.
+		//
+		// On a disk hit: refresh both the path and the snapshot.
+		// On a miss (no rslint.json on disk, or the LSP test harness
+		// didn't wire a real filesystem): drop `rslintConfigPath` so
+		// we don't claim a file that no longer exists, but KEEP
+		// `s.jsonConfig` as a best-effort fallback. A user whose
+		// startup JSON config briefly got eclipsed by JS configs and
+		// then deleted should still see their original JSON rules —
+		// not silent "no rules at all".
+		configPath, found := findRslintConfig(s.fs, s.cwd)
+		if found {
+			s.rslintConfigPath = configPath
+			if err := s.reloadConfig(); err != nil {
+				log.Printf("[rslint] Failed to reload JSON config after JS configs cleared: %v", err)
+				// Keep the previous jsonConfig snapshot rather than
+				// failing the update outright.
+			} else {
+				log.Printf("[rslint] Reloaded JSON config from disk after JS configs cleared: %s", configPath)
+			}
+		} else {
+			// No disk hit — drop the stale path, keep jsonConfig.
+			s.rslintConfigPath = ""
+		}
+	} else {
+		// JS configs take priority over JSON — clear the JSON config
+		// path so that a subsequent JSON file-watcher event does not
+		// silently overwrite the JS/TS configs.
+		s.rslintConfigPath = ""
+	}
 	log.Printf("[rslint] Config updated from JS/TS configs (%d config files)", len(payload.Configs))
 
 	s.rebuildTsConfigPaths()
+
+	// Register placeholder rules so plugin-prefixed rule names declared
+	// in user configs pass the rule registry's name check. Plugin
+	// execution happens client-side via `rslint/lintCompatBatch`; this
+	// registration is purely for the enabling / enforcePlugins gate.
+	var allEntries []config.EslintPluginEntry
+	for _, entries := range s.jsConfigs {
+		for _, e := range entries {
+			if len(e.EslintPlugins) > 0 {
+				allEntries = append(allEntries, e.EslintPlugins...)
+			}
+		}
+	}
+	config.RegisterEslintPluginRules(allEntries)
 
 	// Ask the client to re-pull diagnostics with the updated config.
 	if err := s.RefreshDiagnostics(ctx); err != nil {
@@ -531,7 +586,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 			})
 		}
 
-		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
+		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs, s.compatDispatcher)
 		if err != nil {
 			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
 			break
@@ -620,11 +675,20 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnosti
 }
 
 func isTypeScriptFile(uri string) bool {
+	// Cover every extension the CLI's createProgramsForConfig accepts
+	// (programs.go:139) so the LSP doesn't silently refuse to lint
+	// `.mts/.cts/.mjs/.cjs` files that work fine from the command line.
+	// Comparing lowercased so users with `.TS` (uncommon but legal on
+	// case-insensitive filesystems) still match.
 	path := strings.ToLower(uri)
 	return strings.HasSuffix(path, ".ts") ||
 		strings.HasSuffix(path, ".tsx") ||
+		strings.HasSuffix(path, ".mts") ||
+		strings.HasSuffix(path, ".cts") ||
 		strings.HasSuffix(path, ".js") ||
-		strings.HasSuffix(path, ".jsx")
+		strings.HasSuffix(path, ".jsx") ||
+		strings.HasSuffix(path, ".mjs") ||
+		strings.HasSuffix(path, ".cjs")
 }
 
 func uriToPath(uri lsproto.DocumentUri) string {
@@ -650,6 +714,14 @@ func uriToPath(uri lsproto.DocumentUri) string {
 }
 
 func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
+	// Tests construct a Server without wiring a real vfs.FS; preserve
+	// the "no config found" fast path instead of letting fs.FileExists
+	// segfault on a nil receiver. Production code always populates fs
+	// (handleInitialized constructs the session with s.fs), so the
+	// guard is purely a test-survival contract.
+	if fs == nil {
+		return "", false
+	}
 	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
 
 	// Strategy 1: Try in the working directory
@@ -662,15 +734,7 @@ func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
 	return "", false
 }
 
-// LintResponse represents a lint response from Go to JS
-type LintResponse struct {
-	Diagnostics []lsproto.Diagnostic `json:"diagnostics"`
-	ErrorCount  int                  `json:"errorCount"`
-	FileCount   int                  `json:"fileCount"`
-	RuleCount   int                  `json:"ruleCount"`
-}
-
-func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS, dispatcher linter.CompatBatchHandler) ([]rule.RuleDiagnostic, error) {
 	filename := uriToPath(uri)
 
 	// Files excluded by the config's `ignores` patterns produce no diagnostics,
@@ -729,6 +793,29 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 			return activeRules
 		},
 		OnDiagnostic: diagnosticCollector,
+		// The LSP server installs an LSP-request-based dispatcher in
+		// NewServer (see lintcompat_dispatcher.go). It's always non-nil
+		// — whether plugin rules actually fire depends on whether any
+		// ConfiguredRule has IsEslintPluginRule=true for the current
+		// file, and on whether the LSP client has any plugin entries
+		// in its CompatPool.
+		CompatRuleDispatcher: dispatcher,
+		// CollectFixes mirrors the native-rule contract: every diagnostic
+		// the runner produces carries a `fixes` payload when the
+		// underlying ESLint plugin rule supplied a `fix` function.
+		// Without this LSP path's createCodeActionFromRuleDiagnostic
+		// (and handleFixAllCodeAction) would only ever see fixes for
+		// native rules — Quick Fix / source.fixAll.rslint silently
+		// degrades to "disable rule" for every ESLint-plugin rule.
+		// The Go linter does not WRITE files — the LSP client applies
+		// the edits via WorkspaceEdit in the standard code-action flow.
+		CollectFixes: true,
+		// LSP wants suggestions surfaced as code actions; eager evaluation.
+		SuggestionsMode: "eager",
+		// Forward the per-request ctx so a superseded keystroke aborts
+		// any in-flight compat IPC instead of running to the per-batch
+		// timeout.
+		Ctx: ctx,
 	})
 
 	if diagnostics == nil {
@@ -937,7 +1024,19 @@ func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
 		dir := uriDirname(string(uri))
 		for {
 			if _, ok := s.jsConfigs[dir]; ok {
-				return s.tsConfigPathsByConfig[dir]
+				// Normalize empty-slice to nil so callers can use the
+				// single nil-check to mean "no resolved tsconfig" rather
+				// than having to also test `len(...)`. Previously an
+				// empty-but-non-nil slice (the byConfig map storing an
+				// explicitly-empty resolve result) made `paths != nil`
+				// true at the call site, incorrectly disabling type-aware
+				// rules on EVERY file in that config — see runLintWithSession
+				// in this file.
+				paths := s.tsConfigPathsByConfig[dir]
+				if len(paths) == 0 {
+					return nil
+				}
+				return paths
 			}
 			parent := uriDirname(dir)
 			if parent == dir {
@@ -945,6 +1044,9 @@ func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
 			}
 			dir = parent
 		}
+		return nil
+	}
+	if len(s.tsConfigPaths) == 0 {
 		return nil
 	}
 	return s.tsConfigPaths
@@ -981,7 +1083,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
 	tsConfigPaths := s.tsConfigPathsForURI(uri)
-	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs, s.compatDispatcher)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		return

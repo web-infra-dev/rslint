@@ -302,65 +302,65 @@ func TestRunLinterInProgram_AllowDirsAndFilesOverlap(t *testing.T) {
 	}
 }
 
-// --- isDirAllowed direct unit tests ---
+// --- IsDirAllowed direct unit tests ---
 
 func TestIsDirAllowed_BasicMatch(t *testing.T) {
-	if !isDirAllowed("/project/src/a.ts", []string{"/project/src"}) {
+	if !IsDirAllowed("/project/src/a.ts", []string{"/project/src"}, true) {
 		t.Error("Expected /project/src/a.ts to be allowed under /project/src")
 	}
 }
 
 func TestIsDirAllowed_NoMatch(t *testing.T) {
-	if isDirAllowed("/project/lib/b.ts", []string{"/project/src"}) {
+	if IsDirAllowed("/project/lib/b.ts", []string{"/project/src"}, true) {
 		t.Error("Expected /project/lib/b.ts NOT to be allowed under /project/src")
 	}
 }
 
 func TestIsDirAllowed_NoPrefixFalsePositive(t *testing.T) {
-	if isDirAllowed("/project/src-other/a.ts", []string{"/project/src"}) {
+	if IsDirAllowed("/project/src-other/a.ts", []string{"/project/src"}, true) {
 		t.Error("Expected src-other NOT to match src")
 	}
 }
 
 func TestIsDirAllowed_EmptyString(t *testing.T) {
-	if isDirAllowed("/project/a.ts", []string{""}) {
+	if IsDirAllowed("/project/a.ts", []string{""}, true) {
 		t.Error("Expected empty string dir NOT to match")
 	}
 }
 
 func TestIsDirAllowed_EmptySlice(t *testing.T) {
-	if isDirAllowed("/project/a.ts", []string{}) {
+	if IsDirAllowed("/project/a.ts", []string{}, true) {
 		t.Error("Expected empty slice NOT to match")
 	}
 }
 
 func TestIsDirAllowed_NilSlice(t *testing.T) {
-	if isDirAllowed("/project/a.ts", nil) {
+	if IsDirAllowed("/project/a.ts", nil, true) {
 		t.Error("Expected nil slice NOT to match")
 	}
 }
 
 func TestIsDirAllowed_TrailingSlash(t *testing.T) {
-	if !isDirAllowed("/project/src/a.ts", []string{"/project/src/"}) {
+	if !IsDirAllowed("/project/src/a.ts", []string{"/project/src/"}, true) {
 		t.Error("Expected trailing slash to still match")
 	}
 }
 
 func TestIsDirAllowed_ExactPathNotMatch(t *testing.T) {
 	// A file path equal to the dir path is not "inside" the directory
-	if isDirAllowed("/project/src", []string{"/project/src"}) {
+	if IsDirAllowed("/project/src", []string{"/project/src"}, true) {
 		t.Error("Expected exact dir path NOT to match itself")
 	}
 }
 
 func TestIsDirAllowed_MultipleMatches(t *testing.T) {
-	if !isDirAllowed("/project/lib/b.ts", []string{"/project/src", "/project/lib"}) {
+	if !IsDirAllowed("/project/lib/b.ts", []string{"/project/src", "/project/lib"}, true) {
 		t.Error("Expected /project/lib/b.ts to match second allowDir")
 	}
 }
 
 func TestIsDirAllowed_RootDir(t *testing.T) {
-	if !isDirAllowed("/any/file.ts", []string{"/"}) {
+	if !IsDirAllowed("/any/file.ts", []string{"/"}, true) {
 		t.Error("Expected root dir to match all absolute paths")
 	}
 }

@@ -31,6 +31,11 @@ export type {
 
 // Worker pool
 export { WorkerPool } from './worker-pool.js';
+export {
+  WorkerClosedError,
+  isWorkerClosedError,
+  WORKER_CLOSED_CODE,
+} from './errors.js';
 export type { WorkerPoolOptions, LintTask } from './worker-pool.js';
 
 // Compat-layer types — exported so callers can build requests and read
@@ -59,6 +64,10 @@ export {
   loadPluginsFromConfigs,
   loadPluginsFromConfigFile,
 } from './plugin/plugin-loader.js';
+export {
+  selectPluginSource,
+  configEntryHasEslintPlugins,
+} from './plugin-source.js';
 
 // Compat-batch boundary helpers — single-sourced wire-shape projections
 // shared by every host that owns a WorkerPool (CLI engine.ts, VS Code

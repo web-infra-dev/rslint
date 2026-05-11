@@ -3,21 +3,31 @@ import {
   Disposable,
   workspace,
   WorkspaceFolder,
-  ExtensionMode,
   OutputChannel,
   window,
 } from 'vscode';
 import { State } from 'vscode-languageclient/node';
-import { LogLevel, Logger } from './logger';
+import { Logger } from './logger';
 import { Rslint } from './Rslint';
 import { setupStatusBar } from './statusBar';
 import { RegisterCommands } from './commands';
+import { applyFolderChange, folderKey } from './workspace-folders';
 
 export class Extension implements Disposable {
   private readonly rslintInstances = new Map<string, Rslint>();
   private disposables: Disposable[] = [];
+  // Per-instance state-change listener disposables, tracked by id so a
+  // folder removal releases its listener. Previously pushed only to
+  // extension-lifetime arrays and never released on remove → one leaked
+  // Disposable per add/remove cycle.
+  private readonly stateChangeDisposables = new Map<string, Disposable>();
   private readonly logger: Logger;
   public context: ExtensionContext;
+  // Stashed so onDidChangeWorkspaceFolders can reuse the SAME channels
+  // when new folders join (one shared "Rslint Language Server" output
+  // channel; per-folder spam in N channels is the wrong UX).
+  private outputChannel?: OutputChannel;
+  private lspOutputChannel?: OutputChannel;
 
   constructor(context: ExtensionContext) {
     Logger.setDefaultLogLevel(context);
@@ -29,26 +39,65 @@ export class Extension implements Disposable {
     this.logger.info('Rslint extension activating...');
 
     const folders = workspace.workspaceFolders ?? [];
-    const outputChannel = window.createOutputChannel(
+    this.outputChannel = window.createOutputChannel(
       'Rslint Language Server',
       'log',
     );
-    const lspOutputChannel = window.createOutputChannel(
+    this.lspOutputChannel = window.createOutputChannel(
       'Rslint Language Server(LSP)',
     );
 
     for (const folder of folders) {
       const workspaceRslint = this.createRslintInstance(
-        folder.name,
+        folderKey(folder),
         folder,
-        outputChannel,
-        lspOutputChannel,
+        this.outputChannel,
+        this.lspOutputChannel,
       );
       await workspaceRslint.start();
-      this.setupStateChangeMonitoring(workspaceRslint, folder.name);
+      this.setupStateChangeMonitoring(workspaceRslint, folderKey(folder));
     }
+
+    // React to dynamic add/remove of workspace folders (VS Code's
+    // "Add Folder to Workspace…" / "Remove Folder from Workspace").
+    // Without this, folders joined post-activation get no Rslint
+    // instance (their files never lint until window reload), and
+    // removed folders leak their worker + LSP client until the
+    // window closes. The logic itself lives in `workspace-folders.ts`
+    // as a pure helper so it can be unit-tested without spinning up
+    // the VS Code extension host.
+    this.disposables.push(
+      workspace.onDidChangeWorkspaceFolders(async (event) =>
+        applyFolderChange(
+          event,
+          {
+            has: (id) => this.rslintInstances.has(id),
+            create: async (folder) => {
+              const inst = this.createRslintInstance(
+                folderKey(folder),
+                folder,
+                this.outputChannel!,
+                this.lspOutputChannel!,
+              );
+              await inst.start();
+              this.setupStateChangeMonitoring(inst, folderKey(folder));
+            },
+            remove: async (id) => this.removeRslintInstance(id),
+          },
+          {
+            warn: (m) => {
+              this.logger.warn(m);
+            },
+            error: (m, err) => {
+              this.logger.error(m, err);
+            },
+          },
+        ),
+      ),
+    );
+
     setupStatusBar(this.context);
-    RegisterCommands(this.context, outputChannel, lspOutputChannel);
+    RegisterCommands(this.context, this.outputChannel, this.lspOutputChannel);
     this.logger.info('Rslint extension activated successfully');
   }
 
@@ -108,6 +157,11 @@ export class Extension implements Disposable {
     instance.dispose();
     this.rslintInstances.delete(id);
 
+    // Release this instance's state-change listener (else it leaks per
+    // add/remove cycle).
+    this.stateChangeDisposables.get(id)?.dispose();
+    this.stateChangeDisposables.delete(id);
+
     this.logger.debug(`Removed Rslint instance with id: ${id}`);
   }
 
@@ -121,20 +175,20 @@ export class Extension implements Disposable {
     });
     this.rslintInstances.clear();
 
+    this.stateChangeDisposables.forEach((d) => d.dispose());
+    this.stateChangeDisposables.clear();
+
     this.disposables.forEach((disposable) => {
       disposable.dispose();
     });
     this.disposables = [];
 
-    this.logger.dispose();
-  }
+    // Shared output channels are owned here (not per Rslint instance) —
+    // dispose them once on extension teardown (#13).
+    this.outputChannel?.dispose();
+    this.lspOutputChannel?.dispose();
 
-  private setupLogging(): void {
-    this.logger.setLogLevel(
-      this.context.extensionMode === ExtensionMode.Development
-        ? LogLevel.DEBUG
-        : LogLevel.INFO,
-    );
+    this.logger.dispose();
   }
 
   private setupStateChangeMonitoring(rslint: Rslint, instanceId: string): void {
@@ -157,7 +211,6 @@ export class Extension implements Disposable {
       }
     });
 
-    this.disposables.push(stateChangeDisposable);
-    this.context.subscriptions.push(stateChangeDisposable);
+    this.stateChangeDisposables.set(instanceId, stateChangeDisposable);
   }
 }

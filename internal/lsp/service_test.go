@@ -1293,7 +1293,6 @@ func TestCloseAndReopen(t *testing.T) {
 	}
 }
 
-
 // ======== tsConfigPaths lifecycle tests ========
 
 func TestHandleConfigUpdate_RebuildsTsConfigPaths(t *testing.T) {
@@ -1523,7 +1522,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 			}
 		}()
 
-		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil)
+		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil, nil)
 		if err != nil {
 			t.Fatalf("expected nil error, got %v", err)
 		}
@@ -1546,6 +1545,6 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
 			}
 		}()
-		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil, nil)
 	})
 }

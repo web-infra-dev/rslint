@@ -71,6 +71,88 @@ async function main() {
     failed = true;
   }
 
+  // --- Single-config ESLint plugin smoke test ---
+  // Verifies the full chain from a user config that declares
+  // `eslintPlugins` down to plugin diagnostics arriving in
+  // vscode.languages.getDiagnostics. Uses a self-contained fake
+  // plugin under the workspace so the fixture has no npm deps.
+  const eslintPluginWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-eslint-plugin',
+  );
+  const eslintPluginTestsPath = path.resolve(
+    __dirname,
+    './suite-eslint-plugin',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: eslintPluginTestsPath,
+      launchArgs: ['--disable-extensions', eslintPluginWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('ESLint plugin (single-config) tests failed:', err);
+    failed = true;
+  }
+
+  // --- Multi-config ESLint plugin routing test ---
+  // Two nested packages, each with a disjoint plugin (different
+  // prefix, different module). Verifies the worker's per-config
+  // `loadedPluginsByDir` map keeps the two configs isolated end-to-
+  // end through the LSP layer.
+  const eslintPluginMonorepoWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-eslint-plugin-monorepo',
+  );
+  const eslintPluginMonorepoTestsPath = path.resolve(
+    __dirname,
+    './suite-eslint-plugin-monorepo',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: eslintPluginMonorepoTestsPath,
+      launchArgs: ['--disable-extensions', eslintPluginMonorepoWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('ESLint plugin (multi-config) tests failed:', err);
+    failed = true;
+  }
+
+  // --- Mixed native+plugin & gap-file+plugin tests ---
+  // The config enables a native rule (no-debugger) AND a plugin rule
+  // (fx/no-forbidden) together; tsconfig include is src/ only so
+  // scripts/gap.ts is a gap file. Covers the two LSP-side combinations
+  // the pure-plugin suites miss: native+plugin on the same file, and a
+  // gap file still receiving plugin diagnostics.
+  const eslintPluginMixedWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-eslint-plugin-mixed',
+  );
+  const eslintPluginMixedTestsPath = path.resolve(
+    __dirname,
+    './suite-eslint-plugin-mixed',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: eslintPluginMixedTestsPath,
+      launchArgs: ['--disable-extensions', eslintPluginMixedWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error(
+      'ESLint plugin (mixed native+plugin / gap) tests failed:',
+      err,
+    );
+    failed = true;
+  }
+
   // --- No config fallback tests ---
   const noConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-noconfig');
   const noConfigTestsPath = path.resolve(__dirname, './suite-noconfig');

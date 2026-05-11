@@ -3,7 +3,6 @@ package ipc
 
 import (
 	"bufio"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -47,6 +46,8 @@ func NewAstInfoBuilder(c *checker.Checker, sf *ast.SourceFile) *AstInfoBuilder {
 type MessageKind string
 
 const (
+	// ── Existing kinds (used by --api mode and shared infrastructure) ──
+
 	// KindLint is sent from JS to Go to request linting
 	KindLint MessageKind = "lint"
 	// KindApplyFixes is sent from JS to Go to request applying fixes
@@ -61,6 +62,40 @@ const (
 	KindHandshake MessageKind = "handshake"
 	// KindExit is sent to request termination
 	KindExit MessageKind = "exit"
+
+	// ── Kinds used by the IPC CLI handshake ──
+	//
+	// The LSP path no longer uses these — it talks to its client over
+	// the standard LSP JSON-RPC channel via custom methods (e.g.
+	// `rslint/lintCompatBatch`). The kinds below are CLI-only.
+
+	// KindInit is sent from Node to Go at session start, carrying the
+	// configs and eslintPluginEntries that drive the run. Inbound request
+	// — Go acknowledges with `response { ok: true }` once registries are
+	// populated.
+	KindInit MessageKind = "init"
+	// KindLintEslintPlugin is a reverse request from Go to Node asking
+	// the Worker pool (hosted by engine.ts in the Node parent) to lint
+	// a per-Program batch with one or more JS plugin rules. Outbound
+	// from Go's BidirectionalService.
+	KindLintEslintPlugin MessageKind = "lintEslintPlugin"
+	// KindOutput is sent from Go to Node carrying formatted user-visible
+	// output text (stdout content) framed in chunks. Notification (id=0).
+	// Chunks split at a byte-size threshold (drainStdoutToIPC) on
+	// UTF-8 boundaries; mid-line splits within a chunk are possible
+	// for line-oriented formats like `--format=jsonline` because the
+	// drain does not search for '\n' before flushing. Downstream
+	// consumers reassemble the byte stream and split lines themselves
+	// (Node parent forwards raw to its stdout).
+	KindOutput MessageKind = "output"
+	// KindLog is sent from Node to Go carrying log lines (typically
+	// `console.*` from Worker plugin code, redirected so they never
+	// pollute the IPC stdout pipe). Notification (id=0).
+	KindLog MessageKind = "log"
+	// KindShutdown is sent from Go to Node at the end of a run to
+	// gracefully drain the Worker pool. Inbound request from Node's
+	// perspective.
+	KindShutdown MessageKind = "shutdown"
 )
 
 // Version is the IPC protocol version
@@ -212,50 +247,28 @@ func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
 	}
 }
 
-// readMessage reads a message from the input
+// readMessage reads one length-prefixed JSON frame via the shared
+// readFrame codec (bidirectional.go), so api-mode and the bidirectional
+// service can't drift in wire format or frame-size cap.
 func (s *Service) readMessage() (*Message, error) {
-	// Read message length (4 bytes)
-	var length uint32
-	if err := binary.Read(s.reader, binary.LittleEndian, &length); err != nil {
-		return nil, fmt.Errorf("failed to read message length: %w", err)
-	}
-
-	// Read message content
-	data := make([]byte, length)
-	if _, err := io.ReadFull(s.reader, data); err != nil {
-		return nil, fmt.Errorf("failed to read message content: %w", err)
-	}
-
-	// Unmarshal message
-	var msg Message
-	if err := json.Unmarshal(data, &msg); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-
-	return &msg, nil
+	return readFrame(s.reader)
 }
 
-// writeMessage writes a message to the output
+// writeMessage writes a message via the shared encodeFrame codec
+// (bidirectional.go), which builds the whole `[len][JSON]` frame as one
+// buffer so a single Write keeps length prefix and body atomic under the
+// mutex.
 func (s *Service) writeMessage(msg *Message) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	// Marshal message
-	data, err := json.Marshal(msg)
+	frame, err := encodeFrame(*msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
-
-	// Write message length (4 bytes)
-	if err := binary.Write(s.writer, binary.LittleEndian, uint32(len(data))); err != nil {
-		return fmt.Errorf("failed to write message length: %w", err)
-	}
-
-	// Write message content
-	if _, err := s.writer.Write(data); err != nil {
+	if _, err := s.writer.Write(frame); err != nil {
 		return fmt.Errorf("failed to write message content: %w", err)
 	}
-
 	return nil
 }
 

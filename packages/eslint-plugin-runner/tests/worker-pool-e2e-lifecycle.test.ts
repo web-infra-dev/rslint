@@ -224,7 +224,7 @@ describe.skipIf(process.platform === 'win32')(
       expect(elapsed).toBeLessThan(8_000);
 
       // In-flight tasks resolve with a sentinel parseError instead of
-      // hanging the caller forever. worker-pool.ts:539-548 maps the
+      // hanging the caller forever. worker-pool.ts maps the
       // shutdown-kind rejection back to a result-shaped failure so
       // callers (internal/linter) see one file as compat-failed rather
       // than the whole batch throwing.

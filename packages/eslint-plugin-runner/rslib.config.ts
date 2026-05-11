@@ -20,14 +20,16 @@ import { defineConfig } from '@rslib/core';
  * bundling its loader would repoint that URL at our bundle file and
  * the native binary lookup would fail.
  *
- * Five outputs map 1:1 to the package.json `exports` field:
+ * Five build outputs — four are package.json `exports` entries, plus the
+ * worker entry resolved internally by sibling lookup:
  *
- *   - `index.js`        — main entry, host integration
- *   - `lint-worker.js`  — worker_threads entry (resolved by sibling
+ *   - `index.js`         — main entry, host integration
+ *   - `lint-worker.js`   — worker_threads entry (resolved by sibling
  *                          lookup inside `worker-pool.ts`, so the file
  *                          MUST land at `dist/lint-worker.js`)
- *   - `ipc-client.js`   — Go-side stdio framing helpers
- *   - `types.js`        — shared type re-exports
+ *   - `ipc-client.js`    — Go-side stdio framing helpers
+ *   - `types.js`         — shared type re-exports
+ *   - `plugin-source.js` — host↔worker plugin-source predicates
  */
 const baseLib = {
   format: 'esm' as const,
@@ -84,6 +86,14 @@ export default defineConfig({
     {
       ...baseLib,
       source: { ...baseLib.source, entry: { types: './src/types.ts' } },
+      dts: { bundle: true },
+    },
+    {
+      ...baseLib,
+      source: {
+        ...baseLib.source,
+        entry: { 'plugin-source': './src/plugin-source.ts' },
+      },
       dts: { bundle: true },
     },
   ],

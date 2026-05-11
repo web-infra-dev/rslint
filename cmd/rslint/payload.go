@@ -10,11 +10,11 @@ import (
 
 // configPayloadEntry represents a single config with its directory.
 type configPayloadEntry struct {
-	ConfigDirectory string                   `json:"configDirectory"`
+	ConfigDirectory string                    `json:"configDirectory"`
 	Entries         rslintconfig.RslintConfig `json:"entries"`
 }
 
-// parsedPayload is the result of parsing a config-stdin payload.
+// parsedPayload is the result of parsing a stdin config payload.
 type parsedPayload struct {
 	// configMap maps normalized configDirectory to config entries (multi-config mode).
 	// nil when using legacy single-config mode.
@@ -28,11 +28,29 @@ type parsedPayload struct {
 	IsMultiConfig bool
 }
 
-// parseConfigPayload parses the JSON payload from --config-stdin.
-// It supports both the new multi-config format ({ configs: [...] })
-// and the legacy single-config format ({ configDirectory, entries }).
+// parseConfigPayload parses the JSON config payload that
+// `executeLintPipeline` reads from stdin. The pipeline accepts two
+// shapes:
+//   - multi-config:   `{ configs: [{configDirectory, entries}, ...] }`
+//   - single-config:  `{ configDirectory, entries }` (kept for
+//     backward compatibility with older callers).
+//
+// In the IPC entry path (runCLI) the payload is synthesized from the
+// `init` message's Configs field; the pipeline doesn't care which
+// transport delivered the bytes.
 func parseConfigPayload(data []byte) (*parsedPayload, error) {
-	// Try multi-config format: { configs: [...] }
+	// Step 1: detect whether the wire shape is the multi-config one by
+	// asking the JSON layer directly whether `configs` was present.
+	// `json.Unmarshal` with `Configs []T` decodes:
+	//   - missing / `null`     → `Configs == nil`
+	//   - `"configs": []`      → `Configs != nil, len == 0`
+	//   - `"configs": [...]`   → `Configs != nil, len > 0`
+	// The previous logic conflated empty-array with missing and silently
+	// fell through to the legacy single-config decoder, which then
+	// produced an empty single-config (no rules, no files). That is a
+	// silent no-lint, not an obvious failure. Distinguish them by the
+	// nil-vs-non-nil signal so an explicit `{configs:[]}` lands in the
+	// multi-config branch (with zero configs — equally valid).
 	var multiPayload struct {
 		Configs []configPayloadEntry `json:"configs"`
 	}
@@ -40,7 +58,7 @@ func parseConfigPayload(data []byte) (*parsedPayload, error) {
 		return nil, fmt.Errorf("error parsing config from stdin: %w", err)
 	}
 
-	if len(multiPayload.Configs) > 0 {
+	if multiPayload.Configs != nil {
 		configMap := make(map[string]rslintconfig.RslintConfig, len(multiPayload.Configs))
 		for _, cfg := range multiPayload.Configs {
 			configDir := tspath.NormalizePath(cfg.ConfigDirectory)

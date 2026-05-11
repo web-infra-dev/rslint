@@ -405,7 +405,12 @@ func TestIntegration_CLIArrayOverridesConfigString(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	assert.Assert(t, merged != nil)
 	assert.Equal(t, merged.Rules["no-console"].Level, "warn")
-	opts, ok := merged.Rules["no-console"].Options.(map[string]interface{})
+	// Options is the ESLint-aligned positional array; the lone object
+	// option lives at [0] (#5 — config.go no longer unwraps it).
+	optsArr, ok := merged.Rules["no-console"].Options.([]interface{})
+	assert.Assert(t, ok)
+	assert.Equal(t, len(optsArr), 1)
+	opts, ok := optsArr[0].(map[string]interface{})
 	assert.Assert(t, ok)
 	allow, ok := opts["allow"].([]interface{})
 	assert.Assert(t, ok)

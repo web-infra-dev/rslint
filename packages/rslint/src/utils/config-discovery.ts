@@ -130,16 +130,20 @@ export function discoverConfigs(
  * `ignores` and no other meaningful fields. Aligns with ESLint flat config
  * semantics where such entries prevent directory traversal.
  */
-function isGlobalIgnoreEntry(
+export function isGlobalIgnoreEntry(
   entry: RslintConfigEntry,
 ): entry is Required<Pick<RslintConfigEntry, 'ignores'>> {
   const ignores = entry.ignores;
   if (!Array.isArray(ignores) || ignores.length === 0) return false;
 
+  // An entry declaring `eslintPlugins` is real plugin config, NOT a bare
+  // global-ignore; misclassifying it hoists its `ignores` to global and
+  // silently prunes nested configs from linting.
   return (
     entry.files == null &&
     entry.rules == null &&
     entry.plugins == null &&
+    entry.eslintPlugins == null &&
     entry.languageOptions == null &&
     entry.settings == null
   );
@@ -182,6 +186,23 @@ function isDirIgnoredByPatterns(
   for (const pattern of patterns) {
     // Skip empty or negation patterns.
     if (!pattern || pattern.startsWith('!')) continue;
+
+    // ESLint v10 documents `ignores` patterns as RELATIVE to the
+    // config directory. Absolute patterns (`/abs/path/...`) won't
+    // match against the computed `normalizedRelDir` and silently
+    // fail to ignore — users frequently write absolute paths and
+    // assume they work. Warn once per pattern so the mistake is
+    // visible. `path.isAbsolute` covers both POSIX (`/...`) and
+    // Windows (`C:\...`); we also catch the POSIX form on Windows.
+    if (path.isAbsolute(pattern) || pattern.startsWith('/')) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[rslint] ignores pattern ${JSON.stringify(pattern)} is absolute; ` +
+          `ESLint v10 requires patterns relative to the config directory. ` +
+          `This pattern will NOT ignore anything.`,
+      );
+      continue;
+    }
 
     // Skip file-level patterns (ending with /**/* or /*). These only ignore
     // files inside a directory, NOT the directory itself. ESLint v10's
@@ -227,6 +248,10 @@ function isDirIgnoredByPatterns(
 
 export interface ConfigEntry {
   configDirectory: string;
+  /** Absolute path of the config file. Forwarded to the worker pool
+   *  (as `ConfigDescriptor.configPath`) so each worker re-imports the
+   *  config independently and recovers live plugin instances. */
+  configPath?: string;
   entries: RslintConfigEntry[];
 }
 
