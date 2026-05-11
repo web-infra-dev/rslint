@@ -14,6 +14,15 @@ ruleTester.run('no-identical-title', {} as never, {
       });
     `,
     },
+    { code: 'describe(); describe();' },
+    { code: 'describe("foo", () => {}); it("foo", () => {});' },
+    {
+      code: `
+      describe("foo", () => {
+        it("works", () => {});
+      });
+    `,
+    },
     {
       code: `
       it('one', () => {});
