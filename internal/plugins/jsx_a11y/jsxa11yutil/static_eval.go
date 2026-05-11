@@ -891,6 +891,12 @@ func literalPropValue(node *ast.Node) jsValue {
 		// model the actual contents — for our purposes (just truthy?) any
 		// array (empty or not) is truthy in JS, so jsTruthy is enough.
 		return jsTruthy
+	case ast.KindDeleteExpression:
+		// LITERAL_TYPES inherits TYPES.UnaryExpression which for `delete x`
+		// returns boolean true (the runtime value of the operator on a
+		// deletable target). Surfacing as jvBool here lets GetTabIndexEx's
+		// step-1 boolean arm short-circuit to undefined, matching upstream.
+		return jsValue{Kind: jvBool, Bool: true}
 	}
 	// All other expressions (Call, Member, Conditional, Logical, Binary, etc.)
 	// → noop → null per LITERAL_TYPES. Returning jvNull marks them as falsy

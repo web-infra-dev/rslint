@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -101,25 +102,104 @@ func IsNonLiteralProperty(attrs []*ast.Node, propName string) bool {
 // upstream skips the `Number.isInteger` filter and lets JS's loose `>=`
 // handle string / boolean / number identically).
 //
-// Returns (0, false) when:
+// Returns (0, false) when upstream would yield either `undefined` or `null`.
+// Callers that need to distinguish the two — because they implement an
+// upstream comparison like `tabIndex >= -1` whose result diverges between
+// `undefined >= -1` (NaN, false) and `null >= -1` (ToNumber(null)=0, true) —
+// must use [GetTabIndexEx] instead.
+//
+// Specifically, (0, false) covers:
 //   - the prop is absent / boolean-form (getPropValue would yield true →
 //     undefined per the step-1 boolean arm)
 //   - the literal value is an empty string / non-integer number / NaN
 //   - the literal value is a boolean (step-1 boolean arm)
 //   - getPropValue cannot statically resolve the expression
-func GetTabIndex(attr *ast.Node) (float64, bool) {
+func GetTabIndex(attr *ast.Node, sourceText string) (float64, bool) {
+	val, resolved, _ := GetTabIndexEx(attr, sourceText)
+	return val, resolved
+}
+
+// GetTabIndexEx mirrors upstream `getTabIndex(getProp(attrs, 'tabIndex'))`
+// with explicit two-state classification of the unresolved case. Used by
+// callers whose downstream comparison is loose JS `>=` / `>` / `<=` / `<`
+// against a number, where `null` and `undefined` differ:
+//
+//	null >= -1      → ToNumber(null) = 0      → true
+//	undefined >= -1 → ToNumber(undefined) = NaN → false
+//
+// Returns:
+//   - (val, true,  false) — upstream resolved a usable Number. Callers
+//     compare `val` directly.
+//   - (0,   false, false) — upstream would yield `undefined`. Callers should
+//     treat the comparison `tabIndex op N` as if `undefined op N` (NaN, so
+//     all loose comparisons are false).
+//   - (0,   false, true)  — upstream would yield `null`. Callers should
+//     treat the comparison as if `null op N` (ToNumber(null)=0, so JS-loose
+//     comparison applies).
+//
+// The undefined-vs-null split mirrors jsx-ast-utils' two extraction paths:
+// step-1 `getLiteralPropValue` returns undefined for boolean form / empty
+// string / NaN-coercing literal / boolean literal; step-2 `getPropValue`
+// returns null for any ESTree expression type its TYPES table does not
+// recognize (TSSatisfiesExpression, AwaitExpression, YieldExpression,
+// ImportExpression, ...).
+func GetTabIndexEx(attr *ast.Node, sourceText string) (val float64, resolved bool, nullLike bool) {
 	if attr == nil {
-		return 0, false
+		// upstream: getProp(attrs, 'tabIndex') === undefined → getTabIndex
+		// passes undefined through unchanged.
+		return 0, false, false
 	}
 	if AttributeIsBooleanForm(attr) {
 		// `<div tabIndex />` — extractValue's null-attribute-value path
 		// produces JS boolean `true`, which upstream's getTabIndex passes
 		// through to its `=== true` branch → undefined.
-		return 0, false
+		return 0, false, false
 	}
+
+	// Direct StringLiteral JsxAttribute (`tabIndex="…"`, NOT
+	// `tabIndex={"…"}` which wraps in JsxExpression) carries HTML-style
+	// attribute text. ESTree parsers decode HTML entities (`&#49;`→"1",
+	// `&nbsp;`→U+00A0, …) before passing the value to lint rules; tsgo
+	// keeps the raw `&…;` source in StringLiteral.Text, so we apply
+	// DecodeEntities here to realign with upstream getLiteralPropValue
+	// output for this shape. The decoded string then routes through the
+	// same step-1 classification as a plain StringLiteral.
+	if attr.Kind == ast.KindJsxAttribute {
+		if init := attr.AsJsxAttribute().Initializer; init != nil && init.Kind == ast.KindStringLiteral {
+			decoded := jsxtx.DecodeEntities(init.AsStringLiteral().Text)
+			return classifyTabIndexString(decoded)
+		}
+	}
+
 	inner := attributeInnerExpression(attr)
 	if inner == nil {
-		return 0, false
+		// `<div tabIndex={} />` — empty JsxExpression body / JSXEmptyExpression.
+		// jsx-ast-utils' TYPES has no entry for JSXEmptyExpression → noop →
+		// null. Downstream `null >= 0` ToNumber-coerces to true, so upstream
+		// reports. Classify as null-like to mirror.
+		return 0, false, true
+	}
+
+	// Template literals — upstream's TemplateLiteral extractor reads
+	// `quasi.value.raw` (literal source between back-ticks), NOT the
+	// cooked `.Text` field. Override here before the literalPropValue
+	// dispatch (which uses cooked text and is shared with other a11y
+	// rules that care about truthiness rather than ToNumber coercion).
+	if inner.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return classifyTabIndexString(rawTemplateLiteralText(inner, sourceText))
+	}
+	if inner.Kind == ast.KindTemplateExpression {
+		v := templateExpressionRawText(inner.AsTemplateExpression(), sourceText)
+		return classifyTabIndexString(v.Str)
+	}
+
+	// Cluster A: TSNonNullExpression — upstream's TSNonNullExpression
+	// extractor stringifies (`0!` → "0!", `(0)!` → "0!", `x!` → "x!"). The
+	// resulting string always contains `!` and ToNumbers to NaN, so step-1
+	// resolves to undefined. Without this branch staticEval's
+	// OEKNonNullAssertions strip would resolve `0!` to the bare 0 — wrong.
+	if inner.Kind == ast.KindNonNullExpression {
+		return 0, false, false
 	}
 
 	// Step 1: getLiteralPropValue path — upstream applies the integer
@@ -128,13 +208,34 @@ func GetTabIndex(attr *ast.Node) (float64, bool) {
 	switch literalV.Kind {
 	case jvString:
 		if literalV.Str == "" {
-			return 0, false
+			// upstream `length === 0` short-circuit → undefined.
+			return 0, false, false
 		}
-		return parseLiteralTabIndexString(literalV.Str)
+		if v, ok := parseLiteralTabIndexString(literalV.Str); ok {
+			return v, true, false
+		}
+		// upstream `Number.isNaN(value)` → undefined.
+		return 0, false, false
 	case jvNumber:
-		return parseLiteralTabIndexFloat(literalV.Num)
+		if v, ok := parseLiteralTabIndexFloat(literalV.Num); ok {
+			return v, true, false
+		}
+		// upstream `Number.isInteger(value) ? value : undefined`.
+		return 0, false, false
 	case jvBool:
-		return 0, false
+		// upstream step-1 boolean arm → undefined.
+		return 0, false, false
+	case jvBigInt:
+		// Cluster B: BigInt literal. Upstream getLiteralPropValue returns
+		// the BigInt; getTabIndex falls through to step-2 (typeof bigint is
+		// not 'string'/'number'/bool) → returns the BigInt → downstream
+		// `>=` ToNumber-coerces (`Number(0n)=0`, `Number(-1n)=-1`,
+		// out-of-range → ±Infinity). Match by computing Number(BigInt)
+		// directly and surfacing it as resolved.
+		if n, ok := jsValueToNumber(literalV); ok {
+			return n, true, false
+		}
+		return 0, false, false
 	}
 
 	// Step 2: getPropValue fallback — covers expressions that LITERAL_TYPES
@@ -150,65 +251,88 @@ func GetTabIndex(attr *ast.Node) (float64, bool) {
 	// downstream `>= 0` coercion needs. They are kept local to GetTabIndex
 	// so the shared staticEval engine is not affected.
 	if inner.Kind == ast.KindArrayLiteralExpression {
-		return arrayToTabIndex(inner)
+		// Cluster F: route through arrayLiteralPropToTabIndexString (same
+		// engine tabindex-no-positive uses) — it handles nested arrays via
+		// recursion, unary on non-number operands via the TYPES.UnaryExpression
+		// protocol, and ObjectExpression / RegExp / function / JsxElement
+		// via jsToString (which produces non-empty non-numeric strings →
+		// downstream NaN). The pre-Ex inline arrayToTabIndex lost precision
+		// on these by collapsing jsTruthy to "" → 0.
+		arrV := arrayLiteralPropToTabIndexString(inner, sourceText)
+		if n, ok := jsValueToNumber(arrV); ok && !math.IsNaN(n) {
+			return n, true, false
+		}
+		return 0, false, false
 	}
 	if inner.Kind == ast.KindPrefixUnaryExpression {
-		if val, ok, applicable := unaryStringToTabIndex(inner); applicable {
-			return val, ok
+		if v, ok, applicable := unaryStringToTabIndex(inner); applicable {
+			if ok {
+				return v, true, false
+			}
+			return 0, false, false
+		}
+		// Cluster E: jsx-ast-utils' UnaryExpression handler ToNumber-coerces
+		// the operand before applying `+` / `-` / `~`. Our staticEvalUnary
+		// only computes when operand is already jvNumber, so `+undefined`,
+		// `-true`, `~null`, etc. fall through to its jsNull return → in
+		// our previous Ex impl that landed on nullLike → REPORT (wrong).
+		// Mirror upstream by running ToNumber on the operand here.
+		un := inner.AsPrefixUnaryExpression()
+		if un.Operator == ast.KindPlusToken || un.Operator == ast.KindMinusToken || un.Operator == ast.KindTildeToken || un.Operator == ast.KindExclamationToken {
+			opV := unaryLiteralPropToTabIndexJsValue(un)
+			if n, ok := jsValueToNumber(opV); ok {
+				if !math.IsNaN(n) {
+					return n, true, false
+				}
+			}
+			return 0, false, false
 		}
 	}
 	staticV := staticEval(inner)
-	return staticEvalToTabIndex(staticV)
+	if v, ok := staticEvalToTabIndex(staticV); ok {
+		return v, true, false
+	}
+	// staticEvalToTabIndex failed — classify by the inner sentinel:
+	//   - jvNull, jvUnknown → upstream's "TYPES has no entry" / explicit
+	//     AwaitExpression / YieldExpression / TSSatisfiesExpression / etc.
+	//     → returns null. null-like.
+	//   - jvUndef → upstream resolved to undefined (jvx Identifier
+	//     `undefined`, void/typeof, ...) → undefined-like.
+	//   - jvFunction / jvTruthy / jvBool / jvBigInt → upstream resolved to
+	//     a non-numeric truthy that ToNumber-coerces to NaN (or, for
+	//     BigInt, to a number our extractor doesn't yet model) → in either
+	//     case the loose `>= -1` lands on the same arm as undefined. We
+	//     classify as undefined-like to keep callers reporting on these
+	//     until BigInt support is added (see TODO above arrayToTabIndex
+	//     for the BigInt expansion path).
+	switch staticV.Kind {
+	case jvNull, jvUnknown:
+		return 0, false, true
+	}
+	return 0, false, false
 }
 
-// arrayToTabIndex models JS `ToPrimitive(array, "default") → ToNumber` for
-// an ArrayLiteralExpression as the tabIndex value. Mirrors upstream's
-// getPropValue → ArrayExpression extractor + downstream `>= 0` coercion.
-//
-// Per spec (ECMA-262 Array.prototype.join):
-//   - undefined / null / sparse elements stringify to "" (NOT "undefined" /
-//     "null").
-//   - other elements use String(element).
-//
-// Joined with "," then fed through ToNumber. Examples:
-//
-//	[]            → ""          → 0
-//	[5]           → "5"         → 5
-//	[1, 2]        → "1,2"       → NaN
-//	[null]        → ""          → 0
-//	[Infinity]    → "Infinity"  → +Inf (≥0 → reports)
-//	[-1]          → "-1"        → -1  (<0 → skips)
-func arrayToTabIndex(node *ast.Node) (float64, bool) {
-	if node == nil || node.Kind != ast.KindArrayLiteralExpression {
-		return 0, false
+// classifyTabIndexString applies upstream getTabIndex's step-1 string
+// semantics to an already-extracted string value (post-entity-decode for
+// direct attribute strings; raw quasi text for templates). Returns the
+// same three-state result as GetTabIndexEx.
+func classifyTabIndexString(s string) (float64, bool, bool) {
+	if s == "" {
+		// upstream `length === 0` short-circuit → undefined.
+		return 0, false, false
 	}
-	arr := node.AsArrayLiteralExpression()
-	var elements []*ast.Node
-	if arr != nil && arr.Elements != nil {
-		elements = arr.Elements.Nodes
+	// jsx-ast-utils' Literal extractor coerces case-insensitive "true" /
+	// "false" string values to actual booleans, which upstream's
+	// getTabIndex then routes to its boolean arm → undefined.
+	switch strings.ToLower(s) {
+	case "true", "false":
+		return 0, false, false
 	}
-	if len(elements) == 0 {
-		// `[].toString() == ""` → ToNumber("") = 0.
-		return 0, true
+	if v, ok := parseLiteralTabIndexString(s); ok {
+		return v, true, false
 	}
-	parts := make([]string, 0, len(elements))
-	for _, el := range elements {
-		if el == nil {
-			parts = append(parts, "")
-			continue
-		}
-		ev := staticEval(el)
-		switch ev.Kind {
-		case jvNull, jvUndef, jvUnknown:
-			// Array.prototype.join special-cases null/undefined to "".
-			// Unknown (statically unresolvable) values fall through the
-			// same way — upstream's noop → null → "" via Array.join.
-			parts = append(parts, "")
-		default:
-			parts = append(parts, jsToString(ev))
-		}
-	}
-	return staticEvalToTabIndex(jsValue{Kind: jvString, Str: strings.Join(parts, ",")})
+	// upstream `Number.isNaN(value)` → undefined.
+	return 0, false, false
 }
 
 // unaryStringToTabIndex models JS unary `+x` / `-x` ToNumber coercion for
@@ -373,6 +497,9 @@ func staticEvalToTabIndex(v jsValue) (float64, bool) {
 			return 1, true
 		}
 		return 0, true
+	case jvBigInt:
+		// Mirror JS Number(bigint): floors to Float64 (out-of-range → ±Inf).
+		return jsValueToNumber(v)
 	}
 	return 0, false
 }

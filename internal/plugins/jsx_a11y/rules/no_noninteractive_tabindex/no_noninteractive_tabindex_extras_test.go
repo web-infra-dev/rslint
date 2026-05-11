@@ -246,9 +246,10 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex={1e-5} />`, Tsx: true},
 		{Code: `<div tabIndex="1.5" />`, Tsx: true},
 		{Code: `<div tabIndex="0.5" />`, Tsx: true},
-		// BigInt → step 1 jvBigInt → not in switch → step 2 jvBigInt → not handled → skip.
-		{Code: `<div tabIndex={1n} />`, Tsx: true},
-		{Code: `<div tabIndex={0n} />`, Tsx: true},
+		// BigInt — upstream Number(BigInt) coerces to a usable Number,
+		// so `0n` / `1n` reach `>= 0` true → REPORT. Lock-ins in the
+		// invalid section. Only negative BigInts skip here.
+		{Code: `<div tabIndex={-1n} />`, Tsx: true}, // Number(-1n) = -1, -1 >= 0 false → skip
 		// Identifier / runtime expression — staticEval returns string fallback,
 		// parseFloat fails → undefined.
 		{Code: `<div tabIndex={someVar} />`, Tsx: true},
@@ -292,9 +293,9 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex={+'-5'} />`, Tsx: true}, // +(-5) = -5
 		// Bitwise NOT — staticEval already handles, just lock the negative result.
 		{Code: `<div tabIndex={~5} />`, Tsx: true}, // -6
-		// `<div tabIndex={} />` — empty JsxExpression. attributeInnerExpression
-		// returns nil → skip.
-		{Code: `<div tabIndex={} />`, Tsx: true},
+		// `<div tabIndex={} />` — empty JsxExpression / JSXEmptyExpression.
+		// Upstream's TYPES has no entry → noop → null → `null >= 0` true →
+		// REPORT. Moved to invalid section below.
 		// undefined identifier → step 1 jvUndef (literalPropValue) → not in
 		// switch → step 2 staticEval → jvUndef → not handled → skip.
 		{Code: `<div tabIndex={undefined} />`, Tsx: true},
@@ -312,7 +313,10 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex={(-1) as number} />`, Tsx: true},
 		{Code: `<div tabIndex={-1 as number} />`, Tsx: true},
 		{Code: `<div tabIndex={(-1)!} />`, Tsx: true},
-		{Code: `<div tabIndex={-1 satisfies number} />`, Tsx: true}, // satisfies opaque → step 2 jvNull → skip; would-be valid even if wired
+		// Note: `<div tabIndex={-1 satisfies number} />` is INVALID per
+		// upstream (TSSatisfiesExpression → null → `null >= 0` true →
+		// REPORT). It's covered in the invalid section as part of the
+		// opaque-expression-types lock-in group.
 		// Parenthesized string literal coerces to integer (negative).
 		{Code: `<div tabIndex={("-1")} />`, Tsx: true},
 		{Code: `<div tabIndex={("-1") as string} />`, Tsx: true},
@@ -536,7 +540,56 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex={true ? someVar : otherVar} />`, Tsx: true},
 		// LogicalExpression with falsy-string value.
 		{Code: `<div tabIndex={false || -1} />`, Tsx: true},
+
+		// progressbar role — aria-query treats it as interactive (widget
+		// descendant via `range`), so isInteractiveRole skips. Lock-in.
+		{Code: `<div role="progressbar" tabIndex={0} />`, Tsx: true},
+
+		// TSNonNullExpression on tabIndex — upstream stringifies to "0!" /
+		// "5!" → Number(...) = NaN → step-1 undefined → no-non skips.
+		// Lock-in for Cluster A.
+		{Code: `<div tabIndex={0!} />`, Tsx: true},
+		{Code: `<div tabIndex={(0)!} />`, Tsx: true},
+		{Code: `<div tabIndex={(5)!} />`, Tsx: true},
+
+		// BigInt with negative value — Number(-1n) = -1, -1 >= 0 false → skip.
+		{Code: `<div tabIndex={-1n} />`, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
+		// Empty JsxExpression `tabIndex={}` — JSXEmptyExpression, upstream
+		// TYPES no entry → null. `null >= 0` true → REPORT. Lock-in for
+		// the Cluster H fix.
+		{Code: `<div tabIndex={} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+
+		// BigInt — upstream Number(BigInt) coerces. 0n → 0 → `0>=0` REPORT;
+		// 1n → 1 → REPORT; 2n → 2 → REPORT. Lock-in for Cluster B.
+		{Code: `<div tabIndex={0n} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `<div tabIndex={1n} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `<div tabIndex={2n} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `<div tabIndex={5n} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `<div tabIndex={true ? 1n : 0n} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+
+		// ============================================================
+		// Group 0: Opaque expression types — upstream returns null which
+		// passes the `typeof === 'undefined'` guard, then `null >= 0` is
+		// true (ToNumber-coerces to 0). Aligned via GetTabIndexEx's
+		// nullLike arm. Locks against accidental regression to the lossy
+		// pre-Ex behavior that silently skipped these.
+		// ============================================================
+		{Code: `<div tabIndex={-1 satisfies number} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `<div tabIndex={5 satisfies number} />`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `async function f() { return <div tabIndex={await p} />; }`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+		{Code: `function* g() { yield <div tabIndex={yield 0} />; }`, Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNoninteractiveTabindex", Message: errorMessage}}},
+
 		// ============================================================
 		// Group 1: Position assertions
 		// ============================================================
@@ -676,8 +729,10 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div role="heading" tabIndex={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div role="region" tabIndex={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div role="tabpanel" tabIndex={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
-		// `progressbar` is forced to non-interactive in the upstream filter.
-		{Code: `<div role="progressbar" tabIndex={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+		// Note: `<div role="progressbar" tabIndex={0} />` is VALID per upstream.
+		// progressbar's superClass chain in aria-query contains `widget` (via
+		// `range`), so isInteractiveRole returns true and the rule skips.
+		// Moved to valid section above.
 		// More non-interactive roles.
 		{Code: `<div role="alert" tabIndex={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div role="banner" tabIndex={0} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
@@ -810,7 +865,9 @@ func TestNoNoninteractiveTabindexExtras(t *testing.T) {
 		{Code: `<div tabIndex={0 as number} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div tabIndex={(0) as number} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div tabIndex={0 as any} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
-		{Code: `<div tabIndex={(0)!} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+		// Note: `<div tabIndex={(0)!} />` is VALID per upstream
+		// (TSNonNullExpression stringifies to "0!" → NaN → step-1 undefined
+		// → no-non skips). Moved to valid section.
 		// ConditionalExpression with non-negative arms — staticEval picks one.
 		{Code: `<div tabIndex={cond ? 0 : -1} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div tabIndex={true ? 0 : 1} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
