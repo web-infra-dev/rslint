@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_redundant_roles"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/scope"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/tabindex_no_positive"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -38,5 +39,6 @@ func GetAllRules() []rule.Rule {
 		no_noninteractive_tabindex.NoNoninteractiveTabindexRule,
 		no_redundant_roles.NoRedundantRolesRule,
 		scope.ScopeRule,
+		tabindex_no_positive.TabindexNoPositiveRule,
 	}
 }

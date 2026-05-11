@@ -19,10 +19,10 @@ import (
 const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
 
 type ExtraShim struct {
-	ExtraFunctions  []string
-	ExtraMethods    map[string]([]string)
-	ExtraFields     map[string]([]string)
-	IgnoreFunctions []string
+	ExtraFunctions  []string              `json:"ExtraFunctions"`
+	ExtraMethods    map[string]([]string) `json:"ExtraMethods"`
+	ExtraFields     map[string]([]string) `json:"ExtraFields"`
+	IgnoreFunctions []string              `json:"IgnoreFunctions"`
 }
 
 // check whether signature can be exported
@@ -57,6 +57,7 @@ func main() {
 		"scanner",
 		"tsoptions",
 		"tspath",
+		"transformers/jsxtransforms",
 		"vfs",
 		"vfs/cachedvfs",
 		"vfs/osvfs",
