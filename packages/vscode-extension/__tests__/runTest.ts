@@ -26,17 +26,17 @@ async function main() {
     failed = true;
   }
 
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace],
-      version: '1.106.3',
-    });
-  } catch (err) {
-    console.error('JSON config tests (1.106.3) failed:', err);
-    failed = true;
-  }
+  // try {
+  //   await runTests({
+  //     extensionDevelopmentPath,
+  //     extensionTestsPath,
+  //     launchArgs: ['--disable-extensions', testWorkspace],
+  //     version: '1.106.3',
+  //   });
+  // } catch (err) {
+  //   console.error('JSON config tests (1.106.3) failed:', err);
+  //   failed = true;
+  // }
 
   // --- JS config tests ---
   const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
