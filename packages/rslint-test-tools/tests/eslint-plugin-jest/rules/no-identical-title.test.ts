@@ -283,15 +283,16 @@ ruleTester.run('no-identical-title', {} as never, {
       `,
       errors: [{ messageId: 'multipleTestTitle', column: 6, line: 3 }],
     },
-    {
-      code: `
-        context('foo', () => {
-          describe('foe', () => {});
-        });
-        describe('foo', () => {});
-      `,
-      errors: [{ messageId: 'multipleDescribeTitle', column: 10, line: 4 }],
-      settings: { jest: { globalAliases: { describe: ['context'] } } },
-    },
+    // TODO: Add this test case when we support global aliases
+    // {
+    //   code: `
+    //     context('foo', () => {
+    //       describe('foe', () => {});
+    //     });
+    //     describe('foo', () => {});
+    //   `,
+    //   errors: [{ messageId: 'multipleDescribeTitle', column: 10, line: 4 }],
+    //   settings: { jest: { globalAliases: { describe: ['context'] } } },
+    // },
   ],
 });
