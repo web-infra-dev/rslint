@@ -94,6 +94,13 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     presetName: 'unicornPlugin.configs.recommended',
     description: 'Unicorn rules',
   },
+  {
+    prefix: 'jsx-a11y',
+    group: 'eslint-plugin-jsx-a11y',
+    importName: 'jsxA11yPlugin',
+    presetName: 'jsxA11yPlugin.configs.recommended',
+    description: 'JSX a11y rules',
+  },
 ];
 
 /**
