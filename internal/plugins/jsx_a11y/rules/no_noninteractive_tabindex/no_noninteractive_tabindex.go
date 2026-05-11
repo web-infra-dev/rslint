@@ -71,6 +71,9 @@ var NoNoninteractiveTabindexRule = rule.Rule{
 	Name: "jsx-a11y/no-noninteractive-tabindex",
 	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
 		opts := parseOptions(rawOptions)
+		// sourceText is required by GetTabIndexEx for raw-text template
+		// literal extraction (NoSubstitutionTemplate has no RawText field).
+		sourceText := ctx.SourceFile.Text()
 
 		check := func(node *ast.Node) {
 			attrs := reactutil.GetJsxElementAttributes(node)
@@ -78,9 +81,16 @@ var NoNoninteractiveTabindexRule = rule.Rule{
 			if tabIndexProp == nil {
 				return
 			}
-			tabIndex, ok := jsxa11yutil.GetTabIndex(tabIndexProp)
-			if !ok {
-				// upstream `if (typeof tabIndex === 'undefined') return;`
+			// upstream `if (typeof tabIndex === 'undefined') return;` matches
+			// strictly when getTabIndex's step-1 short-circuited (boolean
+			// form, empty string, NaN, missing). The step-2 fallback returns
+			// `null` (typeof object) for unrecognized expression types, which
+			// passes the `typeof === 'undefined'` guard and reaches the
+			// `tabIndex >= 0` check below — where `null >= 0` ToNumber-coerces
+			// to `0 >= 0` = true → REPORT. GetTabIndexEx surfaces the
+			// distinction via nullLike so we can mirror this exactly.
+			tabIndex, hasTabIndex, nullLike := jsxa11yutil.GetTabIndexEx(tabIndexProp, sourceText)
+			if !hasTabIndex && !nullLike {
 				return
 			}
 
@@ -125,7 +135,10 @@ var NoNoninteractiveTabindexRule = rule.Rule{
 				return
 			}
 
-			if tabIndex >= 0 {
+			// Upstream `tabIndex >= 0` ToNumber-coerces null to 0; the
+			// nullLike arm therefore unconditionally reports (`0 >= 0` is
+			// true). The hasTabIndex arm compares the resolved number.
+			if (hasTabIndex && tabIndex >= 0) || nullLike {
 				ctx.ReportNode(tabIndexProp, rule.RuleMessage{
 					Id:          "noNoninteractiveTabindex",
 					Description: errorMessage,

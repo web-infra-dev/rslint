@@ -184,7 +184,15 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     { code: '<div tabIndex={1e-5} />' },
     { code: '<div tabIndex="1.5" />' },
     { code: '<div tabIndex="0.5" />' },
-    { code: '<div tabIndex={1n} />' }, // BigInt
+    // BigInt 0n/1n/positive are INVALID per upstream (Number(BigInt)
+    // coerces — see invalid section). Only negative BigInts skip here.
+    { code: '<div tabIndex={-1n} />' },
+    // progressbar role — widget-class in aria-query → interactive → skip.
+    { code: '<div role="progressbar" tabIndex={0} />' },
+    // TSNonNullExpression → stringifies to "0!" → NaN → undefined → skip.
+    { code: '<div tabIndex={0!} />' },
+    { code: '<div tabIndex={(0)!} />' },
+    { code: '<div tabIndex={(5)!} />' },
     { code: '<div tabIndex={someVar} />' },
     { code: '<div tabIndex={fn()} />' },
     { code: '<div tabIndex={obj.x} />' },
@@ -214,7 +222,9 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     { code: '<div tabIndex={(-1)!} />' },
     { code: '<div tabIndex={("-1")} />' },
     { code: '<div tabIndex={("-1") as string} />' },
-    { code: '<div tabIndex={-1 satisfies number} />' },
+    // `<div tabIndex={X satisfies T} />` is INVALID under upstream
+    // (TSSatisfiesExpression → null → `null >= 0` true → REPORT). See
+    // the invalid section below for the lock-in.
 
     // ============================================================
     // Options matrix
@@ -367,6 +377,38 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
   ],
   invalid: [
     // ============================================================
+    // Opaque expression types — upstream returns null which passes the
+    // `typeof === 'undefined'` guard, then `null >= 0` ToNumber-coerces
+    // to `0 >= 0` = true → REPORT. Aligned via GetTabIndexEx's nullLike
+    // arm. Locks against the lossy pre-Ex behavior that silently skipped.
+    // ============================================================
+    { code: '<div tabIndex={-1 satisfies number} />', errors: [expectedError] },
+    { code: '<div tabIndex={5 satisfies number} />', errors: [expectedError] },
+    {
+      code: 'async function f() { return <div tabIndex={await p} />; }',
+      errors: [expectedError],
+    },
+    {
+      code: 'function* g() { yield <div tabIndex={yield 0} />; }',
+      errors: [expectedError],
+    },
+
+    // ============================================================
+    // BigInt — Number(BigInt) coerces. 0n → 0 → REPORT; 1n → 1 → REPORT.
+    // ============================================================
+    { code: '<div tabIndex={0n} />', errors: [expectedError] },
+    { code: '<div tabIndex={1n} />', errors: [expectedError] },
+    { code: '<div tabIndex={2n} />', errors: [expectedError] },
+    { code: '<div tabIndex={5n} />', errors: [expectedError] },
+    { code: '<div tabIndex={true ? 1n : 0n} />', errors: [expectedError] },
+
+    // ============================================================
+    // Empty JsxExpression `tabIndex={}` — JSXEmptyExpression → null →
+    // `null >= 0` true → REPORT.
+    // ============================================================
+    { code: '<div tabIndex={} />', errors: [expectedError] },
+
+    // ============================================================
     // Upstream neverValid
     // ============================================================
     { code: '<div tabIndex="0" />', errors: [expectedError] },
@@ -461,10 +503,9 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
       code: '<div role="tabpanel" tabIndex={0} />',
       errors: [expectedError],
     },
-    {
-      code: '<div role="progressbar" tabIndex={0} />',
-      errors: [expectedError],
-    },
+    // Note: `<div role="progressbar" tabIndex={0} />` is VALID per
+    // upstream — progressbar is widget-class in aria-query → interactive →
+    // rule skips. Moved to valid section.
     { code: '<div role="alert" tabIndex={0} />', errors: [expectedError] },
     { code: '<div role="banner" tabIndex={0} />', errors: [expectedError] },
     {
@@ -581,7 +622,8 @@ new RuleTester().run('no-noninteractive-tabindex', null as never, {
     { code: '<div tabIndex={0 as number} />', errors: [expectedError] },
     { code: '<div tabIndex={(0) as number} />', errors: [expectedError] },
     { code: '<div tabIndex={0 as any} />', errors: [expectedError] },
-    { code: '<div tabIndex={(0)!} />', errors: [expectedError] },
+    // Note: `<div tabIndex={(0)!} />` is VALID (stringified to "0!" → NaN
+    // → undefined → skip). Lock-in in the valid section.
     // Conditional / Logical / Nullish resolving to non-negative.
     { code: '<div tabIndex={cond ? 0 : -1} />', errors: [expectedError] },
     { code: '<div tabIndex={true ? 0 : 1} />', errors: [expectedError] },

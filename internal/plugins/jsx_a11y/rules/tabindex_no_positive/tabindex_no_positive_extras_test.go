@@ -363,6 +363,17 @@ func TestTabindexNoPositiveExtras(t *testing.T) {
 		{Code: `<div tabIndex={5 as any} />`, Tsx: true},
 		{Code: `<div tabIndex={5 satisfies number} />`, Tsx: true},
 		{Code: `<div tabIndex={(5)!} />`, Tsx: true},
+		// AwaitExpression / YieldExpression — same upstream flow as
+		// TSSatisfiesExpression: TYPES has no entry → noop → null →
+		// Number(null) = 0 → 0 <= 0 → skip. Verified via differential
+		// against eslint-plugin-jsx-a11y v6.10.2 — neither expression
+		// triggers tabindex-no-positive. LiteralPropToNumber lands the
+		// same way through literalPropValue's default jsNull arm followed
+		// by jsValueToNumber's jvNull → (0, true) mapping. Locks the
+		// alignment in case future LiteralPropToNumber refactors change
+		// the jvNull handling.
+		{Code: `async function f() { return <div tabIndex={await p} />; }`, Tsx: true},
+		{Code: `function* g() { yield <div tabIndex={yield 0} />; }`, Tsx: true},
 
 		// ============================================================
 		// Spread attributes — listener fires on JsxAttribute only

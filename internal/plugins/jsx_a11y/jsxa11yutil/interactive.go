@@ -52,9 +52,10 @@ type elementAttrSchema struct {
 }
 
 // interactiveRolesSet is the set of roles whose `superClass` chain contains
-// `widget`, MINUS `progressbar` (treated as readonly hence non-interactive),
-// PLUS `toolbar` (does not descend from widget but supports
-// aria-activedescendant). Mirrors upstream's `interactiveRoles` Set.
+// `widget`, PLUS `toolbar` (does not descend from widget but supports
+// aria-activedescendant). Mirrors upstream's `interactiveRoles` Set, which
+// is derived from aria-query and includes `progressbar` (a widget
+// descendant via `range`).
 var interactiveRolesSet = map[string]struct{}{
 	"button":           {},
 	"checkbox":         {},
@@ -74,6 +75,7 @@ var interactiveRolesSet = map[string]struct{}{
 	"menuitemcheckbox": {},
 	"menuitemradio":    {},
 	"option":           {},
+	"progressbar":      {},
 	"radio":            {},
 	"radiogroup":       {},
 	"row":              {},
@@ -126,7 +128,7 @@ var nonInteractiveRoleNames = []string{
 	"graphics-document", "graphics-object", "graphics-symbol",
 	"group", "heading", "img", "insertion", "list", "listitem", "log",
 	"main", "mark", "marquee", "math", "meter", "navigation", "none",
-	"note", "paragraph", "presentation", "progressbar", "region",
+	"note", "paragraph", "presentation", "region",
 	"rowgroup", "search", "separator", "status", "strong", "subscript",
 	"superscript", "table", "tabpanel", "term", "time", "timer",
 	"tooltip",

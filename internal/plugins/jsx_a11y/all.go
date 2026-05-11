@@ -4,6 +4,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/alt_text"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_has_content"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_is_valid"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_activedescendant_has_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_unsupported_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/autocomplete_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/heading_has_content"
@@ -26,6 +27,7 @@ func GetAllRules() []rule.Rule {
 		alt_text.AltTextRule,
 		anchor_has_content.AnchorHasContentRule,
 		anchor_is_valid.AnchorIsValidRule,
+		aria_activedescendant_has_tabindex.AriaActivedescendantHasTabindexRule,
 		aria_unsupported_elements.AriaUnsupportedElementsRule,
 		autocomplete_valid.AutocompleteValidRule,
 		heading_has_content.HeadingHasContentRule,

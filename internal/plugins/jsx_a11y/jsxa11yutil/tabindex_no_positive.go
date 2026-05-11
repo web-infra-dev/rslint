@@ -324,6 +324,17 @@ func arrayElementToString(el *ast.Node, sourceText string) string {
 		// the same way — upstream's TYPES path returns null for unknowns
 		// and Array.join then writes "".
 		return ""
+	case jvTruthy:
+		// Objects / regex / array literals stringify via toString:
+		// `String({})` = "[object Object]", `String(/foo/)` = "/foo/", ...
+		// All non-empty non-numeric strings → Number(...) = NaN downstream,
+		// which is what upstream's array-join arm ends up with too. A stable
+		// placeholder suffices; the exact text isn't observed by any rule.
+		return "(obj)"
+	case jvFunction:
+		// Functions / arrow functions stringify to source code; same
+		// downstream behaviour as objects (NaN). Use a stable placeholder.
+		return "(fn)"
 	}
 	return jsToString(ev)
 }
