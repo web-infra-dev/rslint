@@ -56,9 +56,8 @@ const (
 	preferKindDefined
 )
 
-// unwrapTypeAssertions strips parentheses, type assertions, non-null
-// assertions, and `satisfies` so the resulting node represents the
-// underlying expression visible to the runtime.
+// unwrapTypeAssertions strips parentheses and TypeScript type assertions so
+// the resulting node matches what the upstream rule inspects at runtime.
 func unwrapTypeAssertions(node *ast.Node) *ast.Node {
 	for node != nil {
 		switch node.Kind {
@@ -68,10 +67,6 @@ func unwrapTypeAssertions(node *ast.Node) *ast.Node {
 			node = node.AsAsExpression().Expression
 		case ast.KindTypeAssertionExpression:
 			node = node.AsTypeAssertion().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
 		default:
 			return node
 		}
