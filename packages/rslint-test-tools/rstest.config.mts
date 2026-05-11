@@ -173,6 +173,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/no-noninteractive-tabindex.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-redundant-roles.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/scope.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/tabindex-no-positive.test.ts',
 
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
