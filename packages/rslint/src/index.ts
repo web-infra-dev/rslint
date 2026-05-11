@@ -20,6 +20,7 @@ export {
   promisePlugin,
   jestPlugin,
   unicornPlugin,
+  jsxA11yPlugin,
 } from './configs/index.js';
 
 // Export the main RSLintService class for direct usage
