@@ -381,6 +381,10 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 // Phase 1 — lint rules: each program is processed via
 // runLintRulesInProgram, with files filtered through opts.ExcludePaths,
 // opts.Scope, opts.PerProgramFilter and the program's own owned-file set.
+// When opts.GetRulesForFile is nil, Phase 1 is skipped entirely — no work
+// group is created, no per-program goroutines are spawned, and no
+// owned-file sets are built. This is how callers run a pure type-check
+// pass (--type-check-only) without paying lint-side setup cost.
 //
 // Phase 2 — type-check (skipped when opts.TypeCheck is false): each
 // non-skipped program is handed to runTypeCheckAcrossPrograms, which
@@ -400,44 +404,45 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}
 
 	var executedRules sync.Map
-	trackedGetRules := opts.GetRulesForFile
-	if trackedGetRules != nil {
+	var lintedFileCount atomic.Int32
+
+	// Phase 1: lint rules per program (parallel). Skipped when no rule
+	// handler was supplied — see doc above.
+	if opts.GetRulesForFile != nil {
 		base := opts.GetRulesForFile
-		trackedGetRules = func(sf *ast.SourceFile) []ConfiguredRule {
+		trackedGetRules := func(sf *ast.SourceFile) []ConfiguredRule {
 			rules := base(sf)
 			for _, r := range rules {
 				executedRules.Store(r.Name, struct{}{})
 			}
 			return rules
 		}
-	}
 
-	// Phase 1: lint rules per program (parallel).
-	wg := core.NewWorkGroup(opts.SingleThreaded)
-	var lintedFileCount atomic.Int32
-	for i, program := range opts.Programs {
-		var perProgramFilter FileFilter
-		if i < len(opts.PerProgramFilter) {
-			perProgramFilter = opts.PerProgramFilter[i]
-		}
-		ownedFiles := buildOwnedFileSet(program)
-		filter := composeOwnedFilter(perProgramFilter, ownedFiles)
+		wg := core.NewWorkGroup(opts.SingleThreaded)
+		for i, program := range opts.Programs {
+			var perProgramFilter FileFilter
+			if i < len(opts.PerProgramFilter) {
+				perProgramFilter = opts.PerProgramFilter[i]
+			}
+			ownedFiles := buildOwnedFileSet(program)
+			filter := composeOwnedFilter(perProgramFilter, ownedFiles)
 
-		programOpts := runProgramOptions{
-			Program:         program,
-			Scope:           opts.Scope,
-			ExcludePaths:    opts.ExcludePaths,
-			FileFilter:      filter,
-			GetRulesForFile: trackedGetRules,
-			TypeInfoFiles:   opts.TypeInfoFiles,
-			OnDiagnostic:    opts.OnDiagnostic,
+			programOpts := runProgramOptions{
+				Program:         program,
+				Scope:           opts.Scope,
+				ExcludePaths:    opts.ExcludePaths,
+				FileFilter:      filter,
+				GetRulesForFile: trackedGetRules,
+				TypeInfoFiles:   opts.TypeInfoFiles,
+				OnDiagnostic:    opts.OnDiagnostic,
+			}
+			wg.Queue(func() {
+				n := runLintRulesInProgram(programOpts)
+				lintedFileCount.Add(n)
+			})
 		}
-		wg.Queue(func() {
-			n := runLintRulesInProgram(programOpts)
-			lintedFileCount.Add(n)
-		})
+		wg.RunAndWait()
 	}
-	wg.RunAndWait()
 
 	// Phase 2: program-level type-check (tsc-aligned).
 	if opts.TypeCheck {

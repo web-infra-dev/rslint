@@ -434,6 +434,7 @@ Options:
   --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
   --type-check          Enable TypeScript type checking
+  --type-check-only     Run only TypeScript type checking (skip all lint rules)
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
@@ -482,6 +483,142 @@ func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
 	return fixed
 }
 
+// allowFileWarningKind categorizes why a CLI-specified file won't have lint
+// rules applied. These are Phase-1 (lint) concepts; Phase 2 (type-check) is
+// not affected by either case (it runs program-wide regardless of CLI scope
+// and rslint ignores).
+type allowFileWarningKind int
+
+const (
+	allowFileNotInProgram allowFileWarningKind = iota
+	allowFileIgnored
+)
+
+// allowFileWarning is the structured form of a "this CLI-specified file
+// won't be linted" diagnostic. Returned by collectAllowFileWarnings so the
+// emission policy (skip in --type-check-only, format with relative paths,
+// etc.) can be unit-tested without capturing stderr.
+type allowFileWarning struct {
+	Path string // absolute, normalized — matches what was put in allowFiles
+	Kind allowFileWarningKind
+}
+
+// formatAllowFileWarning renders an allowFileWarning for stderr emission,
+// resolving the absolute path against comparePathOptions. Returns "" for
+// unknown kinds so callers can safely ignore the empty case.
+func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions) string {
+	rel := tspath.ConvertToRelativePath(w.Path, opts)
+	switch w.Kind {
+	case allowFileNotInProgram:
+		return fmt.Sprintf("warning: %s was not found in the project, skipping", rel)
+	case allowFileIgnored:
+		return fmt.Sprintf("warning: %s is ignored because of a matching ignore pattern", rel)
+	}
+	return ""
+}
+
+// collectAllowFileWarnings explains, for each CLI-specified file in
+// allowFiles, why it won't be visited by Phase 1 (lint). A file lands in
+// the result if it is outside every Program, or if it is in some Program
+// but the nearest config's `ignores` patterns exclude it. Returns nil for
+// empty allowFiles.
+//
+// This is a Phase-1 concern only. In --type-check-only mode the lint phase
+// is skipped, so callers MUST gate emission on `!typeCheckOnly` — otherwise
+// users see misleading messages like "is ignored because of a matching
+// ignore pattern" while Phase 2 happily reports type errors for that same
+// file. See website/docs/en/guide/type-checking.md ("type-check is not
+// constrained by `files`/`ignores`").
+func collectAllowFileWarnings(
+	allowFiles []string,
+	programs []*compiler.Program,
+	configMap map[string]rslintconfig.RslintConfig,
+	rslintConfig rslintconfig.RslintConfig,
+	currentDirectory string,
+) []allowFileWarning {
+	if len(allowFiles) == 0 {
+		return nil
+	}
+	programFiles := make(map[string]struct{})
+	for _, prog := range programs {
+		for _, sf := range prog.GetSourceFiles() {
+			programFiles[sf.FileName()] = struct{}{}
+		}
+	}
+
+	// Cache FindNearestConfig results by directory to avoid redundant lookups
+	// when many files are in the same directory (e.g., lint-staged).
+	type cachedConfig struct {
+		cfgDir string
+		cfg    rslintconfig.RslintConfig
+	}
+	dirConfigCache := make(map[string]*cachedConfig)
+
+	var out []allowFileWarning
+	for _, f := range allowFiles {
+		if _, inProgram := programFiles[f]; !inProgram {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotInProgram})
+			continue
+		}
+		// File is in a Program — check if config would assign rules
+		var merged *rslintconfig.MergedConfig
+		if configMap != nil {
+			dir := tspath.GetDirectoryPath(f)
+			cached, ok := dirConfigCache[dir]
+			if !ok {
+				cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
+				cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
+				dirConfigCache[dir] = cached
+			}
+			if cached.cfg != nil {
+				merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
+			}
+		} else {
+			merged = rslintConfig.GetConfigForFile(f, currentDirectory)
+		}
+		if merged == nil {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
+		}
+	}
+	return out
+}
+
+// shouldShortCircuitOutput returns true when rslint should bail early
+// without printing diagnostics or a summary. The short-circuit exists so
+// that e.g. `rslint nonexistent-file.ts` returns 0 with no spurious output
+// when Phase 1 visited zero files.
+//
+// Any type-check mode (`--type-check` or `--type-check-only`) must NOT take
+// the short-circuit: Phase 2 runs program-wide and is not gated by the CLI
+// Scope/PerProgramFilter that drives lintedFileCount, so lintedFileCount==0
+// is a normal state in which Phase 2 may still have produced diagnostics.
+// Short-circuiting there would silently drop type errors that the user
+// explicitly asked for — see website/docs/en/guide/type-checking.md.
+func shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {
+	if typeCheckOnly || typeCheck {
+		return false
+	}
+	return scopeRestricted && lintedFileCount == 0
+}
+
+// validateTypeCheckOnlyFlags rejects --type-check-only combined with flags
+// whose semantics depend on the lint phase that this mode disables. Returns
+// (0, "") when the combination is valid (or --type-check-only isn't set);
+// otherwise returns (exitCode > 0, stderr message). Pulled out as a pure
+// function so the policy can be exercised in unit tests.
+func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (int, string) {
+	if !typeCheckOnly {
+		return 0, ""
+	}
+	if fix {
+		return 2, "error: --fix cannot be combined with --type-check-only (no lint rules run, nothing to fix)"
+	}
+	if len(ruleFlags) > 0 {
+		return 2, "error: --rule cannot be combined with --type-check-only (no lint rules run)"
+	}
+	return 0, ""
+}
+
 // resolveStartTime returns the start time for timing output.
 // If startTimeMs (epoch millis from the Node.js entry point) is positive,
 // it is used so the reported duration covers end-to-end execution.
@@ -501,8 +638,9 @@ func runCMD() int {
 		help        bool
 		config      string
 		configStdin bool
-		fix         bool
-		typeCheck   bool
+		fix           bool
+		typeCheck     bool
+		typeCheckOnly bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -521,6 +659,7 @@ func runCMD() int {
 	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
 	flag.BoolVar(&typeCheck, "type-check", false, "enable TypeScript type checking")
+	flag.BoolVar(&typeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
@@ -535,6 +674,16 @@ func runCMD() int {
 	flag.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 
 	flag.Parse()
+
+	// --type-check-only implies --type-check and skips all lint rules.
+	// Reject incompatible flag combinations before doing any work.
+	if code, msg := validateTypeCheckOnlyFlags(typeCheckOnly, fix, []string(ruleFlags)); code != 0 {
+		fmt.Fprintln(os.Stderr, msg)
+		return code
+	}
+	if typeCheckOnly {
+		typeCheck = true
+	}
 
 	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
 	var allowFiles []string
@@ -969,12 +1118,20 @@ func runCMD() int {
 	// tsconfig Coverage").
 	skipTypeCheck := buildTypeCheckSkipMask(len(programs), fallbackProgramIndex)
 
+	// In --type-check-only mode, skip the lint phase entirely by passing
+	// nil for GetRulesForFile. RunLinter's Phase 1 is gated on this being
+	// non-nil; Phase 2 (type-check) runs independently.
+	var rulesForFile linter.RuleHandler
+	if !typeCheckOnly {
+		rulesForFile = getRulesForFile
+	}
+
 	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 		PerProgramFilter:      toFileFilters(fileFilters),
-		GetRulesForFile:       getRulesForFile,
+		GetRulesForFile:       rulesForFile,
 		TypeInfoFiles:         typeInfoFiles,
 		TypeCheck:             typeCheck,
 		SkipTypeCheckPrograms: skipTypeCheck,
@@ -994,57 +1151,18 @@ func runCMD() int {
 	wg.Wait()
 
 	// Emit per-file warnings for CLI-specified files that won't be linted.
-	// Distinguish between "ignored by pattern" vs "no matching configuration"
-	// vs "not found in project", aligned with ESLint v10's warning behavior.
-	if len(allowFiles) > 0 {
-		programFiles := make(map[string]struct{})
-		for _, prog := range programs {
-			for _, sf := range prog.GetSourceFiles() {
-				programFiles[sf.FileName()] = struct{}{}
-			}
-		}
-		// Cache FindNearestConfig results by directory to avoid redundant lookups
-		// when many files are in the same directory (e.g., lint-staged).
-		type cachedConfig struct {
-			cfgDir string
-			cfg    rslintconfig.RslintConfig
-		}
-		dirConfigCache := make(map[string]*cachedConfig)
-
-		for _, f := range allowFiles {
-			_, inProgram := programFiles[f]
-
-			if !inProgram {
-				// File not in any Program — warn and skip
-				relPath := tspath.ConvertToRelativePath(f, comparePathOptions)
-				fmt.Fprintf(os.Stderr, "warning: %s was not found in the project, skipping\n", relPath)
-				continue
-			}
-
-			// File is in a Program — check if config would assign rules
-			var merged *rslintconfig.MergedConfig
-			if configMap != nil {
-				dir := tspath.GetDirectoryPath(f)
-				cached, ok := dirConfigCache[dir]
-				if !ok {
-					cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
-					cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
-					dirConfigCache[dir] = cached
-				}
-				if cached.cfg != nil {
-					merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
-				}
-			} else {
-				merged = rslintConfig.GetConfigForFile(f, currentDirectory)
-			}
-
-			if merged == nil {
-				relPath := tspath.ConvertToRelativePath(f, comparePathOptions)
-				fmt.Fprintf(os.Stderr, "warning: %s is ignored because of a matching ignore pattern\n", relPath)
-			}
+	// Distinguishes "not found in project" vs "ignored by pattern", aligned
+	// with ESLint v10's warning behavior. Skipped in --type-check-only mode:
+	// these are lint-phase concepts and would mislead users about Phase 2
+	// (which runs program-wide regardless of CLI scope and rslint ignores).
+	if !typeCheckOnly {
+		warnings := collectAllowFileWarnings(allowFiles, programs, configMap, rslintConfig, currentDirectory)
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, formatAllowFileWarning(w, comparePathOptions))
 		}
 	}
-	if (len(allowFiles) > 0 || len(allowDirs) > 0) && lintedfileCount == 0 {
+	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
+	if shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
 	}
 
@@ -1164,21 +1282,54 @@ func runCMD() int {
 		// Build the errors summary part.
 		// When type-check is enabled and there are type errors, split the display.
 		var errorsSummary string
-		if typeCheck {
+		switch {
+		case typeCheckOnly:
+			// Lint phase was skipped; only type errors are possible.
+			errorsSummary = fmt.Sprintf("%s %s",
+				errorsColorFunc("%d", typeErrorsCount),
+				pluralize(typeErrorsCount, "type error", "type errors"),
+			)
+		case typeCheck:
 			errorsSummary = fmt.Sprintf("%s %s, %s %s",
 				errorsColorFunc("%d", lintErrorsCount),
 				pluralize(lintErrorsCount, "lint error", "lint errors"),
 				errorsColorFunc("%d", typeErrorsCount),
 				pluralize(typeErrorsCount, "type error", "type errors"),
 			)
-		} else {
+		default:
 			errorsSummary = fmt.Sprintf("%s %s",
 				errorsColorFunc("%d", errorsCount),
 				pluralize(errorsCount, "error", "errors"),
 			)
 		}
 
-		if fix && fixedCount > 0 {
+		if typeCheckOnly {
+			// type-check-only: omit lint-file/rule/warning columns since no
+			// lint ran. Report the type-checked file count derived from
+			// non-skipped programs' root files (tsconfig include/files);
+			// transitive .d.ts imports are excluded for user readability.
+			seen := make(map[string]struct{})
+			for i, prog := range programs {
+				if i < len(skipTypeCheck) && skipTypeCheck[i] {
+					continue
+				}
+				for _, fn := range prog.CommandLine().FileNames() {
+					seen[fn] = struct{}{}
+				}
+			}
+			typeCheckedFileCount := len(seen)
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s %s(type-checked %s %s in %s using %s threads)%s\n",
+				errorsSummary,
+				colors.DimText(""),
+				colors.BoldText("%d", typeCheckedFileCount),
+				pluralize(typeCheckedFileCount, "file", "files"),
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""),
+			)
+		} else if fix && fixedCount > 0 {
 			fixText := pluralize(fixedCount, "issue", "issues")
 			fmt.Fprintf(
 				os.Stdout,
