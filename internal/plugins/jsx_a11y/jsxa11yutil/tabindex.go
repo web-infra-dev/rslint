@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -160,15 +159,13 @@ func GetTabIndexEx(attr *ast.Node, sourceText string) (val float64, resolved boo
 	// `tabIndex={"…"}` which wraps in JsxExpression) carries HTML-style
 	// attribute text. ESTree parsers decode HTML entities (`&#49;`→"1",
 	// `&nbsp;`→U+00A0, …) before passing the value to lint rules; tsgo
-	// keeps the raw `&…;` source in StringLiteral.Text, so we apply
-	// DecodeEntities here to realign with upstream getLiteralPropValue
-	// output for this shape. The decoded string then routes through the
-	// same step-1 classification as a plain StringLiteral.
-	if attr.Kind == ast.KindJsxAttribute {
-		if init := attr.AsJsxAttribute().Initializer; init != nil && init.Kind == ast.KindStringLiteral {
-			decoded := jsxtx.DecodeEntities(init.AsStringLiteral().Text)
-			return classifyTabIndexString(decoded)
-		}
+	// keeps the raw `&…;` source in StringLiteral.Text, so
+	// directAttributeStringValue applies jsxtransforms.DecodeEntities to
+	// realign with upstream getLiteralPropValue output for this shape. The
+	// decoded string then routes through the same step-1 classification as
+	// a plain StringLiteral.
+	if decoded, ok := directAttributeStringValue(attr); ok {
+		return classifyTabIndexString(decoded)
 	}
 
 	inner := attributeInnerExpression(attr)
@@ -310,6 +307,108 @@ func GetTabIndexEx(attr *ast.Node, sourceText string) (val float64, resolved boo
 		return 0, false, true
 	}
 	return 0, false, false
+}
+
+// HasUpstreamTabIndexValue mirrors upstream's
+// `getTabIndex(getProp(attrs, 'tabIndex')) !== undefined` boolean check —
+// is the tabIndex prop set to ANY value that upstream getTabIndex doesn't
+// resolve to JS undefined?
+//
+// Differs from [GetTabIndex] / [GetTabIndexEx]:
+//   - GetTabIndex returns true only when the value is a usable focus order
+//     (integer-typed step-1 win, or step-2 numeric coercion).
+//   - HasUpstreamTabIndexValue also returns true when upstream's step-2
+//     getPropValue falls back to a non-numeric non-undefined value — e.g.
+//     Identifier `someVar` (whose name string passes through TYPES.Identifier),
+//     Call / Member / JsxElement (synthesized non-empty strings), Object /
+//     Array / Function / BigInt (typeof "object"/"function"/"bigint" — all
+//     `!== undefined`).
+//
+// Returns false only for the shapes that upstream getTabIndex outputs JS
+// `undefined`:
+//   - missing prop
+//   - boolean form (`<X tabIndex />`) — getPropValue → true → step-1 boolean
+//     arm → undefined
+//   - empty string / non-integer numeric / NaN-coercing literal
+//   - direct boolean (`{true}` / `{false}`)
+//   - explicit `{undefined}` and TS-wrapped variants, `typeof` / `void`
+//     expressions
+//   - TSNonNullExpression (upstream stringifies to "x!" → NaN → undefined)
+//
+// Used by interactive-supports-focus's `hasTabindex` gate.
+func HasUpstreamTabIndexValue(attrs []*ast.Node, sourceText string) bool {
+	attr := FindAttributeByName(attrs, "tabIndex")
+	if attr == nil {
+		return false
+	}
+	if AttributeIsBooleanForm(attr) {
+		return false
+	}
+
+	// Direct StringLiteral attribute carries HTML-style entity-encoded text
+	// — directAttributeStringValue applies jsxtransforms.DecodeEntities so we
+	// see the same value @typescript-eslint / @babel's JSX parser would expose.
+	if decoded, ok := directAttributeStringValue(attr); ok {
+		return tabIndexStringHasUpstreamValue(decoded)
+	}
+
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		// empty `{}` — TYPES.JSXEmptyExpression missing → null → `null !== undefined` → true.
+		return true
+	}
+
+	if inner.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		return tabIndexStringHasUpstreamValue(rawTemplateLiteralText(inner, sourceText))
+	}
+	if inner.Kind == ast.KindTemplateExpression {
+		v := templateExpressionRawText(inner.AsTemplateExpression(), sourceText)
+		return tabIndexStringHasUpstreamValue(v.Str)
+	}
+	if inner.Kind == ast.KindNonNullExpression {
+		// upstream TSNonNullExpression extractor stringifies the operand
+		// with a trailing `!` → ParseFloat fails → step-1 undefined.
+		return false
+	}
+
+	literalV := literalPropValue(inner)
+	switch literalV.Kind {
+	case jvString:
+		return tabIndexStringHasUpstreamValue(literalV.Str)
+	case jvNumber:
+		if _, ok := parseLiteralTabIndexFloat(literalV.Num); ok {
+			return true
+		}
+		return false
+	case jvBool:
+		return false
+	case jvBigInt:
+		// step-1 typeof bigint not in string/number/boolean → falls through
+		// to step-2, which returns the bigint → `!== undefined`.
+		return true
+	}
+	// step 2: getPropValue fallback. Anything that isn't JS undefined passes.
+	return !jsValueIsExactlyUndefined(staticEval(inner))
+}
+
+// tabIndexStringHasUpstreamValue reduces getTabIndex's step-1 string
+// classification to the binary "result !== undefined" question. Used by
+// [HasUpstreamTabIndexValue] for direct StringLiteral / NoSubstitutionTemplateLiteral
+// / TemplateExpression shapes; the same string semantics as
+// classifyTabIndexString without the numeric value extraction.
+func tabIndexStringHasUpstreamValue(s string) bool {
+	if s == "" {
+		return false
+	}
+	switch strings.ToLower(s) {
+	case "true", "false":
+		// jsxAstUtilsLiteralCoerce → boolean → step-1 boolean arm → undefined.
+		return false
+	}
+	if _, ok := parseLiteralTabIndexString(s); ok {
+		return true
+	}
+	return false
 }
 
 // classifyTabIndexString applies upstream getTabIndex's step-1 string

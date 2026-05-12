@@ -1,3 +1,5 @@
+// cspell:ignore utton idden
+
 // Package jsxa11yutil contains shared helpers for eslint-plugin-jsx-a11y rule
 // ports. The functions here mirror jsx-ast-utils / jsx-a11y/util semantics that
 // are common across many a11y rules: case-insensitive attribute lookup,
@@ -9,9 +11,37 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// directAttributeStringValue extracts the JSX attribute's string value with
+// HTML entity decoding for the direct `<attr="…">` form. Returns ("", false)
+// when the attribute isn't a JsxAttribute whose initializer is a bare
+// StringLiteral (i.e. caller should fall back to the JsxExpression /
+// spread-resolved path that reads the cooked JS string).
+//
+// Rationale: @typescript-eslint / @babel JSX parsers decode HTML entities
+// (`&#98;` → "b", `&amp;` → "&", `&nbsp;` → U+00A0) at parse time and
+// expose the decoded text via the AST's `value` field; jsx-ast-utils
+// consumes that decoded text. tsgo, by contrast, preserves the raw `&…;`
+// source on `StringLiteral.Text` for JSX attributes. To realign, callers
+// reading literal string values from JSX attributes must apply
+// `jsxtransforms.DecodeEntities` on the direct-StringLiteral branch.
+// `{…}` JsxExpression-wrapped strings carry JS string literals (not JSX
+// attribute text), so they MUST NOT be decoded — JS parsers leave entity
+// notation alone.
+func directAttributeStringValue(attr *ast.Node) (string, bool) {
+	if attr == nil || attr.Kind != ast.KindJsxAttribute {
+		return "", false
+	}
+	init := attr.AsJsxAttribute().Initializer
+	if init == nil || init.Kind != ast.KindStringLiteral {
+		return "", false
+	}
+	return jsxtx.DecodeEntities(init.AsStringLiteral().Text), true
+}
 
 // skipTransparent is the wrapper mask used by `staticEval` (the
 // `getPropValue` / TYPES path). Strips parentheses, type assertions
@@ -258,6 +288,12 @@ func AttributeIsBooleanForm(attr *ast.Node) bool {
 // substitutions, etc. This mirrors jsx-ast-utils' `getLiteralPropValue` for
 // the string-typed cases the alt-text / role / type / title checks rely on.
 func LiteralStringValue(attr *ast.Node) (string, bool) {
+	// Direct attribute form `<attr="…">` — the underlying StringLiteral.Text
+	// holds the raw `&…;`-encoded source. Decode via jsxtransforms so callers
+	// see the same value @typescript-eslint / @babel's JSX parser would expose.
+	if v, ok := directAttributeStringValue(attr); ok {
+		return v, true
+	}
 	inner := attributeInnerExpression(attr)
 	if inner == nil {
 		return "", false
@@ -319,7 +355,11 @@ func attributeInnerExpression(attr *ast.Node) *ast.Node {
 // alt validity to distinguish `<img alt={undefined} />` from
 // `<img alt={someVar} />`.
 func AttributeIsExplicitUndefined(attr *ast.Node) bool {
-	return utils.IsUndefinedIdentifier(attributeInnerExpression(attr))
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		return false
+	}
+	return utils.IsUndefinedIdentifier(inner)
 }
 
 // AltAttributeIsValid encodes the alt-text validity rule for a present `alt`
@@ -480,6 +520,19 @@ func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 		return "", false
 	}
 	if AttributeIsBooleanForm(attr) {
+		return "", false
+	}
+	// Direct attribute form `<attr="…">` — apply HTML entity decoding so
+	// `<X role="&#98;utton" />` is seen as `"button"` (matching upstream's
+	// post-JSX-parser value). jsxAstUtilsLiteralCoerce semantics still apply
+	// downstream when the caller routes through literalPropValue, but for the
+	// direct-string path we short-circuit here because literalPropValue would
+	// only re-read the raw StringLiteral.Text and skip the entity decode.
+	if v, ok := directAttributeStringValue(attr); ok {
+		coerced := jsxAstUtilsLiteralCoerce(v)
+		if coerced.Kind == jvString {
+			return coerced.Str, true
+		}
 		return "", false
 	}
 	inner := attributeInnerExpression(attr)
@@ -715,6 +768,14 @@ func LiteralPropIsExactlyTrue(attr *ast.Node) bool {
 		// boolean true; true === true → matches.
 		return true
 	}
+	// Direct attribute form `<X muted="true">` — entity-decode before
+	// jsxAstUtilsLiteralCoerce so e.g. `aria-disabled="&#116;rue"` still
+	// coerces to bool true (upstream sees the decoded "true"). The
+	// JsxExpression / spread paths carry JS string literals (no decode).
+	if decoded, ok := directAttributeStringValue(attr); ok {
+		v := jsxAstUtilsLiteralCoerce(decoded)
+		return v.Kind == jvBool && v.Bool
+	}
 	inner := attributeInnerExpression(attr)
 	if inner == nil {
 		return false
@@ -869,6 +930,19 @@ func polymorphicPropValue(propAttr *ast.Node) (string, bool) {
 		// Set.has(true) check downstream fails, so this skips alt-text
 		// entirely. Mirror by returning the string "true".
 		return "true", true
+	}
+	// Direct attribute `<Foo as="button">` — entity-decode + literal coerce.
+	// `<Foo as="&#98;utton">` should resolve to `"button"` so the rawType
+	// matches the HTML element name set downstream.
+	if decoded, ok := directAttributeStringValue(propAttr); ok {
+		v := jsxAstUtilsLiteralCoerce(decoded)
+		if !jsTruthy_(v) {
+			return "", false
+		}
+		if v.Kind == jvString {
+			return v.Str, true
+		}
+		return jsToString(v), true
 	}
 	inner := attributeInnerExpression(propAttr)
 	if inner == nil {
@@ -1081,7 +1155,15 @@ func IsHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) st
 	if tag == "INPUT" {
 		typeAttr := FindAttributeByName(attrs, "type")
 		if typeAttr != nil {
-			if inner := attributeInnerExpression(typeAttr); inner != nil {
+			// Direct attribute string: HTML entities have to be decoded
+			// before the case-insensitive "hidden" compare. `<input type="&#104;idden">`
+			// must match. The JsxExpression / spread path doesn't need decoding
+			// (those carry JS string literals, not JSX attribute text).
+			if decoded, ok := directAttributeStringValue(typeAttr); ok {
+				if strings.EqualFold(decoded, "hidden") {
+					return true
+				}
+			} else if inner := attributeInnerExpression(typeAttr); inner != nil {
 				v := literalPropValue(inner)
 				if v.Kind == jvString && strings.EqualFold(v.Str, "hidden") {
 					return true
@@ -1097,13 +1179,20 @@ func IsHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) st
 		// Boolean form maps to extractValue's null-attr-value → true; true === true → hidden.
 		return true
 	}
+	// `getPropValue(...) === true` — only the actual boolean true matches.
+	// `<div aria-hidden="true">` works because the Literal extractor maps the
+	// case-insensitive string "true" to boolean true (jsxAstUtilsLiteralCoerce).
+	// For the direct-attribute string form we have to entity-decode before
+	// running the coercion, otherwise `<div aria-hidden="&#116;rue">` slips
+	// through. JsxExpression / spread paths carry JS strings — no decode.
+	if decoded, ok := directAttributeStringValue(ariaHidden); ok {
+		v := jsxAstUtilsLiteralCoerce(decoded)
+		return v.Kind == jvBool && v.Bool
+	}
 	inner := attributeInnerExpression(ariaHidden)
 	if inner == nil {
 		return false
 	}
-	// `getPropValue(...) === true` — only the actual boolean true matches.
-	// `<div aria-hidden="true">` works because the Literal extractor maps the
-	// case-insensitive string "true" to boolean true (jsxAstUtilsLiteralCoerce).
 	v := staticEval(inner)
 	return v.Kind == jvBool && v.Bool
 }

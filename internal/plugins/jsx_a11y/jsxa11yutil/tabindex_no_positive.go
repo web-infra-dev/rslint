@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	jsxtx "github.com/microsoft/typescript-go/shim/transformers/jsxtransforms"
 )
 
 // LiteralPropToNumber mirrors upstream's `Number(getLiteralPropValue(prop))`
@@ -65,16 +64,14 @@ func LiteralPropToNumber(attr *ast.Node, sourceText string) (float64, bool) {
 	// JsxExpression) is an HTML-style attribute string. babel's JSX parser
 	// decodes HTML entities (`&#49;` → "1", `&nbsp;` → U+00A0, etc.) before
 	// surfacing the value to lint rules. tsgo does NOT decode in its
-	// StringLiteral.Text, so we apply jsxtransforms.DecodeEntities here to
-	// realign with upstream `getLiteralPropValue` output for this shape.
-	// Only the direct-StringLiteral path needs this — `tabIndex={"&#49;"}`
-	// stays opaque (the inner StringLiteral is a JS expression, where
-	// entities are not decoded).
-	if attr.Kind == ast.KindJsxAttribute {
-		if init := attr.AsJsxAttribute().Initializer; init != nil && init.Kind == ast.KindStringLiteral {
-			decoded := jsxtx.DecodeEntities(init.AsStringLiteral().Text)
-			return jsValueToNumber(jsxAstUtilsLiteralCoerce(decoded))
-		}
+	// StringLiteral.Text, so directAttributeStringValue applies
+	// jsxtransforms.DecodeEntities to realign with upstream
+	// `getLiteralPropValue` output for this shape. Only the direct-
+	// StringLiteral path needs this — `tabIndex={"&#49;"}` stays opaque
+	// (the inner StringLiteral is a JS expression, where entities are
+	// not decoded).
+	if decoded, ok := directAttributeStringValue(attr); ok {
+		return jsValueToNumber(jsxAstUtilsLiteralCoerce(decoded))
 	}
 	inner := attributeInnerExpression(attr)
 	if inner == nil {

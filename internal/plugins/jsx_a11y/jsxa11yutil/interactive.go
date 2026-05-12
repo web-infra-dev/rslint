@@ -363,12 +363,20 @@ func IsInteractiveElement(tagName string, attrs []*ast.Node) bool {
 // Non-literal expressions (`role={someVar}`), absent role, or first valid
 // role that is non-interactive all return false. Empty / all-invalid
 // space-split lists also return false.
+//
+// Routes through [LiteralPropStringValue] (= upstream `getLiteralPropValue`)
+// rather than the simpler [LiteralStringValue]: this picks up upstream's
+// TemplateExpression-with-substitutions synthesis (each substitution's
+// LITERAL_TYPES extraction concatenated against the quasi text) and the
+// `null` literal → "null" magic string. Matters for `` role={`button${''}`} ``
+// and `role={null}` corner cases — uncommon, but covered by upstream's
+// `getLiteralPropValue` and therefore in scope for parity.
 func IsInteractiveRole(_ string, attrs []*ast.Node) bool {
 	roleAttr := FindAttributeByName(attrs, "role")
 	if roleAttr == nil {
 		return false
 	}
-	value, ok := LiteralStringValue(roleAttr)
+	value, ok := LiteralPropStringValue(roleAttr)
 	if !ok {
 		return false
 	}
@@ -383,6 +391,259 @@ func IsInteractiveRole(_ string, attrs []*ast.Node) bool {
 		// First valid role wins per upstream's `validRoles[0]`.
 		_, isInteractive := interactiveRolesSet[part]
 		return isInteractive
+	}
+	return false
+}
+
+// nonInteractiveRolesSet mirrors upstream's `isNonInteractiveRole`
+// `nonInteractiveRoles` Set — every non-abstract role whose `superClass`
+// chain does NOT contain `widget`. Note the asymmetry with [interactiveRolesSet]:
+//
+//   - `toolbar` lives in BOTH sets upstream. interactiveRoles concat's it
+//     in (does not descend from widget, but supports aria-activedescendant);
+//     nonInteractiveRoles' filter (superClass !⊇ widget) ALSO matches it.
+//   - `progressbar` lives only in interactiveRolesSet — it IS a widget
+//     descendant, so the nonInteractiveRoles filter rejects it.
+//
+// Each individual upstream util reuses its OWN local filter pipeline; this
+// duplication is load-bearing for the observable semantics of
+// `interactive-supports-focus` and similar rules. Maintain the two sets
+// separately rather than computing one as the complement of the other.
+var nonInteractiveRolesSet = func() map[string]struct{} {
+	out := make(map[string]struct{}, len(nonInteractiveRoleNames)+1)
+	for _, k := range nonInteractiveRoleNames {
+		out[k] = struct{}{}
+	}
+	// `toolbar` matches the upstream `!superClass.some(...widget)` filter.
+	// nonInteractiveRoleNames intentionally omits it (it lives in
+	// interactiveRolesSet for the isInteractiveRole path); replicate the
+	// upstream membership explicitly here.
+	out["toolbar"] = struct{}{}
+	return out
+}()
+
+// IsNonInteractiveRole mirrors upstream's `isNonInteractiveRole(tagName,
+// attributes)`. The function is tag-aware (unlike [IsInteractiveRole]) —
+// upstream early-returns false for custom components, so the rule's caller
+// can short-circuit without consulting role attributes on JSX-component tags.
+//
+// Returns true iff:
+//   - tagName is an aria-query DOM element name, AND
+//   - the `role` attribute resolves to a literal string whose first valid
+//     space-separated role is in [nonInteractiveRolesSet].
+//
+// Returns false when the role expression is non-literal, when no valid role
+// is found in the space-separated list, or when tagName is a custom
+// component (matches upstream's `!dom.has(type)` guard).
+func IsNonInteractiveRole(tagName string, attrs []*ast.Node) bool {
+	if !IsDOMElement(tagName) {
+		return false
+	}
+	roleAttr := FindAttributeByName(attrs, "role")
+	if roleAttr == nil {
+		return false
+	}
+	// Same extractor as IsInteractiveRole — see that comment for the
+	// LiteralPropStringValue vs LiteralStringValue rationale.
+	value, ok := LiteralPropStringValue(roleAttr)
+	if !ok {
+		return false
+	}
+	for _, part := range strings.Split(strings.ToLower(value), " ") {
+		if _, isRole := allRolesSet[part]; !isRole {
+			continue
+		}
+		_, isNonInteractive := nonInteractiveRolesSet[part]
+		return isNonInteractive
+	}
+	return false
+}
+
+// strictNonInteractiveElementRoleSchemas mirrors upstream
+// `isNonInteractiveElement.js`'s view of `nonInteractiveElementRoleSchemas`
+// — `elementRoles` entries whose role list is ENTIRELY non-interactive
+// under that file's stricter `nonInteractiveRoles` set:
+//
+//	{role | !role.abstract
+//	     && role !== 'toolbar'
+//	     && role !== 'generic'
+//	     && !role.superClass.some(...widget)}
+//	∪ {'progressbar'}
+//
+// Differs from [nonInteractiveElementRoleSchemas]: that table is generated
+// from `isInteractiveElement.js`'s `nonInteractiveRoles` set (which keeps
+// `generic` in the non-interactive set), so generic-role HTML elements
+// like `div`, `span`, `a`, `area`, `b`, `bdo`, `body`, `data`, `hgroup`,
+// `i`, `pre`, `q`, `samp`, `small`, `u`, and `section` (no attrs) appear
+// there but NOT here.
+//
+// `IsNonInteractiveElement` consults THIS table (not the one above) — a
+// `<div role="radio" onClick={…} />` must trip `interactive-supports-focus`,
+// which requires `IsNonInteractiveElement("div", …)` to return false. If
+// we used the `isInteractiveElement.js`-view table, `div` would match the
+// non-interactive schema and the rule would fall silent.
+//
+// Generated from `aria-query` v5 + the upstream filter pipeline.
+// Element-level constraints are not modeled (see file-level note).
+var strictNonInteractiveElementRoleSchemas = []elementSchema{
+	{Name: "article"},
+	{Name: "header"},
+	{Name: "blockquote"},
+	{Name: "caption"},
+	{Name: "td"},
+	{Name: "code"},
+	{Name: "aside"},
+	{Name: "aside", Attributes: []elementAttrSchema{{Name: "aria-label"}}},
+	{Name: "aside", Attributes: []elementAttrSchema{{Name: "aria-labelledby"}}},
+	{Name: "footer"},
+	{Name: "dd"},
+	{Name: "del"},
+	{Name: "dialog"},
+	{Name: "html"},
+	{Name: "em"},
+	{Name: "figure"},
+	{Name: "form", Attributes: []elementAttrSchema{{Name: "aria-label"}}},
+	{Name: "form", Attributes: []elementAttrSchema{{Name: "aria-labelledby"}}},
+	{Name: "form", Attributes: []elementAttrSchema{{Name: "name"}}},
+	{Name: "details"},
+	{Name: "fieldset"},
+	{Name: "optgroup"},
+	{Name: "address"},
+	{Name: "h1"},
+	{Name: "h2"},
+	{Name: "h3"},
+	{Name: "h4"},
+	{Name: "h5"},
+	{Name: "h6"},
+	{Name: "img", Attributes: []elementAttrSchema{{Name: "alt"}}},
+	{Name: "img", Attributes: []elementAttrSchema{{Name: "alt", Value: ""}}},
+	{Name: "ins"},
+	{Name: "menu"},
+	{Name: "ol"},
+	{Name: "ul"},
+	{Name: "li"},
+	{Name: "main"},
+	{Name: "mark"},
+	{Name: "math"},
+	{Name: "meter"},
+	{Name: "nav"},
+	{Name: "p"},
+	{Name: "progress"},
+	{Name: "section", Attributes: []elementAttrSchema{{Name: "aria-label"}}},
+	{Name: "section", Attributes: []elementAttrSchema{{Name: "aria-labelledby"}}},
+	{Name: "tbody"},
+	{Name: "tfoot"},
+	{Name: "thead"},
+	{Name: "hr"},
+	{Name: "output"},
+	{Name: "strong"},
+	{Name: "sub"},
+	{Name: "sup"},
+	{Name: "table"},
+	{Name: "dfn"},
+	{Name: "dt"},
+	{Name: "time"},
+}
+
+// nonInteractiveElementAXSchemas mirrors upstream's
+// `nonInteractiveElementAXObjectSchemas` — every entry in axobject-query's
+// `elementAXObjects` whose AX-object list is ENTIRELY made of window/structure
+// AX objects. Consulted only after the role-schema matchers miss; ordering
+// matches upstream's iteration over `elementAXObjects`.
+//
+// Generated from `axobject-query` v4 + `AXObjects.type ∈ {window, structure}`
+// using the same filter pipeline as upstream. Element-level constraints are
+// not modeled (see file-level note).
+var nonInteractiveElementAXSchemas = []elementSchema{
+	{Name: "abbr"},
+	{Name: "article"},
+	{Name: "blockquote"},
+	{Name: "caption"},
+	{Name: "dfn"},
+	{Name: "dd"},
+	{Name: "dl"},
+	{Name: "dt"},
+	{Name: "details"},
+	{Name: "dialog"},
+	{Name: "dir"},
+	{Name: "figcaption"},
+	{Name: "figure"},
+	{Name: "footer"},
+	{Name: "form"},
+	{Name: "h1"},
+	{Name: "h2"},
+	{Name: "h3"},
+	{Name: "h4"},
+	{Name: "h5"},
+	{Name: "h6"},
+	{Name: "iframe"},
+	{Name: "img", Attributes: []elementAttrSchema{{Name: "usemap"}}},
+	{Name: "img"},
+	{Name: "label"},
+	{Name: "legend"},
+	{Name: "br"},
+	{Name: "li"},
+	{Name: "ul"},
+	{Name: "ol"},
+	{Name: "main"},
+	{Name: "mark"},
+	{Name: "marquee"},
+	{Name: "menu"},
+	{Name: "meter"},
+	{Name: "nav"},
+	{Name: "p"},
+	{Name: "pre"},
+	{Name: "progress"},
+	{Name: "tr"},
+	{Name: "ruby"},
+	{Name: "table"},
+	{Name: "time"},
+}
+
+// IsNonInteractiveElement reports whether `(tagName, attrs)` denotes a
+// non-interactive HTML element by ARIA semantics. Mirrors upstream's
+// `isNonInteractiveElement(tagName, attributes)`:
+//
+//  1. Tag must be in aria-query's `dom` map; otherwise false (custom
+//     components — we don't know what DOM they render).
+//  2. `<header>` always returns false — upstream comments call out that
+//     header semantics depend on parent context (banner landmark inside
+//     <body>), which static analysis cannot verify.
+//  3. First match against non-interactive role schemas (with the `td`
+//     exception below) → true.
+//  4. First match against interactive role schemas (same `td` exception)
+//     → false.
+//  5. First match against non-interactive AX-object schemas → true.
+//  6. Otherwise → false.
+//
+// `td` is excluded from the role-schema matchers via upstream's
+// `tagName !== 'td'` guard — both `interactiveElementRoleSchemas` and
+// `nonInteractiveElementRoleSchemas` contain a `{name: "td"}` entry, so
+// without the guard the matchers would both fire. Upstream documents this
+// as a TODO; we mirror byte-for-byte.
+func IsNonInteractiveElement(tagName string, attrs []*ast.Node) bool {
+	if !IsDOMElement(tagName) {
+		return false
+	}
+	if tagName == "header" {
+		return false
+	}
+	if tagName != "td" {
+		for _, s := range strictNonInteractiveElementRoleSchemas {
+			if s.Name == tagName && schemaMatchesAttrs(s, attrs) {
+				return true
+			}
+		}
+		for _, s := range interactiveElementRoleSchemas {
+			if s.Name == tagName && schemaMatchesAttrs(s, attrs) {
+				return false
+			}
+		}
+	}
+	for _, s := range nonInteractiveElementAXSchemas {
+		if s.Name == tagName && schemaMatchesAttrs(s, attrs) {
+			return true
+		}
 	}
 	return false
 }
