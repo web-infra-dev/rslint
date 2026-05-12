@@ -280,6 +280,46 @@ func JestVersionMajor(v string) int {
 	return n
 }
 
+// ApplyGlobalJestAlias maps settings.jest.globalAliases so that e.g. `context` is treated as
+// `describe`, matching eslint-plugin-jest.
+func ApplyGlobalJestAlias(name string, settings map[string]interface{}) string {
+	if name == "" || settings == nil {
+		return name
+	}
+	raw, ok := settings["jest"]
+	if !ok {
+		return name
+	}
+	jm, ok := raw.(map[string]interface{})
+	if !ok {
+		return name
+	}
+	rawGA, ok := jm["globalAliases"]
+	if !ok {
+		return name
+	}
+	ga, ok := rawGA.(map[string]interface{})
+	if !ok {
+		return name
+	}
+	for canonStr, aliasesVal := range ga {
+		if !JEST_METHOD_NAMES[canonStr] {
+			continue
+		}
+		list, ok := aliasesVal.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, a := range list {
+			alias, ok := a.(string)
+			if ok && alias == name {
+				return canonStr
+			}
+		}
+	}
+	return name
+}
+
 // jestVersionFromSettings returns the Jest version from rslint settings (ESLint style settings.jest.version).
 func jestVersionFromSettings(settings map[string]interface{}) (string, bool) {
 	if settings == nil {

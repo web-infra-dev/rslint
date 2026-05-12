@@ -14,7 +14,7 @@ const recommended: RslintConfigEntry = {
     'jest/no-done-callback': 'error',
     // 'jest/no-export': 'error', // not implemented
     'jest/no-focused-tests': 'error',
-    // 'jest/no-identical-title': 'error', // not implemented
+    'jest/no-identical-title': 'error',
     // 'jest/no-interpolation-in-snapshots': 'error', // not implemented
     // 'jest/no-jasmine-globals': 'error', // not implemented
     'jest/no-mocks-import': 'error',
