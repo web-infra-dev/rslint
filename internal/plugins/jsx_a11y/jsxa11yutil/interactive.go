@@ -459,6 +459,61 @@ func IsNonInteractiveRole(tagName string, attrs []*ast.Node) bool {
 	return false
 }
 
+// abstractRolesSet mirrors upstream's `isAbstractRole.js` -
+// `new Set(roles.keys().filter((role) => roles.get(role).abstract))` -
+// every aria-query role whose definition carries `abstract: true`. These
+// roles are not assignable to HTML elements at runtime; some rules (e.g.
+// no-noninteractive-element-interactions) treat them as "no opinion"
+// short-circuits.
+//
+// Source: https://github.com/A11yance/aria-query/blob/main/src/etc/roles/abstract/
+var abstractRolesSet = map[string]struct{}{
+	"command":     {},
+	"composite":   {},
+	"input":       {},
+	"landmark":    {},
+	"range":       {},
+	"roletype":    {},
+	"section":     {},
+	"sectionhead": {},
+	"select":      {},
+	"structure":   {},
+	"widget":      {},
+	"window":      {},
+}
+
+// IsAbstractRole mirrors upstream `isAbstractRole(tagName, attributes)`:
+//
+//	if (!DOMElements.has(tagName)) return false;
+//	const role = getLiteralPropValue(getProp(attributes, 'role'));
+//	return abstractRoles.has(role);
+//
+// Notable upstream quirks we preserve:
+//
+//   - Custom components short-circuit to false (upstream `!DOMElements.has`).
+//   - The role lookup uses `getLiteralPropValue` (= [LiteralPropStringValue]),
+//     so non-literal `role` expressions (Identifier, CallExpression,
+//     ConditionalExpression, …) silently produce a `false` here.
+//   - Set membership is whole-string and case-sensitive — upstream does NOT
+//     lowercase or split on whitespace, unlike the interactive/non-interactive
+//     role predicates. `role=" widget "` (with surrounding whitespace) and
+//     `role="WIDGET"` therefore do NOT match. Mirror.
+func IsAbstractRole(tagName string, attrs []*ast.Node) bool {
+	if !IsDOMElement(tagName) {
+		return false
+	}
+	roleAttr := FindAttributeByName(attrs, "role")
+	if roleAttr == nil {
+		return false
+	}
+	value, ok := LiteralPropStringValue(roleAttr)
+	if !ok {
+		return false
+	}
+	_, isAbstract := abstractRolesSet[value]
+	return isAbstract
+}
+
 // strictNonInteractiveElementRoleSchemas mirrors upstream
 // `isNonInteractiveElement.js`'s view of `nonInteractiveElementRoleSchemas`
 // — `elementRoles` entries whose role list is ENTIRELY non-interactive
