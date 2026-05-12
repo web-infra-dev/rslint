@@ -501,15 +501,15 @@ rule_tester.InvalidTestCase{
 1. **Check Directory**: Verify if `packages/rslint-test-tools/tests/<plugin-name>` exists.
 
 2. **Check Configuration**:
-   - **Reference**: Use `packages/rslint-test-tools/tests/eslint-plugin-import` as the template.
+   - **Reference**: Use `packages/rslint-test-tools/tests/eslint-plugin-jsx-a11y` as the template (ESM flat-config format).
    - **Required Files**:
-     - `rslint.json` (Configuration for the linter)
+     - `rslint.config.mjs` (Configuration for the linter — JSON `rslint.json` is legacy and the loader auto-migrates it to JS/TS; do NOT create new `rslint.json` files)
      - `tsconfig.files.json` (TS Config for file-based tests)
      - `tsconfig.virtual.json` (TS Config for virtual/code-based tests)
-   - **Plugin Configuration**: In `rslint.json`, set `plugins` field:
-     - **Core Rules**: `"plugins": []`
-     - **Plugin Rules**: `"plugins": ["eslint-plugin-import"]`
-   - **Warning**: When copying `rule-tester.ts`, remove any hardcoded rule prefixes (e.g., `ruleName = 'import/' + ruleName;`).
+   - **Plugin Configuration**: In `rslint.config.mjs`, set the `plugins` field (use the short plugin name, matching how rules are addressed in tests):
+     - **Core Rules**: `plugins: []`
+     - **Plugin Rules**: `plugins: ['<short-name>']` (e.g. `'jsx-a11y'`, `'jest'`, `'react'`, `'promise'`)
+   - **Warning**: When copying `rule-tester.ts`, remove any hardcoded rule prefixes (e.g., `ruleName = 'jsx-a11y/' + ruleName;`).
 
 ### Step 6: Add JS Tests
 
@@ -523,7 +523,7 @@ rule_tester.InvalidTestCase{
 
 - **Core ESLint Rules**: Import `RuleTester` from `../rule-tester` (in `tests/eslint/rule-tester.ts`, no prefix)
 - **typescript-eslint Rules**: Import `RuleTester` from `@typescript-eslint/rule-tester` (auto-prefixes with `@typescript-eslint/`)
-- **Other Plugin Rules**: Refer to `packages/rslint-test-tools/tests/eslint-plugin-import/rule-tester.ts`
+- **Other Plugin Rules**: Refer to `packages/rslint-test-tools/tests/eslint-plugin-jsx-a11y/rule-tester.ts`
 
 **Options Format**: JS tests use array format: `options: [{ allow: ['warn'] }]`
 
@@ -707,8 +707,8 @@ Follow this **strict order** — each step depends on the previous one:
 This step is executed **after each rule's Phase 4 completes** (both in single-rule and batch mode).
 
 1. **Configure Project Settings (Conditional)**:
-   - If the rule's plugin is already in `rslint.json` `plugins`, add the rule with `"warn"` severity
-   - Otherwise, do NOT modify `rslint.json`
+   - If the rule's plugin is already in the repo-root `rslint.config.ts` `plugins`, add the rule with `'warn'` severity
+   - Otherwise, do NOT modify `rslint.config.ts`
 
 2. **Commit Changes**:
 
@@ -836,7 +836,7 @@ If JS tests fail with 0 diagnostics found:
 1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
 2. **Is the rule registered?** Check `internal/config/config.go`
 3. **Are test files included?** Check `rstest.config.mts`
-4. **Is rslint.json configured?** Ensure the rule is enabled
+4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
 5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code
 
 ### Line/Column Mismatch

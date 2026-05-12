@@ -174,7 +174,7 @@ Already-committed rules are not affected by later failures.
 - Commit message: `feat: port rule <rule-name>`
 - Do NOT include AI-related information in commit messages (no `Co-Authored-By: Claude` or similar)
 - Only stage files related to the current rule(s). `pnpm format:go` may reformat unrelated files — discard them with `git checkout -- <file>` before committing.
-- If the rule's plugin is already in `rslint.json` `plugins`, add the rule with `"warn"` severity. Otherwise, do NOT modify `rslint.json`.
+- If the rule's plugin is already in the repo-root `rslint.config.ts` `plugins`, add the rule with `'warn'` severity. Otherwise, do NOT modify `rslint.config.ts`.
 
 **PR title format**:
 
