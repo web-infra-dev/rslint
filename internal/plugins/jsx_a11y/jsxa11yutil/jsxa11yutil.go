@@ -884,15 +884,23 @@ func polymorphicPropValue(propAttr *ast.Node) (string, bool) {
 	return jsToString(v), true
 }
 
-// IsPresentationRole mirrors `isPresentationRole`: the element has an
-// explicit `role` attribute whose literal value is "presentation" or "none".
-// Non-literal expressions and absent role attributes return false.
+// IsPresentationRole mirrors upstream `isPresentationRole`:
+//
+//	const role = getLiteralPropValue(getProp(attributes, 'role'));
+//	return ['presentation', 'none'].indexOf(role) > -1;
+//
+// Routes through LiteralPropStringValue (= getLiteralPropValue / LITERAL_TYPES),
+// not LiteralStringValue, so that TemplateExpression with substitutions whose
+// quasis + extracted substitution values concatenate to the literal strings
+// "presentation" / "none" are recognized — e.g. ``role={`presentation${''}`}``.
+// Non-literal `role` expressions (Identifier, CallExpression, …) and absent
+// `role` attributes return false.
 func IsPresentationRole(attrs []*ast.Node) bool {
 	roleAttr := FindAttributeByName(attrs, "role")
 	if roleAttr == nil {
 		return false
 	}
-	value, ok := LiteralStringValue(roleAttr)
+	value, ok := LiteralPropStringValue(roleAttr)
 	if !ok {
 		return false
 	}

@@ -164,6 +164,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/aria-props.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/aria-unsupported-elements.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/autocomplete-valid.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/click-events-have-key-events.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/heading-has-content.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/html-has-lang.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/iframe-has-title.test.ts',
