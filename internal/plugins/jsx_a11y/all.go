@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_activedescendant_has_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_proptypes"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_unsupported_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/autocomplete_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/click_events_have_key_events"
@@ -36,6 +37,7 @@ func GetAllRules() []rule.Rule {
 		aria_activedescendant_has_tabindex.AriaActivedescendantHasTabindexRule,
 		aria_props.AriaPropsRule,
 		aria_proptypes.AriaProptypesRule,
+		aria_role.AriaRoleRule,
 		aria_unsupported_elements.AriaUnsupportedElementsRule,
 		autocomplete_valid.AutocompleteValidRule,
 		click_events_have_key_events.ClickEventsHaveKeyEventsRule,

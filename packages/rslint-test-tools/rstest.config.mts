@@ -163,6 +163,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/aria-activedescendant-has-tabindex.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/aria-props.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/aria-proptypes.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/aria-role.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/aria-unsupported-elements.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/autocomplete-valid.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/click-events-have-key-events.test.ts',
