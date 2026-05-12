@@ -1,45 +1,9 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import path from 'node:path';
 import util from 'node:util';
 
 import { lint } from '@rslint/core';
 
-// Per-test rslint.json builder used to thread `settings` through to the
-// linter. The base rslint.json registered for the suite has `settings: {}`;
-// when a test case carries its own settings, we emit a temporary config
-// that merges the base with the test's settings and point `lint()` at it.
-function buildConfigForSettings(
-  baseConfigPath: string,
-  settings: Record<string, unknown> | undefined,
-): { configPath: string; cleanup: () => void } {
-  if (!settings || Object.keys(settings).length === 0) {
-    return { configPath: baseConfigPath, cleanup: () => {} };
-  }
-  const base = JSON.parse(readFileSync(baseConfigPath, 'utf8'));
-  const merged = base.map((entry: any) => ({
-    ...entry,
-    settings: { ...(entry.settings ?? {}), ...settings },
-  }));
-  const baseDir = path.dirname(baseConfigPath);
-  const cfg = path.join(
-    baseDir,
-    `rslint.test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`,
-  );
-  writeFileSync(cfg, JSON.stringify(merged), 'utf8');
-  void mkdtempSync;
-  void tmpdir;
-  return {
-    configPath: cfg,
-    cleanup: () => {
-      try {
-        rmSync(cfg, { force: true });
-      } catch {
-        /* best-effort cleanup; never fail a test on rmdir */
-      }
-    },
-  };
-}
+import { buildConfigForSettings } from '../src/util/load-test-config';
 
 export interface ValidTestCase {
   name?: string;
@@ -86,7 +50,7 @@ export class RuleTester {
     ruleName = 'react-hooks/' + ruleName;
     describe(ruleName, () => {
       const cwd = process.cwd();
-      const config = path.resolve(import.meta.dirname, './rslint.json');
+      const config = path.resolve(import.meta.dirname, './rslint.config.mjs');
 
       let hasOnly =
         cases.valid.some((x) => {
@@ -121,7 +85,7 @@ export class RuleTester {
               : (validCase.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
 
-          const { configPath, cleanup } = buildConfigForSettings(
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
             settings,
           );
@@ -167,7 +131,7 @@ export class RuleTester {
               ? defaultFilename
               : (item.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
-          const { configPath, cleanup } = buildConfigForSettings(
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
             settings,
           );

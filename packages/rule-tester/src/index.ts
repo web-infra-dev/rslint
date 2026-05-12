@@ -1,9 +1,71 @@
 // Forked and modified from https://github.com/typescript-eslint/typescript-eslint/blob/16c344ec7d274ea542157e0f19682dd1930ab838/packages/rule-tester/src/RuleTester.ts#L4
 
+import { rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
 import { applyFixes, lint, LintResponse, type Diagnostic } from '@rslint/core';
+import { loadConfigFile, normalizeConfig } from '@rslint/core/config-loader';
 import assert from 'node:assert';
+
+// Per-test rslint config builder. The user-facing base config is
+// `rslint.config.mjs` (ESM, flat-config); we load it via `loadConfigFile`
+// and serialize the result to a small temporary file that `lint()`
+// consumes, because rslint's Go binary parses the config as hujson
+// (JSON superset) and does not execute JS/TS configs.
+//
+// `packages/rule-tester` is published as `@typescript-eslint/rule-tester`
+// and cannot import from `packages/rslint-test-tools` (dependency direction
+// is reversed), so this helper is duplicated here intentionally instead of
+// being shared with the plugin-specific rule-testers under
+// `packages/rslint-test-tools/tests/src/util/load-test-config.ts`.
+//
+// The base config is cached by `baseConfigPath` so each .mjs is parsed
+// exactly once per process.
+const baseConfigCache = new Map<string, Record<string, unknown>[]>();
+
+async function getBaseConfig(
+  baseConfigPath: string,
+): Promise<Record<string, unknown>[]> {
+  const cached = baseConfigCache.get(baseConfigPath);
+  if (cached) return cached;
+  const raw = await loadConfigFile(baseConfigPath);
+  const normalized = normalizeConfig(raw);
+  baseConfigCache.set(baseConfigPath, normalized);
+  return normalized;
+}
+
+async function buildConfigForSettings(
+  baseConfigPath: string,
+  settings: Record<string, unknown> | undefined,
+): Promise<{ configPath: string; cleanup: () => void }> {
+  const base = await getBaseConfig(baseConfigPath);
+  const merged = base.map((entry) => ({
+    ...entry,
+    settings: {
+      ...((entry.settings as object | undefined) ?? {}),
+      ...(settings ?? {}),
+    },
+  }));
+  // Write the serialized config next to the base — rslint resolves the
+  // relative `tsconfig.*.json` paths inside each entry against the config
+  // file's directory, so the temp file must live in the same dir.
+  const baseDir = path.dirname(baseConfigPath);
+  const cfg = path.join(
+    baseDir,
+    `.rslint.test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
+  );
+  writeFileSync(cfg, JSON.stringify(merged), 'utf8');
+  return {
+    configPath: cfg,
+    cleanup: () => {
+      try {
+        rmSync(cfg, { force: true });
+      } catch {
+        /* best-effort cleanup; never fail a test on rmdir */
+      }
+    },
+  };
+}
 
 interface TsDiagnostic {
   line?: number;
@@ -155,7 +217,7 @@ export class RuleTester {
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
         process.cwd();
-      const config = path.resolve(cwd, './rslint.json');
+      const config = path.resolve(cwd, './rslint.config.mjs');
 
       // test whether case has only
       let hasOnly =
@@ -208,17 +270,26 @@ export class RuleTester {
               }
             }
           }
-          const diags = await lint({
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: {
-              [virtual_entry]: code,
-            },
-            ruleOptions: {
-              [ruleName]: options,
-            },
-            languageOptions: languageOptions as any,
-          });
+            undefined,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: {
+                [virtual_entry]: code,
+              },
+              ruleOptions: {
+                [ruleName]: options,
+              },
+              languageOptions: languageOptions as any,
+            });
+          } finally {
+            cleanup();
+          }
 
           assert(
             diags.diagnostics?.length === 0,
@@ -250,17 +321,26 @@ export class RuleTester {
             cwd,
             isDts ? 'decl.d.ts' : isJSX ? 'react.tsx' : 'virtual.ts',
           );
-          const diags = await lint({
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: {
-              [test_virtual_entry]: code,
-            },
-            ruleOptions: {
-              [ruleName]: options,
-            },
-            languageOptions: languageOptions as any,
-          });
+            undefined,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: {
+                [test_virtual_entry]: code,
+              },
+              ruleOptions: {
+                [ruleName]: options,
+              },
+              languageOptions: languageOptions as any,
+            });
+          } finally {
+            cleanup();
+          }
 
           assert(
             diags.diagnostics?.length > 0,
