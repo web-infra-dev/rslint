@@ -3,6 +3,8 @@ import util from 'node:util';
 
 import { lint } from '@rslint/core';
 
+import { buildConfigForSettings } from '../src/util/load-test-config';
+
 // Port from 'eslint'
 export interface ValidTestCase {
   name?: string;
@@ -56,7 +58,7 @@ export class RuleTester {
     ruleName = 'import/' + ruleName;
     describe(ruleName, () => {
       const cwd = process.cwd();
-      const config = path.resolve(import.meta.dirname, './rslint.json');
+      const config = path.resolve(import.meta.dirname, './rslint.config.mjs');
 
       // test whether case has only
       let hasOnly =
@@ -83,6 +85,8 @@ export class RuleTester {
 
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
+          const settings =
+            typeof validCase === 'string' ? undefined : validCase.settings;
           const defaultFilename = 'src/virtual.ts';
           const filename =
             typeof validCase === 'string'
@@ -90,16 +94,25 @@ export class RuleTester {
               : (validCase.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
 
-          const diags = await lint({
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: {
-              [absoluteFilename]: code,
-            },
-            ruleOptions: {
-              [ruleName]: options,
-            },
-          });
+            settings,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: {
+                [absoluteFilename]: code,
+              },
+              ruleOptions: {
+                [ruleName]: options,
+              },
+            });
+          } finally {
+            cleanup();
+          }
 
           assert(
             diags.diagnostics?.length === 0,
@@ -117,7 +130,7 @@ export class RuleTester {
             assert.fail('Invalid cases must have at least one error');
           }
 
-          const { code, only = false, options = [] } = item;
+          const { code, only = false, options = [], settings } = item;
           if (hasOnly && !only) {
             continue;
           }
@@ -127,16 +140,25 @@ export class RuleTester {
               ? defaultFilename
               : (item.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
-          const diags = await lint({
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: {
-              [absoluteFilename]: code,
-            },
-            ruleOptions: {
-              [ruleName]: options,
-            },
-          });
+            settings,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: {
+                [absoluteFilename]: code,
+              },
+              ruleOptions: {
+                [ruleName]: options,
+              },
+            });
+          } finally {
+            cleanup();
+          }
 
           if (typeof item.errors === 'number') {
             if (item.errors === 0) {

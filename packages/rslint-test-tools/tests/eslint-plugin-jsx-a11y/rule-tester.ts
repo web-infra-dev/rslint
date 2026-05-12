@@ -1,66 +1,9 @@
-import { rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import util from 'node:util';
 
 import { lint } from '@rslint/core';
-import { loadConfigFile, normalizeConfig } from '@rslint/core/config-loader';
 
-// Per-test rslint config builder. The user-facing base config is
-// `rslint.config.mjs` (ESM, flat-config); we load it via `loadConfigFile`,
-// merge in any per-test `settings`, and serialize the result to a small
-// temporary file that `lint()` consumes.
-//
-// Why we still emit a temporary file: rslint's `lint()` JS API takes a
-// config path and the underlying Go binary parses it as hujson (a JSON
-// superset) — it does NOT execute JS/TS configs the way the CLI does
-// (the CLI pre-loads JS configs and pipes them to the binary via stdin,
-// see packages/rslint/dist/cli.js). Until `lint()` exposes the same
-// pre-load path or a `settings` override, a serialized intermediate is
-// the cleanest way to thread per-test `settings` through to the linter.
-//
-// Cached at module load so the .mjs is parsed exactly once per test run.
-let cachedBase: Record<string, unknown>[] | null = null;
-async function getBaseConfig(
-  baseConfigPath: string,
-): Promise<Record<string, unknown>[]> {
-  if (cachedBase) return cachedBase;
-  const raw = await loadConfigFile(baseConfigPath);
-  cachedBase = normalizeConfig(raw);
-  return cachedBase;
-}
-
-async function buildConfigForSettings(
-  baseConfigPath: string,
-  settings: Record<string, unknown> | undefined,
-): Promise<{ configPath: string; cleanup: () => void }> {
-  const base = await getBaseConfig(baseConfigPath);
-  const merged = base.map((entry) => ({
-    ...entry,
-    settings: {
-      ...((entry.settings as object | undefined) ?? {}),
-      ...(settings ?? {}),
-    },
-  }));
-  // Write the serialized config next to the base — rslint resolves the
-  // relative `tsconfig.*.json` paths inside each entry against the config
-  // file's directory, so the temp file must live in the same dir.
-  const baseDir = path.dirname(baseConfigPath);
-  const cfg = path.join(
-    baseDir,
-    `.rslint.test-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`,
-  );
-  writeFileSync(cfg, JSON.stringify(merged), 'utf8');
-  return {
-    configPath: cfg,
-    cleanup: () => {
-      try {
-        rmSync(cfg, { force: true });
-      } catch {
-        /* best-effort cleanup; never fail a test on rmdir */
-      }
-    },
-  };
-}
+import { buildConfigForSettings } from '../src/util/load-test-config';
 
 export interface ValidTestCase {
   name?: string;
