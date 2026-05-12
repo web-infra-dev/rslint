@@ -68,3 +68,24 @@ var InteractiveEventHandlerNames = func() []string {
 	out = append(out, EventHandlersKeyboard...)
 	return out
 }()
+
+// DefaultStaticInteractionHandlers mirrors upstream's
+// `defaultInteractiveProps` constant in `no-static-element-interactions`:
+//
+//	[].concat(
+//	  eventHandlersByType.focus,
+//	  eventHandlersByType.keyboard,
+//	  eventHandlersByType.mouse,
+//	);
+//
+// Composed from the per-group slices above to keep the source-of-truth in one
+// place. Order matches the upstream concat (focus → keyboard → mouse);
+// consumers iterate to check `hasProp + non-null value`, so order is
+// semantically irrelevant.
+var DefaultStaticInteractionHandlers = func() []string {
+	out := make([]string, 0, len(EventHandlersFocus)+len(EventHandlersKeyboard)+len(EventHandlersMouse))
+	out = append(out, EventHandlersFocus...)
+	out = append(out, EventHandlersKeyboard...)
+	out = append(out, EventHandlersMouse...)
+	return out
+}()

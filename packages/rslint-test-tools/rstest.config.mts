@@ -182,6 +182,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/no-noninteractive-element-interactions.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-noninteractive-tabindex.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-redundant-roles.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/no-static-element-interactions.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/scope.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/tabindex-no-positive.test.ts',
 

@@ -368,7 +368,7 @@ func IsInteractiveElement(tagName string, attrs []*ast.Node) bool {
 // rather than the simpler [LiteralStringValue]: this picks up upstream's
 // TemplateExpression-with-substitutions synthesis (each substitution's
 // LITERAL_TYPES extraction concatenated against the quasi text) and the
-// `null` literal → "null" magic string. Matters for `` role={`button${''}`} ``
+// `null` literal → "null" magic string. Matters for “ role={`button${”}`} “
 // and `role={null}` corner cases — uncommon, but covered by upstream's
 // `getLiteralPropValue` and therefore in scope for parity.
 func IsInteractiveRole(_ string, attrs []*ast.Node) bool {
@@ -463,8 +463,8 @@ func IsNonInteractiveRole(tagName string, attrs []*ast.Node) bool {
 // `new Set(roles.keys().filter((role) => roles.get(role).abstract))` -
 // every aria-query role whose definition carries `abstract: true`. These
 // roles are not assignable to HTML elements at runtime; some rules (e.g.
-// no-noninteractive-element-interactions) treat them as "no opinion"
-// short-circuits.
+// no-noninteractive-element-interactions, no-static-element-interactions)
+// treat them as "no opinion" short-circuits.
 //
 // Source: https://github.com/A11yance/aria-query/blob/main/src/etc/roles/abstract/
 var abstractRolesSet = map[string]struct{}{
@@ -496,8 +496,11 @@ var abstractRolesSet = map[string]struct{}{
 //     ConditionalExpression, …) silently produce a `false` here.
 //   - Set membership is whole-string and case-sensitive — upstream does NOT
 //     lowercase or split on whitespace, unlike the interactive/non-interactive
-//     role predicates. `role=" widget "` (with surrounding whitespace) and
-//     `role="WIDGET"` therefore do NOT match. Mirror.
+//     role predicates. `role="widget radio"` (multi-role) and `role="WIDGET"`
+//     (case-variant) therefore do NOT match. Mirror.
+//   - TS-wrapped non-literal shapes (`role={x as "widget"}`) likewise return
+//     false — `getLiteralPropValue` maps TSAsExpression / TSNonNullExpression
+//     to null, never to the inner string.
 func IsAbstractRole(tagName string, attrs []*ast.Node) bool {
 	if !IsDOMElement(tagName) {
 		return false
