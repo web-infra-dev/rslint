@@ -70,7 +70,6 @@ new RuleTester().run('no-autofocus', null as never, {
     { code: '<div autoFocus={"False"} />' },
     { code: '<div autoFocus={("false")} />' },
     { code: '<div autoFocus={"false" as string} />' },
-    { code: '<div autoFocus={"false"!} />' },
     { code: '<div autoFocus={false as boolean} />' },
     { code: '<div autoFocus={`false`} />' },
 
@@ -235,6 +234,10 @@ new RuleTester().run('no-autofocus', null as never, {
     { code: '<div autoFocus={true as boolean} />', errors: [expectedError] },
     { code: '<div autoFocus={(true)} />', errors: [expectedError] },
     { code: '<div autoFocus={(true)!} />', errors: [expectedError] },
+    // TSNonNullExpression on string literal: upstream stringifies to "false!"
+    // (NOT coerced via case-insensitive "true"/"false" Literal rule).
+    // "false!" !== false → autoFocus enabled → reports.
+    { code: '<div autoFocus={"false"!} />', errors: [expectedError] },
 
     // ---- `satisfies` is opaque — even `false satisfies boolean` reports ----
     {

@@ -42,7 +42,7 @@ import (
 // jsx-ast-utils' `getPropValue` output. Returning the actual value (instead of
 // just a truthy / falsy bit) is required because alt-text and similar a11y
 // rules distinguish three states: truthy, falsy, AND empty-string, and the
-// `=== ''` branch alone takes precedence over truthiness.
+// `=== ”` branch alone takes precedence over truthiness.
 //
 // Discriminated by Kind. Only the field corresponding to Kind is meaningful.
 //
@@ -88,7 +88,7 @@ var (
 // staticEval mirrors jsx-ast-utils' `getValue` (the engine behind getPropValue).
 // Walks the expression tree and computes the static JS value, applying real
 // JS semantics for `&&` / `||` / `??` / ternary / arithmetic so that callers
-// can distinguish "altValue === ''" from "altValue is truthy" precisely.
+// can distinguish "altValue === ”" from "altValue is truthy" precisely.
 //
 // Parentheses and TS assertion wrappers are unwrapped on every recursion.
 //
@@ -172,6 +172,38 @@ func staticEval(node *ast.Node) jsValue {
 		// Upstream's ThisExpression extractor returns the magic string "this"
 		// — non-empty truthy.
 		return jsValue{Kind: jvString, Str: "this"}
+	case ast.KindNonNullExpression:
+		// Upstream jsx-ast-utils keeps a dedicated `TSNonNullExpression`
+		// entry in TYPES that recurses into the inner expression and
+		// APPENDS `!` to the stringified result. Examples (verbatim
+		// upstream output of `getPropValue`):
+		//
+		//   {x!}        → "x!"
+		//   {true!}     → "true!"          (Number-coerces to NaN)
+		//   {0!}        → "0!"             (Number-coerces to NaN)
+		//   {"foo"!}    → "foo!"
+		//   {x.y!}      → "x.y!"
+		//   {(x as T)!} → "x!"             (TSAsExpression flattened first)
+		//   {(x!)!}     → "(x!)!"          (parenthesized inner gets "(…)!" wrap)
+		//
+		// The result is ALWAYS a non-empty string — never the bare
+		// inner boolean / null / number — so `=== true`, `=== null`,
+		// and integer-only comparisons fail for these inputs while
+		// truthy / non-empty-after-trim checks still pass. We mirror
+		// by converting the inner staticEval result to a string and
+		// appending "!". The parenthesized wrapping variant
+		// (`(x!)!` → "(x!)!")
+		// is not currently distinguished here because `staticEval`
+		// strips parens at the outermost level via `skipTransparent`;
+		// for the inputs the a11y rules actually inspect, the
+		// non-parenthesized form is sufficient.
+		inner := node.AsNonNullExpression().Expression
+		if inner == nil {
+			// Defensive: malformed source. A bare `!` with no operand
+			// shouldn't reach here; treat as the literal `!` string.
+			return jsValue{Kind: jvString, Str: "!"}
+		}
+		return jsValue{Kind: jvString, Str: jsToString(staticEval(inner)) + "!"}
 	case ast.KindBinaryExpression:
 		return staticEvalBinary(node.AsBinaryExpression())
 	case ast.KindConditionalExpression:
@@ -562,7 +594,7 @@ func staticEvalUnary(un *ast.PrefixUnaryExpression) jsValue {
 // NOT recursively extract substitution values. Anything whose ESTree type
 // name is `Literal` / `JSXElement` / `JSXFragment` / `TemplateLiteral` /
 // `Super` / `SpreadElement` / `MetaProperty` / `TSTypeAssertion` etc.
-// contributes the empty string. So `\`${"en"}\`` → `""` (falsy), NOT `"en"`.
+// contributes the empty string. So `\`${"en"}\“ → `""` (falsy), NOT `"en"`.
 //
 // We previously used `${name}` / `${Expression}` (with a `$` prefix) and
 // always returned a truthy non-empty string for non-Identifier substitutions.
@@ -745,7 +777,7 @@ func jsToString(v jsValue) string {
 }
 
 // jsValueIsExactlyEmptyString reports whether the value is statically known
-// to be the empty string. Used for the `altValue === ''` branch of the
+// to be the empty string. Used for the `altValue === ”` branch of the
 // alt-text validity check.
 func jsValueIsExactlyEmptyString(v jsValue) bool {
 	return v.Kind == jvString && v.Str == ""
@@ -952,7 +984,7 @@ func assignmentOperatorText(k ast.Kind) string {
 // Why this matters: alt-text and other a11y rules read attribute values
 // through this extractor. A literal `<img alt="false" />` evaluates to the
 // boolean `false`, not the string "false" — making it falsy and failing the
-// `(altValue && !isNullValued) || altValue === ''` check. Skipping this
+// `(altValue && !isNullValued) || altValue === ”` check. Skipping this
 // normalization would silently accept `alt="false"`.
 func jsxAstUtilsLiteralCoerce(text string) jsValue {
 	switch strings.ToLower(text) {
