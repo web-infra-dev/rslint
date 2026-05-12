@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/html_has_lang"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/iframe_has_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/img_redundant_alt"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/interactive_supports_focus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/media_has_caption"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_autofocus"
@@ -40,6 +41,7 @@ func GetAllRules() []rule.Rule {
 		html_has_lang.HtmlHasLangRule,
 		iframe_has_title.IframeHasTitleRule,
 		img_redundant_alt.ImgRedundantAltRule,
+		interactive_supports_focus.InteractiveSupportsFocusRule,
 		media_has_caption.MediaHasCaptionRule,
 		no_access_key.NoAccessKeyRule,
 		no_autofocus.NoAutofocusRule,

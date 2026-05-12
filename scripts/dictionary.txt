@@ -438,3 +438,5 @@ undefinedundefined
 tokenlist
 idlist
 allowundefined
+Seeked
+usemap
