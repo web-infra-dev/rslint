@@ -131,13 +131,9 @@ var NoNoninteractiveElementInteractionsRule = rule.Rule{
 			interactiveProps = *opts.Handlers
 		}
 
-		getElementType := func(node *ast.Node) string {
-			return jsxa11yutil.GetElementType(node, ctx.Settings)
-		}
-
 		check := func(node *ast.Node) {
 			rawAttrs := reactutil.GetJsxElementAttributes(node)
-			elementType := getElementType(node)
+			elementType := jsxa11yutil.GetElementType(node, ctx.Settings)
 
 			// Per-element allow-list filter. Upstream:
 			//   attributes.filter(attr =>

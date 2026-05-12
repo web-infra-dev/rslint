@@ -62,4 +62,9 @@ var (
 // Order matches the upstream concat (mouse first, then keyboard) for
 // auditability — semantically irrelevant because every consumer uses set
 // membership rather than ordering.
-var InteractiveEventHandlerNames = append(append([]string{}, EventHandlersMouse...), EventHandlersKeyboard...)
+var InteractiveEventHandlerNames = func() []string {
+	out := make([]string, 0, len(EventHandlersMouse)+len(EventHandlersKeyboard))
+	out = append(out, EventHandlersMouse...)
+	out = append(out, EventHandlersKeyboard...)
+	return out
+}()
