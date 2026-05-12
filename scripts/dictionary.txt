@@ -435,3 +435,6 @@ jsxtransforms
 jsxtx
 uppercased
 undefinedundefined
+tokenlist
+idlist
+allowundefined
