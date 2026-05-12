@@ -226,6 +226,32 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			diagnostic.Fixes = fixes
 		}
 
+		if d.Suggestions != nil && len(*d.Suggestions) > 0 {
+			suggestions := make([]api.Suggestion, 0, len(*d.Suggestions))
+			for _, suggestion := range *d.Suggestions {
+				apiSuggestion := api.Suggestion{
+					MessageId: suggestion.Message.Id,
+					Desc:      suggestion.Message.Description,
+					Data:      suggestion.Message.Data,
+				}
+
+				if len(suggestion.Fixes()) > 0 {
+					fixes := make([]api.Fix, 0, len(suggestion.Fixes()))
+					for _, fix := range suggestion.Fixes() {
+						fixes = append(fixes, api.Fix{
+							Text:     fix.Text,
+							StartPos: fix.Range.Pos(),
+							EndPos:   fix.Range.End(),
+						})
+					}
+					apiSuggestion.Fixes = fixes
+				}
+
+				suggestions = append(suggestions, apiSuggestion)
+			}
+			diagnostic.Suggestions = suggestions
+		}
+
 		diagnostics = append(diagnostics, diagnostic)
 		errorsCount++
 

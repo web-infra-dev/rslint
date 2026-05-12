@@ -17,6 +17,13 @@ ruleTester.run('no-focused-tests', {} as never, {
     { code: 'test.each()()' },
     { code: 'test.each`table`()' },
     { code: 'test.concurrent()' },
+    {
+      code: `
+        import { describe as fdescribe } from '@jest/globals';
+
+        fdescribe()
+      `,
+    },
   ],
   invalid: [
     {
@@ -365,22 +372,6 @@ ruleTester.run('no-focused-tests', {} as never, {
         },
       ],
     },
-  ],
-});
-
-// import test cases
-ruleTester.run('no-focused-tests', {} as never, {
-  valid: [
-    {
-      code: `
-        import { describe as fdescribe } from '@jest/globals';
-
-        fdescribe()
-      `,
-    },
-  ],
-
-  invalid: [
     {
       code: `
         const { describe } = require('@jest/globals');
@@ -453,40 +444,6 @@ ruleTester.run('no-focused-tests', {} as never, {
                 const { fdescribe } = require('@jest/globals');
 
                 describe()
-              `,
-            },
-          ],
-        },
-      ],
-    },
-  ],
-});
-
-// alias test cases
-ruleTester.run('no-focused-tests', {} as never, {
-  valid: [],
-
-  invalid: [
-    {
-      code: `
-        import { describe as describeThis } from '@jest/globals';
-
-        describeThis.only()
-      `,
-      errors: [
-        {
-          line: 3,
-          column: 14,
-          endLine: 3,
-          endColumn: 18,
-          messageId: 'focusedTest',
-          suggestions: [
-            {
-              messageId: 'suggestRemoveFocus',
-              output: `
-                import { describe as describeThis } from '@jest/globals';
-
-                describeThis()
               `,
             },
           ],

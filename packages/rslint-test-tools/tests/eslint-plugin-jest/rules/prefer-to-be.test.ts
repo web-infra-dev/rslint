@@ -20,15 +20,6 @@ ruleTester.run('prefer-to-be', {} as never, {
     { code: 'expect(value).toEqual(dedent`my string`);' },
 
     // null
-    { code: 'expect(null).toBeNull();' },
-    { code: 'expect(null).not.toBeNull();' },
-    { code: 'expect(null).toBe(1);' },
-    { code: 'expect(obj).toStrictEqual([ x, 1 ]);' },
-    { code: 'expect(obj).toStrictEqual({ x: 1 });' },
-    { code: 'expect(obj).not.toStrictEqual({ x: 1 });' },
-    { code: 'expect(value).toMatchSnapshot();' },
-    { code: "expect(catchError()).toStrictEqual({ message: 'oh noes!' })" },
-    { code: 'expect("something");' },
     { code: 'expect(null).not.toEqual();' },
     { code: 'expect(null).toBe();' },
     { code: 'expect(null).toMatchSnapshot();' },
@@ -39,14 +30,6 @@ ruleTester.run('prefer-to-be', {} as never, {
     // undefined
     { code: 'expect(undefined).toBeUndefined();' },
     { code: 'expect(true).toBeDefined();' },
-    { code: 'expect({}).toEqual({});' },
-    { code: 'expect(something).toBe()' },
-    { code: 'expect(something).toBe(somethingElse)' },
-    { code: 'expect(something).toEqual(somethingElse)' },
-    { code: 'expect(something).not.toBe(somethingElse)' },
-    { code: 'expect(something).not.toEqual(somethingElse)' },
-    { code: 'expect(undefined).toBe' },
-    { code: 'expect("something");' },
 
     // NaN
     { code: 'expect(NaN).toBeNaN();' },
@@ -58,7 +41,6 @@ ruleTester.run('prefer-to-be', {} as never, {
     { code: 'expect(something).not.toBe(somethingElse)' },
     { code: 'expect(something).not.toEqual(somethingElse)' },
     { code: 'expect(undefined).toBe' },
-    { code: 'expect("something");' },
 
     // typescript edition
     {

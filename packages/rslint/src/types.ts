@@ -18,7 +18,21 @@ export interface Diagnostic {
   filePath: string;
   range: Range;
   severity?: string;
-  suggestions: any[];
+  fixes?: Fix[];
+  suggestions?: Suggestion[];
+}
+
+export interface Fix {
+  text: string;
+  startPos: number;
+  endPos: number;
+}
+
+export interface Suggestion {
+  messageId?: string;
+  desc?: string;
+  data?: Record<string, string>;
+  fixes?: Fix[];
 }
 
 export interface LintResponse {

@@ -172,13 +172,14 @@ type Range struct {
 
 // Diagnostic represents a single lint diagnostic
 type Diagnostic struct {
-	RuleName  string `json:"ruleName"`
-	Message   string `json:"message"`
-	FilePath  string `json:"filePath"`
-	Range     Range  `json:"range"`
-	Severity  string `json:"severity,omitempty"`
-	MessageId string `json:"messageId"`
-	Fixes     []Fix  `json:"fixes,omitempty"`
+	RuleName    string       `json:"ruleName"`
+	Message     string       `json:"message"`
+	FilePath    string       `json:"filePath"`
+	Range       Range        `json:"range"`
+	Severity    string       `json:"severity,omitempty"`
+	MessageId   string       `json:"messageId"`
+	Fixes       []Fix        `json:"fixes,omitempty"`
+	Suggestions []Suggestion `json:"suggestions,omitempty"`
 }
 
 // Fix represents a single fix that can be applied
@@ -186,6 +187,14 @@ type Fix struct {
 	Text     string `json:"text"`
 	StartPos int    `json:"startPos"` // Character position in the file content
 	EndPos   int    `json:"endPos"`   // Character position in the file content
+}
+
+// Suggestion represents a single code-action style suggestion attached to a diagnostic.
+type Suggestion struct {
+	MessageId string            `json:"messageId,omitempty"`
+	Desc      string            `json:"desc,omitempty"`
+	Data      map[string]string `json:"data,omitempty"`
+	Fixes     []Fix             `json:"fixes,omitempty"`
 }
 
 // Handler defines the interface for handling IPC messages

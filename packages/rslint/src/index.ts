@@ -64,6 +64,7 @@ export async function getAstInfo(
 // Export all types
 export {
   type Diagnostic,
+  type Fix,
   type LintOptions,
   type LintResponse,
   type ApplyFixesRequest,
@@ -72,6 +73,7 @@ export {
   type ParserOptions,
   type RSlintOptions,
   type RslintServiceInterface,
+  type Suggestion,
   // AST Info types
   type GetAstInfoRequest,
   type GetAstInfoResponse,
