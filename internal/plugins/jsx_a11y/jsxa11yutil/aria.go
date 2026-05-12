@@ -149,6 +149,73 @@ type AriaLiteralValue struct {
 	Str    string
 }
 
+// LiteralPropArrayAsString reports whether the JSX attribute's literal value
+// is an `ArrayLiteralExpression` and, if so, returns its `String(arr)` JS
+// coercion — each element evaluated under the static evaluator (mirroring
+// jsx-ast-utils' `LITERAL_TYPES.ArrayExpression` which delegates to TYPES,
+// the full evaluator path, NOT extractLiteral), null / undefined elements
+// filtered, the rest joined by `,`.
+//
+// Returns `("", false)` for any non-array attribute value (including the
+// boolean attribute form). Returns `("", true)` for an empty `[]` array —
+// `String([])` is the empty string.
+//
+// Used by jsx-a11y/aria-role to validate `<div role={[...]} />` shapes
+// without needing to extend the shared `LiteralPropAriaValue` (which keeps
+// arrays as NoLit for callers that don't need element-level evaluation).
+func LiteralPropArrayAsString(attr *ast.Node) (string, bool) {
+	if attr == nil {
+		return "", false
+	}
+	if AttributeIsBooleanForm(attr) {
+		return "", false
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil || inner.Kind != ast.KindArrayLiteralExpression {
+		return "", false
+	}
+	arr := inner.AsArrayLiteralExpression()
+	if arr == nil || arr.Elements == nil {
+		return "", true
+	}
+	parts := make([]string, 0, len(arr.Elements.Nodes))
+	for _, el := range arr.Elements.Nodes {
+		v := staticEval(el)
+		// Upstream filters `null` results from `LITERAL_TYPES.ArrayExpression`.
+		// `jvNull` covers explicit `null` literals; `jvUndef` mirrors the
+		// `Identifier === 'undefined'` arm — both stringify to empty in JS's
+		// `String([...])` after the filter (which Array.prototype.join treats
+		// as empty), so dropping them matches observable output.
+		if v.Kind == jvNull || v.Kind == jvUndef {
+			continue
+		}
+		parts = append(parts, jsToString(v))
+	}
+	return strings.Join(parts, ","), true
+}
+
+// AriaLiteralValueAsJSString mirrors JS `String(value)` semantics on an
+// AriaLiteralValue:
+//
+//   - AriaLiteralString: passes through.
+//   - AriaLiteralBool: "true" / "false".
+//   - AriaLiteralNumber: ECMA-262 Number-to-String — `NaN`, `Infinity`,
+//     `-Infinity`, integer / decimal forms.
+//   - AriaLiteralBigInt: decimal digits (matches JS `String(2n) === "2"`).
+//   - AriaLiteralUndef: "undefined".
+//   - AriaLiteralNoLit: returns "" — callers should short-circuit on this
+//     kind before calling. Defensive default; never produces a meaningful
+//     diagnostic input.
+//
+// Reuses the internal jsToString engine used by the static evaluator's
+// `+` string-concat path, so coercion stays consistent across helpers.
+func AriaLiteralValueAsJSString(v AriaLiteralValue) string {
+	if v.Kind == AriaLiteralNoLit {
+		return ""
+	}
+	return jsToString(ariaLiteralValueToInternal(v))
+}
+
 // AriaLiteralValueAsJSNumber mirrors JS `Number(value)` semantics on an
 // AriaLiteralValue:
 //

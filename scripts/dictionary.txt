@@ -36,10 +36,12 @@ codspeed
 CODSPEED
 cpuprof
 dagre
+datepicker
 dirxml
 dlclark
 dont
 doublestar
+DPUB
 endline
 errchkjson
 errgroup
