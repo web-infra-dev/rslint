@@ -173,6 +173,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/iframe-has-title.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/img-redundant-alt.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/interactive-supports-focus.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/label-has-associated-control.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/media-has-caption.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/mouse-events-have-key-events.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
