@@ -103,7 +103,6 @@ func TestNoAutofocusExtras(t *testing.T) {
 		{Code: `<div autoFocus={"False"} />`, Tsx: true},
 		{Code: `<div autoFocus={("false")} />`, Tsx: true},
 		{Code: `<div autoFocus={"false" as string} />`, Tsx: true},
-		{Code: `<div autoFocus={"false"!} />`, Tsx: true},
 		{Code: `<div autoFocus={false as boolean} />`, Tsx: true},
 		// NoSubstitutionTemplateLiteral does NOT route through
 		// jsxAstUtilsLiteralCoerce, so `` `false` `` extracts to string
@@ -441,6 +440,14 @@ func TestNoAutofocusExtras(t *testing.T) {
 		{Code: `<div autoFocus={true as boolean} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div autoFocus={(true)} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 		{Code: `<div autoFocus={(true)!} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+		// `<div autoFocus={"false"!} />` — upstream's `TSNonNullExpression`
+		// extractor stringifies the inner string literal and appends "!"
+		// → "false!" (a NEW string, NOT coerced via the case-insensitive
+		// "true"/"false" Literal rule). `"false!" !== false` →
+		// autoFocus enabled → reports. rslint emits the same stringified
+		// form via the dedicated `case ast.KindNonNullExpression` arm
+		// in static_eval.go.
+		{Code: `<div autoFocus={"false"!} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 
 		// ============================================================
 		// Group 10: `satisfies` is OPAQUE — wrapped value falls through

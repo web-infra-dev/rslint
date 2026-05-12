@@ -49,13 +49,6 @@ Examples of **correct** code for this rule:
 <MyComponent onClick={() => {}} />
 ```
 
-## Differences from ESLint
-
-- `<div onClick={…} aria-hidden={value!} />` — when the value of
-  `aria-hidden` is wrapped in a TS non-null assertion (`!`), rslint treats
-  it as hidden and does not report; ESLint reports. Drop the `!` to align
-  with both linters: `aria-hidden={value}`.
-
 ## Resources
 
 - [WCAG 2.1.1 — Keyboard](https://www.w3.org/WAI/WCAG21/Understanding/keyboard)

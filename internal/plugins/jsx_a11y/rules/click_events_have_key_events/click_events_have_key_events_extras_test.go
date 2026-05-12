@@ -131,20 +131,6 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 			// ---- aria-hidden as JsxExpression containing string "true"
 			//      (jsxAstUtilsLiteralCoerce: "true" → bool true). ----
 			{Code: `<div onClick={() => void 0} aria-hidden={"true"} />`, Tsx: true},
-			// ---- DOCUMENTED DIVERGENCE: aria-hidden={true!} (TS non-null
-			//      assertion on a boolean literal). Upstream ESLint reports
-			//      this — jsx-ast-utils' `extract()` (the getPropValue path)
-			//      has no TYPES entry for `TSNonNullExpression` and falls
-			//      through to null, so aria-hidden does not equal boolean
-			//      true and the rule fires. rslint's shared `staticEval`
-			//      transparently strips `!` (via OEKNonNullAssertions in
-			//      skipTransparent), recovering the boolean true → element
-			//      is treated as hidden → no diagnostic. The plugin-wide
-			//      staticEval semantics are shared across 30+ jsx-a11y
-			//      tests in this repo and intentionally more permissive
-			//      than the upstream TYPES table — see Phase 1 Step 6.B
-			//      (language-natural divergence) in PORT_RULE.md. ----
-			{Code: `<div onClick={() => void 0} aria-hidden={true!} />`, Tsx: true},
 
 			// ---- role as JsxExpression containing string literal. ----
 			{Code: `<div onClick={() => void 0} role={"presentation"} />`, Tsx: true},
@@ -376,6 +362,15 @@ func TestClickEventsHaveKeyEventsExtras(t *testing.T) {
 			{Code: `<div onClick={() => void 0} aria-hidden={isHidden()} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 			// ---- aria-hidden as Identifier (non-static) → not boolean true. ----
 			{Code: `<div onClick={() => void 0} aria-hidden={hiddenVar} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
+			// ---- aria-hidden={true!} (TS non-null assertion on a boolean
+			//      literal). Upstream's `TSNonNullExpression` extractor
+			//      stringifies the inner value and appends "!" → "true!"
+			//      (a non-empty string, NOT bool true). aria-hidden !== true
+			//      → element NOT hidden → rule fires. Aligned with upstream
+			//      after the OEKNonNullAssertions strip was removed from
+			//      `skipTransparent`; see the `case ast.KindNonNullExpression`
+			//      arm in static_eval.go. ----
+			{Code: `<div onClick={() => void 0} aria-hidden={true!} />`, Tsx: true, Errors: []rule_tester.InvalidTestCaseError{expectedError}},
 
 			// ============================================================
 			// Non-interactive DOM element survey (upstream tests cover

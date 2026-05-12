@@ -331,6 +331,12 @@ func TestAltTextExtras(t *testing.T) {
 		{Code: `<img alt={altText as string} />`, Tsx: true},
 		// Double TS wrapping `(altText as any)!`.
 		{Code: `<img alt={(altText as any)!} />`, Tsx: true},
+		// `(undefined as any)!` — upstream `TSNonNullExpression` extractor
+		// stringifies inner + appends "!" → "undefined!" (non-empty truthy
+		// string, ≠ ''). AltAttributeIsValid → valid alt → no report.
+		// Locks in alignment after the OEKNonNullAssertions strip was
+		// removed from `skipTransparent` (see jsxa11yutil.go).
+		{Code: `<img alt={(undefined as any)!} />`, Tsx: true},
 		// String literal under `as` — extracts to "foo" → truthy → valid.
 		{Code: `<img alt={"foo" as string} />`, Tsx: true},
 		// Empty string under `as` — extracts to "" → valid via `=== ''`.
@@ -796,14 +802,6 @@ func TestAltTextExtras(t *testing.T) {
 		// undefined identifier; alt is still missing semantically.
 		{
 			Code: `<img alt={undefined as any} />`,
-			Tsx:  true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},
-			},
-		},
-		// `(undefined as any)!` — double-wrapped, still undefined.
-		{
-			Code: `<img alt={(undefined as any)!} />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "altValue", Message: altValueMessage("img"), Line: 1, Column: 1},

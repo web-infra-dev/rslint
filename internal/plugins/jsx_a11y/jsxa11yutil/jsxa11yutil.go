@@ -44,25 +44,36 @@ func directAttributeStringValue(attr *ast.Node) (string, bool) {
 }
 
 // skipTransparent is the wrapper mask used by `staticEval` (the
-// `getPropValue` / TYPES path). Strips parentheses, type assertions
-// (`as` / `<T>x` / `TypeCastExpression`), and non-null assertions (`!`),
-// because upstream's jsx-ast-utils does the equivalent:
+// `getPropValue` / TYPES path). Strips parentheses and type assertions
+// (`as` / `<T>x` / `TypeCastExpression`), mirroring upstream
+// jsx-ast-utils:
 //
-//   - parens are flattened by ESTree's parser; tsgo preserves them, so
+//   - Parens are flattened by ESTree's parser; tsgo preserves them, so
 //     stripping is needed for parity.
-//   - `TSAsExpression` is unwrapped via the while-loop in
-//     `extractValueFromExpression`.
-//   - `TSNonNullExpression` has its own TYPES extractor that recurses
-//     into `.expression`, equivalent to stripping.
+//   - `TSAsExpression` is unwrapped via the `while (type ===
+//     'TSAsExpression')` loop in `extractValueFromExpression`.
 //
-// `OEKSatisfies` is INTENTIONALLY EXCLUDED. Upstream's `TYPES` table has
-// no entry for `TSSatisfiesExpression`, so it falls to the
+// `OEKNonNullAssertions` is INTENTIONALLY EXCLUDED. Upstream has a
+// dedicated `TSNonNullExpression` entry in `TYPES` that recurses into
+// `.expression` and APPENDS the `!` token to the stringified inner
+// result — so `{x!}` resolves to the string `"x!"`, `{true!}` to
+// `"true!"`, `{0!}` to `"0!"` (never the bare inner literal). The
+// presence of `!` makes upstream's `=== true` / `=== null` /
+// `Number(...) is integer` comparisons fail for these inputs while
+// truthiness / non-empty-after-trim checks still pass. Stripping `!`
+// here would silently convert `aria-hidden={true!}` to bool true (and
+// `tabIndex={0!}` to 0), diverging from upstream. The corresponding
+// `case ast.KindNonNullExpression` in `staticEval` produces the
+// stringified-with-`!` value upstream emits.
+//
+// `OEKSatisfies` is also INTENTIONALLY EXCLUDED. Upstream's `TYPES`
+// table has no entry for `TSSatisfiesExpression`, so it falls to the
 // `TYPES[type] === undefined → return null` branch. Keeping satisfies
 // opaque here makes it land on `staticEval`'s default `jsNull` arm,
 // matching upstream's null exactly. Used only by `staticEval`; the
 // `getLiteralPropValue` (`literalPropValue`) and `getProp` paths strip
 // parens only — see those callers.
-const skipTransparent = ast.OEKParentheses | ast.OEKTypeAssertions | ast.OEKNonNullAssertions
+const skipTransparent = ast.OEKParentheses | ast.OEKTypeAssertions
 
 // StringSliceOption coerces a JSON-decoded option value into `[]string`,
 // silently dropping any non-string entries. It is the standard helper for
@@ -621,9 +632,13 @@ func LiteralPropJSNumber(attr *ast.Node) (float64, bool) {
 //     no entry for `JSXEmptyExpression` and falls through to its
 //     `TYPES[type] === undefined → return null` path, which is `== null`.
 //   - the prop's value statically resolves to `null` or `undefined`. This
-//     covers `prop={null}`, `prop={undefined}`, and the TS-wrapped variants
-//     `prop={null as any}` / `prop={undefined!}` (skipTransparent unwraps
-//     parens + assertion wrappers per jsx-ast-utils' extract loop).
+//     covers `prop={null}`, `prop={undefined}`, and the `as`-wrapped
+//     variant `prop={null as any}` (skipTransparent unwraps parens +
+//     TSAsExpression per jsx-ast-utils' extract while-loop). Note that
+//     the `!`-wrapped variant `prop={undefined!}` is NOT nullish — upstream's
+//     `TSNonNullExpression` extractor stringifies it to `"undefined!"`
+//     (a non-empty string, `!= null`), and staticEval mirrors that. See
+//     the `case ast.KindNonNullExpression` arm.
 //   - staticEval cannot resolve the expression at all (`jvUnknown`). This
 //     mirrors jsx-ast-utils returning `null` for unrecognized expression
 //     types via the same fallback path. Producing this state is rare in
@@ -706,7 +721,7 @@ func PropValueIsTruthy(attr *ast.Node) bool {
 //   - boolean-attribute form (`<iframe title />` → upstream returns boolean
 //     true → typeof "boolean")
 //   - empty `{}` JsxExpression (upstream's "type not in TYPES" → null)
-//   - explicitly empty string (`title=""`, `title={""}`, `title={``}`)
+//   - explicitly empty string (`title=""`, `title={""}`, `title={“}`)
 //   - non-string truthy shapes: Object / Array / New / RegExp / function
 //     (Arrow / Function / Class) / Number / BigInt / Boolean / null /
 //     undefined / typeof / void / delete / SequenceExpression
@@ -966,7 +981,7 @@ func polymorphicPropValue(propAttr *ast.Node) (string, bool) {
 // Routes through LiteralPropStringValue (= getLiteralPropValue / LITERAL_TYPES),
 // not LiteralStringValue, so that TemplateExpression with substitutions whose
 // quasis + extracted substitution values concatenate to the literal strings
-// "presentation" / "none" are recognized — e.g. ``role={`presentation${''}`}``.
+// "presentation" / "none" are recognized — e.g. “role={`presentation${”}`}“.
 // Non-literal `role` expressions (Identifier, CallExpression, …) and absent
 // `role` attributes return false.
 func IsPresentationRole(attrs []*ast.Node) bool {

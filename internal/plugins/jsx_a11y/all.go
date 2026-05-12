@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_unsupported_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/autocomplete_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/click_events_have_key_events"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/control_has_associated_label"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/heading_has_content"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/html_has_lang"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/iframe_has_title"
@@ -37,6 +38,7 @@ func GetAllRules() []rule.Rule {
 		aria_unsupported_elements.AriaUnsupportedElementsRule,
 		autocomplete_valid.AutocompleteValidRule,
 		click_events_have_key_events.ClickEventsHaveKeyEventsRule,
+		control_has_associated_label.ControlHasAssociatedLabelRule,
 		heading_has_content.HeadingHasContentRule,
 		html_has_lang.HtmlHasLangRule,
 		iframe_has_title.IframeHasTitleRule,
