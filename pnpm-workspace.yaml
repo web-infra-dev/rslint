@@ -4,5 +4,24 @@ packages:
   - 'npm/rslint/*'
   - 'npm/tsgo/*'
   - 'website'
-ignoreDepScripts: true
-ignoreScripts: true
+
+allowBuilds:
+  '@tailwindcss/oxide': false
+  '@vscode/vsce-sign': false
+  core-js: false
+  esbuild: true
+  keytar: false
+
+# Reduce the risk of installing compromised packages
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@rspack/*'
+  - '@rsbuild/*'
+  - '@rslib/*'
+  - '@rspress/*'
+  - '@rstest/*'
+  - '@rsdoctor/*'
+  - '@rslint/*'
+
+# Prevent un-reviewed build scripts
+strictDepBuilds: true

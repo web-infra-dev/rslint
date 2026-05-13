@@ -4,6 +4,7 @@
     'config:recommended',
     'schedule:weekly',
     'helpers:pinGitHubActionDigests',
+    'github>rstackjs/renovate:security',
   ],
   ignorePaths: ['**/tests/**', '**/node_modules/**', '**/typescript-go/**'],
   cloneSubmodules: true,
