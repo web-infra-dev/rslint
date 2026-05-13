@@ -132,6 +132,7 @@ noopener
 noopenernoreferrer
 noreferrer
 noregabi
+notarole
 notcool
 notunique
 nsec
