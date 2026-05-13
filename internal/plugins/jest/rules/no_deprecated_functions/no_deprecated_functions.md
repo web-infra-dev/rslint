@@ -1,4 +1,4 @@
-# jest/no-deprecated-functions
+# no-deprecated-functions
 
 ## Rule Details
 

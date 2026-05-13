@@ -1,4 +1,4 @@
-# jest/no-done-callback
+# no-done-callback
 
 ## Rule Details
 

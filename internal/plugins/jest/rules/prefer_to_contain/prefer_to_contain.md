@@ -1,4 +1,4 @@
-# jest/prefer-to-contain
+# prefer-to-contain
 
 ## Rule Details
 

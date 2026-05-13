@@ -1,4 +1,4 @@
-# jest/no-identical-title
+# no-identical-title
 
 ## Rule Details
 
