@@ -179,6 +179,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-autofocus.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-distracting-elements.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/no-interactive-element-to-noninteractive-role.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-noninteractive-element-interactions.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-noninteractive-tabindex.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-redundant-roles.test.ts',
