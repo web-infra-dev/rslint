@@ -399,6 +399,7 @@ tabindex
 noninteractive
 progressbar
 contentinfo
+contenteditable
 alertdialog
 focusable
 columnheader

@@ -1163,10 +1163,31 @@ func HasAccessibleChild(node *ast.Node, getElementType func(*ast.Node) string) b
 //
 // `child` is the JsxOpeningElement / JsxSelfClosingElement to inspect;
 // `getElementType` is the per-context resolver (use a closure that calls
-// GetElementType with `ctx.Settings` already bound).
+// GetElementType with `ctx.Settings` already bound). This is a thin
+// convenience wrapper around [IsHiddenFromScreenReaderFromTagAttrs] —
+// callers that already have the element type and attribute list resolved
+// (e.g. rules that apply a filter/mask to attributes before classification
+// and need downstream helpers to observe the same filtered list) should
+// use the attrs variant directly.
 func IsHiddenFromScreenReader(child *ast.Node, getElementType func(*ast.Node) string) bool {
-	tag := strings.ToUpper(getElementType(child))
-	attrs := reactutil.GetJsxElementAttributes(child)
+	return IsHiddenFromScreenReaderFromTagAttrs(
+		getElementType(child),
+		reactutil.GetJsxElementAttributes(child),
+	)
+}
+
+// IsHiddenFromScreenReaderFromTagAttrs is the attrs-based variant of
+// [IsHiddenFromScreenReader]. Semantics are identical — see that function's
+// doc for the upstream mapping. Use this when the caller has already
+// computed the effective element type (via [GetElementType]) AND when the
+// caller's attribute list may have been filtered/masked relative to the
+// node's raw attributes (e.g. the per-element allow-list in
+// `no-noninteractive-element-interactions`'s `config[type]` filter).
+// Upstream's `isHiddenFromScreenReader(type, attributes)` takes both
+// arguments by value, so passing the filtered list mirrors upstream
+// byte-for-byte.
+func IsHiddenFromScreenReaderFromTagAttrs(elementType string, attrs []*ast.Node) bool {
+	tag := strings.ToUpper(elementType)
 	if tag == "INPUT" {
 		typeAttr := FindAttributeByName(attrs, "type")
 		if typeAttr != nil {
