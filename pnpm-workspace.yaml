@@ -6,3 +6,17 @@ packages:
   - 'website'
 ignoreDepScripts: true
 ignoreScripts: true
+
+# Reduce the risk of installing compromised packages
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - '@rspack/*'
+  - '@rsbuild/*'
+  - '@rslib/*'
+  - '@rspress/*'
+  - '@rstest/*'
+  - '@rsdoctor/*'
+  - '@rslint/*'
+
+# Prevent un-reviewed build scripts
+strictDepBuilds: true
