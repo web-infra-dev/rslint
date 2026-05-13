@@ -1,82 +1,67 @@
 # Type Checking
 
-Rslint can perform TypeScript semantic type checking alongside lint diagnostics. This allows you to replace `tsc --noEmit` with a single `rslint --type-check` command.
+Rslint runs TypeScript semantic type-check alongside or instead of lint rules — a drop-in replacement for `tsc --noEmit` in CI.
 
-## Quick Start
+- `--type-check` — lint rules **and** type-check, in one pass.
+- `--type-check-only` — type-check only; lint phase is skipped entirely.
+
+## Quick start
+
+Point rslint at your tsconfig(s) via `languageOptions.parserOptions.project`:
+
+```js
+// rslint.config.mjs
+export default [
+  {
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: { project: ['./tsconfig.json'] },
+    },
+  },
+];
+```
+
+Then:
 
 ```bash
-rslint --type-check .
+rslint --type-check .         # lint + type-check
+rslint --type-check-only .    # type-check only
 ```
 
-When `--type-check` is enabled, TypeScript semantic errors (e.g. type mismatches, missing properties, unresolved modules) are reported together with lint diagnostics in a single unified output.
+Without `parserOptions.project` no TypeScript program is built and type-check produces no diagnostics.
 
-## Replacing `tsc --noEmit`
+## What gets type-checked
 
-Traditionally, TypeScript projects run type checking and linting as two separate steps:
+`parserOptions.project` accepts one or more tsconfig paths:
 
-```bash
-tsc --noEmit        # type checking
-rslint .            # linting
+```js
+// Single tsconfig
+parserOptions: { project: ['./tsconfig.json'] }
+
+// Multiple tsconfigs (monorepo, separate test/build configs, …)
+parserOptions: {
+  project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+}
 ```
 
-With `--type-check`, both can be done in one pass:
+Each entry produces one TypeScript program. Type-check runs over every program independently.
 
-```bash
-rslint --type-check .
-```
+**The type-check scope is each tsconfig's `include` / `files` minus `exclude` — nothing in your rslint config or on the CLI changes it.** Specifically, the following are **lint-phase concepts** that do **not** affect type-check scope:
 
-This provides several advantages:
+- rslint config's `files` patterns
+- rslint config's `ignores` patterns (root-level or per-entry)
+- `.gitignore`
+- CLI file / directory arguments — `rslint --type-check-only foo.ts` still type-checks every file in the program(s), not just `foo.ts`
 
-- **Single command** — no need to orchestrate two tools in scripts or CI pipelines.
-- **Shared TypeScript program** — type checking reuses the same TypeScript program built for type-aware lint rules, so it adds minimal overhead compared to running a separate `tsc` process.
-- **Unified output** — type errors and lint errors appear in the same output stream with a consistent format, making it easier to triage issues.
+If a file is included by tsconfig but matched by rslint `ignores`, lint rules do not run on it, but **type errors for it are still reported**. To exclude it from type-check as well, add it to the tsconfig's `exclude` or prepend `// @ts-nocheck` to the file.
 
-### CI Migration
+### Gap files
 
-#### GitHub Actions
-
-Before:
-
-```yaml
-steps:
-  - run: npx tsc --noEmit
-  - run: npx rslint .
-```
-
-After:
-
-```yaml
-steps:
-  - run: npx rslint --type-check .
-```
-
-To get inline annotations on pull request diffs, use `--format github`:
-
-```yaml
-steps:
-  - run: npx rslint --type-check --format github .
-```
-
-#### Other CI Environments
-
-```bash
-# Lint + type check in one command
-npx rslint --type-check .
-
-# With error threshold for warnings
-npx rslint --type-check --max-warnings 10 .
-
-# Errors only (cleaner CI logs)
-npx rslint --type-check --quiet .
-```
+Files that match your rslint config's `files` pattern but are **not** in any tsconfig (root-level scripts, ad-hoc config files, etc.) are called _gap files_. Syntactic lint rules still run on them, but type-check skips them — semantic type information requires tsconfig coverage. To enable type-check for a gap file, add it to an existing tsconfig's `include` or create a dedicated tsconfig that covers it.
 
 ## Output
 
-Type errors are reported with their original TypeScript error codes as the rule name, e.g. `TypeScript(TS2322)`. All type errors have severity `error` and cause a non-zero exit code.
-
-Type errors are included in all output formats (`default`, `jsonline`, `github`).
-
-### Default format
+Type errors carry `TypeScript(TS<code>)` as the rule name and severity `error`:
 
 ```
   TypeScript(TS2322)  — [error] Type 'string' is not assignable to type 'number'.
@@ -87,40 +72,102 @@ Type errors are included in all output formats (`default`, `jsonline`, `github`)
   ╰────────────────────────────────
 ```
 
-For errors with detailed explanations, TypeScript's message chain is displayed with indentation:
+Chained errors indent the TypeScript message chain:
 
 ```
   TypeScript(TS2322)  — [error] Type 'B' is not assignable to type 'A'.
     The types of 'x.y.z' are incompatible between these types.
       Type 'number' is not assignable to type 'string'.
-  ╭─┴──────────( src/types.ts:3:7 )─────
 ```
+
+Type errors appear in every output format (`default`, `jsonline`, `github`).
 
 ### Summary line
 
-When `--type-check` is enabled, the summary always splits lint errors and type errors:
+Three templates depending on mode:
 
 ```
-Found 3 lint errors, 2 type errors and 1 warning (linted 42 files in 120ms using 8 threads)
+# Plain lint
+Found 3 errors and 1 warning (linted 42 files with 5 rules in 120ms using 8 threads)
+
+# --type-check
+Found 3 lint errors, 2 type errors and 1 warning (linted 42 files with 5 rules in 120ms using 8 threads)
+
+# --type-check-only
+Found 2 type errors (type-checked 42 files in 80ms using 8 threads)
 ```
+
+### Exit codes
+
+| Code | When                                                                 |
+| :--: | -------------------------------------------------------------------- |
+|  0   | No errors. (Warnings still allowed unless `--max-warnings` rejects.) |
+|  1   | At least one error (lint or type), or a runtime failure.             |
+|  2   | Flag misuse — `--type-check-only` combined with `--fix` or `--rule`. |
 
 ## Alignment with `tsc --noEmit`
 
-`--type-check` is designed to produce the same diagnostics as `tsc --noEmit` (and `tsgo --noEmit`) for any given TypeScript program — same error code, same file, same line and column.
+For any given program, `--type-check` (and `--type-check-only`) produces the same diagnostics as `tsc --noEmit` / `tsgo --noEmit` — same error code, same file, same line and column.
 
-The one intentional difference: TypeScript diagnostics that have no source-file anchor (e.g. tsconfig validation messages such as `TS18003` "No inputs were found in config file" or `TS5108` "Option … has been removed") are not reported by `--type-check`, because rslint's output is rendered per file. Run `tsc --noEmit` directly when you need to surface those configuration-level errors.
+One intentional difference: TypeScript diagnostics without a source-file anchor (e.g. `TS18003` "No inputs were found in config file", `TS5108` removed-option warnings) are not reported, because rslint output is per file. Run `tsc --noEmit` directly to surface these configuration-level errors.
 
-## Files Without tsconfig Coverage
+## Replacing `tsc --noEmit` in CI
 
-Files that match your config's `files` patterns but are not included in any tsconfig (e.g. root-level scripts, config files) are still linted with syntax-level rules. However, `--type-check` will **not** report semantic type errors for these files, since reliable type information requires tsconfig coverage.
+```yaml
+# Before — two steps
+steps:
+  - run: npx tsc --noEmit
+  - run: npx rslint .
 
-To enable full type checking for these files, add them to your tsconfig's `include` or create a separate tsconfig that covers them.
+# After — one combined step
+steps:
+  - run: npx rslint --type-check .
+```
 
-## Interaction with Other Flags
+For inline annotations on PR diffs:
 
-| Flag             | Behavior with `--type-check`                                                     |
-| ---------------- | -------------------------------------------------------------------------------- |
-| `--fix`          | Applies lint auto-fixes as usual. Type errors have no auto-fix.                  |
-| `--quiet`        | Suppresses warnings. Type errors (severity `error`) are always shown.            |
-| `--format`       | Type errors are rendered in the chosen format (`default`, `jsonline`, `github`). |
-| `--max-warnings` | Only counts lint warnings, not type errors (which are always `error`).           |
+```yaml
+- run: npx rslint --type-check --format github .
+```
+
+If your CI keeps lint and type-check as separate jobs, use `--type-check-only` in the type-check job:
+
+```yaml
+jobs:
+  type-check:
+    steps:
+      - run: npx rslint --type-check-only .
+  lint:
+    steps:
+      - run: npx rslint .
+```
+
+## `--type-check-only`
+
+Skips every lint rule and runs only the type-check phase. Use this when CI splits "type-check" and "lint" into separate steps and you want the type-check step to pay zero lint-side cost.
+
+```bash
+rslint --type-check-only .
+```
+
+`--type-check-only` implies `--type-check`; passing both is redundant.
+
+### vs. `--type-check`
+
+| Flag                | Lint rules | Type diagnostics | Suppresses lint-phase warnings <sup>\*</sup> |
+| ------------------- | :--------: | :--------------: | :------------------------------------------: |
+| `--type-check`      |     ✓      |        ✓         |                      no                      |
+| `--type-check-only` |     ✗      |        ✓         |                     yes                      |
+
+<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found in the project, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, when in fact Phase 2 is independent of CLI scope and rslint ignores (see [What gets type-checked](#what-gets-type-checked)).
+
+## Flag matrix
+
+| Flag             | `--type-check`                                       | `--type-check-only`                          |
+| ---------------- | ---------------------------------------------------- | -------------------------------------------- |
+| `--fix`          | Applies lint fixes. Type errors have no auto-fix.    | **Rejected** (exit code 2).                  |
+| `--rule`         | Overrides lint rules normally.                       | **Rejected** (exit code 2).                  |
+| `--quiet`        | Suppresses warnings; type errors always shown.       | No-op — the lint phase produces nothing.     |
+| `--format`       | Type errors rendered in the chosen format.           | Same.                                        |
+| `--max-warnings` | Counts lint warnings only.                           | Always zero warnings (lint phase skipped).   |
+| File/dir args    | Restricts lint scope. Type-check stays program-wide. | Lint skipped. Type-check still program-wide. |

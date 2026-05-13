@@ -25,6 +25,7 @@ export default defineConfig({
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',
     './tests/cli/type-check/ignores-suppression.test.ts',
+    './tests/cli/type-check/type-check-only.test.ts',
 
     // eslint
     './tests/eslint/rules/accessor-pairs.test.ts',
