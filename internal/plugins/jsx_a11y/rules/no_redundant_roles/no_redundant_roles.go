@@ -100,7 +100,7 @@ var NoRedundantRolesRule = rule.Rule{
 			if !ok {
 				return
 			}
-			explicitRole, ok := getExplicitRole(attrs)
+			explicitRole, ok := jsxa11yutil.GetExplicitRole(attrs)
 			if !ok {
 				return
 			}
@@ -144,43 +144,6 @@ var NoRedundantRolesRule = rule.Rule{
 			ast.KindJsxSelfClosingElement: check,
 		}
 	},
-}
-
-// getExplicitRole mirrors upstream `util/getExplicitRole.js`:
-//
-//	const explicit = toLowerCase(getLiteralPropValue(getProp(attrs, 'role')));
-//	return rolesMap.has(explicit) ? explicit : null;
-//
-// Steps:
-//  1. Look up the `role` attribute case-insensitively (upstream uses
-//     getProp with its default ignoreCase: true).
-//  2. Extract its literal value via `getLiteralPropValue` semantics —
-//     non-literal expressions (CallExpression, MemberExpression,
-//     Identifier other than `undefined`, TemplateExpression with
-//     substitutions, …) return null.
-//  3. Lower-case the result, then check membership in aria-query's
-//     `roles` map.
-//
-// TemplateLiteral note: `<button role={` + "`${foo}button`" + `} />` is
-// a valid case upstream because the template's synthesized placeholder
-// string doesn't match any real ARIA role. tsgo and jsx-ast-utils
-// produce different placeholder text, but since neither resembles a
-// real role name the membership check filters them both out — the
-// observable result is identical.
-func getExplicitRole(attrs []*ast.Node) (string, bool) {
-	roleAttr := jsxa11yutil.FindAttributeByName(attrs, "role")
-	if roleAttr == nil {
-		return "", false
-	}
-	roleVal, ok := jsxa11yutil.LiteralPropStringValue(roleAttr)
-	if !ok {
-		return "", false
-	}
-	lower := strings.ToLower(roleVal)
-	if _, ok := ariaRolesSet[lower]; !ok {
-		return "", false
-	}
-	return lower, true
 }
 
 // getImplicitRole mirrors upstream `util/getImplicitRole.js`:
@@ -274,7 +237,7 @@ func getImplicitRole(elementType string, attrs []*ast.Node) (string, bool) {
 	default:
 		return "", false
 	}
-	if _, ok := ariaRolesSet[role]; !ok {
+	if _, ok := jsxa11yutil.AriaRoleAllSet[role]; !ok {
 		return "", false
 	}
 	return role, true

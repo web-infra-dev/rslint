@@ -1,5 +1,11 @@
 package jsxa11yutil
 
+import (
+	"strings"
+
+	"github.com/microsoft/typescript-go/shim/ast"
+)
+
 // AriaRoleNonAbstract is the list of every non-abstract ARIA role as defined
 // by `aria-query`'s `rolesMap`. The order mirrors
 // `roles.keys().filter(role => roles.get(role).abstract === false)`, so
@@ -73,6 +79,72 @@ var AriaRoleNonAbstractSet = func() map[string]struct{} {
 func IsValidAriaRole(role string) bool {
 	_, ok := AriaRoleNonAbstractSet[role]
 	return ok
+}
+
+// AriaRoleAllSet is the union of every name in aria-query's `rolesMap` —
+// abstract + non-abstract + DPub + Graphics. Mirrors upstream's
+// `rolesMap.has(role)` membership check used by jsx-a11y's `getExplicitRole`
+// helper. Unlike [AriaRoleNonAbstractSet], abstract roles (`command`,
+// `composite`, `widget`, …) ARE included because upstream's `rolesMap`
+// exposes them under the same key space.
+var AriaRoleAllSet = func() map[string]struct{} {
+	set := make(map[string]struct{}, len(AriaRoleNonAbstract)+len(AriaRoleAbstract))
+	for _, r := range AriaRoleNonAbstract {
+		set[r] = struct{}{}
+	}
+	for _, r := range AriaRoleAbstract {
+		set[r] = struct{}{}
+	}
+	return set
+}()
+
+// GetExplicitRole mirrors upstream `util/getExplicitRole.js`:
+//
+//	const explicit = toLowerCase(getLiteralPropValue(getProp(attrs, 'role')));
+//	return rolesMap.has(explicit) ? explicit : null;
+//
+// Steps:
+//  1. Look up the `role` attribute via [FindAttributeByName] (mirrors
+//     upstream's `getProp` with default `ignoreCase: true` — our shared
+//     finder is case-insensitive).
+//  2. Extract the literal value via [LiteralPropStringValue] (= upstream
+//     `getLiteralPropValue`). Non-literal expressions (Identifier,
+//     CallExpression, ConditionalExpression, TemplateExpression with
+//     substitutions, …) yield (`""`, false), causing this helper to return
+//     ("", false) as well — matches upstream's null return.
+//  3. Lowercase the result and check membership in [AriaRoleAllSet]
+//     (= upstream's `rolesMap.has`). The membership check filters out
+//     non-role strings ("foobar", "button radio") and the magic "null"
+//     literal that `getLiteralPropValue` synthesizes for `role={null}`.
+//
+// Returns the lowercased role and `true` only when the explicit role
+// resolves to a real ARIA role name (including abstract roles, DPub
+// `doc-*`, and Graphics `graphics-*`). Otherwise returns ("", false).
+//
+// Notable upstream quirks preserved here:
+//
+//   - The tag-name parameter that upstream's signature accepts is ignored
+//     upstream and not exposed here.
+//   - Space-separated multi-role attributes (`role="img button"`) DO NOT
+//     match — upstream lowercases then does a whole-string lookup in
+//     `rolesMap`. To match individual roles in a multi-role string, see
+//     [IsInteractiveRole] / [IsNonInteractiveRole] which split on space.
+//   - The "null" magic string from `getLiteralPropValue(role={null})`
+//     fails the membership check (lowercased "null" isn't a real role).
+func GetExplicitRole(attrs []*ast.Node) (string, bool) {
+	roleAttr := FindAttributeByName(attrs, "role")
+	if roleAttr == nil {
+		return "", false
+	}
+	value, ok := LiteralPropStringValue(roleAttr)
+	if !ok {
+		return "", false
+	}
+	lower := strings.ToLower(value)
+	if _, ok := AriaRoleAllSet[lower]; !ok {
+		return "", false
+	}
+	return lower, true
 }
 
 // AriaRoleRequiredProps is the list of (role, required ARIA props) pairs for
