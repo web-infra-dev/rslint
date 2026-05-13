@@ -464,7 +464,7 @@ func TestNoInteractiveElementToNoninteractiveRoleUpstreamRecommended(t *testing.
 
 	invalid := applyOptionsInvalid(neverValid(), recommendedConfig)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t,
 		&NoInteractiveElementToNoninteractiveRoleRule, valid, invalid)
 }
 
@@ -478,6 +478,6 @@ func TestNoInteractiveElementToNoninteractiveRoleUpstreamStrict(t *testing.T) {
 	invalid := append([]rule_tester.InvalidTestCase{}, neverValid()...)
 	invalid = append(invalid, strictExtraInvalid()...)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t,
 		&NoInteractiveElementToNoninteractiveRoleRule, valid, invalid)
 }

@@ -825,5 +825,5 @@ func TestRoleSupportsAriaPropsUpstream(t *testing.T) {
 	valid = append(valid, gv...)
 	invalid = append(invalid, gi...)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RoleSupportsAriaPropsRule, valid, invalid)
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &RoleSupportsAriaPropsRule, valid, invalid)
 }

@@ -379,7 +379,7 @@ func TestInteractiveSupportsFocusUpstreamRecommended(t *testing.T) {
 	invalid = append(invalid, applyOptionsInvalid(failCases(recommendedTabbable, triggeringHandlers, tabbableMessage), opts)...)
 	invalid = append(invalid, applyOptionsInvalid(failCases(filterRoles(interactiveRolesForTests, recommendedTabbable), triggeringHandlers, focusableMessage), opts)...)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &InteractiveSupportsFocusRule, valid, invalid)
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &InteractiveSupportsFocusRule, valid, invalid)
 }
 
 // TestInteractiveSupportsFocusUpstreamStrict mirrors upstream's
@@ -396,5 +396,5 @@ func TestInteractiveSupportsFocusUpstreamStrict(t *testing.T) {
 	invalid = append(invalid, applyOptionsInvalid(failCases(strictTabbable, triggeringHandlers, tabbableMessage), opts)...)
 	invalid = append(invalid, applyOptionsInvalid(failCases(filterRoles(interactiveRolesForTests, strictTabbable), triggeringHandlers, focusableMessage), opts)...)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &InteractiveSupportsFocusRule, valid, invalid)
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &InteractiveSupportsFocusRule, valid, invalid)
 }

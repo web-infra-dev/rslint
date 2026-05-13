@@ -73,7 +73,7 @@ var componentsMapSettings = map[string]interface{}{
 // upstream's test file doesn't exercise but are reachable through the
 // rule's listener gate.
 func TestNoNoninteractiveElementInteractionsExtras(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t,
 		&NoNoninteractiveElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// ============================================================

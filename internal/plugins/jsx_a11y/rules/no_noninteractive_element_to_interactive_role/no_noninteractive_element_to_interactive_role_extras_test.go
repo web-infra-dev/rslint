@@ -15,7 +15,7 @@ import (
 // makes the report range cover `role="…"`, so a multi-line opening tag
 // still anchors the report on the role attribute's line / column.
 func TestNoNoninteractiveElementToInteractiveRolePositions(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
 		// Self-closing — report on `role="button"` between the tag name and `/>`.
 		{
 			Code: `<article role="button" />`,
@@ -66,7 +66,7 @@ func TestNoNoninteractiveElementToInteractiveRolePositions(t *testing.T) {
 // nested JSX hierarchies produce one report per qualifying ancestor, with
 // each report anchored on its own role attribute.
 func TestNoNoninteractiveElementToInteractiveRoleListenerBoundary(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
 		// Two nested non-interactive-with-interactive-role elements — both
 		// should report independently.
 		{
@@ -96,7 +96,7 @@ func TestNoNoninteractiveElementToInteractiveRoleListenerBoundary(t *testing.T) 
 // boolean / non-literal / template shapes around the `role` attribute
 // exercise corners upstream tests rarely cover.
 func TestNoNoninteractiveElementToInteractiveRoleEdgeShapes(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Boolean form `<article role />` — `getLiteralPropValue`
 			// returns boolean true, not a string. `IsInteractiveRole`
@@ -167,7 +167,7 @@ func TestNoNoninteractiveElementToInteractiveRoleEdgeShapes(t *testing.T) {
 // `[]interface{}` would silently fall back to defaults on every CLI
 // invocation.
 func TestNoNoninteractiveElementToInteractiveRoleOptionParsing(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Bare map — CLI single-option shape.
 			{
@@ -223,7 +223,7 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionParsing(t *testing.T) {
 // the rule's behavior across every tsgo-specific wrapper around a
 // `role={…}` expression value. Each row pins one shape.
 func TestNoNoninteractiveElementToInteractiveRoleRoleExpressionShapes(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// `as` / `satisfies` / non-null wrappers map to noop in
 			// jsx-ast-utils' LITERAL_TYPES → null → no classification.
@@ -275,7 +275,7 @@ func TestNoNoninteractiveElementToInteractiveRoleRoleExpressionShapes(t *testing
 // valid role wins" produces several non-obvious classifications that a
 // Go re-implementation could easily flip.
 func TestNoNoninteractiveElementToInteractiveRoleRoleStringBoundaries(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Empty role string — no valid role token → no classification.
 			{Code: `<article role="" />`, Tsx: true},
@@ -341,7 +341,7 @@ func TestNoNoninteractiveElementToInteractiveRoleRoleStringBoundaries(t *testing
 //     lowercasing — `role="Menu"` (lowercases to "menu") matches an
 //     allow-list entry "menu" exactly.
 func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Mixed-type array — only "menu" survives, exempting the case.
 			{
@@ -409,7 +409,7 @@ func TestNoNoninteractiveElementToInteractiveRoleOptionRobustness(t *testing.T) 
 // renders. The rule must fire identically regardless of the surrounding
 // expression context.
 func TestNoNoninteractiveElementToInteractiveRoleContainerForms(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{},
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{},
 		[]rule_tester.InvalidTestCase{
 			// Inside a JsxFragment (`<>…</>`).
 			{
@@ -452,7 +452,7 @@ func TestNoNoninteractiveElementToInteractiveRoleContainerForms(t *testing.T) {
 // is lost would either silently flag `<img role="button" />` without alt
 // or silently exempt `<img alt="x" role="button" />` (or the form variants).
 func TestNoNoninteractiveElementToInteractiveRoleNonInteractiveGate(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// `<form>` without aria-label / aria-labelledby / name — schema
 			// gate fails → `IsNonInteractiveElement` returns false (the
@@ -502,7 +502,7 @@ func TestNoNoninteractiveElementToInteractiveRoleNonInteractiveGate(t *testing.T
 // + role ordering — that a rule operating only on simple attribute
 // lists could mishandle.
 func TestNoNoninteractiveElementToInteractiveRoleMixedRealWorld(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Non-interactive role on a non-interactive element — fine.
 			{Code: `<article role="article" className="card" onClick={f} aria-label="Card" />`, Tsx: true},
@@ -566,7 +566,7 @@ func TestNoNoninteractiveElementToInteractiveRoleMixedRealWorld(t *testing.T) {
 //     `getExplicitRole` lowercases before comparing. Sibling rule would
 //     NOT match (raw-value comparison is case-sensitive).
 func TestNoNoninteractiveElementToInteractiveRoleAllowListSemantics(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Uppercase role value — `getExplicitRole` lowercases →
 			// matches "menu" in allow-list. Locks in the upstream
@@ -639,7 +639,7 @@ func TestNoNoninteractiveElementToInteractiveRolePolymorphicSettings(t *testing.
 		},
 	}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Without settings — `<Box>` is a custom component, no dom.has match.
 			{Code: `<Box as="article" role="button" />`, Tsx: true},
@@ -729,7 +729,7 @@ func TestNoNoninteractiveElementToInteractiveRoleComponentsMappingEdges(t *testi
 		},
 	}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Map key is case-sensitive — `<article>` (lower) doesn't match
 			// "Article" key in components map; goes through with rawType "article"
@@ -769,7 +769,7 @@ func TestNoNoninteractiveElementToInteractiveRoleComponentsMappingEdges(t *testi
 // statements (or skipped JSX inside callable bodies) would silently
 // miss every JSX inside a real React codebase.
 func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{},
 		[]rule_tester.InvalidTestCase{
 			// forwardRef arrow body.
@@ -838,7 +838,7 @@ func TestNoNoninteractiveElementToInteractiveRoleHOCAndComponentBodies(t *testin
 // container with a header, body, and footer, each containing its own
 // nested JSX.
 func TestNoNoninteractiveElementToInteractiveRoleDeepNesting(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{},
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{},
 		[]rule_tester.InvalidTestCase{
 			// 4 violations across 5 nested levels (Card → CardHeader → h1;
 			// Card → CardBody → article → h2; Card → CardFooter → ul → li).
@@ -918,7 +918,7 @@ func TestNoNoninteractiveElementToInteractiveRoleDeepNesting(t *testing.T) {
 // report per matching JsxAttribute regardless of the surrounding control
 // flow's static reachability.
 func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{},
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule, []rule_tester.ValidTestCase{},
 		[]rule_tester.InvalidTestCase{
 			// `&&` short-circuit.
 			{
@@ -997,7 +997,7 @@ func TestNoNoninteractiveElementToInteractiveRoleConditionalRendering(t *testing
 // to a string by mistake (silently changing classification) — `as`,
 // `satisfies`, JSX generic type parameters, TS const assertions, etc.
 func TestNoNoninteractiveElementToInteractiveRoleTSXTypeSystemShapes(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// `as` casting the whole JSX element — outer cast doesn't affect
 			// rule (rule fires on attribute regardless).
@@ -1065,7 +1065,7 @@ func TestNoNoninteractiveElementToInteractiveRoleTSXTypeSystemShapes(t *testing.
 // probes a different unicode shape that could classify differently
 // under a Go reimplementation.
 func TestNoNoninteractiveElementToInteractiveRoleUnicodeInRoleValue(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// CJK in role — not a real ARIA role → no classification.
 			{Code: `<article role="按钮" />`, Tsx: true},
@@ -1122,7 +1122,7 @@ func TestNoNoninteractiveElementToInteractiveRoleAllowListMultiTag(t *testing.T)
 		"fieldset": []interface{}{"radiogroup"},
 	}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// Each tag exempts only its own configured roles.
 			{Code: `<ul role="menu" />`, Tsx: true, Options: multiTagAllowList},
@@ -1174,7 +1174,7 @@ func TestNoNoninteractiveElementToInteractiveRoleAllowListMultiTag(t *testing.T)
 // subset. A regression in [interactiveRolesSet] / [allRolesSet] (e.g.,
 // loss of DPub interactive roles) would silently let these slip past.
 func TestNoNoninteractiveElementToInteractiveRoleExtendedRoleClassification(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoNoninteractiveElementToInteractiveRoleRule,
 		[]rule_tester.ValidTestCase{
 			// DPub non-interactive on non-interactive element — no report.
 			{Code: `<article role="doc-chapter" />`, Tsx: true},

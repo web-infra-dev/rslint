@@ -15,7 +15,7 @@ import (
 // matching `>` / `/>`. Two cases per shape: a single-line baseline and a
 // multi-line variant where the opening tag spans several lines.
 func TestNoStaticElementInteractionsPositions(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
 		// Self-closing — report spans <div … />.
 		{
 			Code: `<div onClick={() => {}} />`,
@@ -66,7 +66,7 @@ func TestNoStaticElementInteractionsPositions(t *testing.T) {
 // "bleeds" the outer report into the inner traversal (or vice versa)
 // would silently fold them into one diagnostic.
 func TestNoStaticElementInteractionsListenerBoundary(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule, []rule_tester.ValidTestCase{}, []rule_tester.InvalidTestCase{
 		// Three levels of nesting; outer + middle + inner each report.
 		{
 			Code: "<div onClick={() => {}}>\n  <span onClick={() => {}}>\n    <a onClick={() => {}} />\n  </span>\n</div>",
@@ -107,7 +107,7 @@ func TestNoStaticElementInteractionsHandlersOption(t *testing.T) {
 		},
 	}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// onClick is NOT in the custom handler list → no interactive prop.
 			{Code: `<div onClick={() => {}} />`, Tsx: true, Options: customHandlersBareObject},
@@ -165,7 +165,7 @@ func TestNoStaticElementInteractionsAllowExpressionValuesMatrix(t *testing.T) {
 	allowTrue := map[string]interface{}{"allowExpressionValues": true}
 	allowFalse := map[string]interface{}{"allowExpressionValues": false}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Identifier → non-literal → allowed.
 			{Code: `<div role={ROLE} onClick={() => {}} />`, Tsx: true, Options: allowTrue},
@@ -222,7 +222,7 @@ func TestNoStaticElementInteractionsAllowExpressionValuesMatrix(t *testing.T) {
 // TestNoStaticElementInteractionsEdgeShapes locks the Dimension-4 universal
 // edge shapes our prep walk identified.
 func TestNoStaticElementInteractionsEdgeShapes(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// `onClick={undefined}` — upstream `getPropValue` resolves to JS
 			// undefined → `!= null` is false → no interactive prop → exempt.
@@ -319,7 +319,7 @@ func TestNoStaticElementInteractionsEdgeShapes(t *testing.T) {
 // (matches the multi-element rule_tester shape). Also covers nil / empty /
 // malformed shapes so a future refactor of parseOptions can't regress them.
 func TestNoStaticElementInteractionsOptionParsing(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// nil options — defaults: full focus+keyboard+mouse handlers,
 			// allowExpressionValues=falsy. Validates the "options absent"
@@ -372,7 +372,7 @@ func TestNoStaticElementInteractionsOptionParsing(t *testing.T) {
 // is expected to look through these wrappers; the explicit cases protect
 // against a regression where the wrapper unwrap is skipped.
 func TestNoStaticElementInteractionsTSWrappers(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Function-cast handler resolves to a non-null function → upstream
 			// reports, but the element is `<button>` (inherently interactive) → exempt.
@@ -425,7 +425,7 @@ func TestNoStaticElementInteractionsTSWrappers(t *testing.T) {
 // upstream test file. Each test below names the upstream code branch it
 // pins; a future refactor that flips the branch behavior fails these tests.
 func TestNoStaticElementInteractionsUpstreamBranchLockIns(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Locks in upstream `hasInteractiveProps` short-circuit arm
 			// `getPropValue(...) != null` — even though `<div onChange={x} />`
@@ -513,7 +513,7 @@ func TestNoStaticElementInteractionsUpstreamBranchLockIns(t *testing.T) {
 // ConditionalExpression (eager-eval the matched arm), and NonNullExpression
 // (string of inner + "!"). NewExpression / Object / Array map to truthy.
 func TestNoStaticElementInteractionsRealHandlerShapes(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// `cond ? null : null` — both arms null; ConditionalExpression
 			// statically evaluates the truthy arm (cond resolves truthy as
@@ -686,7 +686,7 @@ func TestNoStaticElementInteractionsPolymorphicSettings(t *testing.T) {
 		},
 	}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// `<Foo as="button">` — resolves to "button" (interactive) → exempt.
 			{Code: `<Foo as="button" onClick={() => {}} />`, Tsx: true, Settings: asPolymorphic},
@@ -760,7 +760,7 @@ func TestNoStaticElementInteractionsComponentsRemapping(t *testing.T) {
 		},
 	}
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// MyButton → button (inherently interactive).
 			{Code: `<MyButton onClick={() => {}} />`, Tsx: true, Settings: componentsMap},
@@ -814,7 +814,7 @@ func TestNoStaticElementInteractionsComponentsRemapping(t *testing.T) {
 // per-role level — not the cross-class interaction (e.g. abstract role
 // listed first vs second) or the case-sensitivity boundary.
 func TestNoStaticElementInteractionsRoleSemantics(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Mixed-case roles — upstream lowercases before lookup.
 			{Code: `<div role="Button" onClick={() => {}} />`, Tsx: true},
@@ -874,7 +874,7 @@ func TestNoStaticElementInteractionsRoleSemantics(t *testing.T) {
 // upstream's strict comparison, so only the actual JS boolean true (or
 // jsxAstUtilsLiteralCoerce'd "true"/boolean-form) exempts.
 func TestNoStaticElementInteractionsAriaHiddenVariants(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Boolean form, expression, string-coerced — all exempt.
 			{Code: `<div onClick={() => {}} aria-hidden />`, Tsx: true},
@@ -932,7 +932,7 @@ func TestNoStaticElementInteractionsAriaHiddenVariants(t *testing.T) {
 // no-static-element-interactions because IsInteractiveElement returns
 // true → step 3 of the rule short-circuits.
 func TestNoStaticElementInteractionsInputSchemaVariants(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// `<input>` with no `type` — the input schema is matched via
 			// `{name: "input"}` schemas (multiple schemas with attribute
@@ -981,7 +981,7 @@ func TestNoStaticElementInteractionsInputSchemaVariants(t *testing.T) {
 // non-null combinations across different handler names exercise the
 // short-circuit boundary.
 func TestNoStaticElementInteractionsMultiHandlerCombinations(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// All handlers null — no match anywhere.
 			{Code: `<div onClick={null} onMouseDown={null} onKeyDown={null} />`, Tsx: true},
@@ -1039,7 +1039,7 @@ func TestNoStaticElementInteractionsMultiHandlerCombinations(t *testing.T) {
 // element, leaving the wrapper / fragment / Generic / conditional shell
 // untouched.
 func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Empty fragment — listener doesn't fire on fragment opening.
 			{Code: `<></>`, Tsx: true},
@@ -1122,7 +1122,7 @@ func TestNoStaticElementInteractionsJsxStructuralEdgeCases(t *testing.T) {
 // cover `<a href="http://...">` and bare `<a>`; the value-shape boundary
 // (empty string, null/undefined value, boolean form, expression) is on us.
 func TestNoStaticElementInteractionsAnchorSchemaVariants(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule,
 		[]rule_tester.ValidTestCase{
 			// Plain URL.
 			{Code: `<a href="/" onClick={() => {}} />`, Tsx: true},

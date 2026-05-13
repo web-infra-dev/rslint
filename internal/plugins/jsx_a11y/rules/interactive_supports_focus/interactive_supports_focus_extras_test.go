@@ -62,7 +62,7 @@ func extrasFocusableSuggestionsTwo(outZero, outNegOne string) []rule_tester.Inva
 // file — tsgo↔ESTree AST differences, position assertions, configuration
 // edges, and lock-ins for branches the upstream suite doesn't exercise.
 func TestInteractiveSupportsFocusExtras(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &InteractiveSupportsFocusRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &InteractiveSupportsFocusRule,
 		[]rule_tester.ValidTestCase{
 			// ---- Custom (non-DOM) components — rule bails at the `dom.has(type)` gate.
 			{Code: `<MyComp role="button" onClick={() => {}} />`, Tsx: true},

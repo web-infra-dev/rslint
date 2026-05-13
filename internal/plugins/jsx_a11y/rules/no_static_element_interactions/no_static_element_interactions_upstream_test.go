@@ -89,7 +89,7 @@ var allowExpressionValuesFalseOptions = []interface{}{
 // listener-boundary repeats, options JSON-path matrix, etc. — lives in
 // no_static_element_interactions_extras_test.go.
 func TestNoStaticElementInteractionsUpstream(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule, []rule_tester.ValidTestCase{
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &NoStaticElementInteractionsRule, []rule_tester.ValidTestCase{
 		// ============================================================
 		// alwaysValid (run under both :recommended and :strict)
 		// ============================================================

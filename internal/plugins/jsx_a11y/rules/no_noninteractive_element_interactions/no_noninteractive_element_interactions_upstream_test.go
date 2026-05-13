@@ -575,7 +575,7 @@ func TestNoNoninteractiveElementInteractionsUpstreamRecommended(t *testing.T) {
 
 	invalid := applyOptionsInvalid(neverValid(), recommendedConfig)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t,
 		&NoNoninteractiveElementInteractionsRule, valid, invalid)
 }
 
@@ -589,6 +589,6 @@ func TestNoNoninteractiveElementInteractionsUpstreamStrict(t *testing.T) {
 	invalid = append(invalid, strictExtraInvalid()...)
 	invalid = applyOptionsInvalid(invalid, strictConfig)
 
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t,
 		&NoNoninteractiveElementInteractionsRule, valid, invalid)
 }

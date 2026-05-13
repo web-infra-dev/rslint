@@ -31,7 +31,7 @@ var polymorphicSettings = map[string]interface{}{
 // lock-in tests for each branch in the upstream `JSXOpeningElement`
 // listener that the upstream test file leaves uncovered.
 func TestRoleSupportsAriaPropsExtras(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RoleSupportsAriaPropsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &RoleSupportsAriaPropsRule,
 		[]rule_tester.ValidTestCase{
 			// ============================================================
 			// Step 3 — non-string / non-literal role values short-circuit.
@@ -387,7 +387,7 @@ var componentsAndPolymorphic = map[string]interface{}{
 // Each group lives behind a comment marker `============= GROUP X =============`;
 // individual cases name the upstream branch / scenario / quirk they protect.
 func TestRoleSupportsAriaPropsRobust(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RoleSupportsAriaPropsRule,
+	rule_tester.RunRuleTesterBatched(fixtures.GetRootDir(), "tsconfig.json", t, &RoleSupportsAriaPropsRule,
 		[]rule_tester.ValidTestCase{
 			// =============================================================
 			// GROUP A — Real-world component patterns. Designed around
