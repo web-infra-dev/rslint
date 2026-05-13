@@ -73,19 +73,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-go-windows
 
-      - name: Relocate Go build cache & temp to runner work disk
-        shell: pwsh
-        run: |
-          $base = 'C:\Users\ContainerAdministrator\runner\_work'
-          $goCache = Join-Path $base 'go\cache'
-          $temp    = Join-Path $base 'temp'
-          New-Item -ItemType Directory -Force -Path $goCache, $temp | Out-Null
-
-          "GOCACHE=$goCache" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-          "TEMP=$temp"       | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-          "TMP=$temp"        | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-          "GOTMPDIR=$temp"   | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
-
       - name: Unit Test
         shell: pwsh
         run: |
@@ -122,26 +109,52 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
+  build-rslint-windows:
+    name: Build rslint.exe (Windows)
+    runs-on: rspack-windows-2022-large
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: ci-go-windows-build
+
+      - name: Build rslint.exe
+        shell: pwsh
+        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
+
+      - name: Upload rslint.exe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-test-rslint-windows-amd64
+          path: packages/rslint/bin/rslint.exe
+          retention-days: 1
+          if-no-files-found: error
+
   test-node-windows:
     name: Test npm packages (windows-latest)
     runs-on: windows-latest
+    needs: build-rslint-windows
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           submodules: true
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.26.0
-          cache-name: ci-go-windows-node
-
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Build Go binary
-        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
+      - name: Download rslint.exe
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ci-test-rslint-windows-amd64
+          path: packages/rslint/bin
 
       - name: Build JS packages
         shell: bash
@@ -338,6 +351,7 @@ jobs:
     needs:
       - test-go
       - test-go-windows
+      - build-rslint-windows
       - test-node
       - test-node-windows
       - lint

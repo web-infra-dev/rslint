@@ -149,25 +149,15 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `
-        // test(
-        //   "foo", function () {}
-        // )
-      `,
+				Code: "// test(\n//   \"foo\", function () {}\n// )\n",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "commentedTests", Line: 2, Column: 9},
+					{MessageId: "commentedTests", Line: 1, Column: 1},
 				},
 			},
 			{
-				Code: `
-        /* test
-          (
-            "foo", function () {}
-          )
-        */
-      `,
+				Code: "/* test\n  (\n    \"foo\", function () {}\n  )\n*/\n",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "commentedTests", Line: 2, Column: 9},
+					{MessageId: "commentedTests", Line: 1, Column: 1},
 				},
 			},
 			{
@@ -201,15 +191,9 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `
-        foo()
-        /*
-          describe("has title but no callback", () => {})
-        */
-        bar()
-      `,
+				Code: "foo()\n/*\n  describe(\"has title but no callback\", () => {})\n*/\nbar()\n",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "commentedTests", Line: 3, Column: 9},
+					{MessageId: "commentedTests", Line: 2, Column: 1},
 				},
 			},
 		},

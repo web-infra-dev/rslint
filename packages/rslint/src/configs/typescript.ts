@@ -1,12 +1,16 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
+const base: RslintConfigEntry = {
+  files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+  plugins: ['@typescript-eslint'],
+};
+
 // Aligned with official @typescript-eslint/recommended.
 // Includes the eslint-recommended override layer (disables core rules handled by TS,
 // enables TS-beneficial rules).
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
-  files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
-  plugins: ['@typescript-eslint'],
+  ...base,
   languageOptions: {
     parserOptions: {
       projectService: true,
@@ -122,4 +126,4 @@ const recommended: RslintConfigEntry = {
   },
 };
 
-export { recommended };
+export { base, recommended };

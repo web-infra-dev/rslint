@@ -18,6 +18,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
 	github.com/microsoft/typescript-go/shim/project => ./shim/project
 	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
+	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms => ./shim/transformers/jsxtransforms
 	github.com/microsoft/typescript-go/shim/tsoptions => ./shim/tsoptions
 	github.com/microsoft/typescript-go/shim/tspath => ./shim/tspath
 	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
@@ -42,6 +43,7 @@ require (
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
 	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
+	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms v0.0.0
 	github.com/microsoft/typescript-go/shim/tsoptions v0.0.0
 	github.com/microsoft/typescript-go/shim/tspath v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
@@ -51,25 +53,26 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.43.0
-	golang.org/x/tools v0.44.0
+	golang.org/x/sys v0.44.0
+	golang.org/x/tools v0.45.0
 	gotest.tools/v3 v3.5.2
 )
 
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
+	github.com/mackerelio/go-osstat v0.2.7 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/mod v0.35.0 // indirect
+	golang.org/x/mod v0.36.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
-	github.com/microsoft/typescript-go v0.0.0-20260313230633-c0e5d35a6f8f // indirect
-	golang.org/x/text v0.36.0
+	github.com/microsoft/typescript-go v0.0.0-20260512001534-adb2ab4ed7d7 // indirect
+	golang.org/x/text v0.37.0
 )

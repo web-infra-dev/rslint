@@ -6,7 +6,10 @@ inputs:
     description: Go version range to set up.
     required: true
   cache-name:
-    description: Name of scoped cache for this set up.
+    description: >
+      Name of scoped cache for this set up. On self-hosted Windows runners it
+      also derives the GOCACHE / TEMP subdirectory path under the runner work
+      disk, so it must not contain path separators (`\` or `/`).
     default: 'cache'
 
 runs:
@@ -65,3 +68,23 @@ runs:
         if (Test-Path $toolchainPath) {
           Get-ChildItem -Path $toolchainPath -Filter "toolchain*" -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         }
+
+    # Relocate GOCACHE / TEMP / GOTMPDIR off the small system drive on
+    # self-hosted Windows runners. Required when compiling Go projects whose
+    # build cache and $WORK temp directory would exceed the system drive's
+    # free space (e.g. anything that pulls in the typescript-go shim). Paths
+    # are derived from `cache-name` to keep concurrent jobs on the same runner
+    # isolated.
+    - name: Relocate Go cache & temp (self-hosted Windows)
+      if: runner.environment == 'self-hosted' && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $base = 'C:\Users\ContainerAdministrator\runner\_work'
+        $goCache = Join-Path $base "go\${{ inputs.cache-name }}"
+        $temp    = Join-Path $base "temp\${{ inputs.cache-name }}"
+        New-Item -ItemType Directory -Force -Path $goCache, $temp | Out-Null
+
+        "GOCACHE=$goCache" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+        "TEMP=$temp"       | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+        "TMP=$temp"        | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+        "GOTMPDIR=$temp"   | Out-File -Append -Encoding utf8 $env:GITHUB_ENV

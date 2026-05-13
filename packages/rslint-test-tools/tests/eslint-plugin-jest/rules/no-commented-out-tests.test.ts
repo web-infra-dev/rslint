@@ -22,27 +22,34 @@ ruleTester.run('no-commented-out-tests', {} as never, {
     { code: '// latest(dates)' },
     { code: '// TODO: unify with Git implementation from Shipit (?)' },
     { code: '#!/usr/bin/env node' },
-    { code: `
+    {
+      code: `
       import { pending } from "actions"
 
       test("foo", () => {
         expect(pending()).toEqual({})
       })
-    ` },
-    { code: `
+    `,
+    },
+    {
+      code: `
       const { pending } = require("actions")
 
       test("foo", () => {
         expect(pending()).toEqual({})
       })
-    ` },
-    { code: `
+    `,
+    },
+    {
+      code: `
       test("foo", () => {
         const pending = getPending()
         expect(pending()).toEqual({})
       })
-    ` },
-    { code: `
+    `,
+    },
+    {
+      code: `
       test("foo", () => {
         expect(pending()).toEqual({})
       })
@@ -50,9 +57,9 @@ ruleTester.run('no-commented-out-tests', {} as never, {
       function pending() {
         return {}
       }
-    ` },
+    `,
+    },
   ],
-
   invalid: [
     {
       code: '// describe("foo", function () {})',

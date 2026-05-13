@@ -14,7 +14,7 @@ const recommended: RslintConfigEntry = {
     'jest/no-done-callback': 'error',
     // 'jest/no-export': 'error', // not implemented
     'jest/no-focused-tests': 'error',
-    // 'jest/no-identical-title': 'error', // not implemented
+    'jest/no-identical-title': 'error',
     // 'jest/no-interpolation-in-snapshots': 'error', // not implemented
     // 'jest/no-jasmine-globals': 'error', // not implemented
     'jest/no-mocks-import': 'error',
@@ -30,7 +30,7 @@ const recommended: RslintConfigEntry = {
 const style: RslintConfigEntry = {
   plugins: ['jest'],
   rules: {
-    // 'jest/prefer-to-be': 'error', // not implemented
+    'jest/prefer-to-be': 'error',
     'jest/prefer-to-contain': 'error',
     'jest/prefer-to-have-length': 'error',
   },

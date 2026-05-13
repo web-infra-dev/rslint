@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/reactutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -39,33 +38,6 @@ type componentFlags struct {
 	hasChildContextTypes bool
 	useDecorators        bool
 	hasSCU               bool
-}
-
-// classKeywordStart returns the start position of the `class` keyword for a
-// ClassDeclaration / ClassExpression, skipping any leading `export` /
-// `export default` modifiers tsgo inlines into the node's modifier list.
-//
-// ESTree wraps `export class …` in `ExportNamedDeclaration` /
-// `ExportDefaultDeclaration` and exposes the inner `ClassDeclaration`
-// starting at the `class` keyword. tsgo flattens this; we recover the same
-// position to match upstream's report range exactly. Decorators / TS
-// `abstract` / `declare` modifiers are PART of the class's range upstream
-// (they are kept on TSESTree's ClassDeclaration), so we stop trimming the
-// moment a non-export/default modifier appears.
-func classKeywordStart(text string, node *ast.Node) int {
-	mods := node.Modifiers()
-	pos := node.Pos()
-	if mods != nil {
-		for _, mod := range mods.Nodes {
-			switch mod.Kind {
-			case ast.KindExportKeyword, ast.KindDefaultKeyword:
-				pos = mod.End()
-			default:
-				return scanner.SkipTrivia(text, mod.Pos())
-			}
-		}
-	}
-	return scanner.SkipTrivia(text, pos)
 }
 
 // hasDecorators reports whether `node` carries one or more `@decorator`
@@ -1044,7 +1016,7 @@ var PreferStatelessFunctionRule = rule.Rule{
 				// tsgo inlines `export` into the ClassDeclaration's modifier
 				// list, so we trim it back out to match upstream's report
 				// position.
-				start := classKeywordStart(ctx.SourceFile.Text(), node)
+				start := reactutil.ClassKeywordStart(ctx.SourceFile.Text(), node)
 				ctx.ReportRange(core.NewTextRange(start, node.End()), rule.RuleMessage{
 					Id:          "componentShouldBePure",
 					Description: "Component should be written as a pure function",

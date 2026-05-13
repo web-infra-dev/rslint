@@ -68,6 +68,7 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	if name == "" {
 		return nil
 	}
+	name = ApplyGlobalJestAlias(name, ctx.Settings)
 	if !JEST_METHOD_NAMES[name] {
 		return nil
 	}
