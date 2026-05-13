@@ -31,7 +31,7 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 			{Code: `itHappensToStartWithIt()`},
 			{Code: `testSomething()`},
 			{Code: `// latest(dates)`},
-			{Code: `// TODO: unify with Git implementation from Shipit (?)`},
+			{Code: `// TODO: unify with Git implementation from Ship it (?)`},
 			{Code: `#!/usr/bin/env node`},
 			{Code: `
       import { pending } from "actions"
