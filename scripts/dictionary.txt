@@ -448,3 +448,4 @@ onmouseover
 onmouseout
 onfocus
 onblur
+mynamespace
