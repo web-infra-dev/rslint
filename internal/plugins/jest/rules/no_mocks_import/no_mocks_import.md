@@ -1,4 +1,4 @@
-# jest/no-mocks-import
+# no-mocks-import
 
 ## Rule Details
 
