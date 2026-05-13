@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_distracting_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_interactive_element_to_noninteractive_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_element_interactions"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_element_to_interactive_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_redundant_roles"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_static_element_interactions"
@@ -60,6 +61,7 @@ func GetAllRules() []rule.Rule {
 		no_distracting_elements.NoDistractingElementsRule,
 		no_interactive_element_to_noninteractive_role.NoInteractiveElementToNoninteractiveRoleRule,
 		no_noninteractive_element_interactions.NoNoninteractiveElementInteractionsRule,
+		no_noninteractive_element_to_interactive_role.NoNoninteractiveElementToInteractiveRoleRule,
 		no_noninteractive_tabindex.NoNoninteractiveTabindexRule,
 		no_redundant_roles.NoRedundantRolesRule,
 		no_static_element_interactions.NoStaticElementInteractionsRule,
