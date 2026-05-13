@@ -1,5 +1,4 @@
-import type { RslintConfigEntry } from '../define-config.js';
-import { recommended as tsRecommended } from './typescript.js';
+import { base as tsBase, recommended as tsRecommended } from './typescript.js';
 import { recommended as jsRecommended } from './javascript.js';
 import { recommended as reactRecommended } from './react.js';
 import { recommended as reactHooksRecommended } from './react-hooks.js';
@@ -9,42 +8,38 @@ import { recommended as jestRecommended } from './jest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
 
-interface PluginExport {
-  configs: { recommended: RslintConfigEntry };
-}
-
-export const ts: PluginExport = {
-  configs: { recommended: tsRecommended },
+export const ts = {
+  configs: { base: tsBase, recommended: tsRecommended },
 };
 
-export const js: PluginExport = {
+export const js = {
   configs: { recommended: jsRecommended },
 };
 
-export const reactPlugin: PluginExport = {
+export const reactPlugin = {
   configs: { recommended: reactRecommended },
 };
 
-export const reactHooksPlugin: PluginExport = {
+export const reactHooksPlugin = {
   configs: { recommended: reactHooksRecommended },
 };
 
-export const importPlugin: PluginExport = {
+export const importPlugin = {
   configs: { recommended: importRecommended },
 };
 
-export const promisePlugin: PluginExport = {
+export const promisePlugin = {
   configs: { recommended: promiseRecommended },
 };
 
-export const jestPlugin: PluginExport = {
+export const jestPlugin = {
   configs: { recommended: jestRecommended },
 };
 
-export const unicornPlugin: PluginExport = {
+export const unicornPlugin = {
   configs: { recommended: unicornRecommended },
 };
 
-export const jsxA11yPlugin: PluginExport = {
+export const jsxA11yPlugin = {
   configs: { recommended: jsxA11yRecommended },
 };
