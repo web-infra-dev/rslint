@@ -23,9 +23,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_autofocus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_distracting_elements"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_interactive_element_to_noninteractive_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_element_interactions"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_element_to_interactive_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_redundant_roles"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_static_element_interactions"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/role_has_required_aria_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/role_supports_aria_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/tabindex_no_positive"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -55,9 +60,14 @@ func GetAllRules() []rule.Rule {
 		no_access_key.NoAccessKeyRule,
 		no_autofocus.NoAutofocusRule,
 		no_distracting_elements.NoDistractingElementsRule,
+		no_interactive_element_to_noninteractive_role.NoInteractiveElementToNoninteractiveRoleRule,
 		no_noninteractive_element_interactions.NoNoninteractiveElementInteractionsRule,
+		no_noninteractive_element_to_interactive_role.NoNoninteractiveElementToInteractiveRoleRule,
 		no_noninteractive_tabindex.NoNoninteractiveTabindexRule,
 		no_redundant_roles.NoRedundantRolesRule,
+		no_static_element_interactions.NoStaticElementInteractionsRule,
+		role_has_required_aria_props.RoleHasRequiredAriaPropsRule,
+		role_supports_aria_props.RoleSupportsAriaPropsRule,
 		scope.ScopeRule,
 		tabindex_no_positive.TabindexNoPositiveRule,
 	}

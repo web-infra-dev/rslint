@@ -132,6 +132,7 @@ noopener
 noopenernoreferrer
 noreferrer
 noregabi
+notarole
 notcool
 notunique
 nsec
@@ -447,3 +448,4 @@ onmouseover
 onmouseout
 onfocus
 onblur
+mynamespace
