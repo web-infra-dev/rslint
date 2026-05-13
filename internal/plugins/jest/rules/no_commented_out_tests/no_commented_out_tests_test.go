@@ -39,14 +39,14 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
       test("foo", () => {
         expect(pending()).toEqual({})
       })
-    `},
+    	`},
 			{Code: `
       const { pending } = require("actions")
 
       test("foo", () => {
         expect(pending()).toEqual({})
       })
-    `},
+    		`},
 			{Code: `
       test("foo", () => {
         const pending = getPending()
@@ -61,7 +61,7 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
       function pending() {
         return {}
       }
-    `},
+    		`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -194,6 +194,58 @@ func TestNoCommentedOutTestsRule(t *testing.T) {
 				Code: "foo()\n/*\n  describe(\"has title but no callback\", () => {})\n*/\nbar()\n",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			// Multi-byte (CJK) and surrogate-pair (emoji) text before the comment: AST
+			// positions are UTF-8 byte offsets; LSP/ESLint columns stay UTF-16 elsewhere.
+			{
+				Code: "const 中文 = 1;\n// describe(\"x\", () => {})\n",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code: "const e = \"🚀\";\n// test(\"x\", () => {})\n",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code: "const 中文 = 1;\n/* test(\"x\", () => {}) */\n",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			{
+				Code: "const e = \"🚀\";\n/* describe() */\n",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 2, Column: 1},
+				},
+			},
+			// Same-line comments: assert 1-based UTF-16 columns (IDE/ESLint), which
+			// differ from naive UTF-8 byte columns when CJK or surrogate pairs precede.
+			{
+				Code: `const 中文 = 1; // describe("a", () => {})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `const e = "🚀"; // test("x", () => {})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 17},
+				},
+			},
+			{
+				Code: `const 中文 = 1; /* test("x") */`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 15},
+				},
+			},
+			{
+				Code: `const e = "🚀"; /* describe() */`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "commentedTests", Line: 1, Column: 17},
 				},
 			},
 		},

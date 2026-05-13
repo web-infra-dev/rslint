@@ -20,7 +20,7 @@ ruleTester.run('no-commented-out-tests', {} as never, {
     { code: 'itHappensToStartWithIt()' },
     { code: 'testSomething()' },
     { code: '// latest(dates)' },
-    { code: '// TODO: unify with Git implementation from Shipit (?)' },
+    { code: '// TODO: unify with Git implementation from Ship it (?)' },
     { code: '#!/usr/bin/env node' },
     {
       code: `
