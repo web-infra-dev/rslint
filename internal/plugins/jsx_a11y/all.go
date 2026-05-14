@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/img_redundant_alt"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/interactive_supports_focus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/label_has_associated_control"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/lang"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/media_has_caption"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/mouse_events_have_key_events"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
@@ -57,6 +58,7 @@ func GetAllRules() []rule.Rule {
 		img_redundant_alt.ImgRedundantAltRule,
 		interactive_supports_focus.InteractiveSupportsFocusRule,
 		label_has_associated_control.LabelHasAssociatedControlRule,
+		lang.LangRule,
 		media_has_caption.MediaHasCaptionRule,
 		mouse_events_have_key_events.MouseEventsHaveKeyEventsRule,
 		no_access_key.NoAccessKeyRule,
