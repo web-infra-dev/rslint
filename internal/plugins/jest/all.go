@@ -2,6 +2,7 @@ package jest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_deprecated_functions"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_done_callback"
@@ -22,6 +23,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		no_alias_methods.NoAliasMethodsRule,
+		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_disabled_tests.NoDisabledTestsRule,
 		no_deprecated_functions.NoDeprecatedFunctionsRule,
 		no_done_callback.NoDoneCallbackRule,
