@@ -6,6 +6,7 @@ activedescendant
 addl
 afoob
 alertdialog
+alink
 allowundefined
 anee
 apos
@@ -179,6 +180,7 @@ iface
 imul
 inlines
 instane
+interrobang
 IPC
 isnan
 Isnt
@@ -437,6 +439,7 @@ wasmfs
 WCAG
 webauthn
 wellformed
+wordlist
 WHATWG
 xdescribe
 xitiViewMap
