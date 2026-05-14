@@ -73,6 +73,6 @@ require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
-	github.com/microsoft/typescript-go v0.0.0-20260512001534-adb2ab4ed7d7 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20260513220310-47ca64821ddc // indirect
 	golang.org/x/text v0.37.0
 )
