@@ -144,6 +144,7 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `const foo = (42, hey.then(x => { console.log(x) }))`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { invalid = x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { invalid['x'] = x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(x => { const value = x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { notWindow[x] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { notWindow['x'] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { windows['x'] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
