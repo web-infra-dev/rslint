@@ -2,6 +2,7 @@ package jsx_a11y_plugin
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/alt_text"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_ambiguous_text"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_has_content"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_is_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_activedescendant_has_tabindex"
@@ -39,6 +40,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		alt_text.AltTextRule,
+		anchor_ambiguous_text.AnchorAmbiguousTextRule,
 		anchor_has_content.AnchorHasContentRule,
 		anchor_is_valid.AnchorIsValidRule,
 		aria_activedescendant_has_tabindex.AriaActivedescendantHasTabindexRule,
