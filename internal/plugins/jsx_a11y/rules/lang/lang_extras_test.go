@@ -324,6 +324,13 @@ func TestLangExtras(t *testing.T) {
 		{Code: `<html lang="en--US" />`, Tsx: true},
 		{Code: `<html lang="en-US-" />`, Tsx: true},
 
+		// ---- RFC 5646 conformance (rslint MORE spec-conformant than
+		//      `language-tags`): variants with declared prefix relationship.
+		//      The IANA registry records `fonxsamp` with Prefix `en-fonipa`,
+		//      so `en-fonipa-fonxsamp` is well-formed. `language-tags`
+		//      rejects this incorrectly; rslint accepts via language.Parse. ----
+		{Code: `<html lang="en-fonipa-fonxsamp" />`, Tsx: true},
+
 		// ============================================================
 		// Dimension 4 — JSX attribute-syntax variants
 		// ============================================================
@@ -849,6 +856,33 @@ func TestLangExtras(t *testing.T) {
 		},
 		{
 			Code: `<html lang="a" />`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+			},
+		},
+
+		// ---- RFC 5646 conformance (rslint MORE spec-conformant than
+		//      `language-tags`): extension/private-use singletons MUST
+		//      carry a 1-8 alphanum payload subtag (RFC 5646 §2.2.6 /
+		//      §2.2.7). `language-tags` accepts the malformed lone-
+		//      singleton tail; rslint rejects via language.Parse. ----
+		{
+			Code: `<html lang="en-x" />`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+			},
+		},
+		{
+			Code: `<html lang="en-u" />`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},
+			},
+		},
+		{
+			Code: `<html lang="en-x-" />`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "invalidLangValue", Message: errorMessage, Line: 1, Column: 7},

@@ -54,26 +54,21 @@ var LangRule = rule.Rule{
 					// MemberExpression, ConditionalExpression, TS-wrappers
 					// (`undefined as any`), etc. → upstream null → no report.
 					return
-				case jsxa11yutil.ExtractUndefined:
-					// Explicit `undefined` Identifier — upstream's
-					// `value === undefined` arm.
+				case jsxa11yutil.ExtractUndefined, jsxa11yutil.ExtractOther:
+					// `ExtractUndefined`: explicit `undefined` Identifier —
+					// upstream's `value === undefined` arm.
+					// `ExtractOther`: boolean attribute form, TrueKeyword,
+					// FalseKeyword, "true"/"false" string coerced to bool,
+					// NumericLiteral, BigIntLiteral, Array/ObjectExpression.
+					// None can be a BCP-47 tag — upstream `tags.check` throws
+					// `TypeError` on non-string input. We surface as a normal
+					// diagnostic so the user sees the problem without losing
+					// the rest of the file's reports.
 					reportInvalid(ctx, attr)
-					return
-				case jsxa11yutil.ExtractOther:
-					// Boolean attribute form, TrueKeyword, FalseKeyword,
-					// "true" / "false" string coerced to bool, NumericLiteral,
-					// BigIntLiteral, ArrayExpression, ObjectExpression. None
-					// can be a BCP-47 tag — upstream crashes with `TypeError`
-					// when `tags.check` receives a non-string. We surface as
-					// a normal report so the user actually sees the problem
-					// instead of an opaque crash.
-					reportInvalid(ctx, attr)
-					return
 				case jsxa11yutil.ExtractString:
-					if isValidBCP47Tag(val) {
-						return
+					if !isValidBCP47Tag(val) {
+						reportInvalid(ctx, attr)
 					}
-					reportInvalid(ctx, attr)
 				}
 			},
 		}

@@ -52,6 +52,21 @@ import (
 // were extracted from `language-subtag-registry@0.3.x` and are kept in
 // sync with the upstream registry — manual refresh is required if rslint
 // adopts a newer registry snapshot.
+//
+// Intentional divergences from `language-tags` (verified empirically;
+// rslint sides with RFC 5646 ABNF rather than mirroring upstream bugs):
+//
+//   - Singleton without payload (`en-x`, `en-u`, `en-x-`): language-tags
+//     accepts, but RFC 5646 §2.2.6/§2.2.7 requires `1*("-" 1*8alphanum)`
+//     after every extension/private-use singleton. We reject via
+//     language.Parse's "not well-formed" error.
+//   - `en-fonipa-fonxsamp`: language-tags rejects, but `fonxsamp` has
+//     IANA Prefix `en-fonipa`, so the tag IS well-formed and the prefix
+//     relationship holds. We accept via language.Parse.
+//
+// These divergences are extreme edge cases (no real production code
+// writes them) and direction is "rslint is more spec-conformant" — not
+// "rslint misses upstream-detected errors".
 func isValidBCP47Tag(value string) bool {
 	if strings.ContainsRune(value, '_') {
 		return false
@@ -60,10 +75,8 @@ func isValidBCP47Tag(value string) bool {
 	if trimmed == "" {
 		return false
 	}
-	for _, r := range trimmed {
-		if r == ' ' || r == '\t' || r == '\n' || r == '\r' || r == '\v' || r == '\f' {
-			return false
-		}
+	if strings.ContainsAny(trimmed, " \t\n\r\v\f") {
+		return false
 	}
 	if deprecatedGrandfatheredTags[strings.ToLower(trimmed)] {
 		return false

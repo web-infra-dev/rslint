@@ -441,11 +441,14 @@ webauthn
 wellformed
 wordlist
 WHATWG
+alphanum
 Armn
 Blis
 CLDR
 enochian
 Ethi
+fonipa
+fonxsamp
 formedness
 Geor
 Grek
