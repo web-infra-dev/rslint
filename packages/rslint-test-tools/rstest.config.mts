@@ -436,6 +436,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
 
     // eslint-plugin-promise
+    './tests/eslint-plugin-promise/rules/always-return.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
 
     // eslint-plugin-unicorn
