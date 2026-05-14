@@ -438,6 +438,7 @@ type extra_Checker struct {
   reportedUnreachableNodes collections.Set[*ast.Node]
   nonExistentProperties collections.Set[checker.NonExistentPropertyKey]
   deferredDiagnosticCallbacks []func()
+  typeToStringNodebuilder *checker.NodeBuilder
   mu sync.Mutex
   tracer *checker.Tracer
 }
