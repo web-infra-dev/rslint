@@ -557,6 +557,120 @@ func LiteralPropStringValue(attr *ast.Node) (string, bool) {
 	return "", false
 }
 
+// LiteralPropExtractState classifies the result of jsx-ast-utils'
+// `getLiteralPropValue(attr)` into four mutually exclusive buckets for rules
+// that need to dispatch on the *kind* of value returned, not just its
+// stringified form. Used by jsx-a11y/lang to distinguish:
+//
+//   - upstream `value === null`                  → ExtractUnresolvable → skip
+//   - upstream `value === undefined`             → ExtractUndefined    → report
+//   - upstream `typeof value === 'string'`        → ExtractString      → validate
+//   - upstream value is neither null/undef/str   → ExtractOther        → report
+//
+// The Other bucket exists because language-tags' `tags.check(value)` THROWS
+// when `value` is not a string (boolean, number, BigInt, etc.). Upstream
+// jsx-a11y/lang relies on every non-null literal being a string, so a
+// boolean / numeric `lang` crashes the lint run. We surface those as a
+// normal report instead of crashing.
+type LiteralPropExtractState int
+
+const (
+	// ExtractUnresolvable: upstream returns `null`. Examples:
+	//   - Identifier non-undefined (`<x lang={foo} />`)
+	//   - CallExpression / MemberExpression / OptionalCallExpression /
+	//     ConditionalExpression / non-assignment BinaryExpression /
+	//     LogicalExpression (LITERAL_TYPES has no entry → noop → null)
+	//   - TSAsExpression / TSNonNullExpression / SatisfiesExpression /
+	//     TypeAssertion (no LITERAL_TYPES entry; upstream and we both null)
+	//   - Spread-only attribute whose spread argument is not an ObjectLiteral
+	//   - Empty `{}` JsxExpression (tsgo synthesizes for malformed source;
+	//     upstream's "type not in TYPES" path → null)
+	ExtractUnresolvable LiteralPropExtractState = iota
+
+	// ExtractUndefined: upstream returns the JavaScript value `undefined`.
+	// Reachable only via the Identifier whose name is exactly `undefined`
+	// (`<x lang={undefined} />`). Note that TS-wrapped variants like
+	// `{undefined as any}` land in ExtractUnresolvable because LITERAL_TYPES
+	// has no `TSAsExpression` entry.
+	ExtractUndefined
+
+	// ExtractString: upstream returns a string value. The string is in the
+	// returned `str` argument. Includes:
+	//   - StringLiteral whose value is NOT the case-insensitive "true" /
+	//     "false" (those coerce to booleans via jsxAstUtilsLiteralCoerce)
+	//   - NoSubstitutionTemplateLiteral (no case-coercion)
+	//   - TemplateExpression — upstream synthesizes a placeholder string
+	//     ("head{name}tail" / "head{TypeName}tail")
+	//   - NullKeyword — upstream LITERAL_TYPES.Literal special-cases `null`
+	//     to the string "null" (truthy in JS, but invalid as a BCP-47 tag)
+	//   - BinaryExpression with an assignment operator — upstream's
+	//     AssignmentExpression extractor synthesizes `${left} ${op} ${right}`
+	ExtractString
+
+	// ExtractOther: upstream returns a value that is neither null, undefined,
+	// nor a string. Examples:
+	//   - TrueKeyword / FalseKeyword (`<x lang={true} />`)
+	//   - StringLiteral coerced to boolean (`<x lang="true" />`,
+	//     `<x lang="FALSE" />` — jsxAstUtilsLiteralCoerce maps these to bools)
+	//   - NumericLiteral, BigIntLiteral (`<x lang={1} />`, `<x lang={1n} />`)
+	//   - Boolean attribute form (`<x lang />`) — upstream's extract
+	//     null-attribute-value path returns boolean `true`
+	//   - ArrayLiteralExpression — LITERAL_TYPES.ArrayExpression returns a
+	//     filtered array (typeof "object", not string)
+	//   - DeleteExpression — runtime boolean true
+	ExtractOther
+)
+
+// LiteralPropExtract runs jsx-ast-utils' `getLiteralPropValue` (LITERAL_TYPES
+// path) on the attribute value and returns the result plus a state tag — see
+// LiteralPropExtractState for the four classifications.
+//
+// This is the FULL-classification companion of LiteralPropStringValue:
+//   - LiteralPropStringValue collapses all non-string results into ("", false),
+//     which is convenient for "validate when string, otherwise ignore" but
+//     loses the distinction between "we don't know" (skip) and "we know it's
+//     not a string" (often report).
+//   - LiteralPropExtract preserves the four-way distinction so rules can
+//     branch on each case explicitly.
+//
+// Returns ("", ExtractUnresolvable) when `attr` is nil — the caller is
+// expected to test the attribute's existence first.
+func LiteralPropExtract(attr *ast.Node) (string, LiteralPropExtractState) {
+	if attr == nil {
+		return "", ExtractUnresolvable
+	}
+	if AttributeIsBooleanForm(attr) {
+		// `<x lang />` — upstream's extract null-attribute-value path returns
+		// boolean `true`; classify as ExtractOther so the caller can choose
+		// whether to report (lang) or just treat as truthy (other rules).
+		return "", ExtractOther
+	}
+	// Direct attribute form `<X attr="…">` — entity-decode then route through
+	// jsxAstUtilsLiteralCoerce so case-insensitive "true" / "false" strings
+	// classify as ExtractOther (boolean coercion), not ExtractString.
+	if decoded, ok := directAttributeStringValue(attr); ok {
+		return classifyJsValueForExtract(jsxAstUtilsLiteralCoerce(decoded))
+	}
+	inner := attributeInnerExpression(attr)
+	if inner == nil {
+		// Empty `{}` JsxExpression — upstream's "type not in TYPES" → null.
+		return "", ExtractUnresolvable
+	}
+	return classifyJsValueForExtract(literalPropValue(inner))
+}
+
+func classifyJsValueForExtract(v jsValue) (string, LiteralPropExtractState) {
+	switch v.Kind {
+	case jvString:
+		return v.Str, ExtractString
+	case jvUndef:
+		return "", ExtractUndefined
+	case jvNull, jvUnknown:
+		return "", ExtractUnresolvable
+	}
+	return "", ExtractOther
+}
+
 // LiteralPropJSNumber mirrors `Number(getLiteralPropValue(prop))` — the
 // literal-typed extraction routed through JS's ToNumber coercion. Used by
 // rules whose upstream form is `getLiteralPropValue(prop) > N` /
