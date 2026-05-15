@@ -146,11 +146,14 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	}
 
 	// isPublicField mirrors upstream's `isPublicField`: true when the
-	// member has no `private`/`protected` accessibility modifier. The
-	// TypeScript-ESLint variant deliberately ignores the PrivateIdentifier
-	// (`#x`) case here — `#`-keyed members are reported under
-	// `ignoreClassesThatImplementAnInterface: 'public-fields'` only via the
-	// accessibility check.
+	// member has no `private` / `protected` accessibility modifier.
+	//
+	// PrivateIdentifier (`#x`) keys cannot syntactically carry an
+	// accessibility modifier in TypeScript, so `isPublicField` always
+	// returns `true` for them. Under `ignoreClassesThatImplementAnInterface:
+	// 'public-fields'` this means `#`-keyed members of an `implements`-class
+	// are *skipped* (treated as public). This is upstream's intentional
+	// behaviour — the rule keys off the modifier, not the `#` prefix.
 	isPublicField := func(member *ast.Node) bool {
 		flags := member.ModifierFlags()
 		return flags&(ast.ModifierFlagsPrivate|ast.ModifierFlagsProtected) == 0
@@ -317,13 +320,21 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	// in ESTree the key visits BEFORE pushContext(member) because pushContext
 	// is invoked from FunctionExpression entry, after the MethodDefinition's
 	// key has already been visited.
+	//
+	// The computed-key deferral also applies to *bodyless* members:
+	// `abstract [this.foo](): void` must let `this` in the computed key flow
+	// to the enclosing scope, not be eaten by the bodyless anonymous frame.
+	// The matching ComputedPropertyName:exit branch handles bodyless and
+	// bodied identically — pushing anonymous when Body() == nil, member when
+	// non-nil — keeping the stack balanced against the unconditional pop on
+	// the member's exit listener.
 	enterClassLikeMember := func(node *ast.Node) {
-		if node.Body() == nil {
-			pushAnonymous()
-			return
-		}
 		if name := ast.GetNameOfDeclaration(node); name != nil && name.Kind == ast.KindComputedPropertyName {
 			// Defer push to ComputedPropertyName:exit.
+			return
+		}
+		if node.Body() == nil {
+			pushAnonymous()
 			return
 		}
 		pushMember(node)
@@ -420,9 +431,13 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			case ast.KindPropertyDeclaration:
 				pushAnonymous()
 			case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-				// Deferred member push for computed-key class members. The
-				// matching pop happens on the member's exit listener.
-				if parent.Body() != nil {
+				// Deferred push for computed-key class members. Bodyless
+				// members (abstract / overload signatures) get an anonymous
+				// frame so the matching exit pop stays balanced without
+				// reporting; bodied members get a real member frame.
+				if parent.Body() == nil {
+					pushAnonymous()
+				} else {
 					pushMember(parent)
 				}
 			}
@@ -473,29 +488,112 @@ func classFieldFunctionDisplayName(field, node *ast.Node) string {
 // classFieldHeadLocAcrossParens reconstructs upstream's `getFunctionHeadLoc`
 // output for a paren-wrapped class-field initializer:
 //
-//	class C { foo = (() => {}); }   // upstream: "foo = " head; rslint: same
+//	class C { foo = (() => {}); }   // upstream: "foo = " head ending at inner '('
 //
 // Upstream's range runs from the PropertyDefinition's start (after decorators)
-// to the function's own open paren. rslint's shared `GetFunctionHeadLoc`
-// inspects only `node.Parent`, so when the immediate parent is
-// `ParenthesizedExpression` the existing helper falls through to the default
-// arrow case ("just the `=>` token") and we lose the field context.
+// to the function's own open paren — except for parenless single-parameter
+// arrows, where it ends at whatever token immediately precedes the parameter
+// identifier (the outer wrapper '(' when paren-wrapped). rslint's shared
+// `GetFunctionHeadLoc` inspects only `node.Parent`, so when the immediate
+// parent is `ParenthesizedExpression` the existing helper falls through to
+// the default arrow case ("just the `=>` token") and we lose the field
+// context. This local helper mirrors ESLint's `getOpeningParenOfParams`
+// branches exactly:
 //
-// This local helper mirrors the upstream computation for the paren-wrapped
-// shape: start at the field's trimmed-of-trivia position, end at the first
-// `(` token at or after the function-like node (which is its own parameter
-// list — the surrounding paren wrappers always sit before `node.Pos()`).
+//   - Arrow with `params.length === 1`: peek the first arrow-owned token.
+//     If it's '(' (parens-form like `(x) => …`), end at that '('.
+//     Otherwise (parenless `x => …`), end at the trimmed start of the
+//     immediate ParenthesizedExpression parent (the wrapping '(').
+//   - Arrow with 0 or 2+ params: scan for the first '(' between the
+//     arrow's start and its body. Falls back to the `=>` token when no
+//     '(' appears (shouldn't happen for these param counts; defensive).
+//   - FunctionExpression: scan for the first '(' between the function's
+//     start and its body — this is always the parameter list's '(',
+//     because the outer wrapper '(' sits before `node.Pos()`.
+//
+// The field start follows `nodeStartSkippingDecorators` semantics (which the
+// shared `GetFunctionHeadLoc` uses for the non-paren-wrapped case): skip past
+// any leading `@decorator` tokens so the head range matches ESLint's
+// `PropertyDefinition.loc.start` (decorators sit outside that range in
+// ESTree, but are part of `field.Pos()` in tsgo).
 func classFieldHeadLocAcrossParens(sf *ast.SourceFile, field, node *ast.Node) core.TextRange {
-	fieldRange := utils.TrimNodeTextRange(sf, field)
-	s := scanner.GetScannerForSourceFile(sf, node.Pos())
-	end := node.End()
+	start := fieldStartAfterDecorators(sf, field)
+
+	endLimit := node.End()
+	if body := node.Body(); body != nil {
+		endLimit = body.Pos()
+	}
+
+	if node.Kind == ast.KindArrowFunction {
+		af := node.AsArrowFunction()
+		params := af.Parameters
+		if params != nil && len(params.Nodes) == 1 {
+			// ESLint's special path for single-parameter arrows.
+			firstToken := scanner.GetScannerForSourceFile(sf, node.Pos())
+			if firstToken.Token() == ast.KindOpenParenToken {
+				return core.NewTextRange(start, firstToken.TokenStart())
+			}
+			// Parenless `x => …`: token immediately before the param is the
+			// outer wrapper `(`. Use the immediate ParenthesizedExpression
+			// parent's trimmed Pos() (which is the position of that '(').
+			if node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
+				return core.NewTextRange(start, utils.TrimNodeTextRange(sf, node.Parent).Pos())
+			}
+			// Defensive fallback — this helper is only invoked when paren-wrapped,
+			// so the branch above should always succeed.
+			return core.NewTextRange(start, utils.TrimNodeTextRange(sf, params.Nodes[0]).Pos())
+		}
+		if pos := firstOpenParenPos(sf, node.Pos(), endLimit); pos >= 0 {
+			return core.NewTextRange(start, pos)
+		}
+		// 0 / 2+ params with no '(' before the body is impossible in valid
+		// TS; keep an `=>`-positioned fallback to stay total.
+		return core.NewTextRange(start, af.EqualsGreaterThanToken.Pos())
+	}
+
+	// FunctionExpression: outer paren is before node.Pos(); first '(' from
+	// `function` keyword to body is always the parameter list's '('.
+	if pos := firstOpenParenPos(sf, node.Pos(), endLimit); pos >= 0 {
+		return core.NewTextRange(start, pos)
+	}
+	return core.NewTextRange(start, endLimit)
+}
+
+// fieldStartAfterDecorators mirrors the private `nodeStartSkippingDecorators`
+// helper used by `GetFunctionHeadLoc` for the non-paren-wrapped case: walk
+// the PropertyDeclaration's modifiers, find the last `@decorator`, and
+// return the position of the next token after it. Without this, an `@dec`
+// field reports the head as starting at the `@`, while ESLint reports
+// starting after the decorators.
+func fieldStartAfterDecorators(sf *ast.SourceFile, field *ast.Node) int {
+	fallback := utils.TrimNodeTextRange(sf, field).Pos()
+	mods := field.Modifiers()
+	if mods == nil || len(mods.Nodes) == 0 {
+		return fallback
+	}
+	var lastDecoratorEnd int
+	for _, mod := range mods.Nodes {
+		if mod.Kind == ast.KindDecorator && mod.End() > lastDecoratorEnd {
+			lastDecoratorEnd = mod.End()
+		}
+	}
+	if lastDecoratorEnd == 0 {
+		return fallback
+	}
+	return scanner.GetRangeOfTokenAtPosition(sf, lastDecoratorEnd).Pos()
+}
+
+// firstOpenParenPos scans for the first `(` token in [start, end). Returns
+// -1 if none. Bounded so it never reads through the function body.
+func firstOpenParenPos(sf *ast.SourceFile, start, end int) int {
+	s := scanner.GetScannerForSourceFile(sf, start)
 	for s.TokenStart() < end {
 		if s.Token() == ast.KindOpenParenToken {
-			return core.NewTextRange(fieldRange.Pos(), s.TokenStart())
+			return s.TokenStart()
 		}
 		s.Scan()
 	}
-	return fieldRange
+	return -1
 }
 
 // propertyDisplayName resolves a property-name node to the string ESLint

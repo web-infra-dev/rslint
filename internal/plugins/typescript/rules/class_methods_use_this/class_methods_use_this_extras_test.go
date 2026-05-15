@@ -210,6 +210,26 @@ class C implements A, B, D {
 				Options: objectOption(map[string]interface{}{"ignoreClassesThatImplementAnInterface": true}),
 			},
 
+			// ---- Locks in: `#`-keyed members under `'public-fields'` are skipped. ----
+			// PrivateIdentifier keys cannot carry an accessibility modifier in TS,
+			// so `isPublicField(member.accessibility === undefined)` returns true →
+			// they fall into the "public field" bucket and are skipped under the
+			// `'public-fields'` mode. Mirrors upstream's intentional behavior.
+			{
+				Code:    `class C implements I { #method() {} }`,
+				Options: objectOption(map[string]interface{}{"ignoreClassesThatImplementAnInterface": "public-fields"}),
+			},
+			{
+				Code:    `class C implements I { #field = () => {}; }`,
+				Options: objectOption(map[string]interface{}{"ignoreClassesThatImplementAnInterface": "public-fields"}),
+			},
+
+			// ---- Locks in: `abstract [this.foo](): void` — `this` in the abstract
+			// member's computed key marks the enclosing method's frame, not the
+			// bodyless anonymous frame. Outer `m` therefore counts as
+			// `this`-using and is valid. ----
+			{Code: `abstract class A { m() { return class extends A { abstract [this.foo](): void; }; } }`},
+
 			// ---- Dimension 4: `this` in default-parameter value of method ----
 			// Parameter defaults execute inside the function's `this` scope; the
 			// reference must mark the method as using `this`.
@@ -957,6 +977,81 @@ class C {
 				},
 			},
 
+			// ---- Locks in: paren-wrapped parenless single-param arrow with
+			// body containing `(` (regression guard for body-paren leakage). ----
+			// ESLint's `getOpeningParenOfParams` special-case for
+			// `params.length === 1` looks at the token before the param: with
+			// paren-wrap, that's the outer `(` — not the body's `(`. End col
+			// must point at the outer `(` (col 17), NOT a `(` inside the body.
+			{
+				Code: `class C { foo = (x => { (1); return x; }); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'foo'.",
+						Line:      1, Column: 11, EndColumn: 17,
+					},
+				},
+			},
+
+			// ---- Locks in: paren-wrapped parenless single-param arrow,
+			// expression body (no block). ----
+			{
+				Code: `class C { foo = (x => x); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'foo'.",
+						Line:      1, Column: 11, EndColumn: 17,
+					},
+				},
+			},
+
+			// ---- Locks in: double-paren-wrapped parenless single-param arrow.
+			// End must be the *innermost* surrounding paren (col 18), not the
+			// outermost — matches ESLint's `tokenBefore(param)` behaviour. ----
+			{
+				Code: `class C { foo = ((x => x)); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'foo'.",
+						Line:      1, Column: 11, EndColumn: 18,
+					},
+				},
+			},
+
+			// ---- Locks in: paren-wrapped two-param arrow uses params `(`. ----
+			// `params.length !== 1` path: scan finds the params open paren,
+			// which sits at the start of the arrow's own range.
+			{
+				Code: `class C { foo = ((x, y) => x + y); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'foo'.",
+						Line:      1, Column: 11, EndColumn: 18,
+					},
+				},
+			},
+
+			// ---- Locks in: decorator on paren-wrapped class-field arrow.
+			// Head start must skip past `@dec` to match ESLint's
+			// `PropertyDefinition.loc.start` (ESTree puts decorators outside
+			// that range; tsgo includes them in `field.Pos()`). End is the
+			// inner arrow params `(`. ----
+			// Note: position is computed after the `@dec ` prefix is skipped.
+			{
+				Code: `function dec(t: any, k: any) {} class C { @dec foo = (() => {}); }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "missingThis",
+						Message:   "Expected 'this' to be used by class method 'foo'.",
+						Line:      1, Column: 48, EndColumn: 55,
+					},
+				},
+			},
+
 			// ---- Locks in: paren-wrapped class-field arrow with `this` is valid ----
 			// (this should be the valid-side variant — moved to valid section)
 
@@ -1026,11 +1121,6 @@ function outer() {
 			// PropertyDeclaration's anonymous frame holds the field-value visit,
 			// which has no `this` of its own. Valid for foo, but B has no methods
 			// to report. So this is locked in as a *valid* — moved to valid.
-
-			// ---- Locks in: ParenthesizedExpression around class-field arrow is
-			// NOT treated as a class-field (documented divergence). ----
-			// `class C { foo = (() => {}); }` — upstream reports, rslint does NOT.
-			// Locked in as a *valid* case (no error expected). Moved to valid.
 		},
 	)
 }
