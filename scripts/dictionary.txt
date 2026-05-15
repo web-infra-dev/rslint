@@ -362,6 +362,7 @@ splitwords
 spreadassignment
 spreadelement
 stdjson
+stdlib
 stmts
 stringutil
 stub
@@ -399,6 +400,7 @@ tsoptions
 tspath
 tsutils
 typeparam
+typescriptutil
 unaliased
 unbnound
 uncast
