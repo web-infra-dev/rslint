@@ -254,7 +254,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-dynamic-delete.test.ts',
     './tests/typescript-eslint/rules/no-empty-function.test.ts',
     './tests/typescript-eslint/rules/no-empty-interface.test.ts',
-    // './tests/typescript-eslint/rules/no-empty-object-type.test.ts',
+    './tests/typescript-eslint/rules/no-empty-object-type.test.ts',
     './tests/typescript-eslint/rules/no-explicit-any.test.ts',
     './tests/typescript-eslint/rules/no-extra-non-null-assertion.test.ts',
     './tests/typescript-eslint/rules/no-extraneous-class.test.ts',
