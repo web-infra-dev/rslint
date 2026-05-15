@@ -302,7 +302,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unsafe-call.test.ts',
     // './tests/typescript-eslint/rules/no-unsafe-declaration-merging.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-enum-comparison.test.ts',
-    // './tests/typescript-eslint/rules/no-unsafe-function-type.test.ts',
+    './tests/typescript-eslint/rules/no-unsafe-function-type.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-member-access.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-return.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-type-assertion.test.ts',
