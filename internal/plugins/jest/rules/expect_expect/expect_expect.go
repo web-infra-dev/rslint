@@ -8,7 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	internalutils "github.com/web-infra-dev/rslint/internal/utils"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Message Builder
@@ -24,7 +24,7 @@ func parseOptions(options any) ([]string, []string) {
 	assertNames := []string{"expect"}
 	additional := []string{}
 
-	m := internalutils.GetOptionsMap(options)
+	m := internalUtils.GetOptionsMap(options)
 	if m == nil {
 		return assertNames, additional
 	}
@@ -134,7 +134,7 @@ func findJestTestCallsPassingFunction(ctx rule.RuleContext, root *ast.Node, decl
 		if fnDecl != nil && fnDecl.Name() != nil {
 			declNameNode = fnDecl.Name()
 			declName = declNameNode.Text()
-			declSymbol = internalutils.GetReferenceSymbol(declNameNode, ctx.TypeChecker)
+			declSymbol = internalUtils.GetReferenceSymbol(declNameNode, ctx.TypeChecker)
 		}
 	}
 	if declName == "" {
@@ -155,7 +155,7 @@ func findJestTestCallsPassingFunction(ctx rule.RuleContext, root *ast.Node, decl
 						goto walkChildren
 					}
 					if declSymbol != nil {
-						if argSymbol := internalutils.GetReferenceSymbol(arg1, ctx.TypeChecker); argSymbol == declSymbol {
+						if argSymbol := internalUtils.GetReferenceSymbol(arg1, ctx.TypeChecker); argSymbol == declSymbol {
 							res = append(res, n)
 						}
 						goto walkChildren
