@@ -1321,6 +1321,33 @@ func IsHiddenFromScreenReaderFromTagAttrs(elementType string, attrs []*ast.Node)
 			}
 		}
 	}
+	return IsAriaHiddenTrue(attrs)
+}
+
+// IsAriaHiddenTrue mirrors upstream's
+//
+//	getPropValue(getProp(attrs, 'aria-hidden')) === true
+//
+// — the bare aria-hidden truthiness check shared by `isHiddenFromScreenReader`
+// and `no-aria-hidden-on-focusable`. Returns true iff the JSX attribute
+// `aria-hidden` resolves to JS boolean true via jsx-ast-utils' extractValue.
+//
+// The five matching shapes:
+//   - boolean form (`<div aria-hidden />`) — extractValue's null-attribute-value
+//     path → true
+//   - direct StringLiteral "true" / "True" / etc. — case-insensitive
+//     jsxAstUtilsLiteralCoerce coerces to boolean true (entity-decoded first
+//     so `<div aria-hidden="&#116;rue">` matches)
+//   - JsxExpression with literal `true` (`<div aria-hidden={true} />`)
+//   - JsxExpression with string literal "true" — same case-insensitive coerce
+//   - Any expression that staticEval resolves to boolean true (e.g.
+//     `<div aria-hidden={cond ? true : false} />` when `cond` is statically
+//     truthy)
+//
+// Every other shape — `aria-hidden="false"`, `aria-hidden={someVar}`, numeric
+// / null / undefined values, expressions staticEval cannot resolve — returns
+// false. This is upstream's `=== true` (strict) check, not a truthy test.
+func IsAriaHiddenTrue(attrs []*ast.Node) bool {
 	ariaHidden := FindAttributeByName(attrs, "aria-hidden")
 	if ariaHidden == nil {
 		return false
