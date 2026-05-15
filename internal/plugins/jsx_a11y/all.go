@@ -23,6 +23,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/media_has_caption"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/mouse_events_have_key_events"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_aria_hidden_on_focusable"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_autofocus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_distracting_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_interactive_element_to_noninteractive_role"
@@ -62,6 +63,7 @@ func GetAllRules() []rule.Rule {
 		media_has_caption.MediaHasCaptionRule,
 		mouse_events_have_key_events.MouseEventsHaveKeyEventsRule,
 		no_access_key.NoAccessKeyRule,
+		no_aria_hidden_on_focusable.NoAriaHiddenOnFocusableRule,
 		no_autofocus.NoAutofocusRule,
 		no_distracting_elements.NoDistractingElementsRule,
 		no_interactive_element_to_noninteractive_role.NoInteractiveElementToNoninteractiveRoleRule,

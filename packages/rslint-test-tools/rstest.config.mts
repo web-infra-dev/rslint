@@ -180,6 +180,7 @@ export default defineConfig({
     './tests/eslint-plugin-jsx-a11y/rules/media-has-caption.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/mouse-events-have-key-events.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-access-key.test.ts',
+    './tests/eslint-plugin-jsx-a11y/rules/no-aria-hidden-on-focusable.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-autofocus.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-distracting-elements.test.ts',
     './tests/eslint-plugin-jsx-a11y/rules/no-interactive-element-to-noninteractive-role.test.ts',
