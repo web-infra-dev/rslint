@@ -8,7 +8,7 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	jestutils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
+	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -249,7 +249,7 @@ func matcherFor(fnKey string, ms matchersByFn) matcherEntry {
 
 // Mirrors eslint-plugin-jest: only run printf checks for the outer each title call
 // (when .each(...) is invoked as (...)(title, cb)), not tagged-template factories.
-func shouldValidateEachPrintf(jestFn *jestutils.ParsedJestFnCall, call *ast.CallExpression) bool {
+func shouldValidateEachPrintf(jestFn *jestUtils.ParsedJestFnCall, call *ast.CallExpression) bool {
 	if jestFn == nil || call == nil {
 		return false
 	}
@@ -297,8 +297,8 @@ func eachInvalidSpecifier(title string) string {
 	return reEachInvalidSpecifier.FindString(s)
 }
 
-func jestEmptyFunctionName(kind jestutils.JestFnType) string {
-	if kind == jestutils.JestFnTypeDescribe {
+func jestEmptyFunctionName(kind jestUtils.JestFnType) string {
+	if kind == jestUtils.JestFnTypeDescribe {
 		return "describe"
 	}
 	return "test"
@@ -312,11 +312,11 @@ var ValidTitleRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFn := jestutils.ParseJestFnCall(node, ctx)
+				jestFn := jestUtils.ParseJestFnCall(node, ctx)
 				if jestFn == nil {
 					return
 				}
-				if jestFn.Kind != jestutils.JestFnTypeDescribe && jestFn.Kind != jestutils.JestFnTypeTest {
+				if jestFn.Kind != jestUtils.JestFnTypeDescribe && jestFn.Kind != jestUtils.JestFnTypeTest {
 					return
 				}
 
@@ -332,10 +332,10 @@ var ValidTitleRule = rule.Rule{
 						return
 					}
 					ignored := false
-					if jestFn.Kind == jestutils.JestFnTypeDescribe && co.ignoreTypeOfDescribeName {
+					if jestFn.Kind == jestUtils.JestFnTypeDescribe && co.ignoreTypeOfDescribeName {
 						ignored = true
 					}
-					if jestFn.Kind == jestutils.JestFnTypeTest && co.ignoreTypeOfTestName {
+					if jestFn.Kind == jestUtils.JestFnTypeTest && co.ignoreTypeOfTestName {
 						ignored = true
 					}
 					if !ignored && arg.Kind != ast.KindTemplateExpression {
@@ -396,12 +396,12 @@ var ValidTitleRule = rule.Rule{
 					}
 				}
 
-				unpref := trimFXPrefix(jestFn.Name)
+				unprefixedName := trimFXPrefix(jestFn.Name)
 				firstTok := title
 				if i := strings.IndexByte(title, ' '); i >= 0 {
 					firstTok = title[:i]
 				}
-				if strings.EqualFold(firstTok, unpref) {
+				if strings.EqualFold(firstTok, unprefixedName) {
 					raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 					fix := duplicatePrefixReplacement(raw)
 					ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
@@ -413,13 +413,13 @@ var ValidTitleRule = rule.Rule{
 				fnKey := trimFXPrefix(jestFn.Name)
 
 				if me := matcherFor(fnKey, co.mustNotMatch); matchRE2(me.re, title) {
-					buildMustNotReport(ctx, arg, unpref, me)
+					buildMustNotReport(ctx, arg, unprefixedName, me)
 					return
 				}
 
 				me := matcherFor(fnKey, co.mustMatch)
 				if me.re != nil && !matchRE2(me.re, title) {
-					buildMustMatchReport(ctx, arg, unpref, me)
+					buildMustMatchReport(ctx, arg, unprefixedName, me)
 				}
 			},
 		}
