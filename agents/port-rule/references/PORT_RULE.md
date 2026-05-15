@@ -49,8 +49,8 @@ Three principles follow — internalize them before writing a single test case:
 **JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
 
 - **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
-- A JS file with N cases next to a Go suite of N upstream + hundreds of extras is the **expected** state, not "JS is under-tested."
-- See Phase 3 Step 6 for what goes in the JS file and Phase 4 Step 5 for the alignment-direction check (JS ⊆ Go upstream).
+- A JS file far smaller than the Go suite — sometimes by 10× or more, depending on whether upstream uses fixture files — is the **expected** state, not "JS is under-tested." The semantic check is "every JS-asserted behavior also has a Go-upstream case"; literal case-count parity is **not** required (see Phase 4 Step 5).
+- See Phase 3 Step 6 for what goes in the JS file and Phase 4 Step 5 for the alignment-direction check (JS ⊆ Go upstream, semantic).
 
 ---
 
@@ -280,7 +280,11 @@ The `_upstream_*` / `_extras_*` split is a hard contract: a reviewer can `ls` th
 - `<rule_name>_extras_realuser_test.go` — issue-tracker shapes
 - `<rule_name>_extras_<feature>_test.go` — option / mode / receiver type, etc.
 
-Same threshold for `_upstream_test.go` if upstream itself partitions cleanly into feature subsets (e.g. one file per option mode). For a worked example of large-rule splitting, see `internal/plugins/react_hooks/rules/exhaustive_deps/` (12 `upstream_*_test.go` + 5 extras files).
+Same threshold for `_upstream_test.go` if upstream itself partitions cleanly into feature subsets (e.g. one file per option mode). When upstream is also split, each subfile's header docstring should describe its own subset, not copy the whole-suite template (e.g. "TestRuleUpstreamCallbackArg migrates upstream's callback-arg test cases ...").
+
+**Test function naming for area splits** — each split file gets one Test function whose name mirrors the area suffix in PascalCase: `<rule>_extras_dim4_test.go` → `TestRuleExtrasDim4`, `<rule>_extras_branches_test.go` → `TestRuleExtrasBranches`, `<rule>_upstream_callback_arg_test.go` → `TestRuleUpstreamCallbackArg`. This keeps a 1:1 file ↔ function mapping that `grep` can exploit.
+
+For a worked example of large-rule splitting, see `internal/plugins/react_hooks/rules/exhaustive_deps/` (12 `upstream_*_test.go` + 5 extras files). **Important**: `exhaustive_deps` predates this convention and uses a hybrid naming pattern — some files keep the `<rule>_` prefix, others drop it; Test function names use `_`-separated snake (`TestExhaustiveDeps_Upstream_CallbackArg`) instead of the documented `Test<Rule><Suffix>` PascalCase. **New rules should follow the documented patterns above; reference `exhaustive_deps` only for _how_ to partition by feature, not for naming.**
 
 ### Step 2: Write Rule Logic
 
@@ -500,17 +504,17 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 
 **Layer-to-file mapping:**
 
-| Layer                                  | File                      | Test function                                                                    | In-file group markers (on the case directly)                                                                                                                                       |
-| -------------------------------------- | ------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Upstream migration                  | `<rule>_upstream_test.go` | `Test<Rule>Upstream`                                                             | `// ---- <upstream group name> ----` — preserve upstream's grouping verbatim so a top-to-bottom read matches the upstream test file                                                |
-| 2. Edge-shape & real-user augmentation | `<rule>_extras_test.go`   | `Test<Rule>Extras`                                                               | `// ---- Dimension 4: <what> ----` for shape rows; `// ---- Real-user: <issue# or scenario> ----` for issue-tracker shapes; `// N/A: <reason>` for rows that genuinely don't apply |
-| 3. Branch lock-ins                     | `<rule>_extras_test.go`   | `Test<Rule>Extras` (or a separate `Test<Rule>BranchLockins` if extras gets busy) | `// Locks in upstream <fn>() arm <N>: <what>` on each case                                                                                                                         |
+| Layer                                  | File                      | Test function                                                                    | In-file group markers (on the case directly)                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------- | ------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Upstream migration                  | `<rule>_upstream_test.go` | `Test<Rule>Upstream`                                                             | `// ---- <upstream group name> ----` — preserve upstream's grouping verbatim so a top-to-bottom read matches the upstream test file                                                                                                                                                                                                                                               |
+| 2. Edge-shape & real-user augmentation | `<rule>_extras_test.go`   | `Test<Rule>Extras`                                                               | `// ---- <description> ----` on each case (free-form descriptive text, as used by existing jsx-a11y rules). For new rules, prefer the prefix-tagged forms `// ---- Dimension 4: <what> ----` and `// ---- Real-user: <issue# or scenario> ----` because they let `grep` find a category quickly; both styles are accepted. `// N/A: <reason>` for rows that genuinely don't apply |
+| 3. Branch lock-ins                     | `<rule>_extras_test.go`   | `Test<Rule>Extras` (or a separate `Test<Rule>ExtrasBranches` if extras is split) | `// Locks in upstream <fn>() arm <N>: <what>` on each case                                                                                                                                                                                                                                                                                                                        |
 
 For non-trivial rules, `<rule>_extras_test.go` is comparable to or larger than `<rule>_upstream_test.go` in case count. A near-empty `_extras` file means Phase 1 Steps 4 and 5 were skipped (Phase 4 Step 6 has an explicit checkbox for this).
 
 **File-header docstring** — open each test file with a top-of-file comment that names what the file is for and points at its sibling:
 
-- `_upstream_test.go`: `// Test<Rule>Upstream migrates the full valid/invalid suite from upstream <upstream test path> 1:1. Position assertions cover line/column for every invalid case. rslint-specific lock-in cases live in <rule>_extras_test.go.`
+- `_upstream_test.go`: `// Test<Rule>Upstream migrates the full valid/invalid suite from upstream <upstream test path> 1:1. Position assertions cover line/column for every invalid case. rslint-specific lock-in cases live in the <rule>_extras_*_test.go file(s).`
 - `_extras_test.go`: `// Test<Rule>Extras locks in branches and edge shapes that the upstream test suite doesn't exercise. Each case carries an inline comment pointing at the specific branch / Dimension 4 row / tsgo AST quirk it covers, so future refactors can't silently regress them without breaking a named lock-in.`
 
 These docstrings are how a reader (or `grep`) confirms a file is doing its assigned job.
@@ -591,7 +595,7 @@ rule_tester.InvalidTestCase{
 
 **Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
 
-**Practical rule:** JS test case count ≈ `<rule>_upstream_test.go` case count. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
+**Practical rule:** the JS file should assert exactly the upstream `valid` / `invalid` semantic set — nothing less, nothing more. Case **counts** between JS and `<rule>_upstream_test.go` may legitimately differ (one side may inline what the other folds into a fixture file); the contract is semantic-subset equivalence, not numeric parity. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
 
 **File Locations** (determined by Phase 1 Step 2):
 
@@ -677,15 +681,17 @@ Follow this **strict order** — each step depends on the previous one:
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
-5. **Verify Go ↔ JS Alignment** (asymmetric — JS ⊆ Go upstream):
+5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
 
    The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 6):
    - **JS suite** = Layer 1 mirror only. It exists to verify the binary, registration, and wire protocol — not rule logic.
    - **Go suite** = Layer 1 + Layer 2 + Layer 3 (full coverage). It is the source of truth for rule behavior.
 
    Two checks:
-   - [ ] **JS ⊆ Go upstream**: every JS case has a matching case in `<rule>_upstream_test.go`. If JS has a case Go's upstream doesn't, the upstream migration is incomplete — fix Go.
-   - [ ] **JS case count ≈ `<rule>_upstream_test.go` case count**: a JS file noticeably larger than `_upstream_test.go` means Layer 2/3 cases leaked into JS — move them to `<rule>_extras_test.go`. (For reference: jsx-a11y rules have JS == Go-upstream exactly: lang 19=19, anchor-ambiguous-text 39=39, aria-role 38=38.)
+   - [ ] **JS ⊆ Go upstream (semantic)**: every behavior asserted by a JS case is also asserted somewhere in `<rule>_upstream_test.go`. The match is **semantic**, not literal — Go may legitimately split one fixture-driven upstream case into many inline cases, or the reverse. If JS asserts a behavior that has no corresponding Go-upstream case, the upstream migration is incomplete — fix Go.
+   - [ ] **JS contains no Layer 2 / 3 cases**: review the JS file's contents (not its case count) for tsgo-specific edge shapes (Dimension 4 rows), branch lock-ins, or GitHub-issue real-user shapes. If any are present they leaked from Go extras — move them out.
+
+   > **Do not use literal case-count equality as the alignment check.** It only happens to match when both sides are written from the same inline-case template (e.g. `lang` is 19=19, `anchor-ambiguous-text` 39=39, `aria-role` 38=38). For the majority of jsx-a11y rules the counts legitimately differ — `no_static_element_interactions` is 644 (Go upstream) vs 135 (JS), `aria_props` is 12 vs 99 — because upstream uses fixture files that one side expands and the other folds. Both are correct as long as the semantic-subset check above holds.
 
    Layer 2 and Layer 3 cases stay in Go only. Do **not** add them to the JS file even if "for completeness" feels tempting — see Phase 3 Step 6 Purpose & scope for why.
 
