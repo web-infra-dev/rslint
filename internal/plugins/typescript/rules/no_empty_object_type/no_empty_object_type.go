@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -133,38 +134,34 @@ func isMergedWithClassDeclaration(ctx rule.RuleContext, nameNode *ast.Node) bool
 // brackets are located via tsgo's scanner rather than by ±1 on the inner
 // element ranges so that whitespace / line breaks / trailing commas
 // between `<`, the parameters, and `>` are preserved verbatim.
+//
+// tsgo's `parseDelimitedList` consumes the trailing comma (when present) and
+// returns a NodeList whose End() points at `>`'s `TokenFullStart`, so we can
+// safely scan from there to find `>` itself — there is no risk of the
+// scanner returning the comma's range.
 func typeParametersText(ctx rule.RuleContext, interfaceDecl *ast.InterfaceDeclaration) string {
 	if interfaceDecl.TypeParameters == nil || len(interfaceDecl.TypeParameters.Nodes) == 0 {
 		return ""
 	}
-	// The `<` token starts at the first non-trivia token after the interface
-	// name; `>` starts at the first non-trivia token after the parameter
-	// list's End (which may sit inside trailing whitespace or after a
-	// trailing comma).
 	ltRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, interfaceDecl.Name().End())
 	gtRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, interfaceDecl.TypeParameters.End())
 	return ctx.SourceFile.Text()[ltRange.Pos():gtRange.End()]
 }
 
-// modifiersPrefix returns the verbatim text of an interface's modifier list
-// followed by a trailing space (e.g. "export ", "declare ", "export declare ").
-// When the interface has no modifiers it returns "". Inter-modifier spacing
-// is preserved as written in source.
-//
-// In typescript-eslint's AST the TSInterfaceDeclaration range starts at the
-// `interface` keyword (modifiers live on the wrapping ExportNamedDeclaration
-// or are siblings). tsgo's node range includes the modifiers, so a verbatim
-// `fixer.replaceText(node, "type X = ...")` would drop them — this helper
-// restores parity with upstream's suggestion output.
-func modifiersPrefix(ctx rule.RuleContext, interfaceDecl *ast.InterfaceDeclaration) string {
-	modifiers := interfaceDecl.Modifiers()
-	if modifiers == nil || len(modifiers.Nodes) == 0 {
-		return ""
+// interfaceFixRange returns the source range to replace when rewriting an
+// `interface` declaration to a `type` alias. The range starts at the
+// `interface` keyword (not the first modifier and not any leading trivia),
+// which mirrors typescript-eslint's TSInterfaceDeclaration.range[0]
+// convention: modifiers AND any trivia between modifiers and the `interface`
+// keyword (e.g. `export /* doc */ interface Foo`) are preserved verbatim by
+// being outside the replace range.
+func interfaceFixRange(ctx rule.RuleContext, interfaceDecl *ast.InterfaceDeclaration, node *ast.Node) core.TextRange {
+	pos := utils.TrimNodeTextRange(ctx.SourceFile, node).Pos()
+	if modifiers := interfaceDecl.Modifiers(); modifiers != nil && len(modifiers.Nodes) > 0 {
+		last := modifiers.Nodes[len(modifiers.Nodes)-1]
+		pos = scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, last.End()).Pos()
 	}
-	first := modifiers.Nodes[0]
-	last := modifiers.Nodes[len(modifiers.Nodes)-1]
-	firstRange := utils.TrimNodeTextRange(ctx.SourceFile, first)
-	return ctx.SourceFile.Text()[firstRange.Pos():last.End()] + " "
+	return core.NewTextRange(pos, node.End())
 }
 
 var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
@@ -216,7 +213,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 
 				nameText := utils.TrimmedNodeText(ctx.SourceFile, nameNode)
 				typeParam := typeParametersText(ctx, interfaceDecl)
-				modifierText := modifiersPrefix(ctx, interfaceDecl)
+				fixRange := interfaceFixRange(ctx, interfaceDecl, node)
 
 				if extendCount == 0 {
 					if mergedWithClass {
@@ -228,7 +225,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 						suggestions = append(suggestions, rule.RuleSuggestion{
 							Message: buildReplaceEmptyInterfaceMessage(replacement),
 							FixesArr: []rule.RuleFix{
-								rule.RuleFixReplace(ctx.SourceFile, node, fmt.Sprintf("%stype %s%s = %s", modifierText, nameText, typeParam, replacement)),
+								rule.RuleFixReplaceRange(fixRange, fmt.Sprintf("type %s%s = %s", nameText, typeParam, replacement)),
 							},
 						})
 					}
@@ -246,7 +243,7 @@ var NoEmptyObjectTypeRule = rule.CreateRule(rule.Rule{
 				ctx.ReportNodeWithSuggestions(nameNode, buildNoEmptyInterfaceWithSuperMessage(), rule.RuleSuggestion{
 					Message: buildReplaceEmptyInterfaceWithSuperMessage(),
 					FixesArr: []rule.RuleFix{
-						rule.RuleFixReplace(ctx.SourceFile, node, fmt.Sprintf("%stype %s%s = %s", modifierText, nameText, typeParam, extendedTypeText)),
+						rule.RuleFixReplaceRange(fixRange, fmt.Sprintf("type %s%s = %s", nameText, typeParam, extendedTypeText)),
 					},
 				})
 			}

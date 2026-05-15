@@ -145,6 +145,187 @@ interface Both extends A, B {}
 			Options: []interface{}{map[string]interface{}{"allowWithName": "Props$"}},
 		},
 	}, []rule_tester.InvalidTestCase{
+		// ---- PR review feedback lock-ins ----
+		// These lock in three behaviors that gemini-code-assist[bot] raised
+		// concerns about during PR review; the rule must keep matching
+		// upstream typescript-eslint v8.45.0 in all three.
+
+		// (1) Trailing comma in type parameters: `interface Foo<T,> {}`. tsgo's
+		// `parseDelimitedList` consumes the comma and positions End() at `>`,
+		// so the scanner-based `<>` capture in `typeParametersText` round-trips
+		// the trailing comma into the suggestion verbatim. Lock that in.
+		{
+			Code: `interface Foo<T,> {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 14,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyInterface", Output: `type Foo<T,> = object`},
+						{MessageId: "replaceEmptyInterface", Output: `type Foo<T,> = unknown`},
+					},
+				},
+			},
+		},
+
+		// (2) Comment between modifier and `interface` keyword must be
+		// preserved in the suggestion. The fix replace-range starts at the
+		// `interface` keyword (via scanner), so any trivia between modifiers
+		// and `interface` falls outside the range and survives verbatim.
+		{
+			Code: `
+namespace N {
+  export /* hello */ interface Foo {}
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterface",
+					Line:      3,
+					Column:    32,
+					EndLine:   3,
+					EndColumn: 35,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "replaceEmptyInterface",
+							Output: `
+namespace N {
+  export /* hello */ type Foo = object
+}
+`,
+						},
+						{
+							MessageId: "replaceEmptyInterface",
+							Output: `
+namespace N {
+  export /* hello */ type Foo = unknown
+}
+`,
+						},
+					},
+				},
+			},
+		},
+
+		// (3) `string & ({})` — the parenthesized `{}`'s immediate parent is
+		// `ParenthesizedType`, not `IntersectionType`. Upstream's
+		// `node.parent.type === 'TSIntersectionType'` is an immediate-parent
+		// check, so this case is REPORTED upstream — and so must we be. Lock
+		// in the no-paren-unwrapping behavior.
+		{
+			Code: `type T = string & ({});`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyObject",
+					Line:      1,
+					Column:    20,
+					EndLine:   1,
+					EndColumn: 22,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyObjectType", Output: `type T = string & (object);`},
+						{MessageId: "replaceEmptyObjectType", Output: `type T = string & (unknown);`},
+					},
+				},
+			},
+		},
+
+		// ---- Additional Dimension 4 lock-ins identified during self-review ----
+
+		// `keyof {}` — TypeOperator parent, reports.
+		{
+			Code: `type T = keyof {};`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyObject",
+					Line:      1,
+					Column:    16,
+					EndLine:   1,
+					EndColumn: 18,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyObjectType", Output: `type T = keyof object;`},
+						{MessageId: "replaceEmptyObjectType", Output: `type T = keyof unknown;`},
+					},
+				},
+			},
+		},
+
+		// `infer U extends {}` — `{}` is the constraint of an `infer` declaration
+		// inside a conditional type. Parent is InferType.
+		{
+			Code: `type T<X> = X extends infer U extends {} ? U : never;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyObject",
+					Line:      1,
+					Column:    39,
+					EndLine:   1,
+					EndColumn: 41,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyObjectType", Output: `type T<X> = X extends infer U extends object ? U : never;`},
+						{MessageId: "replaceEmptyObjectType", Output: `type T<X> = X extends infer U extends unknown ? U : never;`},
+					},
+				},
+			},
+		},
+
+		// Mapped-type value `{}` — `{[P in K]: {}}`. The OUTER is a MappedType
+		// (KindMappedType, not KindTypeLiteral), so it isn't visited; the inner
+		// `{}` is a regular TypeLiteral and gets reported.
+		{
+			Code: `type T<K extends string> = { [P in K]: {} };`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyObject",
+					Line:      1,
+					Column:    40,
+					EndLine:   1,
+					EndColumn: 42,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyObjectType", Output: `type T<K extends string> = { [P in K]: object };`},
+						{MessageId: "replaceEmptyObjectType", Output: `type T<K extends string> = { [P in K]: unknown };`},
+					},
+				},
+			},
+		},
+
+		// Namespace-qualified extends — `interface I extends X.Y {}`. The
+		// extended-type capture must preserve the dotted form.
+		{
+			Code: `interface Foo extends Ns.Inner {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterfaceWithSuper",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 14,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyInterfaceWithSuper", Output: `type Foo = Ns.Inner`},
+					},
+				},
+			},
+		},
+
+		// Generic-namespace-qualified extends — `interface I extends X.Y<T> {}`.
+		{
+			Code: `interface Foo<T> extends Ns.Inner<T> {}`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "noEmptyInterfaceWithSuper",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
+					EndColumn: 14,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "replaceEmptyInterfaceWithSuper", Output: `type Foo<T> = Ns.Inner<T>`},
+					},
+				},
+			},
+		},
+
 		// ---- Dimension 1: type-literal in parameter / return / property positions ----
 		{
 			Code: `function f(x: {}) {}`,
