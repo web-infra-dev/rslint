@@ -24,6 +24,36 @@ The rule doc's "Differences from ESLint" section is reserved for semantic differ
 
 ---
 
+## Testing Philosophy
+
+Porting is **re-implementation on a different substrate**, not translation. tsgo's AST diverges from ESTree in many small ways (parenthesized nodes are explicit, optional chain is a flag, literals split into multiple `Kind*Literal` kinds, numeric/string text is normalized at parse time, `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`); the type checker and scope manager are independent codebases with their own quirks. **Behavioral divergence between Go and ESLint is the default outcome; tests are the only mechanism that turns it into convergence.**
+
+Three principles follow — internalize them before writing a single test case:
+
+1. **Upstream's test suite is a floor, not a goal.** Migrating every `valid` / `invalid` case from the upstream test file proves only that you didn't miss a _documented_ behavior. It is **not** evidence the port is aligned. Upstream tests exercise the paths _upstream's authors_ found important on _their AST_; by construction they cannot cover the divergence your Go implementation introduces, because that divergence does not exist in their world.
+
+2. **The augmentation IS the alignment work.** Every rule's tests are composed of three layers, all required, physically split across two files so the upstream-mirror and the rslint-added cases stay visually separated:
+
+   | Layer                                      | What it covers                                                                                                                                                                                                       | Planned in     | Lives in                  |
+   | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------- |
+   | 1. **Upstream migration**                  | Every upstream `valid` / `invalid` case (or `Skip: true` with reason)                                                                                                                                                | Phase 1 Step 3 | `<rule>_upstream_test.go` |
+   | 2. **Edge-shape & real-user augmentation** | tsgo↔ESTree shape divergence on every child-node access (paren / optional-chain / literal-kind / type-wrapper / computed-key forms), plus real-user code shapes pulled from the upstream rule's GitHub issue tracker | Phase 1 Step 4 | `<rule>_extras_test.go`   |
+   | 3. **Branch lock-ins**                     | A minimum-input test for every reachable branch in the upstream source — including branches upstream itself never tests                                                                                              | Phase 1 Step 5 | `<rule>_extras_test.go`   |
+
+   The `_upstream_*` / `_extras_*` filename split is a contract — never mix migrated and rslint-added cases in the same file. See Phase 2 Step 4 for layout details and Phase 2 Step 1 for the split-when-too-large threshold.
+
+3. **Green tests are necessary, not sufficient.** Before claiming alignment, the rule must additionally pass the Contract Alignment Checklist (Phase 4 Step 6) and — for any rule with non-trivial branching — a differential validation against the reference implementation on a real codebase (Phase 4 Step 8). Any divergence the differential run surfaces feeds back into layer 2 or 3 as a new locked-in test. A green Go suite alone proves only that the rule handles the inputs _you thought of_.
+
+**Coverage bar.** For non-trivial rules, `<rule>_extras_test.go` is comparable to or larger than `<rule>_upstream_test.go` in case count (i.e. layers 2 + 3 ≥ layer 1). A near-empty `_extras_test.go` — or worse, no `_extras_test.go` at all — almost certainly means Phase 1 Steps 4 and 5 were skipped. Re-walk them before submitting. Phase 4 Step 6 has an explicit checkbox to enforce this.
+
+**JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
+
+- **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
+- A JS file with N cases next to a Go suite of N upstream + hundreds of extras is the **expected** state, not "JS is under-tested."
+- See Phase 3 Step 6 for what goes in the JS file and Phase 4 Step 5 for the alignment-direction check (JS ⊆ Go upstream).
+
+---
+
 ## Related Documents
 
 | Document                                       | Description                                                         |
@@ -128,14 +158,23 @@ Before starting, familiarize yourself with these key source locations:
 
    **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT register with `@typescript-eslint/` prefix.
 
-3. **Collect Test Cases**:
+3. **Collect Test Cases — Layer 1 (baseline migration)**:
+
+   This step is the planning input for `<rule>_upstream_test.go` (Layer 1) — the _floor_ of the rule's overall test coverage. The augmentation in Steps 4 and 5 (which is the planning input for `<rule>_extras_test.go`, Layers 2 + 3) is what actually verifies alignment. See the [Testing Philosophy](#testing-philosophy) for why migration alone is insufficient.
+
+   > **Phase 1 is planning, not writing.** Test files are physically created in Phase 2 Step 1 and populated in Phase 2 Step 4. In this phase you collect, organize, and annotate the cases — don't start a `_test.go` file yet.
    - Extract **ALL** `valid` and `invalid` cases from the official documentation.
-   - Migrate **ALL** `valid` and `invalid` cases from the official unit test file (`tests/lib/rules/<rule>.js` for ESLint core; plugin equivalents otherwise) — not a representative subset. The ESLint suite is the **lower bound** for coverage, not the upper bound.
+   - Migrate **ALL** `valid` and `invalid` cases from the official unit test file (`tests/lib/rules/<rule>.js` for ESLint core; plugin equivalents otherwise) — not a representative subset.
    - **Skip with explanation**: If a case exercises an option or syntax we intentionally don't support, keep it in the file as a `Skip: true` test with a `// SKIP: <reason>` comment — don't drop it silently.
-   - **Add extra edge cases on top**: Beyond the ESLint suite, add cases that exercise tsgo-specific AST quirks (see [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials)) — nested expressions, paren / bracket forms, reserved words in various positions, declaration merging, computed keys the upstream parser may not distinguish, etc.
    - **Ensure Coverage**: Ensure Line and Column numbers are tested in invalid cases.
 
-4. **Identify Edge Cases**:
+   **Do NOT stop here.** The migrated suite is a baseline; proceed to Step 4 (edge-shape augmentation) and Step 5 (branch lock-ins) — without them the port can pass every upstream test and silently diverge on real-user inputs.
+
+4. **Identify Edge Cases — Layer 2 (edge-shape & real-user augmentation)**:
+
+   This layer covers the divergence Go-on-tsgo introduces that upstream's tests cannot see — see [Testing Philosophy](#testing-philosophy). Without it, the port can pass every upstream test and silently drift on inputs upstream's contributors didn't write but real users do.
+
+   Walk all four dimensions below. Dimension 4 (Universal Edge Shapes) is **non-skippable** — every applicable row needs ≥1 dedicated Go test (written in `<rule>_extras_test.go` during Phase 2 Step 4) marked `// ---- Dimension 4: <what> ----`, and rows that genuinely don't apply need an explicit `// N/A: <reason>` marker so future audits can verify the walk happened.
 
    Systematically enumerate edge cases across four dimensions.
 
@@ -179,9 +218,11 @@ Before starting, familiarize yourself with these key source locations:
      - Empty class body, empty function body, empty destructuring pattern, empty arguments list
      - Overload signatures / `abstract` / `declare` members — body-absent forms
 
-5. **Upstream semantic walk**:
+   **Real-user shapes** (after walking Dimensions 1–4) — scan the upstream rule's GitHub issue tracker for closed regressions, false-positive reports, and false-negative reports. Convert ≥2 representative real-user code shapes into Go tests, marked `// ---- Real-user: <issue# or scenario> ----`. These are inputs production codebases produce that upstream's contrived test suite typically misses — and they're the inputs your rule will most likely face in real use. Do not skip this step on the grounds that "upstream's tests pass"; that is precisely the failure mode this layer prevents.
 
-   Migrating upstream's `valid`/`invalid` tests covers the main path, but nearly every ESLint rule has branches/OR conditions that are reachable but not tested upstream. Missing these is the #1 source of "passes all upstream tests, silently drifts in semantics" regressions.
+5. **Upstream Semantic Walk — Layer 3 (branch lock-ins)**:
+
+   Migrating upstream's `valid`/`invalid` tests covers the main path, but nearly every ESLint rule has branches / OR conditions that are reachable but not tested upstream. Missing these is the #1 source of "passes all upstream tests, silently drifts in semantics" regressions — exactly the failure mode the [Testing Philosophy](#testing-philosophy) calls out.
 
    Do this walk BEFORE moving to Phase 2:
    1. Read the upstream rule source file end-to-end.
@@ -195,7 +236,7 @@ Before starting, familiarize yourself with these key source locations:
       - Fallback `reactModuleName || pragma` when `reactModuleName` is falsy.
       - A condition that becomes true only for a TS-only syntax form (non-null, `as`, `satisfies`).
 
-   These tests protect against future refactors silently flipping semantics. Put them in the Go test file with a comment referencing the upstream branch they lock in (`// Locks in upstream <function>() arm <N>: <what>`).
+   These tests protect against future refactors silently flipping semantics. They live in `<rule>_extras_test.go` (Phase 2 Step 4); each case carries an inline comment referencing the upstream branch it locks in: `// Locks in upstream <fn>() arm <N>: <what>`.
 
 6. **Document Divergence from ESLint**:
 
@@ -223,11 +264,23 @@ Before starting, familiarize yourself with these key source locations:
 - **Core Rules**: `internal/rules/<rule_name_snake_case>/`
 - **Plugin Rules**: `internal/plugins/<plugin_name>/rules/<rule_name_snake_case>/`
 
-**Action**: Create the directory and three files:
+**Action**: Create the directory and the standard file set:
 
-1. `<rule_name>.go` (Implementation)
-2. `<rule_name>_test.go` (Tests)
-3. `<rule_name>.md` (Documentation)
+1. `<rule_name>.go` — Implementation
+2. `<rule_name>.md` — Documentation
+3. `<rule_name>_upstream_test.go` — Layer 1 tests (upstream 1:1 migration; see [Testing Philosophy](#testing-philosophy))
+4. `<rule_name>_extras_test.go` — Layers 2 + 3 tests (edge-shape augmentation, real-user shapes, branch lock-ins)
+
+The `_upstream_*` / `_extras_*` split is a hard contract: a reviewer can `ls` the directory and immediately see (a) that the rule has rslint-added augmentation at all and (b) which side of the fence each case lives on. **Never** mix migrated and rslint-added cases in the same file, and **never** put augmentation cases in `_upstream_*`.
+
+**When to split further** — if `_extras_test.go` grows past roughly **80 cases or 600 lines**, partition by functional area and create one file per area:
+
+- `<rule_name>_extras_dim4_test.go` — Dimension 4 universal-edge-shape rows
+- `<rule_name>_extras_branches_test.go` — upstream-branch lock-ins
+- `<rule_name>_extras_realuser_test.go` — issue-tracker shapes
+- `<rule_name>_extras_<feature>_test.go` — option / mode / receiver type, etc.
+
+Same threshold for `_upstream_test.go` if upstream itself partitions cleanly into feature subsets (e.g. one file per option mode). For a worked example of large-rule splitting, see `internal/plugins/react_hooks/rules/exhaustive_deps/` (12 `upstream_*_test.go` + 5 extras files).
 
 ### Step 2: Write Rule Logic
 
@@ -443,14 +496,37 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 
 ### Step 4: Write Go Tests
 
-**File**: `<rule_name>_test.go`
+**Files** (per Phase 2 Step 1): `<rule_name>_upstream_test.go` and `<rule_name>_extras_test.go`. The two-file split is the physical embodiment of the [Testing Philosophy](#testing-philosophy) — a reviewer should be able to `ls` the rule directory and immediately tell whether the augmentation work was done.
 
-- Use `rule_tester.RunRuleTester`
-- **All Go test cases go into one `<rule_name>_test.go` file** — do not split by feature, option, or container type. Single-file organization keeps grep / diff against the upstream ESLint test file trivial.
-- **Preserve ESLint's original grouping as inline comments** (e.g. `// ---- Various getter keys ----`, `// ---- Property descriptors ----`). Future audits should be able to read the file top-to-bottom and match the upstream layout.
-- Invalid cases **MUST** include `Line` and `Column` assertions
-- Use `map[string]interface{}` to pass options in Go tests
-- Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`
+**Layer-to-file mapping:**
+
+| Layer                                  | File                      | Test function                                                                    | In-file group markers (on the case directly)                                                                                                                                       |
+| -------------------------------------- | ------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Upstream migration                  | `<rule>_upstream_test.go` | `Test<Rule>Upstream`                                                             | `// ---- <upstream group name> ----` — preserve upstream's grouping verbatim so a top-to-bottom read matches the upstream test file                                                |
+| 2. Edge-shape & real-user augmentation | `<rule>_extras_test.go`   | `Test<Rule>Extras`                                                               | `// ---- Dimension 4: <what> ----` for shape rows; `// ---- Real-user: <issue# or scenario> ----` for issue-tracker shapes; `// N/A: <reason>` for rows that genuinely don't apply |
+| 3. Branch lock-ins                     | `<rule>_extras_test.go`   | `Test<Rule>Extras` (or a separate `Test<Rule>BranchLockins` if extras gets busy) | `// Locks in upstream <fn>() arm <N>: <what>` on each case                                                                                                                         |
+
+For non-trivial rules, `<rule>_extras_test.go` is comparable to or larger than `<rule>_upstream_test.go` in case count. A near-empty `_extras` file means Phase 1 Steps 4 and 5 were skipped (Phase 4 Step 6 has an explicit checkbox for this).
+
+**File-header docstring** — open each test file with a top-of-file comment that names what the file is for and points at its sibling:
+
+- `_upstream_test.go`: `// Test<Rule>Upstream migrates the full valid/invalid suite from upstream <upstream test path> 1:1. Position assertions cover line/column for every invalid case. rslint-specific lock-in cases live in <rule>_extras_test.go.`
+- `_extras_test.go`: `// Test<Rule>Extras locks in branches and edge shapes that the upstream test suite doesn't exercise. Each case carries an inline comment pointing at the specific branch / Dimension 4 row / tsgo AST quirk it covers, so future refactors can't silently regress them without breaking a named lock-in.`
+
+These docstrings are how a reader (or `grep`) confirms a file is doing its assigned job.
+
+**Reference examples** in `internal/plugins/jsx_a11y/rules/`:
+
+- Standard two-file rule: `anchor_ambiguous_text/`, `lang/`, `aria_role/`
+- Large-rule split (further partitioned by area): `internal/plugins/react_hooks/rules/exhaustive_deps/`
+
+**Conventions:**
+
+- Use `rule_tester.RunRuleTester` in each test file (one `Test<Name>` function per file is typical; multiple are fine when it improves grouping).
+- Shared fixtures (option-map literals, expected message strings) can live as package-level vars; both files share the same Go package so they compose freely.
+- Invalid cases **MUST** include `Line` and `Column` assertions.
+- Use `map[string]interface{}` to pass options in Go tests.
+- Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
 
 **Options coverage — MUST exercise the JSON path.** Passing a typed struct directly (e.g. `Options: MyRuleOptions{CheckX: utils.Ref(true)}`) short-circuits the `options.(MyRuleOptions)` type assertion and never exercises `utils.GetOptionsMap` or JSON round-trip. CLI and JS configs always take the JSON path, so a struct-only suite leaves the CLI-facing wiring untested.
 
@@ -513,6 +589,10 @@ rule_tester.InvalidTestCase{
 
 ### Step 6: Add JS Tests
 
+**Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
+
+**Practical rule:** JS test case count ≈ `<rule>_upstream_test.go` case count. If you find yourself reaching for a tsgo-specific edge shape, a Dimension 4 row, a branch lock-in, or a GitHub-issue real-user shape while writing the JS file — stop. Those belong in Go extras.
+
 **File Locations** (determined by Phase 1 Step 2):
 
 - **Core ESLint Rules** (including deprecated typescript-eslint rules): `packages/rslint-test-tools/tests/eslint/rules/<rule-name>.test.ts`
@@ -561,7 +641,7 @@ Follow this **strict order** — each step depends on the previous one:
 
    If files are listed, run `gofmt -w` on them to fix.
 
-2. **Go tests**:
+2. **Go tests** (the package-level invocation runs every `*_test.go` in the rule directory — both `_upstream_test.go` and `_extras_test.go`, plus any further `_extras_<area>_test.go` splits):
 
    ```bash
    go test -count=1 ./internal/rules/<rule_name>
@@ -597,15 +677,17 @@ Follow this **strict order** — each step depends on the previous one:
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
-5. **Verify Test Coverage Alignment (Go ↔ JS)**:
+5. **Verify Go ↔ JS Alignment** (asymmetric — JS ⊆ Go upstream):
 
-   Ensure Go tests cover the same cases as JS tests:
-   - Check the JS test snapshot file for the number of invalid cases
-   - Go tests should include equivalent test cases
-   - Pay special attention to edge cases:
-     - Expressions with comments (e.g., `/* a */ foo /* b */ ()`)
-     - Multi-line expressions
-     - Nested structures (e.g., `foo((x), y)`, `foo(bar(), baz())`)
+   The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 6):
+   - **JS suite** = Layer 1 mirror only. It exists to verify the binary, registration, and wire protocol — not rule logic.
+   - **Go suite** = Layer 1 + Layer 2 + Layer 3 (full coverage). It is the source of truth for rule behavior.
+
+   Two checks:
+   - [ ] **JS ⊆ Go upstream**: every JS case has a matching case in `<rule>_upstream_test.go`. If JS has a case Go's upstream doesn't, the upstream migration is incomplete — fix Go.
+   - [ ] **JS case count ≈ `<rule>_upstream_test.go` case count**: a JS file noticeably larger than `_upstream_test.go` means Layer 2/3 cases leaked into JS — move them to `<rule>_extras_test.go`. (For reference: jsx-a11y rules have JS == Go-upstream exactly: lang 19=19, anchor-ambiguous-text 39=39, aria-role 38=38.)
+
+   Layer 2 and Layer 3 cases stay in Go only. Do **not** add them to the JS file even if "for completeness" feels tempting — see Phase 3 Step 6 Purpose & scope for why.
 
    **Go vs JS test differences**:
 
@@ -620,13 +702,30 @@ Follow this **strict order** — each step depends on the previous one:
 
    Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 6.B); contract differences are not.
 
-   Before claiming the port is aligned, confirm every row. Missing any row means the claim is premature:
-   - [ ] **Full ESLint test migration** — every `valid` / `invalid` case from the upstream unit-test file has a corresponding Go case (or a `Skip: true` with a `// SKIP: <reason>` comment).
-   - [ ] **Message text assertions** — each `messageId` has **at least one** test using the `InvalidTestCaseError.Message` field (exact string match), covering every modifier combination the rule can emit (`static`, `private`, `async`, computed-no-name, etc.).
-   - [ ] **Position assertions per container** — for each container the rule emits into (object literal / class / type / descriptor / …), at least 2 cases assert `Line` + `Column` + `EndLine` + `EndColumn`, including one multi-line case.
-   - [ ] **Options schema match** — option names, types, and **defaults** match ESLint's schema byte-for-byte. Assert every default by running an invalid/valid case with no options vs. `[{}]` options and confirming identical output.
-   - [ ] **Options combination matrix** — for every boolean option, include at least one test where it is `true` and one where it is `false`. Triggering combinations (e.g. rule behaves differently when two options are both on) get dedicated cases.
-   - [ ] **Three-way equivalence classes** (if the rule compares names / keys) — static / private / dynamic keys form separate equivalence classes; test at least one cross-class negative (e.g. `'#a'` string vs `#a` private identifier should NOT pair up).
+   Before claiming the port is aligned, confirm every row. Missing any row means the claim is premature.
+
+   **File split** (each layer has a designated file — see [Testing Philosophy](#testing-philosophy) and Phase 2 Step 4):
+   - [ ] **Two files exist**: `<rule>_upstream_test.go` and `<rule>_extras_test.go` (or area-split variants `<rule>_extras_<area>_test.go` if the rule is large).
+   - [ ] **Header docstrings present**: each file's top-of-file comment names what the file is for and points at its sibling.
+   - [ ] **Split contract honored**: `_upstream_*` files contain only migrated upstream cases; `_extras_*` files contain only rslint-added cases. No mixing.
+
+   **Coverage layers**:
+   - [ ] **Layer 1 — Upstream migration complete** (in `_upstream_test.go`): every `valid` / `invalid` case from the upstream unit-test file has a corresponding Go case (or `Skip: true` + `// SKIP: <reason>`).
+   - [ ] **Layer 2 — Edge-shape augmentation present** (in `_extras_test.go`): Phase 1 Step 4 Dimension 4 walked row-by-row; every applicable row has ≥1 dedicated Go test marked `// ---- Dimension 4: <what> ----`; N/A rows carry an explicit `// N/A: <reason>` marker so the walk is auditable.
+   - [ ] **Layer 2 — Real-user shapes present** (in `_extras_test.go`): ≥2 cases pulled from the upstream rule's GitHub issue tracker (closed regressions / FP / FN reports), marked `// ---- Real-user: <issue# or scenario> ----`.
+   - [ ] **Layer 3 — Branch lock-ins present** (in `_extras_test.go`): every reachable branch in the upstream source has a minimum-input Go test marked `// Locks in upstream <fn>() arm <N>: <what>`, including branches upstream itself never tests.
+   - [ ] **Coverage bar met**: `_extras_test.go` (or all `_extras_*` files combined) is comparable to or larger than `_upstream_test.go` in case count for non-trivial rules. A near-empty `_extras_*` means Phase 1 Steps 4 and 5 were skipped — re-walk them, do not submit.
+
+   **Diagnostic contract** (each invalid output is exactly what ESLint emits):
+   - [ ] **Message text assertions**: each `messageId` has ≥1 test using the `InvalidTestCaseError.Message` field (exact string match), covering every modifier combination the rule can emit (`static`, `private`, `async`, computed-no-name, etc.).
+   - [ ] **Position assertions per container**: for each container the rule emits into (object literal / class / type / descriptor / …), ≥2 cases assert `Line` + `Column` + `EndLine` + `EndColumn`, including one multi-line case.
+
+   **Options contract**:
+   - [ ] **Schema match**: option names, types, and **defaults** match ESLint's schema byte-for-byte. Assert every default by running a case with no options vs. `[{}]` options and confirming identical output.
+   - [ ] **Combination matrix**: for every boolean option, include ≥1 test where it is `true` and ≥1 where it is `false`. Triggering combinations (rule behaves differently when two options are both on) get dedicated cases.
+
+   **Equivalence classes** (when applicable):
+   - [ ] **Three-way equivalence classes** (if the rule compares names / keys): static / private / dynamic keys form separate equivalence classes; test ≥1 cross-class negative (e.g. `'#a'` string vs `#a` private identifier should NOT pair up).
 
 7. **Pre-commit gate** (BLOCKING — must all pass before Phase 5):
 

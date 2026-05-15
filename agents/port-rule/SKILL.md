@@ -136,7 +136,7 @@ Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
 
 1. **Phase 0: Branch Setup** - Create feature branch from main
 2. **Phase 1: Preparation** - Collect test cases, walk Dimensions 1–4 edge cases (including the universal edge-shape checklist), and do an upstream semantic walk that enumerates each branch in the ESLint source
-3. **Phase 2: Implementation** - Before writing helpers, grep same-plugin neighbors and extract any near-duplicates to `<plugin>util/`. Then write Go rule, tests, and documentation (see the "Differences from ESLint" writing rules in PORT_RULE.md Phase 2 Step 3 — user-facing only, no implementation talk)
+3. **Phase 2: Implementation** - Before writing helpers, grep same-plugin neighbors and extract any near-duplicates to `<plugin>util/`. Then write Go rule, two-file test split (`<rule>_upstream_test.go` for Layer 1 + `<rule>_extras_test.go` for Layers 2 + 3 — see PORT_RULE.md Testing Philosophy), and documentation (see the "Differences from ESLint" writing rules in PORT_RULE.md Phase 2 Step 3 — user-facing only, no implementation talk)
 4. **Phase 3: Integration** - Add JS tests and register rule
 5. **Phase 4: Verification** - Build binary; run the rule's Go + JS tests; if a shared helper (`<plugin>util/`, `internal/utils/`) was added or modified, also rerun the whole plugin (or whole tree) test suite; then run the BLOCKING pre-commit gate: `pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && pnpm lint:go`
 6. **Phase 5: Submission** - Commit and create PR
@@ -233,6 +233,16 @@ The workflow is complete ONLY when all tasks created during Planning are marked 
 
 - Core rules: `internal/rules/<rule_name_snake_case>/`
 - Plugin rules: `internal/plugins/<plugin_name>/rules/<rule_name_snake_case>/`
+
+**Per-rule files** (each rule directory contains):
+
+- `<rule>.go` — Implementation
+- `<rule>.md` — Documentation
+- `<rule>_upstream_test.go` — Layer 1: upstream 1:1 migration
+- `<rule>_extras_test.go` — Layers 2 + 3: edge-shape augmentation, real-user shapes, branch lock-ins
+- (optional, when extras grows past ~80 cases / ~600 lines) `<rule>_extras_<area>_test.go` — area-split extras
+
+The `_upstream_*` / `_extras_*` split is a hard contract — see [PORT_RULE.md Testing Philosophy](references/PORT_RULE.md#testing-philosophy) and Phase 2 Step 4 for the rationale and layout.
 
 **Key Commands**:
 
