@@ -6,11 +6,13 @@ activedescendant
 addl
 affordances
 afoob
+agen
 alertdialog
 alink
 allowundefined
 anee
 apos
+argl
 arraybindingpattern
 arrayish
 arrayliteralexpression
@@ -50,6 +52,9 @@ cachedvfs
 callees
 callsite
 cand
+canonicalise
+canonicalised
+canonicalises
 catchable
 Cbar
 centralising
@@ -89,6 +94,7 @@ dedupe
 deprec
 Deque
 describedby
+desugars
 destructures
 dirxml
 disqualifier
@@ -236,6 +242,7 @@ multibyte
 multilines
 multiselectable
 myfunc
+mylib
 mynamespace
 nanotime
 nbsp
@@ -303,6 +310,7 @@ quxx
 qwer
 rankdir
 ranksep
+randomised
 rdquo
 Reactlike
 reactutil
@@ -310,8 +318,10 @@ readonlyness
 Readonlys
 realpath
 recognisable
+recognise
 recognised
 recognises
+recognising
 recurser
 reducable
 Referer
