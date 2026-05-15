@@ -77,7 +77,11 @@ func compileAssertPattern(pattern string) *regexp.Regexp {
 	joined := strings.Join(parts, `\.`)
 	// Segments follow eslint-plugin-jest: only `*` is expanded; other characters (e.g. `\$`)
 	// are copied into the Regexp source like JavaScript's RegExp constructor.
-	return regexp.MustCompile(`(?i)^(?:` + joined + `)(?:\.|$)`)
+	re, err := regexp.Compile(`(?i)^(?:` + joined + `)(?:\.|$)`)
+	if err != nil {
+		return nil
+	}
+	return re
 }
 
 func matchesAssertName(name string, compiled []*regexp.Regexp) bool {
@@ -108,91 +112,92 @@ func indexUnchecked(unchecked []*ast.Node, call *ast.Node) int {
 	return -1
 }
 
-func checkCallExpressionUsedFromCalls(unchecked *[]*ast.Node, calls []*ast.Node) {
+func removeUncheckedCall(unchecked *[]*ast.Node, call *ast.Node) bool {
+	if idx := indexUnchecked(*unchecked, call); idx >= 0 {
+		*unchecked = slices.Delete(*unchecked, idx, idx+1)
+		return true
+	}
+	return false
+}
+
+func clearUncheckedCalls(unchecked *[]*ast.Node, calls []*ast.Node) {
 	for _, call := range calls {
 		if call == nil || call.Kind != ast.KindCallExpression {
 			continue
 		}
-		if idx := indexUnchecked(*unchecked, call); idx >= 0 {
-			*unchecked = slices.Delete(*unchecked, idx, idx+1)
-			return
-		}
+		removeUncheckedCall(unchecked, call)
 	}
 }
 
-func findJestTestCallsPassingFunction(ctx rule.RuleContext, root *ast.Node, decl *ast.Node) []*ast.Node {
-	var res []*ast.Node
-	if decl == nil {
-		return res
+func resolveNamedFunctionCallback(ctx rule.RuleContext, callExpr *ast.CallExpression) (*ast.Node, string) {
+	if callExpr == nil || callExpr.Arguments == nil || len(callExpr.Arguments.Nodes) < 2 {
+		return nil, ""
 	}
 
-	var declNameNode *ast.Node
-	var declName string
-	var declSymbol *ast.Symbol
-	if decl.Kind == ast.KindFunctionDeclaration {
-		fnDecl := decl.AsFunctionDeclaration()
-		if fnDecl != nil && fnDecl.Name() != nil {
-			declNameNode = fnDecl.Name()
-			declName = declNameNode.Text()
-			declSymbol = internalUtils.GetReferenceSymbol(declNameNode, ctx.TypeChecker)
-		}
-	}
-	if declName == "" {
-		return res
+	callback := ast.SkipParentheses(callExpr.Arguments.Nodes[1])
+	if callback == nil || callback.Kind != ast.KindIdentifier {
+		return nil, ""
 	}
 
-	var walk func(*ast.Node)
-	walk = func(n *ast.Node) {
-		if n == nil {
-			return
-		}
-		if n.Kind == ast.KindCallExpression {
-			if jestFn := utils.ParseJestFnCall(n, ctx); jestFn != nil && jestFn.Kind == utils.JestFnTypeTest {
-				ce := n.AsCallExpression()
-				if ce != nil && ce.Arguments != nil && len(ce.Arguments.Nodes) >= 2 {
-					arg1 := ast.SkipParentheses(ce.Arguments.Nodes[1])
-					if arg1 == nil || arg1.Kind != ast.KindIdentifier {
-						goto walkChildren
-					}
-					if declSymbol != nil {
-						if argSymbol := internalUtils.GetReferenceSymbol(arg1, ctx.TypeChecker); argSymbol == declSymbol {
-							res = append(res, n)
-						}
-						goto walkChildren
-					}
-					if arg1.AsIdentifier().Text == declName {
-						res = append(res, n)
-					}
-				}
-			}
-		}
-	walkChildren:
-		n.ForEachChild(func(c *ast.Node) bool {
-			walk(c)
-			return false
-		})
+	name := callback.AsIdentifier().Text
+	decl := internalUtils.GetDeclaration(ctx.TypeChecker, callback)
+	if decl == nil || decl.Kind != ast.KindFunctionDeclaration {
+		return nil, name
 	}
-	walk(root)
-	return res
+	return decl.AsNode(), name
 }
 
-func checkCallExpressionUsed(ctx rule.RuleContext, assertNode *ast.Node, unchecked *[]*ast.Node, namedFnCallCache map[*ast.Node][]*ast.Node) {
+func trackNamedFunctionTestCall(
+	ctx rule.RuleContext,
+	callNode *ast.Node,
+	callExpr *ast.CallExpression,
+	assertedFnDecls map[*ast.Node]bool,
+	assertedFnNames map[string]bool,
+	uncheckedByDecl map[*ast.Node][]*ast.Node,
+	uncheckedByName map[string][]*ast.Node,
+) bool {
+	declNode, fnName := resolveNamedFunctionCallback(ctx, callExpr)
+	switch {
+	case declNode != nil:
+		if assertedFnDecls[declNode] {
+			return true
+		}
+		uncheckedByDecl[declNode] = append(uncheckedByDecl[declNode], callNode)
+	case fnName != "":
+		if assertedFnNames[fnName] {
+			return true
+		}
+		uncheckedByName[fnName] = append(uncheckedByName[fnName], callNode)
+	}
+	return false
+}
+
+func checkCallExpressionUsed(
+	assertNode *ast.Node,
+	unchecked *[]*ast.Node,
+	assertedFnDecls map[*ast.Node]bool,
+	assertedFnNames map[string]bool,
+	uncheckedByDecl map[*ast.Node][]*ast.Node,
+	uncheckedByName map[string][]*ast.Node,
+) {
 	for n := assertNode.Parent; n != nil; n = n.Parent {
 		if n.Kind == ast.KindFunctionDeclaration {
 			decl := n.AsFunctionDeclaration()
 			if decl != nil && decl.Name() != nil {
 				declNode := decl.AsNode()
-				calls, ok := namedFnCallCache[declNode]
-				if !ok {
-					calls = findJestTestCallsPassingFunction(ctx, ctx.SourceFile.AsNode(), declNode)
-					namedFnCallCache[declNode] = calls
-				}
-				checkCallExpressionUsedFromCalls(unchecked, calls)
+				fnName := decl.Name().Text()
+				assertedFnDecls[declNode] = true
+				assertedFnNames[fnName] = true
+
+				clearUncheckedCalls(unchecked, uncheckedByDecl[declNode])
+				delete(uncheckedByDecl, declNode)
+
+				clearUncheckedCalls(unchecked, uncheckedByName[fnName])
+				delete(uncheckedByName, fnName)
 			}
 		}
 		if n.Kind == ast.KindCallExpression {
-			if idx := indexUnchecked(*unchecked, n); idx >= 0 {
-				*unchecked = slices.Delete(*unchecked, idx, idx+1)
+			if removeUncheckedCall(unchecked, n) {
 				return
 			}
 		}
@@ -205,7 +210,10 @@ var ExpectExpectRule = rule.Rule{
 		assertNames, additionalTestBlocks := parseOptions(options)
 		compiled := compileAssertPatterns(assertNames)
 		var unchecked []*ast.Node
-		namedFnCallCache := map[*ast.Node][]*ast.Node{}
+		assertedFnDecls := map[*ast.Node]bool{}
+		assertedFnNames := map[string]bool{}
+		uncheckedByDecl := map[*ast.Node][]*ast.Node{}
+		uncheckedByName := map[string][]*ast.Node{}
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -223,6 +231,17 @@ var ExpectExpectRule = rule.Rule{
 					if isJestTest && isTodoTestCall(jestFn) {
 						return
 					}
+					if isJestTest && trackNamedFunctionTestCall(
+						ctx,
+						node,
+						callExpr,
+						assertedFnDecls,
+						assertedFnNames,
+						uncheckedByDecl,
+						uncheckedByName,
+					) {
+						return
+					}
 					unchecked = append(unchecked, node)
 					return
 				}
@@ -230,7 +249,14 @@ var ExpectExpectRule = rule.Rule{
 				if !matchesAssertName(calleeName, compiled) {
 					return
 				}
-				checkCallExpressionUsed(ctx, node, &unchecked, namedFnCallCache)
+				checkCallExpressionUsed(
+					node,
+					&unchecked,
+					assertedFnDecls,
+					assertedFnNames,
+					uncheckedByDecl,
+					uncheckedByName,
+				)
 			},
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
