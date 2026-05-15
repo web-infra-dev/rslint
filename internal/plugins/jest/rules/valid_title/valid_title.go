@@ -268,9 +268,10 @@ func shouldValidateEachPrintf(jestFn *jestutils.ParsedJestFnCall, call *ast.Call
 }
 
 var (
-	reDupPrefix = regexp.MustCompile(`^([\x60'"]).+?\s+`)
-	reAccOpen   = regexp.MustCompile(`^([\x60'"]) +`)
-	reAccClose  = regexp.MustCompile(` +([\x60'"])$`)
+	reDupPrefix            = regexp.MustCompile(`^([\x60'"]).+?\s+`)
+	reAccOpen              = regexp.MustCompile(`^([\x60'"]) +`)
+	reAccClose             = regexp.MustCompile(` +([\x60'"])$`)
+	reEachInvalidSpecifier = regexp.MustCompile(`%[^psdifjo#$%]`)
 )
 
 func accidentalSpaceReplacement(rawSrc string) string {
@@ -293,8 +294,7 @@ func regexpToMessagePattern(re *regexp2.Regexp) string {
 
 func eachInvalidSpecifier(title string) string {
 	s := strings.ReplaceAll(title, "%%", "")
-	re := regexp.MustCompile(`%[^psdifjo#$%]`)
-	return re.FindString(s)
+	return reEachInvalidSpecifier.FindString(s)
 }
 
 func jestEmptyFunctionName(kind jestutils.JestFnType) string {
@@ -326,7 +326,8 @@ var ValidTitleRule = rule.Rule{
 				}
 				arg := call.Arguments.Nodes[0]
 
-				if _, ok := jestTitleInner(arg); !ok {
+				title, ok := jestTitleInner(arg)
+				if !ok {
 					if binaryPlusContainsStringLit(arg) {
 						return
 					}
@@ -346,15 +347,10 @@ var ValidTitleRule = rule.Rule{
 					return
 				}
 
-				title, ok := jestTitleInner(arg)
-				if !ok {
-					return
-				}
-
 				if title == "" {
 					ctx.ReportNode(arg, rule.RuleMessage{
 						Id:          "emptyTitle",
-						Description: fmt.Sprintf("%s should not have an empty title", jestEmptyFunctionName(jestFn.Kind)),
+						Description: jestEmptyFunctionName(jestFn.Kind) + " should not have an empty title",
 						Data: map[string]string{
 							"jestFunctionName": jestEmptyFunctionName(jestFn.Kind),
 						},
