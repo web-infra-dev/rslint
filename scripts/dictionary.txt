@@ -4,6 +4,7 @@ accesskey
 accum
 activedescendant
 addl
+affordances
 afoob
 alertdialog
 alink

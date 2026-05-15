@@ -32,6 +32,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_redundant_roles"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_static_element_interactions"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/prefer_tag_over_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/role_has_required_aria_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/role_supports_aria_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/scope"
@@ -72,6 +73,7 @@ func GetAllRules() []rule.Rule {
 		no_noninteractive_tabindex.NoNoninteractiveTabindexRule,
 		no_redundant_roles.NoRedundantRolesRule,
 		no_static_element_interactions.NoStaticElementInteractionsRule,
+		prefer_tag_over_role.PreferTagOverRoleRule,
 		role_has_required_aria_props.RoleHasRequiredAriaPropsRule,
 		role_supports_aria_props.RoleSupportsAriaPropsRule,
 		scope.ScopeRule,
