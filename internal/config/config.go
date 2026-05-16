@@ -33,6 +33,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_function_return_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_member_accessibility"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_module_boundary_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/init_declarations"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/max_params"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/member_ordering"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/method_signature_style"
@@ -543,6 +544,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/explicit-function-return-type", explicit_function_return_type.ExplicitFunctionReturnTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/explicit-member-accessibility", explicit_member_accessibility.ExplicitMemberAccessibilityRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/explicit-module-boundary-types", explicit_module_boundary_types.ExplicitModuleBoundaryTypesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/init-declarations", init_declarations.InitDeclarationsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/max-params", max_params.MaxParamsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/member-ordering", member_ordering.MemberOrderingRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/method-signature-style", method_signature_style.MethodSignatureStyleRule)
