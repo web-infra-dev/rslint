@@ -260,7 +260,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-extraneous-class.test.ts',
     './tests/typescript-eslint/rules/no-floating-promises.test.ts',
     './tests/typescript-eslint/rules/no-for-in-array.test.ts',
-    // './tests/typescript-eslint/rules/no-import-type-side-effects.test.ts',
+    './tests/typescript-eslint/rules/no-import-type-side-effects.test.ts',
     './tests/typescript-eslint/rules/no-implied-eval.test.ts',
     './tests/typescript-eslint/rules/no-inferrable-types.test.ts',
     // './tests/typescript-eslint/rules/no-invalid-this.test.ts',
