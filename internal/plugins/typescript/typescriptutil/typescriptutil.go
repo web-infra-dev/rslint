@@ -155,3 +155,51 @@ func IsClassImplementsOrInterfaceExtends(node *ast.Node) bool {
 	}
 	return false
 }
+
+// IsWeakPrecedenceParent mirrors typescript-eslint's `isWeakPrecedenceParent`
+// inside `getWrappingFixer`: it asks whether `node`'s parent might silently
+// rebind operator precedence after `node` is rewrapped, so the caller can
+// decide whether to wrap the replacement in parens. The list is kept in sync
+// with upstream's set:
+//
+//   - any unary/binary/conditional/await/typeof/void/delete parent
+//   - a property access whose object IS `node`
+//   - an element access whose expression IS `node`
+//   - a call/new whose callee IS `node`
+//   - a tagged template whose tag IS `node`
+//
+// Pairs with utils.IsStrongPrecedenceNode (which decides the inverse: whether
+// the INNER expression already binds tight enough to skip its inner paren).
+func IsWeakPrecedenceParent(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPrefixUnaryExpression,
+		ast.KindPostfixUnaryExpression,
+		ast.KindBinaryExpression,
+		ast.KindConditionalExpression,
+		ast.KindAwaitExpression,
+		ast.KindTypeOfExpression,
+		ast.KindVoidExpression,
+		ast.KindDeleteExpression:
+		return true
+	}
+	if ast.IsPropertyAccessExpression(parent) {
+		return parent.AsPropertyAccessExpression().Expression == node
+	}
+	if ast.IsElementAccessExpression(parent) {
+		return parent.AsElementAccessExpression().Expression == node
+	}
+	if ast.IsCallExpression(parent) || ast.IsNewExpression(parent) {
+		return parent.Expression() == node
+	}
+	if ast.IsTaggedTemplateExpression(parent) {
+		return parent.AsTaggedTemplateExpression().Tag == node
+	}
+	return false
+}
