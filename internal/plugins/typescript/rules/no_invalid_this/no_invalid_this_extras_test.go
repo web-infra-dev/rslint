@@ -189,6 +189,24 @@ class A {
   accessor foo = 1;
 }
     `},
+			// ---- Lock-in: `this` in decorator of a computed-key method nested in another method ----
+			// `class A { foo() { class B { @deco(this) [bar]() {} } } }`:
+			// `this` in the decorator resolves to `foo`'s frame (the
+			// surrounding scope), which is on top of stack at decorator
+			// visit time because B.bar's frame is deferred until
+			// `ComputedPropertyName:exit`. Without the "skip 0 if computed-key"
+			// branch in the `ThisExpression` listener, the listener would
+			// peek past `foo`'s frame and falsely report.
+			{Code: `
+class A {
+  foo() {
+    class B {
+      @deco(this)
+      [bar]() {}
+    }
+  }
+}
+    `},
 			// ---- Dimension 4: private method ----
 			{Code: `
 class A {
@@ -311,6 +329,23 @@ var obj = {
 obj.foo = a || b || function () {
   this;
 };
+    `},
+
+			// ---- Branch lock-in: Unicode uppercase identifier under capIsConstructor ----
+			// Upstream's `startsWithUpperCase` uses `s[0] !== s[0].toLocaleLowerCase()`,
+			// which captures any non-ASCII uppercase letter (and Lt
+			// title-case letters), not just ASCII A-Z. Anonymous functions
+			// assigned to such a name must therefore be treated as ES5
+			// constructors.
+			{Code: `
+var Ω = function () {
+  this;
+};
+    `},
+			{Code: `
+function Ω() {
+  this;
+}
     `},
 
 			// ---- Branch lock-in: BindingElement with uppercase name & default function ----
@@ -470,6 +505,42 @@ class A {
       `,
 				Errors: unexpected(3, 9),
 			},
+			// ---- Branch lock-in: `this` in decorator on a computed-key method ----
+			// Computed-key method-likes defer their frame push to
+			// `ComputedPropertyName:exit`, which runs AFTER the decorator
+			// visit. The stack top at decorator time is therefore already
+			// the surrounding scope, NOT the method's frame — so the
+			// peek-one-deeper compensation must NOT apply here. Locked in
+			// because forgetting this distinction either over-reports
+			// (peek deeper than necessary) or under-reports.
+			{
+				Code: `
+class A {
+  @deco(this)
+  [bar]() {}
+}
+      `,
+				Errors: unexpected(3, 9),
+			},
+
+			// ---- Branch lock-in: NewExpression is not an IIFE in upstream's walker ----
+			// Upstream's `isCallee` is strictly `parent.type === "CallExpression"`,
+			// so `new (function() { return function() { this; }; })()` does
+			// NOT propagate through the ReturnStatement IIFE arm: the outer
+			// function is a NewExpression callee, not a CallExpression
+			// callee. The inner function therefore falls through to the
+			// walker's default (default-bound, `this` reported).
+			{
+				Code: `
+new (function () {
+  return function () {
+    this;
+  };
+})();
+      `,
+				Errors: unexpected(4, 5),
+			},
+
 			// ---- Branch lock-in: TS expression wrappers are opaque to the walker ----
 			// Upstream's `isDefaultThisBinding` has no case for
 			// `TSAsExpression` / `TSSatisfiesExpression` / `TSNonNullExpression`,

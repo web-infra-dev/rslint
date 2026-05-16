@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -88,19 +89,11 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		push(computeFunctionValid(node, sf, opts.capIsConstructor))
 	}
 
-	// hasComputedKey reports whether a class member uses a `[expr]` computed
-	// key. For Method / Constructor / Get/SetAccessor the wrapper's
-	// FunctionExpression push fires on the FE child of MethodDefinition —
-	// which in ESTree is visited AFTER the computed key. We mirror this by
-	// deferring the push to `ComputedPropertyName:exit`.
-	hasComputedKey := func(node *ast.Node) bool {
-		name := ast.GetNameOfDeclaration(node)
-		return name != nil && name.Kind == ast.KindComputedPropertyName
-	}
-
 	// enterMethodLike defers push past the computed key (if any). Applies
 	// to Method/Constructor/Get/Set whose ESTree counterpart's wrapper push
-	// happens on the FunctionExpression value, AFTER the key visit.
+	// happens on the FunctionExpression value, AFTER the key visit. The
+	// matching deferred push lives in the `ComputedPropertyName:exit`
+	// listener below.
 	enterMethodLike := func(node *ast.Node) {
 		if hasComputedKey(node) {
 			return
@@ -180,12 +173,19 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			// member node itself, so our `enterMethodLike` push happens
 			// one visitor tick too early to reproduce that timing. To
 			// compensate, peek one frame deeper when `this` appears inside
-			// such a decorator. PropertyDeclaration is intentionally NOT
-			// in this list: upstream's `PropertyDefinition` / `AccessorProperty`
-			// wrapper listeners DO push on entry, so decorators on fields
-			// see the field's frame (matching our default behavior).
+			// such a decorator — but ONLY if the method's frame is actually
+			// on the stack already. A computed-key method-like defers its
+			// push to `ComputedPropertyName:exit`, which runs AFTER the
+			// modifier list (decorators), so at decorator visit time the
+			// stack top is already the surrounding scope and no peek is
+			// needed.
+			//
+			// PropertyDeclaration is intentionally NOT covered here:
+			// upstream's `PropertyDefinition` / `AccessorProperty` wrapper
+			// listeners DO push on entry, so decorators on fields see the
+			// field's frame (matching our default behavior).
 			skip := 0
-			if isInsideDecoratorOfMethodLike(node) {
+			if inside, methodLike := decoratorOfMethodLikeAncestor(node); inside && !hasComputedKey(methodLike) {
 				skip = 1
 			}
 			idx := len(stack) - 1 - skip
@@ -275,16 +275,16 @@ func hasOwnFunctionName(node *ast.Node) bool {
 	return false
 }
 
+// startsWithUpperCase mirrors ESLint's `s[0] !== s[0].toLocaleLowerCase()`:
+// the first rune is uppercase iff it has a different lowercase form. In
+// Unicode terms that's category Lu, plus the rare title-case category Lt
+// (e.g. `Ǆ`). Everything else — lower-case letters, non-cased letters,
+// digits, `_`, `$` — returns false in both halves.
 func startsWithUpperCase(s string) bool {
-	if len(s) == 0 {
-		return false
+	for _, r := range s {
+		return unicode.IsUpper(r) || unicode.IsTitle(r)
 	}
-	// ESLint uses `s[0] !== s[0].toLocaleLowerCase()` which captures any
-	// Unicode uppercase letter. Restrict to ASCII for now — the tsgo
-	// fixtures all use ASCII names and the typescript-eslint suite never
-	// exercises the Unicode branch.
-	c := s[0]
-	return c >= 'A' && c <= 'Z'
+	return false
 }
 
 // thisTagPattern is ESLint's exact pattern: `^[\s*]*@this` applied to a
@@ -654,14 +654,15 @@ func isCallApplyBind(name string) bool {
 	return name == "call" || name == "apply" || name == "bind"
 }
 
-// isInsideDecoratorOfMethodLike reports whether `thisNode` is positioned
+// decoratorOfMethodLikeAncestor reports whether `thisNode` is positioned
 // inside a `@decorator(...)` expression attached to a method-like class
 // member (`KindMethodDeclaration` / `KindConstructor` / `KindGetAccessor` /
-// `KindSetAccessor`). Decorators on these members run at class-evaluation
-// time, so their `this` resolves to the enclosing scope, NOT the member's
-// own implicit `this`. PropertyDeclaration is excluded — upstream's
-// wrapper pushes for `PropertyDefinition` / `AccessorProperty` on entry,
-// so decorators on fields stay in the field's frame to mirror that.
+// `KindSetAccessor`), and returns that member node when so. Decorators on
+// these members run at class-evaluation time, so their `this` resolves to
+// the enclosing scope, NOT the member's own implicit `this`. PropertyDeclaration
+// is excluded — upstream's wrapper pushes for `PropertyDefinition` /
+// `AccessorProperty` on entry, so decorators on fields stay in the field's
+// frame to mirror that.
 //
 // Arrow functions are walked past transparently because their `this` is
 // lexical — `@deco(() => this)` resolves `this` to whatever scope the
@@ -669,21 +670,26 @@ func isCallApplyBind(name string) bool {
 // member). Non-arrow function-likes and class-member boundaries return
 // false: a non-arrow function inside a decorator has its OWN `this`
 // (default-bound), independent of the decorator's host.
-func isInsideDecoratorOfMethodLike(thisNode *ast.Node) bool {
+//
+// The returned `methodLike` node lets the caller distinguish computed-key
+// members (whose frame is deferred to `ComputedPropertyName:exit`) from
+// non-computed ones, since the two require different stack-peek depths at
+// decorator-visit time.
+func decoratorOfMethodLikeAncestor(thisNode *ast.Node) (bool, *ast.Node) {
 	current := thisNode.Parent
 	for current != nil {
 		switch current.Kind {
 		case ast.KindDecorator:
 			parent := current.Parent
 			if parent == nil {
-				return false
+				return false, nil
 			}
 			switch parent.Kind {
 			case ast.KindMethodDeclaration, ast.KindConstructor,
 				ast.KindGetAccessor, ast.KindSetAccessor:
-				return true
+				return true, parent
 			}
-			return false
+			return false, nil
 		case ast.KindArrowFunction:
 			// Lexical `this` — keep walking up.
 		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
@@ -691,19 +697,28 @@ func isInsideDecoratorOfMethodLike(thisNode *ast.Node) bool {
 			ast.KindGetAccessor, ast.KindSetAccessor,
 			ast.KindPropertyDeclaration,
 			ast.KindClassStaticBlockDeclaration:
-			return false
+			return false, nil
 		}
 		current = current.Parent
 	}
-	return false
+	return false, nil
 }
 
-// isCalleeParenOnly mirrors ESLint's `isCallee` — `node.parent` (after
-// stripping ParenthesizedExpression wrappers, which ESTree elides) must
-// be a CallExpression or NewExpression with `node` as the callee. TS
-// expression wrappers (`as` / `satisfies` / `!`) are intentionally NOT
-// stripped to stay byte-for-byte aligned with upstream's walker, which
-// has no case for them and would never treat their parent as a call.
+// hasComputedKey is exposed as a package-level helper so the
+// `KindThisKeyword` listener can re-query it without re-binding through
+// the `run` closure.
+func hasComputedKey(node *ast.Node) bool {
+	name := ast.GetNameOfDeclaration(node)
+	return name != nil && name.Kind == ast.KindComputedPropertyName
+}
+
+// isCalleeParenOnly mirrors ESLint's `isCallee` exactly — `node.parent`
+// (after stripping ParenthesizedExpression wrappers, which ESTree elides)
+// must be a CallExpression with `node` as the callee. NewExpression is
+// NOT accepted: `new fn()` returns the new instance, not what `fn`
+// returns, so it doesn't propagate `this` through the walker's IIFE
+// arms. TS expression wrappers (`as` / `satisfies` / `!`) are also
+// intentionally NOT stripped — upstream's walker has no case for them.
 func isCalleeParenOnly(node *ast.Node) bool {
 	current := node
 	parent := current.Parent
@@ -714,13 +729,7 @@ func isCalleeParenOnly(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	if ast.IsCallExpression(parent) && parent.AsCallExpression().Expression == current {
-		return true
-	}
-	if parent.Kind == ast.KindNewExpression && parent.AsNewExpression().Expression == current {
-		return true
-	}
-	return false
+	return ast.IsCallExpression(parent) && parent.AsCallExpression().Expression == current
 }
 
 // findEnclosingCall walks up from a function-like that has just been
