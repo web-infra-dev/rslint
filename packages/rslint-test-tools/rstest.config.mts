@@ -289,7 +289,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-use-before-define.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-boolean-literal-compare.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-condition.test.ts',
-    // './tests/typescript-eslint/rules/no-unnecessary-parameter-property-assignment.test.ts',
+    './tests/typescript-eslint/rules/no-unnecessary-parameter-property-assignment.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-qualifier.test.ts',
     './tests/typescript-eslint/rules/no-unnecessary-template-expression.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-type-arguments.test.ts',
