@@ -58,6 +58,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_import_type_side_effects"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_inferrable_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_this"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_loop_func"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_magic_numbers"
@@ -566,6 +567,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-object-type", no_empty_object_type.NoEmptyObjectTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-extra-non-null-assertion", no_extra_non_null_assertion.NoExtraNonNullAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-extraneous-class", no_extraneous_class.NoExtraneousClassRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-invalid-this", no_invalid_this.NoInvalidThisRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-invalid-void-type", no_invalid_void_type.NoInvalidVoidTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)
