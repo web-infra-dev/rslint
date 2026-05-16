@@ -138,6 +138,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			}
 
 			funcNode := findParentFunction(node)
+			info := top()
 
 			// Constructor listener — mirrors upstream's
 			// `MethodDefinition[kind='constructor'] > FunctionExpression
@@ -150,7 +151,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 				}
 			}
 			if ctorFunc != nil && ctorFunc.Kind == ast.KindConstructor {
-				handleConstructor(ctx, top(), bin, leftName, op, ctorFunc)
+				handleConstructor(ctx, info, bin, leftName, op, ctorFunc)
 			}
 
 			// PropertyDefinition listener — mirrors upstream's
@@ -158,7 +159,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			// fire independently in upstream and may both apply to the same
 			// assignment (e.g. a nested class field initializer inside an
 			// outer constructor); we mirror that by running both arms here.
-			handlePropertyDef(top(), funcNode, node, leftName)
+			handlePropertyDef(info, funcNode, node, leftName)
 		},
 	}
 }
@@ -288,8 +289,8 @@ func getPropertyName(left *ast.Node) (string, bool) {
 		// Mirror ESTree's paren-elision: `(this).foo` is identical to
 		// `this.foo` in upstream's AST, so we strip the receiver's parens
 		// before the ThisKeyword check.
-		if ast.SkipParentheses(pa.Expression) == nil ||
-			ast.SkipParentheses(pa.Expression).Kind != ast.KindThisKeyword {
+		receiver := ast.SkipParentheses(pa.Expression)
+		if receiver == nil || receiver.Kind != ast.KindThisKeyword {
 			return "", false
 		}
 		name := pa.Name()
@@ -299,8 +300,8 @@ func getPropertyName(left *ast.Node) (string, bool) {
 		return name.AsIdentifier().Text, true
 	case ast.KindElementAccessExpression:
 		ea := left.AsElementAccessExpression()
-		if ast.SkipParentheses(ea.Expression) == nil ||
-			ast.SkipParentheses(ea.Expression).Kind != ast.KindThisKeyword {
+		receiver := ast.SkipParentheses(ea.Expression)
+		if receiver == nil || receiver.Kind != ast.KindThisKeyword {
 			return "", false
 		}
 		// Index argument is also paren-elided in ESTree, so unwrap before
@@ -353,10 +354,15 @@ func iifeCallOfArrow(arrow *ast.Node) *ast.Node {
 }
 
 // getIdentifier unwraps the right-hand side through `as` / `!` (TSAsExpression
-// / TSNonNullExpression in upstream) to find a bare Identifier. Parentheses
-// and `satisfies` are intentionally NOT unwrapped — upstream's recursion only
-// peels those two specific wrapper kinds, and we mirror the set exactly so
-// `this.foo = (foo)` doesn't report despite the lexically-identical name.
+// / TSNonNullExpression in upstream) to find a bare Identifier. Parens ARE
+// stripped via ast.SkipParentheses so the function tracks upstream's behavior
+// on the ESTree AST (which elides ParenthesizedExpression entirely) — e.g.
+// `this.foo = (foo)` is reported by upstream because in ESTree the right-hand
+// side IS the Identifier; tsgo preserves the wrapping ParenthesizedExpression,
+// so we must skip it explicitly to align. SatisfiesExpression and other
+// wrappers are intentionally left alone — upstream's switch lists only
+// TSAsExpression and TSNonNullExpression, so anything else falls through to
+// the default `return null` arm.
 func getIdentifier(node *ast.Node) *ast.Node {
 	node = ast.SkipParentheses(node)
 	if node == nil {
