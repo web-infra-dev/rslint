@@ -369,7 +369,7 @@ type declaredDependency struct {
 // dependency is a used reference observed inside the callback body.
 type dependency struct {
 	IsStable bool
-	IsRef    bool   // true if it's `<x>.current` reference
+	IsRef    bool // true if it's `<x>.current` reference
 	Refs     []*depReference
 	First    *ast.Node // first observed reference identifier (for diagnostics)
 }
@@ -377,11 +377,11 @@ type dependency struct {
 // depReference is a single observed reference inside the callback body —
 // the identifier node and the symbol it resolved to (or nil for fallback).
 type depReference struct {
-	Identifier   *ast.Node
-	Symbol       *ast.Symbol
-	WriteExpr    *ast.Node // BinaryExpression representing assignment, when this reference is written
-	InCleanup    bool
-	DepNodeRoot  *ast.Node
+	Identifier  *ast.Node
+	Symbol      *ast.Symbol
+	WriteExpr   *ast.Node // BinaryExpression representing assignment, when this reference is written
+	InCleanup   bool
+	DepNodeRoot *ast.Node
 }
 
 // dependencyTreeNode mirrors upstream's `DependencyTreeNode`.
@@ -649,6 +649,18 @@ func areDeclaredDepsAlphabetized(declared []declaredDependency) bool {
 func hasUndefinedIdentifier(node *ast.Node) bool {
 	n := stripAsExpression(node)
 	return n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == "undefined"
+}
+
+// isObjectLiteralShorthandReference identifies value reads such as `{ value }`.
+// tsgo's TypeChecker can report the shorthand assignment node itself as the
+// declaration, so exhaustive-deps needs an AST fallback to find the outer
+// binding. Destructuring assignment shorthand is a write pattern and must not
+// be treated as a captured Hook dependency.
+func isObjectLiteralShorthandReference(id *ast.Node) bool {
+	if id == nil || id.Parent == nil || id.Parent.Kind != ast.KindShorthandPropertyAssignment {
+		return false
+	}
+	return id.Parent.Name() == id && !utils.IsInDestructuringAssignment(id.Parent)
 }
 
 // isReferenceIdentifier reports whether the given Identifier appears in a
