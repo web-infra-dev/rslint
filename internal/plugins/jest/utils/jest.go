@@ -126,6 +126,19 @@ type ParsedJestFnMemberEntry struct {
 	Node *ast.Node
 }
 
+func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
+	if len(entries) == 0 {
+		return ""
+	}
+
+	parts := make([]string, len(entries))
+	for i, e := range entries {
+		parts[i] = e.Name
+	}
+
+	return strings.Join(parts, ".")
+}
+
 func getPropertyName(node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindIdentifier:
