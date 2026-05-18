@@ -16,6 +16,8 @@ ruleTester.run('no-jasmine-globals', {} as never, {
     { code: 'function callback(fail) { fail() }' },
     { code: 'var spyOn = require("actions"); spyOn("foo")' },
     { code: 'function callback(pending) { pending() }' },
+    { code: 'jasmine.DEFAULT_TIMEOUT_INTERVAL += 1000;' },
+    { code: 'jasmine["DEFAULT_TIMEOUT_INTERVAL"] += 1000;' },
   ],
   invalid: [
     {

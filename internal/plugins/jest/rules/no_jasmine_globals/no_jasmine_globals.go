@@ -115,6 +115,10 @@ func reportJasmineAssignedProperty(node *ast.Node, ctx rule.RuleContext) {
 	}
 
 	if propName == "DEFAULT_TIMEOUT_INTERVAL" {
+		if bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken {
+			return
+		}
+
 		right := ast.SkipParentheses(bin.Right)
 		if right != nil && isEcmaPrimitiveLiteral(right.Kind) {
 			ctx.ReportNodeWithFixes(

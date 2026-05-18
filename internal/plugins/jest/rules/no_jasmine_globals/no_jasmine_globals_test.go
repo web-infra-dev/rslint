@@ -27,6 +27,8 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 			{Code: `function callback(fail) { fail() }`},
 			{Code: `var spyOn = require("actions"); spyOn("foo")`},
 			{Code: `function callback(pending) { pending() }`},
+			{Code: `jasmine.DEFAULT_TIMEOUT_INTERVAL += 1000;`},
+			{Code: `jasmine["DEFAULT_TIMEOUT_INTERVAL"] += 1000;`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
