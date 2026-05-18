@@ -69,9 +69,9 @@ func compileAssertPattern(pattern string) *regexp.Regexp {
 	parts := make([]string, 0, len(segs))
 	for _, s := range segs {
 		if s == "**" {
-			parts = append(parts, `[a-z0-9\.]*`)
+			parts = append(parts, `[a-zA-Z0-9_$.]*`)
 		} else {
-			parts = append(parts, strings.ReplaceAll(s, "*", `[a-z0-9]*`))
+			parts = append(parts, strings.ReplaceAll(s, "*", `[a-zA-Z0-9_$]*`))
 		}
 	}
 	joined := strings.Join(parts, `\.`)
@@ -151,43 +151,36 @@ func trackNamedFunctionTestCall(
 	ctx rule.RuleContext,
 	callNode *ast.Node,
 	callExpr *ast.CallExpression,
-	assertedFnDecls map[*ast.Node]bool,
-	assertedFnNames map[string]bool,
 	uncheckedByDecl map[*ast.Node][]*ast.Node,
 	uncheckedByName map[string][]*ast.Node,
-) bool {
+) {
 	declNode, fnName := resolveNamedFunctionCallback(ctx, callExpr)
 	switch {
 	case declNode != nil:
-		if assertedFnDecls[declNode] {
-			return true
-		}
 		uncheckedByDecl[declNode] = append(uncheckedByDecl[declNode], callNode)
 	case fnName != "":
-		if assertedFnNames[fnName] {
-			return true
-		}
 		uncheckedByName[fnName] = append(uncheckedByName[fnName], callNode)
 	}
-	return false
 }
 
 func checkCallExpressionUsed(
 	assertNode *ast.Node,
 	unchecked *[]*ast.Node,
-	assertedFnDecls map[*ast.Node]bool,
-	assertedFnNames map[string]bool,
 	uncheckedByDecl map[*ast.Node][]*ast.Node,
 	uncheckedByName map[string][]*ast.Node,
 ) {
+	var ancestors []*ast.Node
 	for n := assertNode.Parent; n != nil; n = n.Parent {
+		ancestors = append(ancestors, n)
+	}
+
+	for i := len(ancestors) - 1; i >= 0; i-- {
+		n := ancestors[i]
 		if n.Kind == ast.KindFunctionDeclaration {
 			decl := n.AsFunctionDeclaration()
 			if decl != nil && decl.Name() != nil {
 				declNode := decl.AsNode()
 				fnName := decl.Name().Text()
-				assertedFnDecls[declNode] = true
-				assertedFnNames[fnName] = true
 
 				clearUncheckedCalls(unchecked, uncheckedByDecl[declNode])
 				delete(uncheckedByDecl, declNode)
@@ -210,8 +203,6 @@ var ExpectExpectRule = rule.Rule{
 		assertNames, additionalTestBlocks := parseOptions(options)
 		compiled := compileAssertPatterns(assertNames)
 		var unchecked []*ast.Node
-		assertedFnDecls := map[*ast.Node]bool{}
-		assertedFnNames := map[string]bool{}
 		uncheckedByDecl := map[*ast.Node][]*ast.Node{}
 		uncheckedByName := map[string][]*ast.Node{}
 
@@ -231,16 +222,14 @@ var ExpectExpectRule = rule.Rule{
 					if isJestTest && isTodoTestCall(jestFn) {
 						return
 					}
-					if isJestTest && trackNamedFunctionTestCall(
-						ctx,
-						node,
-						callExpr,
-						assertedFnDecls,
-						assertedFnNames,
-						uncheckedByDecl,
-						uncheckedByName,
-					) {
-						return
+					if isJestTest {
+						trackNamedFunctionTestCall(
+							ctx,
+							node,
+							callExpr,
+							uncheckedByDecl,
+							uncheckedByName,
+						)
 					}
 					unchecked = append(unchecked, node)
 					return
@@ -252,8 +241,6 @@ var ExpectExpectRule = rule.Rule{
 				checkCallExpressionUsed(
 					node,
 					&unchecked,
-					assertedFnDecls,
-					assertedFnNames,
 					uncheckedByDecl,
 					uncheckedByName,
 				)

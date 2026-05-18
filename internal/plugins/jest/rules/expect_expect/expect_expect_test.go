@@ -22,15 +22,14 @@ func TestExpectExpectRule(t *testing.T) {
 			{Code: `test("should pass", () => expect(true).toBeDefined())`},
 			{Code: `it("should pass", () => somePromise().then(() => expect(true).toBeDefined()))`},
 			{Code: `it("should pass", myTest); function myTest() { expect(true).toBeDefined() }`},
-			{Code: `function myTest() { expect(true).toBeDefined() } it("should pass", myTest);`},
 			{
 				Code: `
+        it("first passes", sharedAssertion);
+        test("second passes", sharedAssertion);
+
         function sharedAssertion() {
           expect(true).toBeDefined();
         }
-
-        it("first passes", sharedAssertion);
-        test("second passes", sharedAssertion);
       `,
 			},
 			{
@@ -112,6 +111,10 @@ func TestExpectExpectRule(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"tester.*.expect"}}},
 			},
 			{
+				Code:    `test('should pass mixed identifier chars', () => Tester_1.foo$Bar().expect(123));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"tester_*.*.expect"}}},
+			},
+			{
 				Code:    `test('should pass **', () => tester.foo().expect(123));`,
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"**"}}},
 			},
@@ -138,6 +141,10 @@ func TestExpectExpectRule(t *testing.T) {
 			{
 				Code:    `test('should pass', () => request.get().foo().expect(456));`,
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.e*e*t"}}},
+			},
+			{
+				Code:    `test('should pass with uppercase and dollar segments', () => Request.GET_1().foo$Bar().expect(456));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.expect"}}},
 			},
 			{
 				Code: `test('should still lint with malformed pattern config', () => {
@@ -317,6 +324,19 @@ func TestExpectExpectRule(t *testing.T) {
         });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 3},
+				},
+			},
+			{
+				Code: `function myTest() { expect(true).toBeDefined() } it("should fail", myTest);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 50, EndLine: 1, EndColumn: 52},
+				},
+			},
+			{
+				Code:    `it('outer', () => { it('inner', () => { someAssert(1); }); });`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"someAssert"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 21, EndLine: 1, EndColumn: 23},
 				},
 			},
 		},
