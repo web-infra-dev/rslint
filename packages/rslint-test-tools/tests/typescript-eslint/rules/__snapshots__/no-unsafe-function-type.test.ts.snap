@@ -1,0 +1,149 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-function-type > invalid 1`] = `
+{
+  "code": "let value: Function;",
+  "diagnostics": [
+    {
+      "message": "The \`Function\` type accepts any function-like value.
+Prefer explicitly defining any function parameters and return type.",
+      "messageId": "bannedFunctionType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 2`] = `
+{
+  "code": "let value: Function[];",
+  "diagnostics": [
+    {
+      "message": "The \`Function\` type accepts any function-like value.
+Prefer explicitly defining any function parameters and return type.",
+      "messageId": "bannedFunctionType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 3`] = `
+{
+  "code": "let value: Function | number;",
+  "diagnostics": [
+    {
+      "message": "The \`Function\` type accepts any function-like value.
+Prefer explicitly defining any function parameters and return type.",
+      "messageId": "bannedFunctionType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 4`] = `
+{
+  "code": "
+        class Weird implements Function {
+          // ...
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The \`Function\` type accepts any function-like value.
+Prefer explicitly defining any function parameters and return type.",
+      "messageId": "bannedFunctionType",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 32,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 5`] = `
+{
+  "code": "
+        interface Weird extends Function {
+          // ...
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The \`Function\` type accepts any function-like value.
+Prefer explicitly defining any function parameters and return type.",
+      "messageId": "bannedFunctionType",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 2,
+        },
+        "start": {
+          "column": 33,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;

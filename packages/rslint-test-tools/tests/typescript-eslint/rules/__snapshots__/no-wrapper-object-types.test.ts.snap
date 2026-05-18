@@ -1,0 +1,409 @@
+// Rstest Snapshot v1
+
+exports[`no-wrapper-object-types > invalid 1`] = `
+{
+  "code": "let value: BigInt;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`bigint\` as a type name, rather than the upper-cased \`BigInt\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: bigint;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 2`] = `
+{
+  "code": "let value: Boolean;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`boolean\` as a type name, rather than the upper-cased \`Boolean\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: boolean;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 3`] = `
+{
+  "code": "let value: Number;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: number;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 4`] = `
+{
+  "code": "let value: Object;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`object\` as a type name, rather than the upper-cased \`Object\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: object;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 5`] = `
+{
+  "code": "let value: String;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`string\` as a type name, rather than the upper-cased \`String\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: string;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 6`] = `
+{
+  "code": "let value: Symbol;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`symbol\` as a type name, rather than the upper-cased \`Symbol\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: symbol;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 7`] = `
+{
+  "code": "let value: Number | Symbol;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+    {
+      "message": "Prefer using the primitive \`symbol\` as a type name, rather than the upper-cased \`Symbol\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "let value: number | symbol;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 8`] = `
+{
+  "code": "let value: { property: Number };",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: { property: number };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 9`] = `
+{
+  "code": "0 as Number;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "0 as number;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 10`] = `
+{
+  "code": "type MyType = Number;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type MyType = number;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 11`] = `
+{
+  "code": "type MyType = [Number];",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type MyType = [number];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 12`] = `
+{
+  "code": "class MyClass implements Number {}",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 13`] = `
+{
+  "code": "interface MyInterface extends Number {}",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-wrapper-object-types > invalid 14`] = `
+{
+  "code": "type MyType = Number & String;",
+  "diagnostics": [
+    {
+      "message": "Prefer using the primitive \`number\` as a type name, rather than the upper-cased \`Number\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+    {
+      "message": "Prefer using the primitive \`string\` as a type name, rather than the upper-cased \`String\`.",
+      "messageId": "bannedClassType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-wrapper-object-types",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "type MyType = number & string;",
+  "ruleCount": 1,
+}
+`;
