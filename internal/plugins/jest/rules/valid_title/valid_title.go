@@ -71,9 +71,6 @@ func boolFromMap(m map[string]interface{}, key string, def bool) bool {
 }
 
 func compileRE2(pat string) (*regexp2.Regexp, error) {
-	if pat == "" {
-		return nil, nil
-	}
 	re, err := regexp2.Compile(pat, jsRegexOpts)
 	if err != nil {
 		return nil, err
@@ -102,6 +99,9 @@ func compileMatcherPatterns(raw interface{}, optionPath string) (matchersByFn, [
 
 	switch x := raw.(type) {
 	case string:
+		if x == "" {
+			break
+		}
 		if re, err := compileRE2(x); err != nil {
 			invalids = append(invalids, invalidPattern{
 				optionPath: optionPath,
@@ -114,7 +114,7 @@ func compileMatcherPatterns(raw interface{}, optionPath string) (matchersByFn, [
 	case []interface{}:
 		me := matcherEntry{}
 		if len(x) >= 1 {
-			if s, ok := x[0].(string); ok {
+			if s, ok := x[0].(string); ok && s != "" {
 				re, err := compileRE2(s)
 				if err != nil {
 					invalids = append(invalids, invalidPattern{
@@ -151,6 +151,9 @@ func fillMatcherField(ms *matchersByFn, key string, raw interface{}, optionPath 
 
 	switch x := raw.(type) {
 	case string:
+		if x == "" {
+			break
+		}
 		re, err := compileRE2(x)
 		if err != nil {
 			invalids = append(invalids, invalidPattern{
@@ -163,7 +166,7 @@ func fillMatcherField(ms *matchersByFn, key string, raw interface{}, optionPath 
 		}
 	case []interface{}:
 		if len(x) >= 1 {
-			if s, ok := x[0].(string); ok {
+			if s, ok := x[0].(string); ok && s != "" {
 				re, err := compileRE2(s)
 				if err != nil {
 					invalids = append(invalids, invalidPattern{
