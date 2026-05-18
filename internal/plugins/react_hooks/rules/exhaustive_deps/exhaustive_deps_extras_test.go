@@ -11,17 +11,17 @@ import (
 // upstream `ESLintRuleExhaustiveDeps-test.js` suite. The categories below
 // target two kinds of risk that the upstream suite under-exercises:
 //
-//   (1) tsgo AST quirks that ESTree flattens — paren-wrapped receivers,
-//       `as` / `satisfies` / `!` (non-null) wrappers, optional chains as
-//       PropertyAccess flags rather than ChainExpression wrappers, etc.
-//       Bugs in these categories are silent (rules look right on the
-//       upstream test suite but drift on real codebases).
+//	(1) tsgo AST quirks that ESTree flattens — paren-wrapped receivers,
+//	    `as` / `satisfies` / `!` (non-null) wrappers, optional chains as
+//	    PropertyAccess flags rather than ChainExpression wrappers, etc.
+//	    Bugs in these categories are silent (rules look right on the
+//	    upstream test suite but drift on real codebases).
 //
-//   (2) Real-world component shapes that don't appear upstream — class-
-//       field arrows, custom `forwardRef` / `memo` HOCs, deeply nested
-//       hooks inside conditionals/loops, useState destructuring with
-//       defaults, async function declarations inside effects, hooks
-//       inside switch / try-catch, etc.
+//	(2) Real-world component shapes that don't appear upstream — class-
+//	    field arrows, custom `forwardRef` / `memo` HOCs, deeply nested
+//	    hooks inside conditionals/loops, useState destructuring with
+//	    defaults, async function declarations inside effects, hooks
+//	    inside switch / try-catch, etc.
 //
 // Each case carries a short comment explaining what aspect it locks in.
 func TestExhaustiveDepsRule_Extras(t *testing.T) {
@@ -130,6 +130,48 @@ var extrasValid = []rule_tester.ValidTestCase{
 	{Code: `
 		function MyComponent() {
 			useEffect(() => {}, []);
+		}
+	`, Tsx: true},
+
+	// Object literal shorthand reads are real value references. tsgo can
+	// resolve the shorthand identifier to the ShorthandPropertyAssignment
+	// node itself, so the rule must fall back to the outer component binding.
+	{Code: `
+		function MyComponent() {
+			const isAdmin = getIsAdmin();
+			useMemo(() => ({ isAdmin }), [isAdmin]);
+		}
+	`, Tsx: true},
+
+	// Local shorthand shadows must resolve lexically, not by same-name lookup
+	// in the outer component scope.
+	{Code: `
+		function MyComponent() {
+			const isAdmin = true;
+			useMemo(() => {
+				const isAdmin = false;
+				return { isAdmin };
+			}, []);
+		}
+	`, Tsx: true},
+	{Code: `
+		function MyComponent() {
+			const isAdmin = true;
+			useMemo(() => {
+				function inner(isAdmin: boolean) {
+					return { isAdmin };
+				}
+				return inner(false);
+			}, []);
+		}
+	`, Tsx: true},
+	{Code: `
+		function MyComponent({ data }: { data: { isAdmin: boolean } }) {
+			const isAdmin = true;
+			useMemo(() => {
+				const { isAdmin } = data;
+				return { isAdmin };
+			}, [data]);
 		}
 	`, Tsx: true},
 

@@ -59,9 +59,9 @@ var ExhaustiveDepsRule = rule.Rule{
 		// previous O(N×hooks×file_size) re-scan pattern that surfaced
 		// in PR-808 review feedback for large codebases.
 		caches := &runCaches{
-			extraWrite:     map[*ast.Symbol]bool{},
-			currentAssign:  map[*ast.Symbol]bool{},
-			usedOutside:    map[*ast.Node]bool{},
+			extraWrite:    map[*ast.Symbol]bool{},
+			currentAssign: map[*ast.Symbol]bool{},
+			usedOutside:   map[*ast.Node]bool{},
 		}
 
 		report := func(node *ast.Node, msg string) {
@@ -1717,7 +1717,12 @@ func processIdentifier(
 	// Resolve.
 	var sym *ast.Symbol
 	if tc != nil {
-		sym = tc.GetSymbolAtLocation(id)
+		if isObjectLiteralShorthandReference(id) {
+			sym = tc.GetShorthandAssignmentValueSymbol(id.Parent)
+		}
+		if sym == nil {
+			sym = tc.GetSymbolAtLocation(id)
+		}
 	}
 	// Determine if the symbol's declaration is in component scope (between
 	// callback exclusive and componentFn inclusive).
@@ -2057,4 +2062,3 @@ func isFunctionWithoutCapturedValues(
 	visit(body)
 	return !captured
 }
-

@@ -85,6 +85,7 @@ type TestConfigEntry = project.TestConfigEntry
 type TestConfigFileNamesEntry = project.TestConfigFileNamesEntry
 type UpdateReason = project.UpdateReason
 const UpdateReasonDidChangeCompilerOptionsForInferredProjects = project.UpdateReasonDidChangeCompilerOptionsForInferredProjects
+const UpdateReasonDidCloseFile = project.UpdateReasonDidCloseFile
 const UpdateReasonDidOpenFile = project.UpdateReasonDidOpenFile
 const UpdateReasonIdleCleanDiskCache = project.UpdateReasonIdleCleanDiskCache
 const UpdateReasonRequestedLanguageServiceForFileNotOpen = project.UpdateReasonRequestedLanguageServiceForFileNotOpen

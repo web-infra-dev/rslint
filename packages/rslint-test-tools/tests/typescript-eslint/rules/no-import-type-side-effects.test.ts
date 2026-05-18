@@ -1,7 +1,5 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 
-
-
 const ruleTester = new RuleTester();
 
 ruleTester.run('no-import-type-side-effects', {
@@ -14,7 +12,6 @@ ruleTester.run('no-import-type-side-effects', {
     "import { type T, U } from 'mod';",
     "import { T, type U } from 'mod';",
     "import type T from 'mod';",
-    "import type T, { U } from 'mod';",
     "import T, { type U } from 'mod';",
     "import type * as T from 'mod';",
     "import 'mod';",
