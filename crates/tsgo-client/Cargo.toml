@@ -10,7 +10,7 @@ thiserror = "2"
 serde = { version = "1", features = [ "derive" ] }
 cbor4ii = {version = "1", features = ["serde1"]}
 serde_bytes = "0.11.19"
-bitflags = { version = "2.10"}
+bitflags = { version = "2.11.1"}
 
 [dev-dependencies]
 insta = { version = "1.40", features = ["json"] }
