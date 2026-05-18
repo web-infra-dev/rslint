@@ -7,6 +7,7 @@ import (
 
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -32,8 +33,15 @@ type compiledOptions struct {
 	ignoreTypeOfDescribeName bool
 	ignoreTypeOfTestName     bool
 	disallowedConcat         *regexp2.Regexp
+	invalidPatterns          []invalidPattern
 	mustNotMatch             matchersByFn
 	mustMatch                matchersByFn
+}
+
+type invalidPattern struct {
+	optionPath string
+	pattern    string
+	err        error
 }
 
 func firstOptionMap(options any) map[string]interface{} {
@@ -62,15 +70,15 @@ func boolFromMap(m map[string]interface{}, key string, def bool) bool {
 	return def
 }
 
-func compileRE2(pat string) *regexp2.Regexp {
+func compileRE2(pat string) (*regexp2.Regexp, error) {
 	if pat == "" {
-		return nil
+		return nil, nil
 	}
 	re, err := regexp2.Compile(pat, jsRegexOpts)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return re
+	return re, nil
 }
 
 func matchRE2(re *regexp2.Regexp, s string) bool {
@@ -81,10 +89,11 @@ func matchRE2(re *regexp2.Regexp, s string) bool {
 	return err == nil && m != nil
 }
 
-func compileMatcherPatterns(raw interface{}) matchersByFn {
+func compileMatcherPatterns(raw interface{}, optionPath string) (matchersByFn, []invalidPattern) {
 	out := matchersByFn{}
+	var invalids []invalidPattern
 	if raw == nil {
-		return out
+		return out, nil
 	}
 
 	setAll := func(e matcherEntry) {
@@ -93,14 +102,29 @@ func compileMatcherPatterns(raw interface{}) matchersByFn {
 
 	switch x := raw.(type) {
 	case string:
-		if re := compileRE2(x); re != nil {
+		if re, err := compileRE2(x); err != nil {
+			invalids = append(invalids, invalidPattern{
+				optionPath: optionPath,
+				pattern:    x,
+				err:        err,
+			})
+		} else if re != nil {
 			setAll(matcherEntry{re: re})
 		}
 	case []interface{}:
 		me := matcherEntry{}
 		if len(x) >= 1 {
 			if s, ok := x[0].(string); ok {
-				me.re = compileRE2(s)
+				re, err := compileRE2(s)
+				if err != nil {
+					invalids = append(invalids, invalidPattern{
+						optionPath: optionPath,
+						pattern:    s,
+						err:        err,
+					})
+				} else {
+					me.re = re
+				}
 			}
 		}
 		if len(x) >= 2 {
@@ -114,23 +138,42 @@ func compileMatcherPatterns(raw interface{}) matchersByFn {
 	case map[string]interface{}:
 		for _, key := range []string{"describe", "test", "it"} {
 			if v, ok := x[key]; ok {
-				fillMatcherField(&out, key, v)
+				invalids = append(invalids, fillMatcherField(&out, key, v, optionPath+"."+key)...)
 			}
 		}
 	}
-	return out
+	return out, invalids
 }
 
-func fillMatcherField(ms *matchersByFn, key string, raw interface{}) {
+func fillMatcherField(ms *matchersByFn, key string, raw interface{}, optionPath string) []invalidPattern {
 	e := matcherEntry{}
+	var invalids []invalidPattern
 
 	switch x := raw.(type) {
 	case string:
-		e.re = compileRE2(x)
+		re, err := compileRE2(x)
+		if err != nil {
+			invalids = append(invalids, invalidPattern{
+				optionPath: optionPath,
+				pattern:    x,
+				err:        err,
+			})
+		} else {
+			e.re = re
+		}
 	case []interface{}:
 		if len(x) >= 1 {
 			if s, ok := x[0].(string); ok {
-				e.re = compileRE2(s)
+				re, err := compileRE2(s)
+				if err != nil {
+					invalids = append(invalids, invalidPattern{
+						optionPath: optionPath,
+						pattern:    s,
+						err:        err,
+					})
+				} else {
+					e.re = re
+				}
 			}
 		}
 		if len(x) >= 2 {
@@ -148,6 +191,8 @@ func fillMatcherField(ms *matchersByFn, key string, raw interface{}) {
 	case "it":
 		ms.it = e
 	}
+
+	return invalids
 }
 
 func parseCompiledOptions(options any) compiledOptions {
@@ -163,36 +208,45 @@ func parseCompiledOptions(options any) compiledOptions {
 	}
 
 	if dw, ok := m["disallowedWords"]; ok && dw != nil {
-		co.disallowedConcat = compileDisallowedWords(dw)
+		co.disallowedConcat, co.invalidPatterns = compileDisallowedWords(dw, co.invalidPatterns)
 	}
 
 	if mn, ok := m["mustNotMatch"]; ok {
-		co.mustNotMatch = compileMatcherPatterns(mn)
+		co.mustNotMatch, co.invalidPatterns = compileMatcherPatterns(mn, "mustNotMatch")
 	}
 	if mm, ok := m["mustMatch"]; ok {
-		co.mustMatch = compileMatcherPatterns(mm)
+		co.mustMatch, co.invalidPatterns = compileMatcherPatterns(mm, "mustMatch")
 	}
 
 	return co
 }
 
-func compileDisallowedWords(raw interface{}) *regexp2.Regexp {
+func compileDisallowedWords(raw interface{}, invalids []invalidPattern) (*regexp2.Regexp, []invalidPattern) {
 	items, ok := raw.([]interface{})
 	if !ok || len(items) == 0 {
-		return nil
+		return nil, invalids
 	}
 	parts := make([]string, 0, len(items))
 	for _, it := range items {
 		w, ok := it.(string)
 		if ok && w != "" {
-			parts = append(parts, regexp.QuoteMeta(w))
+			parts = append(parts, w)
 		}
 	}
 	if len(parts) == 0 {
-		return nil
+		return nil, invalids
 	}
 	pattern := "(?i)\\b(" + strings.Join(parts, "|") + ")\\b"
-	return compileRE2(pattern)
+	re, err := compileRE2(pattern)
+	if err != nil {
+		invalids = append(invalids, invalidPattern{
+			optionPath: "disallowedWords",
+			pattern:    pattern,
+			err:        err,
+		})
+		return nil, invalids
+	}
+	return re, invalids
 }
 
 func trimFXPrefix(word string) string {
@@ -210,7 +264,7 @@ func binaryPlusContainsStringLit(n *ast.Node) bool {
 		return false
 	}
 	be := n.AsBinaryExpression()
-	if be == nil || be.OperatorToken == nil || be.OperatorToken.Kind != ast.KindPlusToken {
+	if be == nil {
 		return false
 	}
 	if utils.IsStringLiteralOrTemplate(be.Left) {
@@ -268,7 +322,7 @@ func shouldValidateEachPrintf(jestFn *jestUtils.ParsedJestFnCall, call *ast.Call
 }
 
 var (
-	reDupPrefix            = regexp.MustCompile(`^([\x60'"]).+?\s+`)
+	reDupPrefix            = regexp.MustCompile(`^([\x60'"]).+? `)
 	reAccOpen              = regexp.MustCompile(`^([\x60'"]) +`)
 	reAccClose             = regexp.MustCompile(` +([\x60'"])$`)
 	reEachInvalidSpecifier = regexp.MustCompile(`%[^psdifjo#$%]`)
@@ -289,7 +343,7 @@ func regexpToMessagePattern(re *regexp2.Regexp) string {
 		return ""
 	}
 	src := re.String()
-	return "/" + strings.ReplaceAll(src, "/", "\\/") + "/"
+	return "/" + strings.ReplaceAll(src, "/", "\\/") + "/u"
 }
 
 func eachInvalidSpecifier(title string) string {
@@ -309,6 +363,18 @@ var ValidTitleRule = rule.Rule{
 	Name: "jest/valid-title",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		co := parseCompiledOptions(options)
+		if len(co.invalidPatterns) > 0 {
+			for _, bad := range co.invalidPatterns {
+				ctx.ReportRange(core.NewTextRange(0, 0), rule.RuleMessage{
+					Id: "invalidPattern",
+					Description: fmt.Sprintf(
+						"Invalid regular expression in `%s` option: `%s`: %s",
+						bad.optionPath, bad.pattern, bad.err.Error(),
+					),
+				})
+			}
+			return rule.RuleListeners{}
+		}
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -348,7 +414,7 @@ var ValidTitleRule = rule.Rule{
 				}
 
 				if title == "" {
-					ctx.ReportNode(arg, rule.RuleMessage{
+					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "emptyTitle",
 						Description: jestEmptyFunctionName(jestFn.Kind) + " should not have an empty title",
 						Data: map[string]string{
@@ -389,10 +455,17 @@ var ValidTitleRule = rule.Rule{
 					if len(trimmed) != len(title) {
 						raw := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false)
 						fix := accidentalSpaceReplacement(raw)
-						ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
-							Id:          "accidentalSpace",
-							Description: "should not have leading or trailing spaces",
-						}, rule.RuleFixReplace(ctx.SourceFile, arg, fix))
+						if fix == raw {
+							ctx.ReportNode(arg, rule.RuleMessage{
+								Id:          "accidentalSpace",
+								Description: "should not have leading or trailing spaces",
+							})
+						} else {
+							ctx.ReportNodeWithFixes(arg, rule.RuleMessage{
+								Id:          "accidentalSpace",
+								Description: "should not have leading or trailing spaces",
+							}, rule.RuleFixReplace(ctx.SourceFile, arg, fix))
+						}
 					}
 				}
 
