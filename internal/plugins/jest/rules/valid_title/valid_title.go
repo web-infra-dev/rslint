@@ -215,10 +215,14 @@ func parseCompiledOptions(options any) compiledOptions {
 	}
 
 	if mn, ok := m["mustNotMatch"]; ok {
-		co.mustNotMatch, co.invalidPatterns = compileMatcherPatterns(mn, "mustNotMatch")
+		var invalids []invalidPattern
+		co.mustNotMatch, invalids = compileMatcherPatterns(mn, "mustNotMatch")
+		co.invalidPatterns = append(co.invalidPatterns, invalids...)
 	}
 	if mm, ok := m["mustMatch"]; ok {
-		co.mustMatch, co.invalidPatterns = compileMatcherPatterns(mm, "mustMatch")
+		var invalids []invalidPattern
+		co.mustMatch, invalids = compileMatcherPatterns(mm, "mustMatch")
+		co.invalidPatterns = append(co.invalidPatterns, invalids...)
 	}
 
 	return co
@@ -270,10 +274,10 @@ func binaryPlusContainsStringLit(n *ast.Node) bool {
 	if be == nil {
 		return false
 	}
-	if utils.IsStringLiteralOrTemplate(be.Left) {
+	if ast.IsStringLiteralLike(be.Left) {
 		return true
 	}
-	if utils.IsStringLiteralOrTemplate(be.Right) {
+	if ast.IsStringLiteralLike(be.Right) {
 		return true
 	}
 	return binaryPlusContainsStringLit(be.Left) || binaryPlusContainsStringLit(be.Right)

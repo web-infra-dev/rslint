@@ -342,6 +342,13 @@ ruleTester.run('valid-title', {} as never, {
       options: [{ disallowedWords: ['properly'] }],
       errors: [{ messageId: 'disallowedWord' }],
     },
+    {
+      code: `it("it foo", () => {});`,
+      options: [
+        { disallowedWords: ['ok', '(unterminated'], mustMatch: '^should ' },
+      ],
+      errors: [{ messageId: 'invalidPattern' }],
+    },
 
     // mustMatch / mustNotMatch
     {
@@ -581,6 +588,14 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: `it(1 + 2 + 3, () => {});`,
+      errors: [{ messageId: 'titleMustBeString' }],
+    },
+    {
+      code: 'it(foo + `suffix${x}`, () => {});',
+      errors: [{ messageId: 'titleMustBeString' }],
+    },
+    {
+      code: 'it(`prefix${x}` + foo, () => {});',
       errors: [{ messageId: 'titleMustBeString' }],
     },
     {
