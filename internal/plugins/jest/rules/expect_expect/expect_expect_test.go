@@ -99,6 +99,10 @@ func TestExpectExpectRule(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"theoretically"}}},
 			},
 			{
+				Code:    `foo.todo("eventual test");`,
+				Options: []interface{}{map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"foo.todo"}}},
+			},
+			{
 				Code:    `test('should pass *', () => expect404ToBeLoaded());`,
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"expect*"}}},
 			},
@@ -111,8 +115,8 @@ func TestExpectExpectRule(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"tester.*.expect"}}},
 			},
 			{
-				Code:    `test('should pass mixed identifier chars', () => Tester_1.foo$Bar().expect(123));`,
-				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"tester_*.*.expect"}}},
+				Code:    `test('should pass mixed identifier chars', () => Tester1.fooBar().expect(123));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"tester*.*.expect"}}},
 			},
 			{
 				Code:    `test('should pass **', () => tester.foo().expect(123));`,
@@ -141,10 +145,6 @@ func TestExpectExpectRule(t *testing.T) {
 			{
 				Code:    `test('should pass', () => request.get().foo().expect(456));`,
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.e*e*t"}}},
-			},
-			{
-				Code:    `test('should pass with uppercase and dollar segments', () => Request.GET_1().foo$Bar().expect(456));`,
-				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.expect"}}},
 			},
 			{
 				Code: `test('should still lint with malformed pattern config', () => {
@@ -230,6 +230,13 @@ func TestExpectExpectRule(t *testing.T) {
 				},
 			},
 			{
+				Code:    `test('should fail when assertFunctionNames is empty', () => { expect(true).toBeDefined(); });`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
+				},
+			},
+			{
 				Code: `it("should fail", () => { somePromise.then(() => {}); });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 3},
@@ -280,6 +287,13 @@ func TestExpectExpectRule(t *testing.T) {
 			{
 				Code:    `test('should fail', () => request(123));`,
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
+				},
+			},
+			{
+				Code:    `test('should fail with uppercase and dollar segments', () => Request.GET_1().foo$Bar().expect(456));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.expect"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
 				},

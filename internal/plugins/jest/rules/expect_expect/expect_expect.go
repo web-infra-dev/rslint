@@ -30,16 +30,14 @@ func parseOptions(options any) ([]string, []string) {
 	}
 
 	if raw, ok := m["assertFunctionNames"]; ok && raw != nil {
-		if arr, ok := raw.([]interface{}); ok && len(arr) > 0 {
+		if arr, ok := raw.([]interface{}); ok {
 			out := make([]string, 0, len(arr))
 			for _, v := range arr {
 				if s, ok := v.(string); ok {
 					out = append(out, s)
 				}
 			}
-			if len(out) > 0 {
-				assertNames = out
-			}
+			assertNames = out
 		}
 	}
 
@@ -69,9 +67,9 @@ func compileAssertPattern(pattern string) *regexp.Regexp {
 	parts := make([]string, 0, len(segs))
 	for _, s := range segs {
 		if s == "**" {
-			parts = append(parts, `[a-zA-Z0-9_$.]*`)
+			parts = append(parts, `[a-zA-Z0-9.]*`)
 		} else {
-			parts = append(parts, strings.ReplaceAll(s, "*", `[a-zA-Z0-9_$]*`))
+			parts = append(parts, strings.ReplaceAll(s, "*", `[a-zA-Z0-9]*`))
 		}
 	}
 	joined := strings.Join(parts, `\.`)
@@ -219,7 +217,7 @@ var ExpectExpectRule = rule.Rule{
 				isExtraBlock := calleeName != "" && slices.Contains(additionalTestBlocks, calleeName)
 
 				if isJestTest || isExtraBlock {
-					if isJestTest && isTodoTestCall(jestFn) {
+					if isTodoTestCall(jestFn) || strings.HasSuffix(calleeName, ".todo") {
 						return
 					}
 					if isJestTest {
