@@ -313,6 +313,11 @@ jobs:
         with:
           workspaces: '.'
           cache-on-failure: true
+          # Workaround for Swatinem/rust-cache#341: on the new macos runner image
+          # caching ~/.cargo/bin restores a broken `cargo` shim that resolves to
+          # rustup-init, causing `cargo fmt`/`clippy` to fail with
+          # "unexpected argument 'fmt' found / Usage: rustup-init[EXE] [OPTIONS]".
+          cache-bin: 'false'
 
       - name: Check formatting
         run: cargo fmt --all -- --check

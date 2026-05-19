@@ -1,0 +1,838 @@
+// Rstest Snapshot v1
+
+exports[`init-declarations > invalid 1`] = `
+{
+  "code": "var foo;",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 2`] = `
+{
+  "code": "for (var a in []) var foo;",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 3`] = `
+{
+  "code": "
+var foo,
+  bar = false,
+  baz;
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+    {
+      "message": "Variable 'baz' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 4`] = `
+{
+  "code": "
+function foo() {
+  var foo = 0;
+  var bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'bar' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 5`] = `
+{
+  "code": "
+function foo() {
+  var foo;
+  var bar = foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 6`] = `
+{
+  "code": "let a;",
+  "diagnostics": [
+    {
+      "message": "Variable 'a' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 7`] = `
+{
+  "code": "
+function foo() {
+  let a = 1,
+    b;
+  if (a) {
+    let c = 3,
+      d = null;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'b' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 8`] = `
+{
+  "code": "
+function foo() {
+  let a;
+  const b = false;
+  var c;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'a' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+    {
+      "message": "Variable 'c' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 9`] = `
+{
+  "code": "var foo = (bar = 2);",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 10`] = `
+{
+  "code": "var foo = true;",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 11`] = `
+{
+  "code": "
+var foo,
+  bar = 5,
+  baz = 3;
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'bar' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+    {
+      "message": "Variable 'baz' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 12`] = `
+{
+  "code": "
+function foo() {
+  var foo;
+  var bar = foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'bar' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 13`] = `
+{
+  "code": "let a = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable 'a' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 14`] = `
+{
+  "code": "
+function foo() {
+  let a = 'foo',
+    b;
+  if (a) {
+    let c, d;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'a' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 15`] = `
+{
+  "code": "
+function foo() {
+  let a;
+  const b = false;
+  var c = 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'c' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 16`] = `
+{
+  "code": "for (var i = 0; i < 1; i++) {}",
+  "diagnostics": [
+    {
+      "message": "Variable 'i' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 17`] = `
+{
+  "code": "
+for (var foo in []) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 18`] = `
+{
+  "code": "
+for (var foo of []) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 19`] = `
+{
+  "code": "
+function foo() {
+  var bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'bar' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 20`] = `
+{
+  "code": "let arr: string[] = ['arr', 'ar'];",
+  "diagnostics": [
+    {
+      "message": "Variable 'arr' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 21`] = `
+{
+  "code": "let arr: string = function () {};",
+  "diagnostics": [
+    {
+      "message": "Variable 'arr' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 22`] = `
+{
+  "code": "
+const class1 = class NAME {
+  constructor() {
+    var name1: string = 'hello';
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'name1' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 23`] = `
+{
+  "code": "let arr: string;",
+  "diagnostics": [
+    {
+      "message": "Variable 'arr' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 24`] = `
+{
+  "code": "
+namespace myLib {
+  let numberOfGreetings: number;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'numberOfGreetings' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 25`] = `
+{
+  "code": "
+namespace myLib {
+  let numberOfGreetings: number = 2;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'numberOfGreetings' should not be initialized on declaration.",
+      "messageId": "notInitialized",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`init-declarations > invalid 26`] = `
+{
+  "code": "
+namespace myLib1 {
+  const foo: number;
+  namespace myLib2 {
+    let bar: string;
+    namespace myLib3 {
+      let baz: object;
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable 'foo' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+    {
+      "message": "Variable 'bar' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+    {
+      "message": "Variable 'baz' should be initialized on declaration.",
+      "messageId": "initialized",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/init-declarations",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
