@@ -73,6 +73,28 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-go-windows
 
+      - name: Disk usage (before tests)
+        shell: pwsh
+        run: |
+          Write-Host "=== PSDrive ==="
+          Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+
+          $paths = @(
+            $env:GOCACHE,
+            'C:\Users\ContainerAdministrator\runner\_work\temp\ci-go-windows',
+            'C:\Users\ContainerAdministrator\runner\_work\rslint\rslint',
+            'C:\Users\ContainerAdministrator\runner\_work'
+          )
+          foreach ($p in $paths) {
+            if ($p -and (Test-Path $p)) {
+              $items = Get-ChildItem $p -Recurse -File -Force -ErrorAction SilentlyContinue
+              $size = ($items | Measure-Object -Sum Length).Sum
+              "{0,-70} {1,10:N2} GB  {2,8:N0} files" -f $p, ($size / 1GB), $items.Count
+            } else {
+              "{0,-70} (missing)" -f $p
+            }
+          }
+
       - name: Unit Test
         shell: pwsh
         run: |
@@ -107,6 +129,29 @@ jobs:
             Write-Host "Running final batch of $($batch.Count) packages..."
             go test -parallel 4 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+
+      - name: Disk usage (after tests)
+        if: always()
+        shell: pwsh
+        run: |
+          Write-Host "=== PSDrive ==="
+          Get-PSDrive -PSProvider FileSystem | Format-Table -AutoSize
+
+          $paths = @(
+            $env:GOCACHE,
+            'C:\Users\ContainerAdministrator\runner\_work\temp\ci-go-windows',
+            'C:\Users\ContainerAdministrator\runner\_work\rslint\rslint',
+            'C:\Users\ContainerAdministrator\runner\_work'
+          )
+          foreach ($p in $paths) {
+            if ($p -and (Test-Path $p)) {
+              $items = Get-ChildItem $p -Recurse -File -Force -ErrorAction SilentlyContinue
+              $size = ($items | Measure-Object -Sum Length).Sum
+              "{0,-70} {1,10:N2} GB  {2,8:N0} files" -f $p, ($size / 1GB), $items.Count
+            } else {
+              "{0,-70} (missing)" -f $p
+            }
           }
 
   build-rslint-windows:
