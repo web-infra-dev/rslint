@@ -653,29 +653,79 @@ func TestNoRestrictedTypesExtras(t *testing.T) {
 			},
 		},
 		// ---- Real-user: ban `React.FC` with a suggested replacement ----
-		// Frequently asked-for ban in React codebases. Important subtlety:
-		// the suggestion replaces only the *TypeName* (`React.FC`), not the
-		// outer TypeReference, so the original `<Props>` argument carries
-		// over into the suggested replacement. Locks in that fix/suggest
-		// scope is the same as the matched node (the typeName), not the
-		// whole parameterized form.
+		// Frequently asked-for ban in React codebases. The suggestion replaces
+		// only the *TypeName* (`React.FC`), not the outer TypeReference, so
+		// the original `<Props>` argument carries over into the suggested
+		// replacement. The replacement type `React.FunctionComponent` itself
+		// accepts type arguments, so the resulting `React.FunctionComponent<Props>`
+		// remains valid TypeScript — the test demonstrates the design intent
+		// while keeping output syntactically valid.
 		{
 			Code: `type Props = {}; const C: React.FC<Props> = () => null;`,
 			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
 				"React.FC": map[string]interface{}{
-					"message": "Prefer plain functions returning JSX.",
-					"suggest": []interface{}{"(props: Props) => JSX.Element"},
+					"message": "Use React.FunctionComponent instead.",
+					"suggest": []interface{}{"React.FunctionComponent"},
 				},
 			}}),
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "bannedTypeMessage",
-					Message:   "Don't use `React.FC` as a type. Prefer plain functions returning JSX.",
+					Message:   "Don't use `React.FC` as a type. Use React.FunctionComponent instead.",
 					Line:      1, Column: 27,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "bannedTypeReplacement", Output: `type Props = {}; const C: (props: Props) => JSX.Element<Props> = () => null;`},
+						{MessageId: "bannedTypeReplacement", Output: `type Props = {}; const C: React.FunctionComponent<Props> = () => null;`},
 					},
 				},
+			},
+		},
+		// ---- Design intent: fixWith on the TypeName preserves TypeArguments ----
+		// This is the *positive-output* counterpart to the upstream
+		// `Omit<Foo, 'a'>` → `Ok<Foo, 'a'>` migration test, written in this
+		// extras suite so the typeName-only-replacement design is locked in
+		// with a directly-named test, not just as a side effect of an upstream
+		// case. If a future refactor anchors fix/report on the outer
+		// TypeReference instead of the TypeName, both this and the upstream
+		// Omit case fail together.
+		{
+			Code: `let v: Banned<X>;`,
+			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
+				"Banned": map[string]interface{}{"fixWith": "Ok", "message": "Use Ok."},
+			}}),
+			Output: []string{`let v: Ok<X>;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "bannedTypeMessage", Message: "Don't use `Banned` as a type. Use Ok.", Line: 1, Column: 8},
+			},
+		},
+		// ---- Design intent: whole-node ban with fixWith replaces the whole TypeReference ----
+		// Mirror of the design-intent lock-in above, this time configuring the
+		// parameterized form `Banned<X>` directly. Here the fix DOES rewrite
+		// the entire `Banned<X>` to `Ok` because the bannedTypes key matches
+		// the whole-node text. Locks in that registering the parameterized
+		// key replaces the parameterized form end-to-end.
+		{
+			Code: `let v: Banned<X>;`,
+			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
+				"Banned<X>": map[string]interface{}{"fixWith": "Ok", "message": "Replace whole Banned<X>."},
+			}}),
+			Output: []string{`let v: Ok;`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "bannedTypeMessage", Message: "Don't use `Banned<X>` as a type. Replace whole Banned<X>.", Line: 1, Column: 8},
+			},
+		},
+		// ---- Branch lock-in: unknown JSON value shape collapses to bare ban ----
+		// Upstream getCustomMessage treats any truthy non-string non-object
+		// (e.g. a stray number `1` slipped past schema validation) as a bare
+		// ban — customMessage = ''. parseBannedTypes' default arm mirrors
+		// this: a number value goes through Kind="true", reporting with no
+		// custom-message suffix.
+		{
+			Code: `let v: Banned;`,
+			Options: optionsArr(map[string]interface{}{"types": map[string]interface{}{
+				"Banned": 1,
+			}}),
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "bannedTypeMessage", Message: "Don't use `Banned` as a type.", Line: 1, Column: 8},
 			},
 		},
 		// ---- Real-user: same name banned and not-banned in same file ----
