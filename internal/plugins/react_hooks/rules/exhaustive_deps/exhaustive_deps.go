@@ -110,12 +110,20 @@ func stripAsExpression(node *ast.Node) *ast.Node {
 }
 
 // containsNode reports whether `descendant` is inside `ancestor` by node range.
-// Returns false when either is nil. Inclusive on both ends.
+// Returns false when either is nil. Inclusive on both ends. Requires both
+// nodes to live in the same SourceFile: positions are per-file offsets, so
+// a raw integer comparison across files would false-positive any time the
+// per-file ranges happen to overlap numerically (issue #962). The SourceFile
+// check runs only after the cheap position comparison so we don't pay the
+// parent-chain walk on the common "obviously outside" path.
 func containsNode(ancestor, descendant *ast.Node) bool {
 	if ancestor == nil || descendant == nil {
 		return false
 	}
-	return descendant.Pos() >= ancestor.Pos() && descendant.End() <= ancestor.End()
+	if descendant.Pos() < ancestor.Pos() || descendant.End() > ancestor.End() {
+		return false
+	}
+	return ast.GetSourceFileOfNode(ancestor) == ast.GetSourceFileOfNode(descendant)
 }
 
 // nodeText returns the trimmed source text for `node`.
@@ -970,6 +978,14 @@ func scanForConstructions(
 		// the component body.
 		decl := resolveDeclaration(tc, dd.Node, dd.Key, componentBody)
 		if decl == nil {
+			continue
+		}
+		// Mirrors upstream's `componentScope.variables` filter: a global,
+		// import, or module-scope binding can never be a construction that
+		// changes identity per render, and a declaration that lives in
+		// another SourceFile (DOM lib, @types/node, …) must not be reported
+		// against the current file's text (issue #962).
+		if !containsNode(componentBody, decl) {
 			continue
 		}
 		switch decl.Kind {
