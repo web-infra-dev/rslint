@@ -168,8 +168,10 @@ type extra_Checker struct {
   evaluate evaluator.Evaluator
   stringLiteralTypes map[string]*checker.Type
   numberLiteralTypes map[jsnum.Number]*checker.Type
+  nanType *checker.Type
   bigintLiteralTypes map[jsnum.PseudoBigInt]*checker.Type
   enumLiteralTypes map[checker.EnumLiteralKey]*checker.Type
+  enumNaNLiteralTypes map[*ast.Symbol]*checker.Type
   indexedAccessTypes map[checker.CacheHashKey]*checker.Type
   templateLiteralTypes map[checker.CacheHashKey]*checker.Type
   stringMappingTypes map[checker.StringMappingKey]*checker.Type
