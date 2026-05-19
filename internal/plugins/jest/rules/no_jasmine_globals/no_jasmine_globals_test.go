@@ -27,8 +27,10 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 			{Code: `function callback(fail) { fail() }`},
 			{Code: `var spyOn = require("actions"); spyOn("foo")`},
 			{Code: `function callback(pending) { pending() }`},
-			{Code: `jasmine.DEFAULT_TIMEOUT_INTERVAL += 1000;`},
-			{Code: `jasmine["DEFAULT_TIMEOUT_INTERVAL"] += 1000;`},
+			{Code: `function callback(jasmine) { jasmine.any() }`},
+			{Code: `const jasmine = foo;`},
+			{Code: `(this as any).jasmine.foo()`},
+			{Code: `(this as any).jasmine.any()`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -72,6 +74,26 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 				}},
 			},
 			{
+				Code:   `jasmine`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
+				Code:   `const value = jasmine;`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    15,
+					Line:      1,
+				}},
+			},
+			{
 				Code:   `jasmine.DEFAULT_TIMEOUT_INTERVAL = 5000;`,
 				Output: []string{`jest.setTimeout(5000);`},
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -92,6 +114,16 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 				}},
 			},
 			{
+				Code:   `jasmine.DEFAULT_TIMEOUT_INTERVAL += 1000;`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
 				Code:   `jasmine["DEFAULT_TIMEOUT_INTERVAL"] = 5000;`,
 				Output: []string{`jest.setTimeout(5000);`},
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -103,6 +135,16 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 			},
 			{
 				Code:   `jasmine["DEFAULT_TIMEOUT_INTERVAL"] = function() {}`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
+				Code:   `jasmine["DEFAULT_TIMEOUT_INTERVAL"] += 1000;`,
 				Output: []string{},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "illegalJasmine",
@@ -178,6 +220,26 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 					MessageId: "illegalMethod",
 					Message:   "Illegal usage of `jasmine.stringMatching`, prefer `expect.stringMatching`",
 					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
+				Code:   `jasmine.foo.any()`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
+				Code:   `console.log(jasmine.version)`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    13,
 					Line:      1,
 				}},
 			},

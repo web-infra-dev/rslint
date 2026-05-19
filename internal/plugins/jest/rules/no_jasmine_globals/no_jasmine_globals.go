@@ -63,12 +63,18 @@ func isBindingResolved(ident *ast.Node, ctx rule.RuleContext) bool {
 	return sym != nil
 }
 
-func jasmineRootCallChain(callee *ast.Node) (chain string, jasmineObj *ast.Node, tail string, ok bool) {
+func jasmineRootCallChain(callee *ast.Node) (chain string, jasmineObj *ast.Node, tail string, entryCount int, ok bool) {
 	entries := jestutils.GetJestFnMemberEntries(callee)
 	if len(entries) < 2 || entries[0].Name != "jasmine" || entries[0].Node == nil {
-		return "", nil, "", false
+		return "", nil, "", 0, false
 	}
-	return jestutils.JoinJestFnMemberEntries(entries), entries[0].Node, entries[len(entries)-1].Name, true
+
+	rootParent := entries[0].Node.Parent
+	if rootParent == nil || rslintutils.AccessExpressionObject(rootParent) != entries[0].Node {
+		return "", nil, "", 0, false
+	}
+
+	return jestutils.JoinJestFnMemberEntries(entries), entries[0].Node, entries[len(entries)-1].Name, len(entries), true
 }
 
 func jasmineAssignedProperty(node *ast.Node) (jasmineObj *ast.Node, propName string, ok bool) {
@@ -101,13 +107,23 @@ func isEcmaPrimitiveLiteral(kind ast.Kind) bool {
 }
 
 func reportJasmineAssignedProperty(node *ast.Node, ctx rule.RuleContext) {
-	_, propName, ok := jasmineAssignedProperty(node)
+	jasmineObj, propName, ok := jasmineAssignedProperty(node)
 	if !ok {
+		return
+	}
+	if isBindingResolved(jasmineObj, ctx) {
 		return
 	}
 
 	parent := node.Parent
+	if parent != nil && rslintutils.AccessExpressionObject(parent) == node {
+		return
+	}
 	if parent == nil || !ast.IsAssignmentExpression(parent, false) {
+		if parent != nil && ast.IsCallExpression(parent) && parent.AsCallExpression().Expression == node {
+			return
+		}
+		ctx.ReportNode(node, buildIllegalJasmineMessage())
 		return
 	}
 	bin := parent.AsBinaryExpression()
@@ -116,22 +132,20 @@ func reportJasmineAssignedProperty(node *ast.Node, ctx rule.RuleContext) {
 	}
 
 	if propName == "DEFAULT_TIMEOUT_INTERVAL" {
-		if bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken {
-			return
-		}
-
-		right := ast.SkipParentheses(bin.Right)
-		if right != nil && isEcmaPrimitiveLiteral(right.Kind) {
-			ctx.ReportNodeWithFixes(
-				node,
-				buildIllegalJasmineMessage(),
-				rule.RuleFixReplace(
-					ctx.SourceFile,
-					parent,
-					fmt.Sprintf("jest.setTimeout(%s)", right.Text()),
-				),
-			)
-			return
+		if bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindEqualsToken {
+			right := ast.SkipParentheses(bin.Right)
+			if right != nil && isEcmaPrimitiveLiteral(right.Kind) {
+				ctx.ReportNodeWithFixes(
+					node,
+					buildIllegalJasmineMessage(),
+					rule.RuleFixReplace(
+						ctx.SourceFile,
+						parent,
+						fmt.Sprintf("jest.setTimeout(%s)", right.Text()),
+					),
+				)
+				return
+			}
 		}
 	}
 
@@ -168,13 +182,17 @@ var NoJasmineGlobalsRule = rule.Rule{
 					}
 					return
 				case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-					chain, jasmineObj, tail, ok := jasmineRootCallChain(callee)
-					if !ok {
+					chain, jasmineObj, tail, entryCount, ok := jasmineRootCallChain(callee)
+					if !ok || isBindingResolved(jasmineObj, ctx) {
 						return
 					}
 
 					switch tail {
 					case "any", "anything", "arrayContaining", "objectContaining", "stringMatching":
+						if entryCount != 2 {
+							ctx.ReportNode(node, buildIllegalJasmineMessage())
+							return
+						}
 						ctx.ReportNodeWithFixes(
 							node,
 							buildIllegalMethodMessage(chain, "expect."+tail),
@@ -194,6 +212,18 @@ var NoJasmineGlobalsRule = rule.Rule{
 			},
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				reportJasmineAssignedProperty(node, ctx)
+			},
+			ast.KindIdentifier: func(node *ast.Node) {
+				if node.AsIdentifier().Text != "jasmine" || isBindingResolved(node, ctx) {
+					return
+				}
+
+				parent := node.Parent
+				if parent != nil && (ast.IsPropertyAccessExpression(parent) || ast.IsElementAccessExpression(parent)) {
+					return
+				}
+
+				ctx.ReportNode(node, buildIllegalJasmineMessage())
 			},
 		}
 	},
