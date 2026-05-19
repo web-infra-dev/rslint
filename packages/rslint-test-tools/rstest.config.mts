@@ -281,7 +281,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-redundant-type-constituents.test.ts',
     './tests/typescript-eslint/rules/no-require-imports.test.ts',
     './tests/typescript-eslint/rules/no-restricted-imports.test.ts',
-    // './tests/typescript-eslint/rules/no-restricted-types.test.ts',
+    './tests/typescript-eslint/rules/no-restricted-types.test.ts',
     // './tests/typescript-eslint/rules/no-shadow/no-shadow-eslint.test.ts',
     './tests/typescript-eslint/rules/no-shadow/no-shadow.test.ts',
     './tests/typescript-eslint/rules/no-this-alias.test.ts',
