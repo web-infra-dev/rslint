@@ -74,8 +74,8 @@ func collectCommentsForward(text string, start, limit int) []core.TextRange {
 		if pos+1 < limit && text[pos] == '/' && text[pos+1] == '*' {
 			cStart := pos
 			pos += 2
-			for pos+1 < limit {
-				if text[pos] == '*' && text[pos+1] == '/' {
+			for pos < limit {
+				if pos+1 < limit && text[pos] == '*' && text[pos+1] == '/' {
 					pos += 2
 					break
 				}
@@ -259,19 +259,22 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			suggestion = "type " + buildInterfaceHeader(node.AsInterfaceDeclaration()) + " = " + suggestion + lastChar
 		}
 
+		nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+
 		// Collect leading and trailing comments by scanning the trivia regions
 		// directly. tsgo's scanner.GetLeadingCommentRanges only collects line-
 		// boundary-adjacent comments, so it misses same-line inline blocks like
 		// `{ /* c */ (): void }` that the upstream rule needs to relocate.
+		// Trailing scan is capped at the containing node's end so comments
+		// outside the type-literal / interface body never leak in.
 		comments := append(
 			collectCommentsForward(sourceText, member.Pos(), memberStart),
-			collectCommentsForward(sourceText, memberEnd, len(sourceText))...,
+			collectCommentsForward(sourceText, memberEnd, nodeRange.End())...,
 		)
 
 		memberLine := scanner.ComputeLineOfPosition(lineStarts, memberStart)
 
 		var fixes []rule.RuleFix
-		nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
 
 		// `export interface Foo` has comments moved before `export` so they
 		// don't end up between `export` and the resulting `type` declaration.

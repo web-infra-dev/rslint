@@ -918,6 +918,123 @@ export type Handler<T> = (event: T) => void;
 			},
 		},
 
+		// ---- Dimension 4: type parameter with nested generic constraint —
+		//      `T extends Map<K, V>`. The constraint contains a `>` of its
+		//      own; the header-slicing loop must walk past it and find the
+		//      type-parameter list's closing `>`, not the inner one.
+		{
+			Code: `
+interface Cache<T extends Map<string, number>> {
+  (key: T): number;
+}
+      `,
+			Output: []string{`
+type Cache<T extends Map<string, number>> = (key: T) => number;
+      `},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "functionTypeOverCallableType",
+					Line:      3,
+					Column:    3,
+				},
+			},
+		},
+
+		// ---- Locks in nested single-member type literal inside a single-
+		//      member interface. Both listeners fire (outer interface +
+		//      inner type literal); the fix outputs overlap so rule-tester
+		//      applies them across multiple passes — the final state has
+		//      both rewrites composed.
+		{
+			Code: `
+interface Outer {
+  (): { (): void };
+}
+      `,
+			Output: []string{`
+type Outer = () => { (): void };
+      `, `
+type Outer = () => () => void;
+      `},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "functionTypeOverCallableType",
+					Line:      3,
+					Column:    3,
+				},
+				{
+					MessageId: "functionTypeOverCallableType",
+					Line:      3,
+					Column:    9,
+				},
+			},
+		},
+
+		// ---- Locks in ConstructSignature with its own type parameters
+		//      living inside a type literal (the previous test had it in an
+		//      interface). Separate AST path: TypeLiteral listener +
+		//      ConstructSignatureDeclaration with TypeParameters.
+		{
+			Code: `
+type Ctor = { new <T>(arg: T): T };
+      `,
+			Output: []string{`
+type Ctor = new <T>(arg: T) => T;
+      `},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "functionTypeOverCallableType",
+					Line:      2,
+					Column:    15,
+				},
+			},
+		},
+
+		// ---- Dimension 4: interface nested inside a namespace. The
+		//      InterfaceDeclaration listener fires the same way; the parent
+		//      ModuleBlock should not influence the rewrite.
+		{
+			Code: `
+namespace N {
+  export interface Handler {
+    (event: string): void;
+  }
+}
+      `,
+			Output: []string{`
+namespace N {
+  export type Handler = (event: string) => void;
+}
+      `},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "functionTypeOverCallableType",
+					Line:      4,
+					Column:    5,
+				},
+			},
+		},
+
+		// ---- Dimension 4: mapped-type value containing a single-member type
+		//      literal — `{ [K in keyof T]: { (): void } }`. Locks in that the
+		//      TypeLiteral listener fires regardless of being inside a
+		//      MappedTypeNode value position.
+		{
+			Code: `
+type Listeners<T> = { [K in keyof T]: { (event: T[K]): void } };
+      `,
+			Output: []string{`
+type Listeners<T> = { [K in keyof T]: (event: T[K]) => void };
+      `},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "functionTypeOverCallableType",
+					Line:      2,
+					Column:    41,
+				},
+			},
+		},
+
 		// ---- Real-user: comment between modifier and `interface` keyword.
 		//      `export /* note */ interface Foo` must preserve the
 		//      `/* note */` verbatim — replace range starts at `interface`,
