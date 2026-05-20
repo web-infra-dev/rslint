@@ -225,9 +225,10 @@ func getElementAccessName(node *ast.Node) string {
 // assertFunctionNames matching).
 //
 // It differs from GetJestFnMemberEntries / getElementAccessName: bracket notation
-// contributes a segment only when the index is a compile-time literal (string,
-// number, or no-substitution template). Dynamic keys like obj[foo] stop at obj.
-// NewExpression is peeled so e.g. new (require('x')).y becomes a chain.
+// contributes a segment only when the index matches eslint-plugin-jest's
+// supported accessor names (identifier, string literal, or no-substitution
+// template). Unsupported keys break the chain entirely. NewExpression is peeled
+// so e.g. new (require('x')).y becomes a chain.
 func CalleeChainName(expr *ast.Node) string {
 	expr = ast.SkipParentheses(expr)
 	if expr == nil {
@@ -254,7 +255,7 @@ func CalleeChainName(expr *ast.Node) string {
 		left := CalleeChainName(ea.Expression)
 		key := calleeChainLiteralElementKey(ast.SkipParentheses(ea.ArgumentExpression))
 		if left == "" || key == "" {
-			return left
+			return ""
 		}
 		return left + "." + key
 	case ast.KindCallExpression:
@@ -273,16 +274,16 @@ func CalleeChainName(expr *ast.Node) string {
 }
 
 // calleeChainLiteralElementKey matches eslint-plugin-jest segments for
-// MemberExpression computed with a literal only.
+// MemberExpression computed with a supported accessor name only.
 func calleeChainLiteralElementKey(n *ast.Node) string {
 	if n == nil {
 		return ""
 	}
 	switch n.Kind {
+	case ast.KindIdentifier:
+		return n.AsIdentifier().Text
 	case ast.KindStringLiteral:
 		return n.AsStringLiteral().Text
-	case ast.KindNumericLiteral:
-		return n.AsNumericLiteral().Text
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return n.AsNoSubstitutionTemplateLiteral().Text
 	default:

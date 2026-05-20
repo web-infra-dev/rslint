@@ -123,6 +123,10 @@ ruleTester.run('expect-expect', {} as never, {
       code: "test('should pass', () => request.get().foo().expect(456));",
       options: [{ assertFunctionNames: ['request.**.e*e*t'] }],
     },
+    {
+      code: "test('should pass', () => foo[bar].expect(1));",
+      options: [{ assertFunctionNames: ['foo.bar.expect'] }],
+    },
 
     // alias
     {
@@ -335,6 +339,45 @@ ruleTester.run('expect-expect', {} as never, {
     {
       code: "test('should fail', () => request(123));",
       options: [{ assertFunctionNames: ['request.**'] }],
+      errors: [
+        {
+          messageId: 'noAssertions',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail for identifier bracket access mismatch', () => foo[bar].expect(1));",
+      options: [{ assertFunctionNames: ['foo.expect'] }],
+      errors: [
+        {
+          messageId: 'noAssertions',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail for numeric bracket access', () => foo[1].expect(1));",
+      options: [{ assertFunctionNames: ['foo.1.expect'] }],
+      errors: [
+        {
+          messageId: 'noAssertions',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 5,
+        },
+      ],
+    },
+    {
+      code: "test('should fail for dynamic bracket access', () => foo[a + b].expect(1));",
+      options: [{ assertFunctionNames: ['foo.expect'] }],
       errors: [
         {
           messageId: 'noAssertions',

@@ -147,6 +147,10 @@ func TestExpectExpectRule(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.e*e*t"}}},
 			},
 			{
+				Code:    `test('should pass', () => foo[bar].expect(1));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"foo.bar.expect"}}},
+			},
+			{
 				Code: `test('should still lint with malformed pattern config', () => {
           expect(true).toBeDefined();
         });`,
@@ -294,6 +298,27 @@ func TestExpectExpectRule(t *testing.T) {
 			{
 				Code:    `test('should fail with uppercase and dollar segments', () => Request.GET_1().foo$Bar().expect(456));`,
 				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"request.**.expect"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
+				},
+			},
+			{
+				Code:    `test('should fail for identifier bracket access mismatch', () => foo[bar].expect(1));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"foo.expect"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
+				},
+			},
+			{
+				Code:    `test('should fail for numeric bracket access', () => foo[1].expect(1));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"foo.1.expect"}}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
+				},
+			},
+			{
+				Code:    `test('should fail for dynamic bracket access', () => foo[a + b].expect(1));`,
+				Options: []interface{}{map[string]interface{}{"assertFunctionNames": []interface{}{"foo.expect"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "noAssertions", Line: 1, Column: 1, EndLine: 1, EndColumn: 5},
 				},
