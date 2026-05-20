@@ -318,6 +318,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-declare.test.ts',
     // './tests/typescript-eslint/rules/no-use-before-define.test.ts',
     './tests/typescript-eslint/rules/no-useless-constructor.test.ts',
+    './tests/typescript-eslint/rules/no-useless-default-assignment.test.ts',
     // './tests/typescript-eslint/rules/no-useless-empty-export.test.ts',
     // './tests/typescript-eslint/rules/no-var-requires.test.ts',
     './tests/typescript-eslint/rules/no-wrapper-object-types.test.ts',

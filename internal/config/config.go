@@ -102,6 +102,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unused_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_use_before_define"
 	ts_no_useless_constructor "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_constructor"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_default_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_empty_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_wrapper_object_types"
@@ -621,6 +622,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-vars", no_unused_vars.NoUnusedVarsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-use-before-define", no_use_before_define.NoUseBeforeDefineRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-constructor", ts_no_useless_constructor.NoUselessConstructorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-default-assignment", no_useless_default_assignment.NoUselessDefaultAssignmentRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-empty-export", no_useless_empty_export.NoUselessEmptyExportRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-var-requires", no_var_requires.NoVarRequiresRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-wrapper-object-types", no_wrapper_object_types.NoWrapperObjectTypesRule)
