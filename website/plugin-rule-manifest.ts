@@ -36,15 +36,18 @@ function resolvePresetConfig(
   return mod?.configs?.[configKey];
 }
 
-const PLUGINS = PLUGIN_REGISTRY.map((p) => {
-  const config =
-    p.presetName && resolvePresetConfig(p.importName, p.presetName);
-  return {
-    prefix: p.prefix,
-    group: p.group,
-    presets: config ? [{ config, name: p.presetName! }] : [],
-  };
-});
+const PLUGINS = PLUGIN_REGISTRY.map((p) => ({
+  prefix: p.prefix,
+  group: p.group,
+  presets: p.presets
+    .map(({ name }) => {
+      const config = resolvePresetConfig(p.importName, name);
+      return config ? { config, name } : null;
+    })
+    .filter((entry): entry is { config: RslintConfigEntry; name: string } =>
+      Boolean(entry),
+    ),
+}));
 
 function getFullRuleName(rule: RuleEntry): string {
   if (rule.group === 'eslint') return rule.name;
