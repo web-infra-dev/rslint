@@ -88,6 +88,13 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     description: 'Jest rules',
   },
   {
+    prefix: 'jest',
+    group: 'eslint-plugin-jest',
+    importName: 'jestPlugin',
+    presetName: 'jestPlugin.configs.style',
+    description: 'Jest style rules',
+  },
+  {
     prefix: 'unicorn',
     group: 'eslint-plugin-unicorn',
     importName: 'unicornPlugin',
