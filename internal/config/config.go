@@ -110,6 +110,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/parameter_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_as_const"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_destructuring"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_enum_initializers"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_for_of"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_includes"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_literal_enum_member"
@@ -629,6 +630,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/parameter-properties", parameter_properties.ParameterPropertiesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-destructuring", prefer_destructuring.PreferDestructuringRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-enum-initializers", prefer_enum_initializers.PreferEnumInitializersRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-includes", prefer_includes.PreferIncludesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-literal-enum-member", prefer_literal_enum_member.PreferLiteralEnumMemberRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-namespace-keyword", prefer_namespace_keyword.PreferNamespaceKeywordRule)
