@@ -376,7 +376,11 @@ if (x) {
       `,
       options: [{ allowNullableEnum: true }],
     },
+    // Skipped: rslint's JS rule-tester does not support per-case
+    // `parserOptions.tsconfigRootDir`. The Go-side upstream test exercises
+    // the same opt-out path.
     {
+      skip: true,
       code: `
 declare const x: string[] | null;
 // eslint-disable-next-line
@@ -3246,8 +3250,13 @@ if (Boolean(x)) {
       ],
     },
 
-    // noStrictNullCheck
+    // noStrictNullCheck — skipped because rslint's JS rule-tester does not
+    // support per-case `parserOptions.tsconfigRootDir` overrides. The
+    // equivalent assertion is covered by the Go upstream test (see
+    // strict_boolean_expressions_upstream_test.go) using TSConfig:
+    // "tsconfig.unstrict.json".
     {
+      skip: true,
       code: `
 declare const x: string[] | null;
 if (x) {

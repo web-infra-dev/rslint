@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -713,7 +714,7 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 
 			if opts.checkTypePredicates {
 				// Check for truthiness assertion functions
-				truthinessArg := findTruthinessAssertedArgument(tc, callExpr)
+				truthinessArg := typescriptutil.FindTruthinessAssertedArgument(tc, callExpr)
 				if truthinessArg != nil {
 					checkNode(truthinessArg, false, nil)
 				}
@@ -945,51 +946,10 @@ type typeGuardResult struct {
 	asserts       bool
 }
 
-// firstSpreadIndex returns the index of the first spread element argument,
-// or -1 if none. Arguments before the first spread can still be reliably
-// mapped to parameters by index.
-func firstSpreadIndex(callExpr *ast.CallExpression) int {
-	for i, arg := range callExpr.Arguments.Nodes {
-		if ast.IsSpreadElement(arg) {
-			return i
-		}
-	}
-	return -1
-}
-
-func findTruthinessAssertedArgument(tc *checker.Checker, callExpr *ast.CallExpression) *ast.Node {
-	// Get the resolved signature
-	sig := checker.Checker_getResolvedSignature(tc, callExpr.AsNode(), nil, checker.CheckModeNormal)
-	if sig == nil {
-		return nil
-	}
-
-	predicate := tc.GetTypePredicateOfSignature(sig)
-	if predicate == nil {
-		return nil
-	}
-
-	// Truthiness assertions: asserts param (no type) or param is truthy (no type)
-	if predicate.Type() != nil {
-		return nil
-	}
-
-	// Must be an asserts predicate
-	if predicate.Kind() != checker.TypePredicateKindAssertsIdentifier {
-		return nil
-	}
-
-	paramIndex := predicate.ParameterIndex()
-	// Skip if parameter index is at or past a spread element (unreliable mapping)
-	spreadIdx := firstSpreadIndex(callExpr)
-	if spreadIdx >= 0 && int(paramIndex) >= spreadIdx {
-		return nil
-	}
-	if int(paramIndex) >= len(callExpr.Arguments.Nodes) {
-		return nil
-	}
-	return callExpr.Arguments.Nodes[paramIndex]
-}
+// firstSpreadIndex / findTruthinessAssertedArgument were moved to
+// typescriptutil because strict_boolean_expressions needs the same predicate
+// mapping. Callers should use typescriptutil.FirstSpreadIndex /
+// typescriptutil.FindTruthinessAssertedArgument directly.
 
 func findTypeGuardAssertedArgument(tc *checker.Checker, callExpr *ast.CallExpression) *typeGuardResult {
 	sig := checker.Checker_getResolvedSignature(tc, callExpr.AsNode(), nil, checker.CheckModeNormal)
@@ -1013,7 +973,7 @@ func findTypeGuardAssertedArgument(tc *checker.Checker, callExpr *ast.CallExpres
 
 	paramIndex := predicate.ParameterIndex()
 	// Skip if parameter index is at or past a spread element (unreliable mapping)
-	spreadIdx := firstSpreadIndex(callExpr)
+	spreadIdx := typescriptutil.FirstSpreadIndex(callExpr)
 	if spreadIdx >= 0 && int(paramIndex) >= spreadIdx {
 		return nil
 	}
