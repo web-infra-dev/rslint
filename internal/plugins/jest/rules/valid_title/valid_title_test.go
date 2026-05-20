@@ -151,6 +151,7 @@ func TestValidTitleRule(t *testing.T) {
 		{Code: `describe("foo", function () { it("bar", function () {}) })`},
 		{Code: "test(`foo`, function () {})"},
 		{Code: "test.concurrent(`foo`, function () {})"},
+		{Code: "test(`\\nfoo\\n`, function () {})"},
 		{Code: "test(`${foo}`, function () {})"},
 		{Code: "test.concurrent(`${foo}`, function () {})"},
 		{Code: `it('foo', function () {})`},
@@ -616,6 +617,18 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code:   `it(1 + 2 + 3, () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
+		},
+		{
+			Code:   `it('a' || 'b', () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
+		},
+		{
+			Code:   `it(cond && 'b', () => {});`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
+		},
+		{
+			Code:   `it(x = 'foo', () => {});`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
 		},
 		{

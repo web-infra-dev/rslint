@@ -266,12 +266,17 @@ func trimFXPrefix(word string) string {
 	return word
 }
 
-func binaryPlusContainsStringLit(n *ast.Node) bool {
+func binaryExprContainsStringLit(n *ast.Node) bool {
 	if n == nil || n.Kind != ast.KindBinaryExpression {
 		return false
 	}
 	be := n.AsBinaryExpression()
-	if be == nil {
+	if be == nil || be.OperatorToken == nil {
+		return false
+	}
+	if ast.IsLogicalOrCoalescingBinaryOperator(be.OperatorToken.Kind) ||
+		ast.IsAssignmentOperator(be.OperatorToken.Kind) ||
+		be.OperatorToken.Kind == ast.KindCommaToken {
 		return false
 	}
 	if ast.IsStringLiteralLike(be.Left) {
@@ -280,10 +285,22 @@ func binaryPlusContainsStringLit(n *ast.Node) bool {
 	if ast.IsStringLiteralLike(be.Right) {
 		return true
 	}
-	return binaryPlusContainsStringLit(be.Left) || binaryPlusContainsStringLit(be.Right)
+	return binaryExprContainsStringLit(be.Left)
 }
 
-func jestTitleInner(n *ast.Node) (string, bool) {
+func rawTemplateLiteralText(node *ast.Node, sourceText string) string {
+	pos := node.Pos()
+	end := node.End()
+	if sourceText == "" || pos+1 >= end-1 {
+		return ""
+	}
+	if end-1 > len(sourceText) || pos+1 < 0 {
+		return ""
+	}
+	return sourceText[pos+1 : end-1]
+}
+
+func jestTitleInner(n *ast.Node, sourceText string) (string, bool) {
 	if n == nil {
 		return "", false
 	}
@@ -291,7 +308,7 @@ func jestTitleInner(n *ast.Node) (string, bool) {
 	case ast.KindStringLiteral:
 		return n.AsStringLiteral().Text, true
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return n.AsNoSubstitutionTemplateLiteral().Text, true
+		return rawTemplateLiteralText(n, sourceText), true
 	default:
 		return "", false
 	}
@@ -399,9 +416,9 @@ var ValidTitleRule = rule.Rule{
 				}
 				arg := call.Arguments.Nodes[0]
 
-				title, ok := jestTitleInner(arg)
+				title, ok := jestTitleInner(arg, ctx.SourceFile.Text())
 				if !ok {
-					if binaryPlusContainsStringLit(arg) {
+					if binaryExprContainsStringLit(arg) {
 						return
 					}
 					ignored := false

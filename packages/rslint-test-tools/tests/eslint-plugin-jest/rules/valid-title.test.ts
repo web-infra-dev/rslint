@@ -105,6 +105,7 @@ ruleTester.run('valid-title', {} as never, {
     },
     { code: 'test(`foo`, function () {})' },
     { code: 'test.concurrent(`foo`, function () {})' },
+    { code: 'test(`\\nfoo\\n`, function () {})' },
     { code: 'test(`${foo}`, function () {})' },
     { code: 'test.concurrent(`${foo}`, function () {})' },
     { code: "it('foo', function () {})" },
@@ -588,6 +589,18 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: `it(1 + 2 + 3, () => {});`,
+      errors: [{ messageId: 'titleMustBeString' }],
+    },
+    {
+      code: `it('a' || 'b', () => {});`,
+      errors: [{ messageId: 'titleMustBeString' }],
+    },
+    {
+      code: `it(cond && 'b', () => {});`,
+      errors: [{ messageId: 'titleMustBeString' }],
+    },
+    {
+      code: `it(x = 'foo', () => {});`,
       errors: [{ messageId: 'titleMustBeString' }],
     },
     {
