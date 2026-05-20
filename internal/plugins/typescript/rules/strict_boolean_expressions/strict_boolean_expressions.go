@@ -1126,9 +1126,22 @@ func wrappingFix(
 }
 
 // isStrongInnerNode extends utils.IsStrongPrecedenceNode with kinds the
-// shared helper does not cover but matter for this rule's wrapping fixer:
-//   - `this` / `super` — bind as tight as identifiers
-//   - `x!` non-null assertion — single-token postfix, never rebinds
+// shared helper does not cover but matter for this rule's wrapping fixer.
+//
+// Intentional divergence from upstream's `isStrongPrecedenceNode`
+// (Phase 1 Step 6.A): upstream's list omits these because ESTree doesn't
+// distinguish them or they don't apply to ESTree. tsgo has them as first-class
+// AST kinds and they ARE strong-precedence in JS grammar, so wrapping them in
+// extra parens would produce noisier (less idiomatic) fix output without
+// changing semantics:
+//   - `this` / `super` — bind exactly as tightly as Identifier; ESTree models
+//     them as `ThisExpression` / `Super` and upstream just doesn't enumerate
+//     them, but the rule wouldn't actually hit them through a fix path on
+//     ESTree either.
+//   - `x!` non-null assertion (TSNonNullExpression) — single-token postfix
+//     that binds tighter than any binary operator, so the outer wrap-or-not
+//     decision is identical to `x` alone. Locked in by the Dimension-4
+//     extras test for `x!` operand of `!` and `if (x!)` outputs.
 func isStrongInnerNode(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -1240,16 +1253,25 @@ func lastSignificantChar(src string, endExclusive int) byte {
 }
 
 // isLeftHandSide mirrors upstream's `isLeftHandSide` (the private helper used
-// by the wrapping fixer's ASI check).
+// by the wrapping fixer's ASI check). Upstream only treats `UpdateExpression`
+// (`a++` / `++a`) as a left-hand parent on the unary side, not the broader
+// `UnaryExpression` (`!a`, `~a`, `typeof a`, ...). tsgo collapses both shapes
+// into PrefixUnary / PostfixUnary, so we differentiate by operator: only the
+// update operators `++` and `--` should return true.
 func isLeftHandSide(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
-	switch parent.Kind {
-	case ast.KindPostfixUnaryExpression, ast.KindPrefixUnaryExpression:
-		// Update expressions in tsgo collapse into prefix/postfix.
+	if parent.Kind == ast.KindPostfixUnaryExpression {
+		// `a++` / `a--` — operand is the leftmost token. Upstream UpdateExpression.
 		return true
+	}
+	if parent.Kind == ast.KindPrefixUnaryExpression {
+		op := parent.AsPrefixUnaryExpression().Operator
+		// Only `++a` / `--a` count as UpdateExpression upstream-side; `!a`,
+		// `~a`, `+a`, `-a` are UnaryExpression and upstream returns false.
+		return op == ast.KindPlusPlusToken || op == ast.KindMinusMinusToken
 	}
 	if ast.IsBinaryExpression(parent) {
 		return parent.AsBinaryExpression().Left == node
