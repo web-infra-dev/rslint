@@ -6,6 +6,7 @@ package typescriptutil
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -154,6 +155,63 @@ func IsClassImplementsOrInterfaceExtends(node *ast.Node) bool {
 		return parent.AsHeritageClause().Token == ast.KindImplementsKeyword
 	}
 	return false
+}
+
+// FirstSpreadIndex returns the index of the first SpreadElement argument in a
+// call expression, or -1 when there is none. Arguments before the first spread
+// can still be mapped to parameters by index; arguments at or past it cannot.
+//
+// Extracted from no_unnecessary_condition because strict_boolean_expressions
+// needs the same predicate-parameter mapping; mirrors typescript-eslint's
+// `firstSpreadIndex` helper.
+func FirstSpreadIndex(callExpr *ast.CallExpression) int {
+	for i, arg := range callExpr.Arguments.Nodes {
+		if ast.IsSpreadElement(arg) {
+			return i
+		}
+	}
+	return -1
+}
+
+// FindTruthinessAssertedArgument returns the argument node corresponding to a
+// truthiness-assertion call (`function f(x): asserts x`), or nil when the call
+// is not such an assertion. Mirrors typescript-eslint's
+// `findTruthinessAssertedArgument`:
+//   - the resolved signature must carry an `asserts` type predicate with no
+//     `Type()` (a truthiness assertion, not a type guard);
+//   - the asserted parameter index must map to an argument before any spread.
+//
+// Extracted from no_unnecessary_condition to satisfy the plugin's
+// duplicate-across-rules rule (strict_boolean_expressions consumes the same
+// helper for its CallExpression listener).
+func FindTruthinessAssertedArgument(tc *checker.Checker, callExpr *ast.CallExpression) *ast.Node {
+	sig := checker.Checker_getResolvedSignature(tc, callExpr.AsNode(), nil, checker.CheckModeNormal)
+	if sig == nil {
+		return nil
+	}
+
+	predicate := tc.GetTypePredicateOfSignature(sig)
+	if predicate == nil {
+		return nil
+	}
+
+	if predicate.Type() != nil {
+		return nil
+	}
+
+	if predicate.Kind() != checker.TypePredicateKindAssertsIdentifier {
+		return nil
+	}
+
+	paramIndex := predicate.ParameterIndex()
+	spreadIdx := FirstSpreadIndex(callExpr)
+	if spreadIdx >= 0 && int(paramIndex) >= spreadIdx {
+		return nil
+	}
+	if int(paramIndex) >= len(callExpr.Arguments.Nodes) {
+		return nil
+	}
+	return callExpr.Arguments.Nodes[paramIndex]
 }
 
 // IsWeakPrecedenceParent mirrors typescript-eslint's `isWeakPrecedenceParent`
