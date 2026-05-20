@@ -60,7 +60,8 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     presets: [
       {
         name: 'ts.configs.recommended',
-        description: 'TypeScript recommended rules (includes ESLint core rules)',
+        description:
+          'TypeScript recommended rules (includes ESLint core rules)',
       },
     ],
   },

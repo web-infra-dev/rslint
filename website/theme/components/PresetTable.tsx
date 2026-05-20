@@ -39,9 +39,7 @@ export const PresetTable: React.FC = () => (
  * `defineConfig` and every preset export listed in {@link PLUGIN_REGISTRY}.
  */
 export const PresetImportSnippet: React.FC = () => {
-  const importNames = [
-    ...new Set(PRESET_PLUGINS.map((p) => p.importName)),
-  ];
+  const importNames = [...new Set(PRESET_PLUGINS.map((p) => p.importName))];
   const names = ['defineConfig', ...importNames];
   const code = `import {\n${names.map((n) => `  ${n},`).join('\n')}\n} from '@rslint/core';\n`;
   return <CodeBlockRuntime lang="ts" code={code} />;
