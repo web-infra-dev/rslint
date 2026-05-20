@@ -43,11 +43,18 @@ func checkCallExpression(ctx rule.RuleContext, opts Options, callNode *ast.Node,
 	if !isInPromise(reportNode) {
 		return
 	}
+	// Bail on optional calls: Promise.resolve?.()
+	if callNode.AsCallExpression().QuestionDotToken != nil {
+		return
+	}
 	callee := ast.SkipOuterExpressions(callNode.AsCallExpression().Expression, skipTransparent)
 	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
 		return
 	}
 	prop := callee.AsPropertyAccessExpression()
+	if prop.QuestionDotToken != nil {
+		return
+	}
 	object := ast.SkipOuterExpressions(prop.Expression, skipTransparent)
 	if object == nil || !ast.IsIdentifier(object) || object.AsIdentifier().Text != "Promise" {
 		return
@@ -88,12 +95,19 @@ func isInPromise(node *ast.Node) bool {
 			break
 		}
 		call := parent.Parent
+		for call != nil && ast.IsOuterExpression(call, skipTransparent) {
+			call = call.Parent
+		}
 		if call == nil || !ast.IsCallExpression(call) || ast.SkipOuterExpressions(call.AsCallExpression().Expression, skipTransparent) != parent {
 			break
 		}
 		functionNode = call
 	}
-	return functionNode.Parent != nil && promiseutil.IsPromiseLikeCall(functionNode.Parent)
+	cur := functionNode.Parent
+	for cur != nil && ast.IsOuterExpression(cur, skipTransparent) {
+		cur = cur.Parent
+	}
+	return cur != nil && promiseutil.IsPromiseLikeCall(cur)
 }
 
 func nearestFunctionExpressionOrArrow(node *ast.Node) *ast.Node {

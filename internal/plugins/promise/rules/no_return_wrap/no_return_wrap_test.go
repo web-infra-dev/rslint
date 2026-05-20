@@ -60,6 +60,22 @@ func TestNoReturnWrap(t *testing.T) {
 			{Code: `Promise.withResolvers(function() { return Promise.resolve(4) })`},
 			// Nested non-promise callback must not be reported even inside a promise callback.
 			{Code: `doThing().then(function() { fn(function() { return Promise.resolve(4) }); return 1 })`},
+			// Optional chain: Promise?.resolve is not a reportable wrap.
+			{Code: `doThing().then(function() { return Promise?.resolve(4) })`},
+
+			// ---- Edge cases: optional chains ----
+			// Optional call (?.()): QuestionDotToken is on the CallExpression, not the PropertyAccessExpression.
+			{Code: `doThing().then(function() { return Promise.resolve?.() })`},
+			// Optional-chain reject in arrow expression body.
+			{Code: `doThing().then(() => Promise?.reject(4))`},
+
+			// ---- Edge cases: parens + non-bind member ----
+			// .toString() wrapped in parens: not bind, must not be treated as a promise argument.
+			{Code: `doThing().then(((function() { return Promise.resolve(4) }).toString()))`},
+
+			// ---- Edge cases: allowReject + parens ----
+			// Parenthesized function with allowReject:true -> valid.
+			{Code: `doThing().then((function() { return Promise.reject(4) }))`, Options: map[string]interface{}{"allowReject": true}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ESLint upstream invalid cases ----
@@ -139,6 +155,28 @@ func TestNoReturnWrap(t *testing.T) {
 			{Code: `Promise.all(xs).then(function() { return Promise.resolve(4) })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
 			// Locks in upstream isPromise(): .then() is promise-like regardless of the receiver.
 			{Code: `Promise.withResolvers().then(function() { return Promise.resolve(4) })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+
+			// ---- Parenthesized-callback false-negative fixes ----
+			// Single parens around function expression.
+			{Code: `doThing().then((function() { return Promise.resolve(4) }))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+			// Double parens around function expression.
+			{Code: `doThing().then(((function() { return Promise.resolve(4) })))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+			// Parens around arrow function.
+			{Code: `doThing().then((() => Promise.resolve(4)))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+			// Parens around the whole bind() call.
+			{Code: `doThing().then(((function() { return Promise.resolve(4) }).bind(this)))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+			// Parens around the .bind member access itself.
+			{Code: `doThing().then(((function() { return Promise.resolve(4) }).bind)(this))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+
+			// ---- Edge cases: parenthesized callbacks (invalid) ----
+			// Parenthesized arrow + reject.
+			{Code: `doThing().then((() => Promise.reject(4)))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reject", Message: rejectMessage}}},
+			// Parenthesized callback in finally.
+			{Code: `doThing().finally((function() { return Promise.resolve(4) }))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+			// Parenthesized callback in catch + reject.
+			{Code: `doThing().catch((function() { return Promise.reject(4) }))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reject", Message: rejectMessage}}},
+			// Chained bind + outer parens.
+			{Code: `doThing().then(((function() { return Promise.resolve(4) }).bind(this).bind(this)))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
 		},
 	)
 }
