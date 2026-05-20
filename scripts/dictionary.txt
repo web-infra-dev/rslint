@@ -382,6 +382,7 @@ stype
 subclassing
 subtag
 subtests
+supertypes
 symb
 symbolname
 tabindex
