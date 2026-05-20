@@ -1,0 +1,404 @@
+// Rstest Snapshot v1
+
+exports[`no-unused-private-class-members > invalid 1`] = `
+{
+  "code": "
+class C {
+  private accessor accessorMember = 42;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'accessorMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 2`] = `
+{
+  "code": "
+class C {
+  private static staticMember = 42;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'staticMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 3`] = `
+{
+  "code": "
+class Test1 {
+  constructor(private parameterProperty: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'parameterProperty' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 4`] = `
+{
+  "code": "
+class C {
+  private usedOutsideClass;
+}
+
+const instance = new C();
+console.log(instance.usedOutsideClass);
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'usedOutsideClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  #privateMember = 5;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member '#privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  private privateMember = 5;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  #privateMember = 5;
+  method() {
+    this.#privateMember = 42;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member '#privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 8`] = `
+{
+  "code": "
+class Foo {
+  private privateMember = 5;
+  method() {
+    this.privateMember = 42;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 9`] = `
+{
+  "code": "
+class C {
+  #privateMember;
+
+  foo() {
+    this.#privateMember++;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member '#privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 10`] = `
+{
+  "code": "
+class Foo {
+  #privateMember() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member '#privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  private privateMember() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 12`] = `
+{
+  "code": "
+class Foo {
+  set #privateMember(value) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member '#privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 13`] = `
+{
+  "code": "
+class Foo {
+  private set privateMember(value) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Private class member 'privateMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,5 +1,4 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import * as path from 'node:path';
 
 
 import { getFixturesRootDir } from '../RuleTester';
@@ -385,7 +384,7 @@ if (x) {
       `,
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
+          project: './tsconfig.unstrict.json',
         },
       },
       options: [
@@ -3246,7 +3245,11 @@ if (Boolean(x)) {
       ],
     },
 
-    // noStrictNullCheck
+    // noStrictNullCheck — uses per-case `parserOptions.project` to point at
+    // tsconfig.unstrict.json (strictNullChecks off). Upstream's equivalent
+    // sets `tsconfigRootDir` to the `unstrict/` subdirectory, but rslint's
+    // backend doesn't read `tsconfigRootDir`; pointing `project` at a
+    // strict-disabled tsconfig achieves the same observable behavior.
     {
       code: `
 declare const x: string[] | null;
@@ -3270,7 +3273,7 @@ if (x) {
       ],
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
+          project: './tsconfig.unstrict.json',
         },
       },
       output: null,
@@ -3544,6 +3547,7 @@ assert(foo, Boolean(nullableString));
       // a bug.
       //
       // See https://github.com/microsoft/TypeScript/issues/59707
+      skip: true,
       code: `
 function asserts1(x: string | number | undefined): asserts x {}
 function asserts2(x: string | number | undefined): asserts x {}
@@ -3608,7 +3612,6 @@ someAssert(Boolean(maybeString));
         },
       ],
       output: null,
-      skip: true,
     },
     {
       // The implementation signature doesn't count towards the call signatures

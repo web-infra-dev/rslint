@@ -75,6 +75,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_redundant_type_constituents"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_require_imports"
 	ts_no_restricted_imports "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_restricted_imports"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_restricted_types"
 	ts_no_shadow "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_shadow"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_boolean_literal_compare"
@@ -97,9 +98,11 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unsafe_type_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unsafe_unary_minus"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unused_expressions"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unused_private_class_members"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unused_vars"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_use_before_define"
 	ts_no_useless_constructor "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_constructor"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_default_assignment"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_useless_empty_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_wrapper_object_types"
@@ -108,7 +111,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/parameter_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_as_const"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_destructuring"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_enum_initializers"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_find"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_for_of"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_function_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_includes"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_literal_enum_member"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_namespace_keyword"
@@ -131,6 +137,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/restrict_plus_operands"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/restrict_template_expressions"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/return_await"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/strict_boolean_expressions"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/strict_void_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/switch_exhaustiveness_check"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/triple_slash_reference"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/unbound_method"
@@ -593,6 +601,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-this-alias", no_this_alias.NoThisAliasRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-require-imports", no_require_imports.NoRequireImportsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-restricted-imports", ts_no_restricted_imports.NoRestrictedImportsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-restricted-types", no_restricted_types.NoRestrictedTypesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-shadow", ts_no_shadow.NoShadowRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-boolean-literal-compare", no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-condition", no_unnecessary_condition.NoUnnecessaryConditionRule)
@@ -614,9 +623,11 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-type-assertion", no_unsafe_type_assertion.NoUnsafeTypeAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-unary-minus", no_unsafe_unary_minus.NoUnsafeUnaryMinusRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-expressions", no_unused_expressions.NoUnusedExpressionsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-private-class-members", no_unused_private_class_members.NoUnusedPrivateClassMembersRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-vars", no_unused_vars.NoUnusedVarsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-use-before-define", no_use_before_define.NoUseBeforeDefineRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-constructor", ts_no_useless_constructor.NoUselessConstructorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-default-assignment", no_useless_default_assignment.NoUselessDefaultAssignmentRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-empty-export", no_useless_empty_export.NoUselessEmptyExportRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-var-requires", no_var_requires.NoVarRequiresRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-wrapper-object-types", no_wrapper_object_types.NoWrapperObjectTypesRule)
@@ -625,10 +636,13 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/parameter-properties", parameter_properties.ParameterPropertiesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-destructuring", prefer_destructuring.PreferDestructuringRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-enum-initializers", prefer_enum_initializers.PreferEnumInitializersRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-find", prefer_find.PreferFindRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-includes", prefer_includes.PreferIncludesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-literal-enum-member", prefer_literal_enum_member.PreferLiteralEnumMemberRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-namespace-keyword", prefer_namespace_keyword.PreferNamespaceKeywordRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-for-of", prefer_for_of.PreferForOfRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-function-type", prefer_function_type.PreferFunctionTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-nullish-coalescing", prefer_nullish_coalescing.PreferNullishCoalescingRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-optional-chain", prefer_optional_chain.PreferOptionalChainRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-promise-reject-errors", prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
@@ -649,6 +663,8 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/restrict-plus-operands", restrict_plus_operands.RestrictPlusOperandsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/restrict-template-expressions", restrict_template_expressions.RestrictTemplateExpressionsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/return-await", return_await.ReturnAwaitRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/strict-boolean-expressions", strict_boolean_expressions.StrictBooleanExpressionsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/strict-void-return", strict_void_return.StrictVoidReturnRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/switch-exhaustiveness-check", switch_exhaustiveness_check.SwitchExhaustivenessCheckRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/triple-slash-reference", triple_slash_reference.TripleSlashReferenceRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/unbound-method", unbound_method.UnboundMethodRule)

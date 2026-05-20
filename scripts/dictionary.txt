@@ -39,6 +39,7 @@ bigints
 Bild
 binaryexpression
 biske
+bivariance
 bizz
 bleh
 bmatcuk
@@ -317,6 +318,7 @@ reactutil
 readonlyness
 Readonlys
 realpath
+realuser
 recognisable
 recognise
 recognised
@@ -381,6 +383,7 @@ stype
 subclassing
 subtag
 subtests
+supertypes
 symb
 symbolname
 tabindex
