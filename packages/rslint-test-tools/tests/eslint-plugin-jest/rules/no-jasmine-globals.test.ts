@@ -16,8 +16,10 @@ ruleTester.run('no-jasmine-globals', {} as never, {
     { code: 'function callback(fail) { fail() }' },
     { code: 'var spyOn = require("actions"); spyOn("foo")' },
     { code: 'function callback(pending) { pending() }' },
-    { code: 'jasmine.DEFAULT_TIMEOUT_INTERVAL += 1000;' },
-    { code: 'jasmine["DEFAULT_TIMEOUT_INTERVAL"] += 1000;' },
+    { code: 'function callback(jasmine) { jasmine.any() }' },
+    { code: 'const jasmine = foo;' },
+    { code: '(this as any).jasmine.foo()' },
+    { code: '(this as any).jasmine.any()' },
   ],
   invalid: [
     {
@@ -55,12 +57,42 @@ ruleTester.run('no-jasmine-globals', {} as never, {
       errors: [{ messageId: 'illegalPending', column: 1, line: 1 }],
     },
     {
+      code: 'jasmine',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'const value = jasmine;',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 15, line: 1 }],
+    },
+    {
       code: 'jasmine.DEFAULT_TIMEOUT_INTERVAL = 5000;',
       output: 'jest.setTimeout(5000);',
       errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
     },
     {
       code: 'jasmine.DEFAULT_TIMEOUT_INTERVAL = function() {}',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine.DEFAULT_TIMEOUT_INTERVAL += 1000;',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine["DEFAULT_TIMEOUT_INTERVAL"] = 5000;',
+      output: 'jest.setTimeout(5000);',
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine["DEFAULT_TIMEOUT_INTERVAL"] = function() {}',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine["DEFAULT_TIMEOUT_INTERVAL"] += 1000;',
       output: null,
       errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
     },
@@ -158,6 +190,16 @@ ruleTester.run('no-jasmine-globals', {} as never, {
       ],
     },
     {
+      code: 'jasmine.foo.any()',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'console.log(jasmine.version)',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 13, line: 1 }],
+    },
+    {
       code: 'jasmine.getEnv()',
       output: null,
       errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
@@ -189,6 +231,11 @@ ruleTester.run('no-jasmine-globals', {} as never, {
     },
     {
       code: 'jasmine.MAX_PRETTY_PRINT_ARRAY_LENGTH = 42',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine["MAX_PRETTY_PRINT_ARRAY_LENGTH"] = 42',
       output: null,
       errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
     },
