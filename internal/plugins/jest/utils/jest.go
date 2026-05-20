@@ -441,7 +441,12 @@ func GetJestVersion(ctx rule.RuleContext) string {
 }
 
 func IsFunction(node *ast.Node) bool {
-	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
+	return ast.IsFunctionDeclaration(node) ||
+		ast.IsFunctionExpressionOrArrowFunction(node) ||
+		node.Kind == ast.KindMethodDeclaration ||
+		node.Kind == ast.KindConstructor ||
+		node.Kind == ast.KindGetAccessor ||
+		node.Kind == ast.KindSetAccessor
 }
 
 func IsMemberAccessNode(node *ast.Node) bool {

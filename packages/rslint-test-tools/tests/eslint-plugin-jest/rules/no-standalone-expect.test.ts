@@ -52,6 +52,12 @@ ruleTester.run('no-standalone-expect', {} as never, {
       code: 'describe.each([1, true])("trues", value => { it("an it", () => expect(value).toBe(true) ); });',
     },
     {
+      code: 'const helpers = { assert() { expect(1).toBe(1); } };',
+    },
+    {
+      code: 'class Helper { assert() { expect(1).toBe(1); } get value() { expect(1).toBe(1); return 1; } }',
+    },
+    {
       code: `
         describe('scenario', () => {
           const t = Math.random() ? it.only : it;
@@ -174,6 +180,30 @@ ruleTester.run('no-standalone-expect', {} as never, {
     {
       code: 'describe.each([1, true])("trues", value => { expect(value).toBe(true); });',
       errors: [{ endColumn: 70, column: 46, messageId: 'unexpectedExpect' }],
+    },
+    {
+      code: `
+        describe.each\`
+          num   | value
+          \${1} | \${true}
+        \`('trues', ({ value }) => {
+          expect(value).toBe(true);
+        });
+      `,
+      errors: [{ endColumn: 27, column: 3, messageId: 'unexpectedExpect' }],
+    },
+    {
+      code: `
+        it.each\`
+          num   | value
+          \${1} | \${true}
+        \`('trues', ({ value }) => {
+          expect(value).toBe(true);
+        });
+
+        expect(1).toBe(1);
+      `,
+      errors: [{ endColumn: 17, column: 1, messageId: 'unexpectedExpect' }],
     },
     {
       code: `

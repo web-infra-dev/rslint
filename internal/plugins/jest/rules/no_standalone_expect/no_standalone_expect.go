@@ -20,6 +20,12 @@ type options struct {
 	additionalTestBlockFunctions map[string]struct{}
 }
 
+type scopeEntry struct {
+	kind  blockType
+	start int
+	end   int
+}
+
 // Message Builder
 
 func buildUnexpectedExpectMessage() rule.RuleMessage {
@@ -74,7 +80,12 @@ func getBlockType(block *ast.Node, ctx rule.RuleContext) blockType {
 		return blockTypeFunction
 	}
 
-	if ast.FindAncestorKind(fn, ast.KindVariableDeclaration) != nil {
+	if fn.Parent != nil && fn.Parent.Kind == ast.KindVariableDeclaration {
+		return blockTypeFunction
+	}
+
+	switch fn.Kind {
+	case ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
 		return blockTypeFunction
 	}
 
@@ -104,11 +115,49 @@ func calleeIsTaggedTemplateExpression(node *ast.Node) bool {
 		callExpr.Expression.Kind == ast.KindTaggedTemplateExpression
 }
 
+func getFunctionBodyRange(fn *ast.Node) (int, int, bool) {
+	if fn == nil {
+		return 0, 0, false
+	}
+
+	body := fn.Body()
+	if body == nil {
+		return 0, 0, false
+	}
+
+	return body.Pos(), body.End(), true
+}
+
+func getTestScopeRange(node *ast.Node) (int, int, bool) {
+	callExpr := node.AsCallExpression()
+	if callExpr == nil || callExpr.Arguments == nil {
+		return 0, 0, false
+	}
+
+	for i := len(callExpr.Arguments.Nodes) - 1; i >= 0; i-- {
+		arg := callExpr.Arguments.Nodes[i]
+		if start, end, ok := getFunctionBodyRange(arg); ok {
+			return start, end, true
+		}
+	}
+
+	return 0, 0, false
+}
+
+func getTemplateScopeRange(node *ast.Node) (int, int, bool) {
+	callExpr := node.AsCallExpression()
+	if callExpr == nil || callExpr.Expression == nil || callExpr.Expression.Kind != ast.KindTaggedTemplateExpression {
+		return 0, 0, false
+	}
+
+	return callExpr.Expression.Pos(), callExpr.Expression.End(), true
+}
+
 var NoStandaloneExpectRule = rule.Rule{
 	Name: "jest/no-standalone-expect",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
-		callStack := make([]blockType, 0, 8)
+		scopeStack := make([]scopeEntry, 0, 8)
 
 		isCustomTestBlockFunction := func(node *ast.Node) bool {
 			name := utils.GetNodeName(node)
@@ -119,11 +168,35 @@ var NoStandaloneExpectRule = rule.Rule{
 			return ok
 		}
 
-		currentBlock := func() blockType {
-			if len(callStack) == 0 {
+		currentScopeKind := func() blockType {
+			if len(scopeStack) == 0 {
 				return ""
 			}
-			return callStack[len(callStack)-1]
+			return scopeStack[len(scopeStack)-1].kind
+		}
+
+		pushScope := func(kind blockType, start, end int) {
+			scopeStack = append(scopeStack, scopeEntry{kind: kind, start: start, end: end})
+		}
+
+		popScope := func(kind blockType) {
+			if len(scopeStack) == 0 || scopeStack[len(scopeStack)-1].kind != kind {
+				return
+			}
+
+			scopeStack = scopeStack[:len(scopeStack)-1]
+		}
+
+		getContainingBlock := func(node *ast.Node) blockType {
+			pos := node.Pos()
+			for i := len(scopeStack) - 1; i >= 0; i-- {
+				scope := scopeStack[i]
+				if scope.start <= pos && pos < scope.end {
+					return scope.kind
+				}
+			}
+
+			return ""
 		}
 
 		return rule.RuleListeners{
@@ -134,7 +207,7 @@ var NoStandaloneExpectRule = rule.Rule{
 						return
 					}
 
-					parent := currentBlock()
+					parent := getContainingBlock(node)
 					if parent == "" || parent == blockTypeDescribe {
 						ctx.ReportNode(node, buildUnexpectedExpectMessage())
 					}
@@ -142,44 +215,48 @@ var NoStandaloneExpectRule = rule.Rule{
 				}
 
 				if (jestFnCall != nil && jestFnCall.Kind == utils.JestFnTypeTest) || isCustomTestBlockFunction(node) {
-					callStack = append(callStack, blockTypeTest)
+					if start, end, ok := getTestScopeRange(node); ok {
+						pushScope(blockTypeTest, start, end)
+					}
 				}
 
 				if calleeIsTaggedTemplateExpression(node) {
-					callStack = append(callStack, blockTypeTemplate)
+					if start, end, ok := getTemplateScopeRange(node); ok {
+						pushScope(blockTypeTemplate, start, end)
+					}
 				}
 			},
 			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
-				top := currentBlock()
-				if top == blockTypeTest &&
-					(utils.IsTypeOfJestFnCall(node, ctx, utils.JestFnTypeTest) || isCustomTestBlockFunction(node)) {
-					callStack = callStack[:len(callStack)-1]
-					return
+				if calleeIsTaggedTemplateExpression(node) {
+					popScope(blockTypeTemplate)
 				}
 
-				if top == blockTypeTemplate && calleeIsTaggedTemplateExpression(node) {
-					callStack = callStack[:len(callStack)-1]
+				if (utils.IsTypeOfJestFnCall(node, ctx, utils.JestFnTypeTest) || isCustomTestBlockFunction(node)) &&
+					currentScopeKind() == blockTypeTest {
+					popScope(blockTypeTest)
 				}
 			},
 			ast.KindBlock: func(node *ast.Node) {
 				if blockType := getBlockType(node, ctx); blockType != "" {
-					callStack = append(callStack, blockType)
+					pushScope(blockType, node.Pos(), node.End())
 				}
 			},
 			rule.ListenerOnExit(ast.KindBlock): func(node *ast.Node) {
 				blockType := getBlockType(node, ctx)
-				if blockType != "" && currentBlock() == blockType {
-					callStack = callStack[:len(callStack)-1]
+				if blockType != "" && currentScopeKind() == blockType {
+					popScope(blockType)
 				}
 			},
 			ast.KindArrowFunction: func(node *ast.Node) {
 				if node.Parent != nil && node.Parent.Kind != ast.KindCallExpression {
-					callStack = append(callStack, blockTypeArrow)
+					if start, end, ok := getFunctionBodyRange(node); ok {
+						pushScope(blockTypeArrow, start, end)
+					}
 				}
 			},
 			rule.ListenerOnExit(ast.KindArrowFunction): func(node *ast.Node) {
-				if currentBlock() == blockTypeArrow {
-					callStack = callStack[:len(callStack)-1]
+				if currentScopeKind() == blockTypeArrow {
+					popScope(blockTypeArrow)
 				}
 			},
 		}

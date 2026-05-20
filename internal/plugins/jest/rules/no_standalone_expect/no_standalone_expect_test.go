@@ -40,6 +40,8 @@ func TestNoStandaloneExpectRule(t *testing.T) {
 			{Code: `it.only("an only", value => { expect(value).toBe(true); });`},
 			{Code: `it.concurrent("an concurrent", value => { expect(value).toBe(true); });`},
 			{Code: `describe.each([1, true])("trues", value => { it("an it", () => expect(value).toBe(true) ); });`},
+			{Code: `const helpers = { assert() { expect(1).toBe(1); } };`},
+			{Code: `class Helper { assert() { expect(1).toBe(1); } get value() { expect(1).toBe(1); return 1; } }`},
 			{
 				Code: `
         describe('scenario', () => {
@@ -210,6 +212,34 @@ func TestNoStandaloneExpectRule(t *testing.T) {
 				Code: `describe.each([1, true])("trues", value => { expect(value).toBe(true); });`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedExpect", Line: 1, Column: 46, EndColumn: 70},
+				},
+			},
+			{
+				Code: `
+        describe.each` + "`" + `
+          num   | value
+          ${1} | ${true}
+        ` + "`" + `('trues', ({ value }) => {
+          expect(value).toBe(true);
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedExpect", Line: 6, Column: 11, EndColumn: 35},
+				},
+			},
+			{
+				Code: `
+        it.each` + "`" + `
+          num   | value
+          ${1} | ${true}
+        ` + "`" + `('trues', ({ value }) => {
+          expect(value).toBe(true);
+        });
+
+        expect(1).toBe(1);
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedExpect", Line: 9, Column: 9, EndColumn: 26},
 				},
 			},
 			{
