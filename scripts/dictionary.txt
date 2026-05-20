@@ -39,6 +39,7 @@ bigints
 Bild
 binaryexpression
 biske
+bivariance
 bizz
 bleh
 bmatcuk
