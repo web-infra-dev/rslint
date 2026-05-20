@@ -107,6 +107,79 @@ namespace NS {
 }
 `},
 	}, []rule_tester.InvalidTestCase{
+		// ---- Dimension 4: `declare` (ambient) enum — listener fires on
+		//      KindEnumDeclaration regardless of declare modifier; uninitialized
+		//      members are still reported. Locked in here because the question
+		//      "should declare enum be silently skipped?" recurs (it sounds
+		//      reasonable for `.d.ts` ergonomics) but upstream does NOT skip:
+		//      empirically `npx eslint` on `declare enum X { Up, Down }` with
+		//      @typescript-eslint/prefer-enum-initializers produces 2 errors.
+		//      Skipping `declare` would silently diverge from upstream.
+		{
+			Code: `
+declare enum AmbientUninit {
+  Up,
+  Down,
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "defineInitializer",
+					Line:      3,
+					Column:    3,
+					EndLine:   3,
+					EndColumn: 5,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "defineInitializerSuggestion", Output: `
+declare enum AmbientUninit {
+  Up = 0,
+  Down,
+}
+`},
+						{MessageId: "defineInitializerSuggestion", Output: `
+declare enum AmbientUninit {
+  Up = 1,
+  Down,
+}
+`},
+						{MessageId: "defineInitializerSuggestion", Output: `
+declare enum AmbientUninit {
+  Up = 'Up',
+  Down,
+}
+`},
+					},
+				},
+				{
+					MessageId: "defineInitializer",
+					Line:      4,
+					Column:    3,
+					EndLine:   4,
+					EndColumn: 7,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{MessageId: "defineInitializerSuggestion", Output: `
+declare enum AmbientUninit {
+  Up,
+  Down = 1,
+}
+`},
+						{MessageId: "defineInitializerSuggestion", Output: `
+declare enum AmbientUninit {
+  Up,
+  Down = 2,
+}
+`},
+						{MessageId: "defineInitializerSuggestion", Output: `
+declare enum AmbientUninit {
+  Up,
+  Down = 'Down',
+}
+`},
+					},
+				},
+			},
+		},
+
 		// ---- Dimension 4: const enum — same listener fires on KindEnumDeclaration
 		//      regardless of `const` modifier; uninitialized member still reported.
 		{
