@@ -353,6 +353,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/return-await.test.ts',
     // './tests/typescript-eslint/rules/sort-type-constituents.test.ts',
     // './tests/typescript-eslint/rules/strict-boolean-expressions.test.ts',
+    './tests/typescript-eslint/rules/strict-void-return.test.ts',
     // './tests/typescript-eslint/rules/switch-exhaustiveness-check.test.ts',
     // './tests/typescript-eslint/rules/triple-slash-reference.test.ts',
     // './tests/typescript-eslint/rules/typedef.test.ts',

@@ -136,6 +136,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/restrict_plus_operands"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/restrict_template_expressions"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/return_await"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/strict_void_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/switch_exhaustiveness_check"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/triple_slash_reference"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/unbound_method"
@@ -659,6 +660,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/restrict-plus-operands", restrict_plus_operands.RestrictPlusOperandsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/restrict-template-expressions", restrict_template_expressions.RestrictTemplateExpressionsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/return-await", return_await.ReturnAwaitRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/strict-void-return", strict_void_return.StrictVoidReturnRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/switch-exhaustiveness-check", switch_exhaustiveness_check.SwitchExhaustivenessCheckRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/triple-slash-reference", triple_slash_reference.TripleSlashReferenceRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/unbound-method", unbound_method.UnboundMethodRule)
