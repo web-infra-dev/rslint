@@ -1,5 +1,4 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import * as path from 'node:path';
 
 
 import { getFixturesRootDir } from '../RuleTester';
@@ -376,11 +375,7 @@ if (x) {
       `,
       options: [{ allowNullableEnum: true }],
     },
-    // Skipped: rslint's JS rule-tester does not support per-case
-    // `parserOptions.tsconfigRootDir`. The Go-side upstream test exercises
-    // the same opt-out path.
     {
-      skip: true,
       code: `
 declare const x: string[] | null;
 // eslint-disable-next-line
@@ -389,7 +384,7 @@ if (x) {
       `,
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
+          project: './tsconfig.unstrict.json',
         },
       },
       options: [
@@ -3250,13 +3245,12 @@ if (Boolean(x)) {
       ],
     },
 
-    // noStrictNullCheck — skipped because rslint's JS rule-tester does not
-    // support per-case `parserOptions.tsconfigRootDir` overrides. The
-    // equivalent assertion is covered by the Go upstream test (see
-    // strict_boolean_expressions_upstream_test.go) using TSConfig:
-    // "tsconfig.unstrict.json".
+    // noStrictNullCheck — uses per-case `parserOptions.project` to point at
+    // tsconfig.unstrict.json (strictNullChecks off). Upstream's equivalent
+    // sets `tsconfigRootDir` to the `unstrict/` subdirectory, but rslint's
+    // backend doesn't read `tsconfigRootDir`; pointing `project` at a
+    // strict-disabled tsconfig achieves the same observable behavior.
     {
-      skip: true,
       code: `
 declare const x: string[] | null;
 if (x) {
@@ -3279,7 +3273,7 @@ if (x) {
       ],
       languageOptions: {
         parserOptions: {
-          tsconfigRootDir: path.join(rootPath, 'unstrict'),
+          project: './tsconfig.unstrict.json',
         },
       },
       output: null,
@@ -3553,6 +3547,7 @@ assert(foo, Boolean(nullableString));
       // a bug.
       //
       // See https://github.com/microsoft/TypeScript/issues/59707
+      skip: true,
       code: `
 function asserts1(x: string | number | undefined): asserts x {}
 function asserts2(x: string | number | undefined): asserts x {}
@@ -3617,7 +3612,6 @@ someAssert(Boolean(maybeString));
         },
       ],
       output: null,
-      skip: true,
     },
     {
       // The implementation signature doesn't count towards the call signatures

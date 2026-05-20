@@ -2618,6 +2618,52 @@ exports[`strict-boolean-expressions > invalid 77`] = `
 exports[`strict-boolean-expressions > invalid 78`] = `
 {
   "code": "
+declare const x: string[] | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "messageId": "noStrictNullCheck",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 79`] = `
+{
+  "code": "
         declare const obj: { x: number } | null;
         !obj ? 1 : 0
         !obj
@@ -2693,7 +2739,7 @@ exports[`strict-boolean-expressions > invalid 78`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 79`] = `
+exports[`strict-boolean-expressions > invalid 80`] = `
 {
   "code": "
 declare function assert(x: unknown): asserts x;
@@ -2724,7 +2770,7 @@ assert(nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 80`] = `
+exports[`strict-boolean-expressions > invalid 81`] = `
 {
   "code": "
 declare function assert(a: number, b: unknown): asserts b;
@@ -2755,7 +2801,7 @@ assert(foo, nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 81`] = `
+exports[`strict-boolean-expressions > invalid 82`] = `
 {
   "code": "
 declare function assert(a: number, b: unknown): asserts b;
@@ -2787,7 +2833,7 @@ assert(foo, nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 82`] = `
+exports[`strict-boolean-expressions > invalid 83`] = `
 {
   "code": "
 declare function assert(this: object, a: number, b: unknown): asserts b;
@@ -2818,7 +2864,7 @@ assert(foo, nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 83`] = `
+exports[`strict-boolean-expressions > invalid 84`] = `
 {
   "code": "
 function assert(this: object, a: number, b: unknown): asserts b;
@@ -2863,7 +2909,7 @@ assert(3 as any, nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 84`] = `
+exports[`strict-boolean-expressions > invalid 85`] = `
 {
   "code": "
 function assert(this: object, a: number, b: unknown): asserts b;
@@ -2909,7 +2955,7 @@ assert(3 as any, nullableString, 'more', 'args', 'afterwards');
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 85`] = `
+exports[`strict-boolean-expressions > invalid 86`] = `
 {
   "code": "
 declare function assert(a: boolean, b: unknown): asserts b;
@@ -2942,7 +2988,7 @@ assert(boo, nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 86`] = `
+exports[`strict-boolean-expressions > invalid 87`] = `
 {
   "code": "
 function assert(one: unknown): asserts one;
@@ -2976,7 +3022,7 @@ assert(nullableString);
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 87`] = `
+exports[`strict-boolean-expressions > invalid 88`] = `
 {
   "code": "
 ['one', 'two', ''].find(x => {
@@ -3006,7 +3052,7 @@ exports[`strict-boolean-expressions > invalid 87`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 88`] = `
+exports[`strict-boolean-expressions > invalid 89`] = `
 {
   "code": "
 ['one', 'two', ''].find(x => {
@@ -3036,7 +3082,7 @@ exports[`strict-boolean-expressions > invalid 88`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 89`] = `
+exports[`strict-boolean-expressions > invalid 90`] = `
 {
   "code": "
 ['one', 'two', ''].findLast(x => {
@@ -3066,7 +3112,7 @@ exports[`strict-boolean-expressions > invalid 89`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 90`] = `
+exports[`strict-boolean-expressions > invalid 91`] = `
 {
   "code": "
 ['one', 'two', ''].find(x => {
@@ -3098,7 +3144,7 @@ exports[`strict-boolean-expressions > invalid 90`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 91`] = `
+exports[`strict-boolean-expressions > invalid 92`] = `
 {
   "code": "
 const predicate = (x: string) => {
@@ -3132,7 +3178,7 @@ const predicate = (x: string) => {
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 92`] = `
+exports[`strict-boolean-expressions > invalid 93`] = `
 {
   "code": "
 [1, null].every(async x => {
@@ -3162,7 +3208,7 @@ exports[`strict-boolean-expressions > invalid 92`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 93`] = `
+exports[`strict-boolean-expressions > invalid 94`] = `
 {
   "code": "
 const predicate = async x => {
@@ -3194,7 +3240,7 @@ const predicate = async x => {
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 94`] = `
+exports[`strict-boolean-expressions > invalid 95`] = `
 {
   "code": "
 [1, null].every((x): boolean | number => {
@@ -3224,7 +3270,7 @@ exports[`strict-boolean-expressions > invalid 94`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 95`] = `
+exports[`strict-boolean-expressions > invalid 96`] = `
 {
   "code": "
 [1, null].every((x): boolean | undefined => {
@@ -3254,7 +3300,7 @@ exports[`strict-boolean-expressions > invalid 95`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 96`] = `
+exports[`strict-boolean-expressions > invalid 97`] = `
 {
   "code": "
 [1, null].every((x, i) => {});
@@ -3282,7 +3328,7 @@ exports[`strict-boolean-expressions > invalid 96`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 97`] = `
+exports[`strict-boolean-expressions > invalid 98`] = `
 {
   "code": "
 [() => {}, null].every((x: () => void) => {});
@@ -3310,7 +3356,7 @@ exports[`strict-boolean-expressions > invalid 97`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 98`] = `
+exports[`strict-boolean-expressions > invalid 99`] = `
 {
   "code": "
 [() => {}, null].every(function (x: () => void) {});
@@ -3338,7 +3384,7 @@ exports[`strict-boolean-expressions > invalid 98`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 99`] = `
+exports[`strict-boolean-expressions > invalid 100`] = `
 {
   "code": "
 [() => {}, null].every(() => {});
@@ -3366,7 +3412,7 @@ exports[`strict-boolean-expressions > invalid 99`] = `
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 100`] = `
+exports[`strict-boolean-expressions > invalid 101`] = `
 {
   "code": "
 declare function f(x: number): string;
@@ -3397,7 +3443,7 @@ declare function f(x: string | null): boolean;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 101`] = `
+exports[`strict-boolean-expressions > invalid 102`] = `
 {
   "code": "
 declare function f(x: number): string;
@@ -3429,7 +3475,7 @@ declare function f(x: string | null): boolean;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 102`] = `
+exports[`strict-boolean-expressions > invalid 103`] = `
 {
   "code": "
 declare function foo<T>(x: number): T;
@@ -3458,7 +3504,7 @@ declare function foo<T>(x: number): T;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 103`] = `
+exports[`strict-boolean-expressions > invalid 104`] = `
 {
   "code": "
 function foo<T extends number>(x: number): T {}
@@ -3487,7 +3533,7 @@ function foo<T extends number>(x: number): T {}
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 104`] = `
+exports[`strict-boolean-expressions > invalid 105`] = `
 {
   "code": "
 declare const nullOrString: string | null;
@@ -3516,7 +3562,7 @@ declare const nullOrString: string | null;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 105`] = `
+exports[`strict-boolean-expressions > invalid 106`] = `
 {
   "code": "
 declare const nullOrString: string | null;
@@ -3545,7 +3591,7 @@ declare const nullOrString: string | null;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 106`] = `
+exports[`strict-boolean-expressions > invalid 107`] = `
 {
   "code": "
 declare const anyValue: any;
@@ -3574,7 +3620,7 @@ declare const anyValue: any;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 107`] = `
+exports[`strict-boolean-expressions > invalid 108`] = `
 {
   "code": "
 declare const nullOrBoolean: boolean | null;
@@ -3603,7 +3649,7 @@ declare const nullOrBoolean: boolean | null;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 108`] = `
+exports[`strict-boolean-expressions > invalid 109`] = `
 {
   "code": "
 enum ExampleEnum {
@@ -3636,7 +3682,7 @@ const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 109`] = `
+exports[`strict-boolean-expressions > invalid 110`] = `
 {
   "code": "
 declare const nullOrNumber: number | null;
@@ -3665,7 +3711,7 @@ declare const nullOrNumber: number | null;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 110`] = `
+exports[`strict-boolean-expressions > invalid 111`] = `
 {
   "code": "
 const objectValue: object = {};
@@ -3694,7 +3740,7 @@ const objectValue: object = {};
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 111`] = `
+exports[`strict-boolean-expressions > invalid 112`] = `
 {
   "code": "
 const objectValue: object = {};
@@ -3725,7 +3771,7 @@ const objectValue: object = {};
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 112`] = `
+exports[`strict-boolean-expressions > invalid 113`] = `
 {
   "code": "
 declare const nullOrObject: object | null;
@@ -3754,7 +3800,7 @@ declare const nullOrObject: object | null;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 113`] = `
+exports[`strict-boolean-expressions > invalid 114`] = `
 {
   "code": "
 const numbers: number[] = [1];
@@ -3783,7 +3829,7 @@ const numbers: number[] = [1];
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 114`] = `
+exports[`strict-boolean-expressions > invalid 115`] = `
 {
   "code": "
 const numberValue: number = 1;
@@ -3812,7 +3858,7 @@ const numberValue: number = 1;
 }
 `;
 
-exports[`strict-boolean-expressions > invalid 115`] = `
+exports[`strict-boolean-expressions > invalid 116`] = `
 {
   "code": "
 const stringValue: string = 'hoge';
