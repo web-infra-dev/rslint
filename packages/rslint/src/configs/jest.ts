@@ -18,7 +18,7 @@ const recommended: RslintConfigEntry = {
     // 'jest/no-interpolation-in-snapshots': 'error', // not implemented
     // 'jest/no-jasmine-globals': 'error', // not implemented
     'jest/no-mocks-import': 'error',
-    // 'jest/no-standalone-expect': 'error', // not implemented
+    'jest/no-standalone-expect': 'error',
     'jest/no-test-prefixes': 'error',
     'jest/valid-describe-callback': 'error',
     // 'jest/valid-expect': 'error', // not implemented

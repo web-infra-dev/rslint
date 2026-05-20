@@ -433,6 +433,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
     './tests/eslint-plugin-jest/rules/no-mocks-import.test.ts',
+    './tests/eslint-plugin-jest/rules/no-standalone-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
