@@ -1,0 +1,289 @@
+// Rstest Snapshot v1
+
+exports[`no-confusing-non-null-assertion > invalid 1`] = `
+{
+  "code": "a! == b;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "messageId": "confusingEqual",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 2`] = `
+{
+  "code": "a! === b;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "messageId": "confusingEqual",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 3`] = `
+{
+  "code": "a + b! == c;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "messageId": "confusingEqual",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 4`] = `
+{
+  "code": "(obj = new new OuterObj().InnerObj).Name! == c;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "messageId": "confusingEqual",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 5`] = `
+{
+  "code": "(a==b)! ==c;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "messageId": "confusingEqual",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 6`] = `
+{
+  "code": "a! = b;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and assignment like \`a! = b\`, which looks very similar to \`a != b\`.",
+      "messageId": "confusingAssign",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 7`] = `
+{
+  "code": "(obj = new new OuterObj().InnerObj).Name! = c;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and assignment like \`a! = b\`, which looks very similar to \`a != b\`.",
+      "messageId": "confusingAssign",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 8`] = `
+{
+  "code": "(a=b)! =c;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and assignment like \`a! = b\`, which looks very similar to \`a != b\`.",
+      "messageId": "confusingAssign",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 9`] = `
+{
+  "code": "a! in b;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and \`in\` operator like \`a! in b\`, which might be misinterpreted as \`!(a in b)\`.",
+      "messageId": "confusingOperator",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 10`] = `
+{
+  "code": "
+a !in b;
+      ",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and \`in\` operator like \`a! in b\`, which might be misinterpreted as \`!(a in b)\`.",
+      "messageId": "confusingOperator",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 11`] = `
+{
+  "code": "a! instanceof b;",
+  "diagnostics": [
+    {
+      "message": "Confusing combination of non-null assertion and \`instanceof\` operator like \`a! instanceof b\`, which might be misinterpreted as \`!(a instanceof b)\`.",
+      "messageId": "confusingOperator",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

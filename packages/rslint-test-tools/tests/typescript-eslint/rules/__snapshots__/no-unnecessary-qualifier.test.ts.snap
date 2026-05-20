@@ -1,0 +1,354 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-qualifier > invalid 1`] = `
+{
+  "code": "
+namespace A {
+  export type B = number;
+  const x: A.B = 3;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'B' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace A {
+  export type B = number;
+  const x: B = 3;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 2`] = `
+{
+  "code": "
+namespace A {
+  export const x = 3;
+  export const y = A.x;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'x' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace A {
+  export const x = 3;
+  export const y = x;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 3`] = `
+{
+  "code": "
+namespace A {
+  export type T = number;
+  export namespace B {
+    const x: A.T = 3;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'T' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace A {
+  export type T = number;
+  export namespace B {
+    const x: T = 3;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 4`] = `
+{
+  "code": "
+namespace A {
+  export namespace B {
+    export type T = number;
+    const x: A.B.T = 3;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'T' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace A {
+  export namespace B {
+    export type T = number;
+    const x: T = 3;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 5`] = `
+{
+  "code": "
+namespace A {
+  export namespace B.C {
+    export type D = number;
+    const x: A.B.C.D = 3;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'D' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 14,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace A {
+  export namespace B.C {
+    export type D = number;
+    const x: D = 3;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 6`] = `
+{
+  "code": "
+namespace A {
+  export namespace B {
+    export const x = 3;
+    const y = A.B.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'x' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 15,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace A {
+  export namespace B {
+    export const x = 3;
+    const y = x;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 7`] = `
+{
+  "code": "
+enum A {
+  B,
+  C = A.B,
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'B' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+enum A {
+  B,
+  C = B,
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 8`] = `
+{
+  "code": "
+namespace Foo {
+  export enum A {
+    B,
+    C = Foo.A.B,
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'B' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace Foo {
+  export enum A {
+    B,
+    C = B,
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-qualifier > invalid 9`] = `
+{
+  "code": "
+import * as Foo from './foo';
+declare module './foo' {
+  const x: Foo.T = 3;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Qualifier is unnecessary since 'T' is in scope.",
+      "messageId": "unnecessaryQualifier",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-qualifier",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+import * as Foo from './foo';
+declare module './foo' {
+  const x: T = 3;
+}
+      ",
+  "ruleCount": 1,
+}
+`;

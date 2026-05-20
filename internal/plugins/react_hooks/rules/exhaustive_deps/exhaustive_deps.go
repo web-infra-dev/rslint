@@ -110,12 +110,20 @@ func stripAsExpression(node *ast.Node) *ast.Node {
 }
 
 // containsNode reports whether `descendant` is inside `ancestor` by node range.
-// Returns false when either is nil. Inclusive on both ends.
+// Returns false when either is nil. Inclusive on both ends. Requires both
+// nodes to live in the same SourceFile: positions are per-file offsets, so
+// a raw integer comparison across files would false-positive any time the
+// per-file ranges happen to overlap numerically (issue #962). The SourceFile
+// check runs only after the cheap position comparison so we don't pay the
+// parent-chain walk on the common "obviously outside" path.
 func containsNode(ancestor, descendant *ast.Node) bool {
 	if ancestor == nil || descendant == nil {
 		return false
 	}
-	return descendant.Pos() >= ancestor.Pos() && descendant.End() <= ancestor.End()
+	if descendant.Pos() < ancestor.Pos() || descendant.End() > ancestor.End() {
+		return false
+	}
+	return ast.GetSourceFileOfNode(ancestor) == ast.GetSourceFileOfNode(descendant)
 }
 
 // nodeText returns the trimmed source text for `node`.
@@ -369,7 +377,7 @@ type declaredDependency struct {
 // dependency is a used reference observed inside the callback body.
 type dependency struct {
 	IsStable bool
-	IsRef    bool   // true if it's `<x>.current` reference
+	IsRef    bool // true if it's `<x>.current` reference
 	Refs     []*depReference
 	First    *ast.Node // first observed reference identifier (for diagnostics)
 }
@@ -377,11 +385,11 @@ type dependency struct {
 // depReference is a single observed reference inside the callback body —
 // the identifier node and the symbol it resolved to (or nil for fallback).
 type depReference struct {
-	Identifier   *ast.Node
-	Symbol       *ast.Symbol
-	WriteExpr    *ast.Node // BinaryExpression representing assignment, when this reference is written
-	InCleanup    bool
-	DepNodeRoot  *ast.Node
+	Identifier  *ast.Node
+	Symbol      *ast.Symbol
+	WriteExpr   *ast.Node // BinaryExpression representing assignment, when this reference is written
+	InCleanup   bool
+	DepNodeRoot *ast.Node
 }
 
 // dependencyTreeNode mirrors upstream's `DependencyTreeNode`.
@@ -649,6 +657,18 @@ func areDeclaredDepsAlphabetized(declared []declaredDependency) bool {
 func hasUndefinedIdentifier(node *ast.Node) bool {
 	n := stripAsExpression(node)
 	return n != nil && n.Kind == ast.KindIdentifier && n.AsIdentifier().Text == "undefined"
+}
+
+// isObjectLiteralShorthandReference identifies value reads such as `{ value }`.
+// tsgo's TypeChecker can report the shorthand assignment node itself as the
+// declaration, so exhaustive-deps needs an AST fallback to find the outer
+// binding. Destructuring assignment shorthand is a write pattern and must not
+// be treated as a captured Hook dependency.
+func isObjectLiteralShorthandReference(id *ast.Node) bool {
+	if id == nil || id.Parent == nil || id.Parent.Kind != ast.KindShorthandPropertyAssignment {
+		return false
+	}
+	return id.Parent.Name() == id && !utils.IsInDestructuringAssignment(id.Parent)
 }
 
 // isReferenceIdentifier reports whether the given Identifier appears in a
@@ -958,6 +978,14 @@ func scanForConstructions(
 		// the component body.
 		decl := resolveDeclaration(tc, dd.Node, dd.Key, componentBody)
 		if decl == nil {
+			continue
+		}
+		// Mirrors upstream's `componentScope.variables` filter: a global,
+		// import, or module-scope binding can never be a construction that
+		// changes identity per render, and a declaration that lives in
+		// another SourceFile (DOM lib, @types/node, …) must not be reported
+		// against the current file's text (issue #962).
+		if !containsNode(componentBody, decl) {
 			continue
 		}
 		switch decl.Kind {

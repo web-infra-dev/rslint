@@ -82,22 +82,14 @@ jobs:
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
           $batchSize = 100
           $batch = @()
-          $cacheDir = go env GOCACHE
 
           foreach ($pkg in $packages) {
             $batch += $pkg
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
-              $marker = New-TemporaryFile
               go test -parallel 4 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-              # Remove only test-generated cache files, keeping build cache warm
-              Get-ChildItem -Path $cacheDir -Recurse -File |
-                Where-Object { $_.LastWriteTime -gt $marker.LastWriteTime } |
-                Remove-Item -Force -ErrorAction SilentlyContinue
-              Remove-Item $marker -Force
               $batch = @()
             }
           }
@@ -313,6 +305,11 @@ jobs:
         with:
           workspaces: '.'
           cache-on-failure: true
+          # Workaround for Swatinem/rust-cache#341: on the new macos runner image
+          # caching ~/.cargo/bin restores a broken `cargo` shim that resolves to
+          # rustup-init, causing `cargo fmt`/`clippy` to fail with
+          # "unexpected argument 'fmt' found / Usage: rustup-init[EXE] [OPTIONS]".
+          cache-bin: 'false'
 
       - name: Check formatting
         run: cargo fmt --all -- --check

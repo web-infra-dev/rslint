@@ -1,0 +1,880 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-types > invalid 1`] = `
+{
+  "code": "let value: bigint;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`bigint\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 2`] = `
+{
+  "code": "let value: boolean;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`boolean\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 3`] = `
+{
+  "code": "let value: never;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`never\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 4`] = `
+{
+  "code": "let value: null;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`null\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 5`] = `
+{
+  "code": "let value: number;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`number\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 6`] = `
+{
+  "code": "let value: object;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`object\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 7`] = `
+{
+  "code": "let value: string;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`string\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 8`] = `
+{
+  "code": "let value: symbol;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`symbol\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 9`] = `
+{
+  "code": "let value: undefined;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`undefined\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 10`] = `
+{
+  "code": "let value: unknown;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`unknown\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 11`] = `
+{
+  "code": "let value: void;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`void\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 12`] = `
+{
+  "code": "let value: [];",
+  "diagnostics": [
+    {
+      "message": "Don't use \`[]\` as a type. Use unknown[] instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 13`] = `
+{
+  "code": "let value: [  ];",
+  "diagnostics": [
+    {
+      "message": "Don't use \`[]\` as a type. Use unknown[] instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 14`] = `
+{
+  "code": "let value: [[]];",
+  "diagnostics": [
+    {
+      "message": "Don't use \`[]\` as a type. Use unknown[] instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 15`] = `
+{
+  "code": "let value: Banned;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 16`] = `
+{
+  "code": "let value: Banned;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use '{}' instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 17`] = `
+{
+  "code": "let value: Banned[];",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use '{}' instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 18`] = `
+{
+  "code": "let value: [Banned];",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use '{}' instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 19`] = `
+{
+  "code": "let value: Banned;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 20`] = `
+{
+  "code": "let b: { c: Banned };",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let b: { c: Ok };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 21`] = `
+{
+  "code": "1 as Banned;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "1 as Ok;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 22`] = `
+{
+  "code": "class Derived implements Banned {}",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "class Derived implements Ok {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 23`] = `
+{
+  "code": "class Derived implements Banned1, Banned2 {}",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned1\` as a type. Use Ok1 instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+    {
+      "message": "Don't use \`Banned2\` as a type. Use Ok2 instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "class Derived implements Ok1, Ok2 {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 24`] = `
+{
+  "code": "interface Derived extends Banned {}",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface Derived extends Ok {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 25`] = `
+{
+  "code": "type Intersection = Banned & {};",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Intersection = Ok & {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 26`] = `
+{
+  "code": "type Union = Banned | {};",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Union = Ok | {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 27`] = `
+{
+  "code": "let value: NS.Banned;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`NS.Banned\` as a type. Use NS.Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: NS.Ok;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 28`] = `
+{
+  "code": "let value: {} = {};",
+  "diagnostics": [
+    {
+      "message": "Don't use \`{}\` as a type. Use object instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: object = {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 29`] = `
+{
+  "code": "let value: NS.Banned;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`NS.Banned\` as a type. Use NS.Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: NS.Ok;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 30`] = `
+{
+  "code": "let value: Type<   Banned   >;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned\` as a type. Use Ok instead.",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let value: Type<   Ok   >;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 31`] = `
+{
+  "code": "type Intersection = Banned<any>;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned<any>\` as a type. Don't use \`any\` as a type parameter to \`Banned\`",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-types > invalid 32`] = `
+{
+  "code": "type Intersection = Banned<A,B>;",
+  "diagnostics": [
+    {
+      "message": "Don't use \`Banned<A,B>\` as a type. Don't pass \`A, B\` as parameters to \`Banned\`",
+      "messageId": "bannedTypeMessage",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
