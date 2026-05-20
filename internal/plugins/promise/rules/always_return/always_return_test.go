@@ -94,6 +94,14 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `hey.then((function() { return 1; }))`},
 			// Expression-bodied arrow is valid even if it is a void expression.
 			{Code: `hey.then(x => void console.log(x))`},
+
+			// ---- switch statement — false-positive regression (review feedback) ----
+			// switch with default and every case terminating: should NOT error
+			{Code: `hey.then(function(x) { switch (x) { case 1: return 'a'; case 2: return 'b'; default: return 'c'; } })`},
+			// switch with fallthrough case (empty case falls through to returning case)
+			{Code: `hey.then(function(x) { switch (x) { case 1: case 2: return 'a'; default: return 'b'; } })`},
+			// switch where every case throws
+			{Code: `hey.then(function(x) { switch (x) { case 1: throw new Error(); default: throw new Error(); } })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ESLint upstream invalid cases ----
@@ -152,6 +160,14 @@ func TestAlwaysReturn(t *testing.T) {
 
 			// Locks in upstream process matcher: only process.exit/abort is terminal.
 			{Code: `hey.then(x => { process.exitCode = 1 })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+
+			// ---- switch statement — false-positive regression (review feedback) ----
+			// switch without default: entry via any case can fall through to end, not terminal
+			{Code: `hey.then(function(x) { switch (x) { case 1: return 'a'; case 2: return 'b'; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			// switch where one case breaks before returning
+			{Code: `hey.then(function(x) { switch (x) { case 1: return 'a'; case 2: break; default: return 'c'; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			// switch where default case body doesn't terminate
+			{Code: `hey.then(function(x) { switch (x) { case 1: return 'a'; default: console.log('nope'); } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 		},
 	)
 }
