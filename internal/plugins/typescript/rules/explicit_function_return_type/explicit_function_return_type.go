@@ -2,6 +2,7 @@ package explicit_function_return_type
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -112,7 +113,7 @@ func run(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
 		if node.Body() == nil {
 			return true
 		}
-		if opts.allowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(info) {
+		if opts.allowHigherOrderFunctions && typescriptutil.DoesImmediatelyReturnFunctionExpression(node, info.returns) {
 			return true
 		}
 		if node.Type() != nil {
@@ -160,8 +161,12 @@ func run(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
 		}
 
 		if opts.allowTypedFunctionExpressions &&
-			(isValidFunctionExpressionReturnType(node, opts) ||
-				ancestorHasReturnType(node)) {
+			(typescriptutil.IsValidFunctionExpressionReturnType(
+				node,
+				opts.allowTypedFunctionExpressions,
+				opts.allowExpressions,
+				opts.allowDirectConstAssertionInArrowFunctions,
+			) || typescriptutil.AncestorHasReturnType(node)) {
 			return
 		}
 
@@ -202,7 +207,7 @@ func run(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
 		// directly inside ObjectLiteralExpression. Apply the same expression-path checks.
 		if node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
 			if opts.allowTypedFunctionExpressions &&
-				(isObjectMethodTyped(node, opts) || ancestorHasReturnType(node) || opts.allowExpressions) {
+				(isObjectMethodTyped(node, opts) || typescriptutil.AncestorHasReturnType(node) || opts.allowExpressions) {
 				return
 			}
 		}
@@ -259,185 +264,11 @@ func isIIFE(node *ast.Node) bool {
 	return callee == node
 }
 
-// isFunction checks if a node is a FunctionDeclaration, FunctionExpression, or ArrowFunction.
-// Matches ESLint's ASTUtils.isFunction — excludes methods, getters, setters, and constructors.
-func isFunction(node *ast.Node) bool {
-	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
-}
-
-// doesImmediatelyReturnFunctionExpression checks if a function immediately returns another function.
-// tsgo preserves ParenthesizedExpression (ESLint strips them), so we must unwrap with SkipParentheses.
-func doesImmediatelyReturnFunctionExpression(info *functionInfo) bool {
-	node := info.node
-	// Arrow function with expression body that is a function
-	if node.Kind == ast.KindArrowFunction {
-		af := node.AsArrowFunction()
-		if af.Body != nil && af.Body.Kind != ast.KindBlock {
-			return isFunction(ast.SkipParentheses(af.Body))
-		}
-	}
-
-	if len(info.returns) == 0 {
-		return false
-	}
-
-	for _, ret := range info.returns {
-		arg := ret.Expression()
-		if arg == nil || !isFunction(ast.SkipParentheses(arg)) {
-			return false
-		}
-	}
-	return true
-}
-
-// getEffectiveParent returns the first meaningful parent, skipping ParenthesizedExpressions.
-// ESLint strips parens from the AST; tsgo preserves them, so this bridges the gap.
-func getEffectiveParent(node *ast.Node) *ast.Node {
-	if node.Parent == nil {
-		return nil
-	}
-	return ast.WalkUpParenthesizedExpressions(node.Parent)
-}
-
-// isTypeAssertion checks if a node is `x as T` or `<T>x`.
-func isTypeAssertion(node *ast.Node) bool {
-	return ast.IsAsExpression(node) || ast.IsTypeAssertion(node)
-}
-
-// isVariableDeclaratorWithTypeAnnotation checks if a node is a VariableDeclaration with a type annotation.
-func isVariableDeclaratorWithTypeAnnotation(node *ast.Node) bool {
-	if node.Kind != ast.KindVariableDeclaration {
-		return false
-	}
-	decl := node.AsVariableDeclaration()
-	return decl.Type != nil
-}
-
-// isPropertyDefinitionWithTypeAnnotation checks if a node is a PropertyDeclaration with a type annotation.
-func isPropertyDefinitionWithTypeAnnotation(node *ast.Node) bool {
-	if node.Kind != ast.KindPropertyDeclaration {
-		return false
-	}
-	return node.AsPropertyDeclaration().Type != nil
-}
-
-// isDefaultFunctionParameterWithTypeAnnotation checks `(param: Type = () => {})`.
-// In tsgo, the function is the initializer of a Parameter node with a type annotation.
-func isDefaultFunctionParameterWithTypeAnnotation(node *ast.Node) bool {
-	if node.Kind != ast.KindParameter {
-		return false
-	}
-	param := node.AsParameterDeclaration()
-	return param.Type != nil && param.Initializer != nil
-}
-
-// isFunctionArgument checks if a parent is a call expression and the function is an argument (not callee).
-func isFunctionArgument(parent *ast.Node, funcNode *ast.Node) bool {
-	if parent.Kind != ast.KindCallExpression {
-		return false
-	}
-	callee := ast.SkipParentheses(parent.AsCallExpression().Expression)
-	return callee != funcNode
-}
-
-// isTypedJSX checks if a node is JSXExpressionContainer or JSXSpreadAttribute.
-func isTypedJSX(node *ast.Node) bool {
-	return node.Kind == ast.KindJsxExpression || node.Kind == ast.KindJsxSpreadAttribute
-}
-
-// isConstructorArgument checks if a node is a NewExpression.
-func isConstructorArgument(node *ast.Node) bool {
-	return node.Kind == ast.KindNewExpression
-}
-
-// isTypedParent checks if the parent of a function expression provides type context.
-func isTypedParent(parent *ast.Node, funcNode *ast.Node) bool {
-	return isTypeAssertion(parent) ||
-		isVariableDeclaratorWithTypeAnnotation(parent) ||
-		isDefaultFunctionParameterWithTypeAnnotation(parent) ||
-		isPropertyDefinitionWithTypeAnnotation(parent) ||
-		isFunctionArgument(parent, funcNode) ||
-		isTypedJSX(parent)
-}
-
-// isPropertyOfObjectWithType checks if a node is a property (or nested property)
-// of a typed object expression.
-func isPropertyOfObjectWithType(property *ast.Node, funcNode *ast.Node) bool {
-	if property == nil {
-		return false
-	}
-	if property.Kind != ast.KindPropertyAssignment &&
-		property.Kind != ast.KindShorthandPropertyAssignment {
-		return false
-	}
-	objectExpr := property.Parent
-	if objectExpr == nil || objectExpr.Kind != ast.KindObjectLiteralExpression {
-		return false
-	}
-	parent := getEffectiveParent(objectExpr)
-	if parent == nil {
-		return false
-	}
-	return isTypedParent(parent, funcNode) || isPropertyOfObjectWithType(parent, funcNode)
-}
-
-// isTypedFunctionExpression checks if a function expression is in a typed context.
-func isTypedFunctionExpression(node *ast.Node, opts options) bool {
-	if !opts.allowTypedFunctionExpressions {
-		return false
-	}
-	parent := getEffectiveParent(node)
-	if parent == nil {
-		return false
-	}
-	return isTypedParent(parent, node) ||
-		isPropertyOfObjectWithType(parent, node) ||
-		isConstructorArgument(parent)
-}
-
-// isValidFunctionExpressionReturnType checks if a function expression's return type
-// is either typed or valid with the provided options.
-func isValidFunctionExpressionReturnType(node *ast.Node, opts options) bool {
-	if isTypedFunctionExpression(node, opts) {
-		return true
-	}
-
-	if opts.allowExpressions {
-		parent := getEffectiveParent(node)
-		if parent != nil &&
-			parent.Kind != ast.KindVariableDeclaration &&
-			parent.Kind != ast.KindMethodDeclaration &&
-			parent.Kind != ast.KindExportAssignment &&
-			parent.Kind != ast.KindPropertyDeclaration {
-			return true
-		}
-	}
-
-	if !opts.allowDirectConstAssertionInArrowFunctions ||
-		node.Kind != ast.KindArrowFunction {
-		return false
-	}
-
-	af := node.AsArrowFunction()
-	body := af.Body
-	if body == nil {
-		return false
-	}
-	// Skip through parentheses and satisfies expressions.
-	// tsgo preserves ParenthesizedExpression; ESLint strips them.
-	body = ast.SkipParentheses(body)
-	for body.Kind == ast.KindSatisfiesExpression {
-		body = ast.SkipParentheses(body.AsSatisfiesExpression().Expression)
-	}
-
-	return ast.IsConstAssertion(body)
-}
-
 // isObjectMethodTyped checks if an object method is in a typed context.
 // This handles the tsgo-specific case where object method shorthand (e.g., { foo() {} })
 // is a MethodDeclaration inside ObjectLiteralExpression.
 //
-// NOTE: isConstructorArgument is intentionally NOT checked here. In ESLint,
+// NOTE: IsConstructorArgument is intentionally NOT checked here. In ESLint,
 // isConstructorArgument is only for direct function arguments to new expressions
 // (e.g., `new Foo(() => {})`), not for methods inside objects passed to new expressions
 // (e.g., `new Proxy(obj, { get() {} })`).
@@ -449,65 +280,12 @@ func isObjectMethodTyped(node *ast.Node, opts options) bool {
 	if objectExpr == nil || objectExpr.Kind != ast.KindObjectLiteralExpression {
 		return false
 	}
-	parent := getEffectiveParent(objectExpr)
+	parent := typescriptutil.GetEffectiveParent(objectExpr)
 	if parent == nil {
 		return false
 	}
-	return isTypedParent(parent, node) ||
-		isPropertyOfObjectWithType(parent, node)
-}
-
-// ancestorHasReturnType checks if any ancestor function has a return type.
-func ancestorHasReturnType(node *ast.Node) bool {
-	ancestor := node.Parent
-	// tsgo preserves ParenthesizedExpression; ESLint strips them.
-	// Skip parens to reach the meaningful parent (e.g., PropertyAssignment or ReturnStatement).
-	for ancestor != nil && ancestor.Kind == ast.KindParenthesizedExpression {
-		ancestor = ancestor.Parent
-	}
-
-	// In ESLint's model: if (ancestor.type === Property) ancestor = ancestor.value;
-	// Property.value for `arrowFn: () => 'test'` is the ArrowFunction itself.
-	// In tsgo, PropertyAssignment.Initializer is the value expression.
-	// Skip through parens since tsgo preserves ParenthesizedExpression.
-	if ancestor != nil && ancestor.Kind == ast.KindPropertyAssignment {
-		pa := ancestor.AsPropertyAssignment()
-		if pa.Initializer != nil {
-			ancestor = ast.SkipParentheses(pa.Initializer)
-		}
-	}
-
-	// Check if the function is being returned (or is a bodyless arrow return value)
-	isReturnStatement := ancestor != nil && ancestor.Kind == ast.KindReturnStatement
-	isBodylessArrow := ancestor != nil &&
-		ancestor.Kind == ast.KindArrowFunction &&
-		ancestor.AsArrowFunction().Body != nil &&
-		ancestor.AsArrowFunction().Body.Kind != ast.KindBlock
-
-	if !isReturnStatement && !isBodylessArrow {
-		return false
-	}
-
-	for ancestor != nil {
-		switch ancestor.Kind {
-		case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration,
-			ast.KindMethodDeclaration, ast.KindGetAccessor:
-			// In tsgo, methods and getters are their own node types (not FunctionExpression
-			// inside MethodDefinition like ESLint). Check their return type the same way.
-			if ancestor.Type() != nil {
-				return true
-			}
-		case ast.KindVariableDeclaration:
-			decl := ancestor.AsVariableDeclaration()
-			return decl.Type != nil
-		case ast.KindPropertyDeclaration:
-			return ancestor.AsPropertyDeclaration().Type != nil
-		case ast.KindExpressionStatement:
-			return false
-		}
-		ancestor = ancestor.Parent
-	}
-	return false
+	return typescriptutil.IsTypedParent(parent, node) ||
+		typescriptutil.IsPropertyOfObjectWithType(parent, node)
 }
 
 // isNameAllowed checks if a function's name is in the allowed names list.

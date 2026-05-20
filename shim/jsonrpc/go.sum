@@ -1,4 +1,4 @@
 github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433 h1:vymEbVwYFP/L05h5TKQxvkXoKxNvTpjxYKdF1Nlwuao=
 github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433/go.mod h1:tphK2c80bpPhMOI4v6bIc2xWywPfbqi1Z06+RcrMkDg=
-github.com/microsoft/typescript-go v0.0.0-20260513220310-47ca64821ddc h1:UcqzA6GPyDA0ILnACKp5ZZrsTj71JkeRmYPupgp+gOY=
-github.com/microsoft/typescript-go v0.0.0-20260513220310-47ca64821ddc/go.mod h1:m8YA0PMC7ti0GW0RI05D6fEcjQeu98XVS+FWF+VDW2k=
+github.com/microsoft/typescript-go v0.0.0-20260518225840-0a7c6b47e616 h1:cg0N6KtRYpVVWGJ3qZRgOoEngfQxFZHd2mA6gslM0+0=
+github.com/microsoft/typescript-go v0.0.0-20260518225840-0a7c6b47e616/go.mod h1:m8YA0PMC7ti0GW0RI05D6fEcjQeu98XVS+FWF+VDW2k=
