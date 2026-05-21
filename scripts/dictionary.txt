@@ -490,6 +490,7 @@ Orya
 oxendict
 phonebk
 phonebook
+psdifjo
 subtags
 Taml
 tarask
