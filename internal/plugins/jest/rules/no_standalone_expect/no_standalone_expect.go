@@ -160,7 +160,11 @@ var NoStandaloneExpectRule = rule.Rule{
 		scopeStack := make([]scopeEntry, 0, 8)
 
 		isCustomTestBlockFunction := func(node *ast.Node) bool {
-			name := utils.GetNodeName(node)
+			callExpr := node.AsCallExpression()
+			if callExpr == nil {
+				return false
+			}
+			name := utils.CalleeChainName(callExpr.Expression)
 			if name == "" {
 				return false
 			}

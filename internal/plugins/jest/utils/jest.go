@@ -129,20 +129,17 @@ type ParsedJestFnMemberEntry struct {
 	Node *ast.Node
 }
 
-// GetNodeName returns the dotted name of a call or tagged-template callee chain
-// (for example "each.test" or "t"). This matches eslint-plugin-jest's getNodeName.
-func GetNodeName(node *ast.Node) string {
-	entries := GetJestFnMemberEntries(node)
+func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
 	if len(entries) == 0 {
 		return ""
 	}
 
-	names := make([]string, len(entries))
-	for i, entry := range entries {
-		names[i] = entry.Name
+	parts := make([]string, len(entries))
+	for i, e := range entries {
+		parts[i] = e.Name
 	}
 
-	return strings.Join(names, ".")
+	return strings.Join(parts, ".")
 }
 
 func getPropertyName(node *ast.Node) string {

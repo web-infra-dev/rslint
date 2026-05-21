@@ -434,6 +434,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
+    './tests/eslint-plugin-jest/rules/no-jasmine-globals.test.ts',
     './tests/eslint-plugin-jest/rules/no-mocks-import.test.ts',
     './tests/eslint-plugin-jest/rules/no-standalone-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
