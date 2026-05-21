@@ -280,7 +280,7 @@ func TestNormalizeJSONConfig_EslintPluginImport(t *testing.T) {
 	RegisterAllRules()
 
 	// JSON config using "eslint-plugin-import" declaration name.
-	// normalizeJSONConfig must normalize plugin name before calling GetPluginRules,
+	// normalizeJSONConfig must resolve plugin declaration names via pluginByDeclName,
 	// so that "import/" prefixed rules are correctly injected.
 	config := normalizeJSONConfig(RslintConfig{
 		{

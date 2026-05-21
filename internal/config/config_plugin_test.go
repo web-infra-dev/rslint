@@ -48,23 +48,6 @@ func TestRulePluginPrefix(t *testing.T) {
 	}
 }
 
-func TestGetPluginRules(t *testing.T) {
-	RegisterAllRules()
-
-	tsRules := GetPluginRules("@typescript-eslint")
-	if len(tsRules) == 0 {
-		t.Error("Expected at least one TS rule")
-	}
-
-	// Verify we only get TS-ESLint rules, not core or import rules.
-	// GetPluginRules filters by registry key prefix, so the returned count
-	// should be less than all rules.
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if len(tsRules) >= len(allRules) {
-		t.Errorf("Expected fewer plugin rules than total rules, got %d vs %d", len(tsRules), len(allRules))
-	}
-}
-
 func TestGetCoreRules(t *testing.T) {
 	RegisterAllRules()
 
@@ -81,14 +64,14 @@ func TestGetCoreRules(t *testing.T) {
 	}
 }
 
-func TestGetPluginRules_Disjoint(t *testing.T) {
+func TestRules_Disjoint(t *testing.T) {
 	RegisterAllRules()
 
-	// Sum across core + every known plugin, so this test does not need to be
-	// edited each time a new plugin is added.
+	// Sum across core + every known plugin's GetAllRules, so this test does not
+	// need to be edited each time a new plugin is added.
 	total := len(GetCoreRules())
 	for _, plugin := range KnownPlugins {
-		total += len(GetPluginRules(plugin.RulePrefix))
+		total += len(plugin.getAllRules())
 	}
 
 	allRules := GlobalRuleRegistry.GetAllRules()
@@ -127,19 +110,6 @@ func TestKnownPlugins_GetAllRulesMatchRulePrefix(t *testing.T) {
 			if !strings.HasPrefix(r.Name, prefix) {
 				t.Errorf("Plugin %q getAllRules() returned rule %q which does not have prefix %q", plugin.RulePrefix, r.Name, prefix)
 			}
-		}
-	}
-}
-
-func TestKnownPlugins_GetAllRulesConsistentWithGetPluginRules(t *testing.T) {
-	RegisterAllRules()
-
-	for _, plugin := range KnownPlugins {
-		fromGetAll := plugin.getAllRules()
-		fromRegistry := GetPluginRules(plugin.RulePrefix)
-		if len(fromGetAll) != len(fromRegistry) {
-			t.Errorf("Plugin %q: getAllRules() returned %d rules but GetPluginRules returned %d",
-				plugin.RulePrefix, len(fromGetAll), len(fromRegistry))
 		}
 	}
 }

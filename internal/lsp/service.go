@@ -120,8 +120,8 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		ParseCache: s.parseCache,
 	})
 
-	// Register all rules before loading config so that normalizeJSONConfig
-	// can inject default core/plugin rules into the registry.
+	// Populate the global rule registry once per process; the LSP request path
+	// resolves rule names against it after config merging.
 	config.RegisterAllRules()
 
 	// Try to load JSON config as fallback.
