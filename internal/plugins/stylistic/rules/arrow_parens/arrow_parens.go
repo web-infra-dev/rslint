@@ -41,12 +41,12 @@ type options struct {
 func parseOptions(raw any) options {
 	opts := options{}
 
-	var arr []interface{}
+	var arr []any
 	switch v := raw.(type) {
-	case []interface{}:
+	case []any:
 		arr = v
 	case string:
-		arr = []interface{}{v}
+		arr = []any{v}
 	}
 
 	if len(arr) > 0 {
@@ -55,7 +55,7 @@ func parseOptions(raw any) options {
 		}
 	}
 	if opts.asNeeded && len(arr) > 1 {
-		if m, ok := arr[1].(map[string]interface{}); ok {
+		if m, ok := arr[1].(map[string]any); ok {
 			if b, ok := m["requireForBlockBody"].(bool); ok {
 				opts.requireForBlockBody = b
 			}

@@ -131,9 +131,9 @@ func TestArrowParensExtras(t *testing.T) {
 			{Code: `([a, ...rest]) => rest.length;`, Options: optsAsNeeded()},
 			{Code: `({a}) => a;`, Options: optsAsNeeded()},
 			{Code: `({a, b}) => a + b;`, Options: optsAsNeeded()},
-			{Code: `({a: x, b: y}) => x + y;`, Options: optsAsNeeded()},     // aliasing
-			{Code: `({a = 1, b = 2}) => a + b;`, Options: optsAsNeeded()},   // pattern default
-			{Code: `({a, ...rest}) => rest;`, Options: optsAsNeeded()},      // pattern rest
+			{Code: `({a: x, b: y}) => x + y;`, Options: optsAsNeeded()},   // aliasing
+			{Code: `({a = 1, b = 2}) => a + b;`, Options: optsAsNeeded()}, // pattern default
+			{Code: `({a, ...rest}) => rest;`, Options: optsAsNeeded()},    // pattern rest
 
 			// ---- Rest param `...a` ----
 			// tsgo: paramDecl.DotDotDotToken != nil. ESTree: RestElement
@@ -155,7 +155,7 @@ func TestArrowParensExtras(t *testing.T) {
 			{Code: `(a: number) => a;`, Options: optsAsNeededBlock()},
 			{Code: `(a: string) => a.length;`, Options: optsAsNeeded()},
 			{Code: `(a: { x: number }) => a.x;`, Options: optsAsNeeded()},  // object type
-			{Code: `(a: number | string) => a;`, Options: optsAsNeeded()}, // union type
+			{Code: `(a: number | string) => a;`, Options: optsAsNeeded()},  // union type
 			{Code: `(a: Array<number>) => a[0];`, Options: optsAsNeeded()}, // generic type ref
 
 			// ---- TS optional `a?`: keep parens ----
@@ -202,8 +202,8 @@ func TestArrowParensExtras(t *testing.T) {
 			{Code: `const f = ( /* leading block */ a ) => a;`, Options: optsAsNeeded()},
 			{Code: "const f = ( a // line\n) => a;", Options: optsAsNeeded()},
 			{Code: "const f = (\n  // line comment alone\n  a\n) => a;", Options: optsAsNeeded()},
-			{Code: "const f = (a /* line1\nline2 */) => a;", Options: optsAsNeeded()},        // multi-line block comment
-			{Code: `const f = (/** JSDoc */ a) => a;`, Options: optsAsNeeded()},               // JSDoc block
+			{Code: "const f = (a /* line1\nline2 */) => a;", Options: optsAsNeeded()},     // multi-line block comment
+			{Code: `const f = (/** JSDoc */ a) => a;`, Options: optsAsNeeded()},           // JSDoc block
 			{Code: `const f = (a /* end */ , /* sep */ ) => a;`, Options: optsAsNeeded()}, // comment between param and trailing comma + after
 
 			// ---- Comments OUTSIDE parens — should NOT block paren removal ----
@@ -232,13 +232,13 @@ func TestArrowParensExtras(t *testing.T) {
 
 			// ---- async + various param shapes under as-needed ----
 			{Code: `async a => a;`, Options: optsAsNeeded()},
-			{Code: `async (a: number) => a;`, Options: optsAsNeeded()},                   // TS type → keep
-			{Code: `async (a?) => a;`, Options: optsAsNeeded()},                          // TS optional → keep
-			{Code: `async (a): Promise<number> => a;`, Options: optsAsNeeded()},          // return type → keep
-			{Code: `async (...args) => args.length;`, Options: optsAsNeeded()},           // rest → keep
-			{Code: `async ({a, b}) => a + b;`, Options: optsAsNeeded()},                  // destructuring → keep
-			{Code: `async <T>(a: T) => a;`, Options: optsAsNeeded()},                     // generic → keep
-			{Code: `async <T>(/* doc */a: T) => a;`, Options: optsAsNeeded()},            // generic + comment
+			{Code: `async (a: number) => a;`, Options: optsAsNeeded()},          // TS type → keep
+			{Code: `async (a?) => a;`, Options: optsAsNeeded()},                 // TS optional → keep
+			{Code: `async (a): Promise<number> => a;`, Options: optsAsNeeded()}, // return type → keep
+			{Code: `async (...args) => args.length;`, Options: optsAsNeeded()},  // rest → keep
+			{Code: `async ({a, b}) => a + b;`, Options: optsAsNeeded()},         // destructuring → keep
+			{Code: `async <T>(a: T) => a;`, Options: optsAsNeeded()},            // generic → keep
+			{Code: `async <T>(/* doc */a: T) => a;`, Options: optsAsNeeded()},   // generic + comment
 
 			// ---- async + requireForBlockBody ----
 			{Code: `async a => a`, Options: optsAsNeededBlock()},
@@ -343,7 +343,7 @@ func TestArrowParensExtras(t *testing.T) {
 			{Code: `[(a) => a, (b) => b].length;`, Options: optsAlways()},
 
 			// ---- Empty options array ----
-			{Code: `(a) => a`, Options: []interface{}{}},
+			{Code: `(a) => a`, Options: []any{}},
 
 			// ---- Bare-string options form ----
 			{Code: `a => a`, Options: "as-needed"},
@@ -351,10 +351,10 @@ func TestArrowParensExtras(t *testing.T) {
 
 			// ---- Options as nested array (rule_tester / config-loader path) ----
 			// `['as-needed']` is the canonical shape; verify nil inner option.
-			{Code: `a => a`, Options: []interface{}{"as-needed"}},
+			{Code: `a => a`, Options: []any{"as-needed"}},
 
 			// ---- Options shape with explicit requireForBlockBody=true and a body ----
-			{Code: `a => a`, Options: []interface{}{"as-needed", map[string]interface{}{"requireForBlockBody": true}}},
+			{Code: `a => a`, Options: []any{"as-needed", map[string]any{"requireForBlockBody": true}}},
 
 			// ---- requireForBlockBody set when mode is 'always' — flag IGNORED ----
 			// Upstream: `requireForBlockBody = asNeeded && options?.requireForBlockBody`.
@@ -363,7 +363,7 @@ func TestArrowParensExtras(t *testing.T) {
 			// 'always' (covered in invalid below). Here we lock that
 			// `(a) => {}` is VALID — it would be UNEXPECTED if the flag
 			// silently activated.
-			{Code: `(a) => {}`, Options: []interface{}{"always", map[string]interface{}{"requireForBlockBody": true}}},
+			{Code: `(a) => {}`, Options: []any{"always", map[string]any{"requireForBlockBody": true}}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ============================================================
@@ -497,9 +497,9 @@ func TestArrowParensExtras(t *testing.T) {
 			// `expectedParens` (NOT `expectedParensBlock`) because upstream
 			// only sets requireForBlockBody internal flag when asNeeded.
 			{
-				Code:   `a => {}`,
-				Output: []string{`(a) => {}`},
-				Options: []interface{}{"always", map[string]interface{}{"requireForBlockBody": true}},
+				Code:    `a => {}`,
+				Output:  []string{`(a) => {}`},
+				Options: []any{"always", map[string]any{"requireForBlockBody": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedParens", Line: 1, Column: 1, EndLine: 1, EndColumn: 2},
 				},

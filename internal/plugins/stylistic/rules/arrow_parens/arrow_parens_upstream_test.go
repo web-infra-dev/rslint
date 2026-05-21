@@ -12,10 +12,14 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func optsAlways() []interface{}                      { return []interface{}{"always"} }
-func optsAsNeeded() []interface{}                    { return []interface{}{"as-needed"} }
-func optsAsNeededBlock() []interface{}               { return []interface{}{"as-needed", map[string]interface{}{"requireForBlockBody": true}} }
-func optsAsNeededFlag(b bool) []interface{}          { return []interface{}{"as-needed", map[string]interface{}{"requireForBlockBody": b}} }
+func optsAlways() []any   { return []any{"always"} }
+func optsAsNeeded() []any { return []any{"as-needed"} }
+func optsAsNeededBlock() []any {
+	return []any{"as-needed", map[string]any{"requireForBlockBody": true}}
+}
+func optsAsNeededFlag(b bool) []any {
+	return []any{"as-needed", map[string]any{"requireForBlockBody": b}}
+}
 
 func TestArrowParensUpstream(t *testing.T) {
 	rule_tester.RunRuleTester(
