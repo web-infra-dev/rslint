@@ -1,6 +1,7 @@
 package jest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_deprecated_functions"
@@ -22,6 +23,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		expect_expect.ExpectExpectRule,
 		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_disabled_tests.NoDisabledTestsRule,

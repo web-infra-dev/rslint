@@ -5,7 +5,7 @@ import type { RslintConfigEntry } from '../define-config.js';
 const recommended: RslintConfigEntry = {
   plugins: ['jest'],
   rules: {
-    // 'jest/expect-expect': 'warn', // not implemented
+    'jest/expect-expect': 'warn',
     'jest/no-alias-methods': 'error',
     'jest/no-commented-out-tests': 'warn',
     // 'jest/no-conditional-expect': 'error', // not implemented
