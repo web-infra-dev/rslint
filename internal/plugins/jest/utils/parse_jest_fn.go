@@ -16,6 +16,8 @@ type ParsedJestFnCall struct {
 	MemberEntries   []ParsedJestFnMemberEntry
 	Modifiers       []string
 	ModifierEntries []ParsedJestFnMemberEntry
+	Matcher         string
+	MatcherEntry    *ParsedJestFnMemberEntry
 	Head            ParsedJestFnCallHead
 }
 
@@ -56,10 +58,7 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	callExpr := node.AsCallExpression()
-	if isEachFactoryCall(callExpr, members) {
-		return nil
-	}
-	if isInvalidTaggedTemplateCall(callExpr, members) {
+	if isEachFactoryCall(callExpr, members) || isInvalidTaggedTemplateCall(callExpr, members) || isInnerExpectCall(node, localName, members, ctx.Settings) {
 		return nil
 	}
 
@@ -82,14 +81,11 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	parsed := &ParsedJestFnCall{
-		Name:      name,
-		LocalName: localName,
-		Kind:      kind,
-		Members:   members,
-		MemberEntries: append(
-			[]ParsedJestFnMemberEntry(nil),
-			memberEntries[1:]...,
-		),
+		Name:          name,
+		LocalName:     localName,
+		Kind:          kind,
+		Members:       members,
+		MemberEntries: memberEntries[1:],
 		Head: ParsedJestFnCallHead{
 			Type: headType,
 			Local: ParsedJestFnCallHeadEntry{
@@ -104,12 +100,124 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	if kind == JestFnTypeExpect {
-		modifiers, modifierEntries := pickExpectModifiersAndEntries(parsed.MemberEntries)
-		parsed.Modifiers = modifiers
-		parsed.ModifierEntries = modifierEntries
+		if !applyParsedExpectCall(parsed) {
+			return nil
+		}
 	}
 
 	return parsed
+}
+
+// FindTopMostCallExpression walks up member/call chains to the outermost CallExpression,
+// matching eslint-plugin-jest's findTopMostCallExpression.
+func FindTopMostCallExpression(node *ast.Node) *ast.Node {
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return node
+	}
+
+	top := node
+	parent := node.Parent
+	for parent != nil {
+		if parent.Kind == ast.KindCallExpression {
+			top = parent
+			parent = parent.Parent
+			continue
+		}
+		if parent.Kind != ast.KindPropertyAccessExpression &&
+			parent.Kind != ast.KindElementAccessExpression {
+			break
+		}
+		parent = parent.Parent
+	}
+
+	return top
+}
+
+func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
+	current := node
+	for current != nil {
+		switch current.Kind {
+		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+			return current.AsImportDeclaration()
+		}
+		current = current.Parent
+	}
+	return nil
+}
+
+func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
+	modifierEntries, matcher, err := findModifiersAndMatcher(parsed.MemberEntries)
+	if err != "" {
+		return false
+	}
+
+	parsed.ModifierEntries = modifierEntries
+	parsed.Matcher = matcher.Name
+	parsed.MatcherEntry = matcher
+	if len(modifierEntries) > 0 {
+		parsed.Modifiers = make([]string, len(modifierEntries))
+		for i, entry := range modifierEntries {
+			parsed.Modifiers[i] = entry.Name
+		}
+	}
+	return true
+}
+
+// isInnerExpectCall detects expect() calls embedded in a matcher chain
+// (e.g. expect(1) in expect(1).toBe(2)) before running type-checker resolution.
+func isInnerExpectCall(node *ast.Node, localName string, members []string, settings map[string]interface{}) bool {
+	if len(members) > 0 || !IsMemberAccessNode(node.Parent) {
+		return false
+	}
+	if FindTopMostCallExpression(node) == node {
+		return false
+	}
+	name := ApplyGlobalJestAlias(localName, settings)
+	return GetJestKind(name) == JestFnTypeExpect
+}
+
+func findModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
+	[]ParsedJestFnMemberEntry,
+	*ParsedJestFnMemberEntry,
+	string,
+) {
+	if len(entries) == 0 {
+		return nil, nil, "matcher-not-found"
+	}
+
+	modifiers := make([]ParsedJestFnMemberEntry, 0, len(entries))
+	for _, member := range entries {
+		parent := member.Node.Parent
+		if parent == nil {
+			return nil, nil, "modifier-unknown"
+		}
+
+		grandparent := parent.Parent
+		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
+			return modifiers, &member, ""
+		}
+
+		switch len(modifiers) {
+		case 0:
+			if !EXPECT_MODIFIER_NAMES[member.Name] {
+				return nil, nil, "modifier-unknown"
+			}
+		case 1:
+			if member.Name != "not" {
+				return nil, nil, "modifier-unknown"
+			}
+			first := modifiers[0].Name
+			if first != "rejects" && first != "resolves" {
+				return nil, nil, "modifier-unknown"
+			}
+		default:
+			return nil, nil, "modifier-unknown"
+		}
+
+		modifiers = append(modifiers, member)
+	}
+
+	return nil, nil, "matcher-not-found"
 }
 
 func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
@@ -198,18 +306,6 @@ func resolveFirstIdentifier(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
-	current := node
-	for current != nil {
-		switch current.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			return current.AsImportDeclaration()
-		}
-		current = current.Parent
-	}
-	return nil
-}
-
 func isEachFactoryCall(callExpr *ast.CallExpression, members []string) bool {
 	if callExpr == nil || len(members) == 0 || members[len(members)-1] != "each" {
 		return false
@@ -246,29 +342,4 @@ func isValidJestCall(name string, members []string) bool {
 
 	_, ok := VALID_JEST_FN_CALL_CHAINS[chain]
 	return ok
-}
-
-func pickExpectModifiersAndEntries(entries []ParsedJestFnMemberEntry) ([]string, []ParsedJestFnMemberEntry) {
-	if len(entries) == 0 {
-		return nil, nil
-	}
-
-	modifierEntries := make([]ParsedJestFnMemberEntry, 0, len(entries))
-	for _, entry := range entries {
-		if !EXPECT_MODIFIER_NAMES[entry.Name] {
-			break
-		}
-		modifierEntries = append(modifierEntries, entry)
-	}
-
-	if len(modifierEntries) == 0 {
-		return nil, nil
-	}
-
-	modifiers := make([]string, 0, len(modifierEntries))
-	for _, entry := range modifierEntries {
-		modifiers = append(modifiers, entry.Name)
-	}
-
-	return modifiers, modifierEntries
 }

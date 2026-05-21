@@ -129,6 +129,22 @@ type ParsedJestFnMemberEntry struct {
 	Node *ast.Node
 }
 
+// GetNodeName returns the dotted name of a call or tagged-template callee chain
+// (for example "each.test" or "t"). This matches eslint-plugin-jest's getNodeName.
+func GetNodeName(node *ast.Node) string {
+	entries := GetJestFnMemberEntries(node)
+	if len(entries) == 0 {
+		return ""
+	}
+
+	names := make([]string, len(entries))
+	for i, entry := range entries {
+		names[i] = entry.Name
+	}
+
+	return strings.Join(names, ".")
+}
+
 func getPropertyName(node *ast.Node) string {
 	switch node.Kind {
 	case ast.KindIdentifier:
@@ -496,4 +512,41 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	}
 
 	return DefaultJestVersion
+}
+
+func IsFunction(node *ast.Node) bool {
+	return ast.IsFunctionDeclaration(node) ||
+		ast.IsFunctionExpressionOrArrowFunction(node) ||
+		node.Kind == ast.KindMethodDeclaration ||
+		node.Kind == ast.KindConstructor ||
+		node.Kind == ast.KindGetAccessor ||
+		node.Kind == ast.KindSetAccessor
+}
+
+func IsMemberAccessNode(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStaticExpectMatcher reports static expect APIs such as expect.any(...) or
+// expect.not.stringContaining(...), but not assertion matchers like toBe.
+func IsStaticExpectMatcher(matcher string, headNode *ast.Node) bool {
+	if matcher == "" || headNode == nil || !IsMemberAccessNode(headNode.Parent) {
+		return false
+	}
+
+	switch matcher {
+	case "assertions", "hasAssertions":
+		return false
+	default:
+		return true
+	}
 }
