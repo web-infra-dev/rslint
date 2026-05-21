@@ -441,6 +441,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
