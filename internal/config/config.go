@@ -243,7 +243,7 @@ var registerOnce sync.Once
 func RegisterAllRules() {
 	registerOnce.Do(func() {
 		registerAllTypeScriptEslintPluginRules()
-		registerAllEslintImportPluginRules()
+		registerAllImportPluginRules()
 		registerAllReactPluginRules()
 		registerAllReactHooksPluginRules()
 		registerAllJestPluginRules()
@@ -303,7 +303,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	}
 }
 
-func registerAllEslintImportPluginRules() {
+func registerAllImportPluginRules() {
 	for _, rule := range importPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
@@ -659,15 +659,9 @@ func RulePluginPrefix(ruleName string) string {
 	return ruleName[:lastSlash]
 }
 
-// GetCoreRules returns core ESLint rules (those without a "/" prefix).
+// GetCoreRules returns core ESLint rules (those without a "/" prefix in their registered name).
 func GetCoreRules() []rule.Rule {
-	var rules []rule.Rule
-	for name, r := range GlobalRuleRegistry.GetAllRules() {
-		if !strings.Contains(name, "/") {
-			rules = append(rules, r)
-		}
-	}
-	return rules
+	return coreRules.GetAllRules()
 }
 
 // InitDefaultConfig, createDefaultConfig, migrateJSONConfig and related helpers
