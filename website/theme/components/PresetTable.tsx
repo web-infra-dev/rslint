@@ -3,7 +3,6 @@ import { CodeBlockRuntime, Link } from '@rspress/core/theme';
 import { expandPluginPresets } from '../plugin-registry';
 
 const PRESET_PLUGINS = expandPluginPresets();
-console.log('PRESET_PLUGINS::', PRESET_PLUGINS);
 
 /**
  * Renders the table of every recommended preset shipped by `@rslint/core`,
