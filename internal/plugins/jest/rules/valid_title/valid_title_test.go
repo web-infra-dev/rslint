@@ -152,6 +152,7 @@ func TestValidTitleRule(t *testing.T) {
 		{Code: "test(`foo`, function () {})"},
 		{Code: "test.concurrent(`foo`, function () {})"},
 		{Code: "test(`\\nfoo\\n`, function () {})"},
+		{Code: "test(\n  `foo`,\n  function () {}\n)"},
 		{Code: "test(`${foo}`, function () {})"},
 		{Code: "test.concurrent(`${foo}`, function () {})"},
 		{Code: `it('foo', function () {})`},

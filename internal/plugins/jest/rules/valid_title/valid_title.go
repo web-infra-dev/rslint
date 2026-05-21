@@ -288,19 +288,24 @@ func binaryExprContainsStringLit(n *ast.Node) bool {
 	return binaryExprContainsStringLit(be.Left)
 }
 
-func rawTemplateLiteralText(node *ast.Node, sourceText string) string {
-	pos := node.Pos()
-	end := node.End()
-	if sourceText == "" || pos+1 >= end-1 {
+func rawTemplateLiteralText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	if sourceFile == nil {
 		return ""
 	}
-	if end-1 > len(sourceText) || pos+1 < 0 {
+	r := utils.TrimNodeTextRange(sourceFile, node)
+	start := r.Pos()
+	end := r.End()
+	sourceText := sourceFile.Text()
+	if sourceText == "" || start+1 >= end-1 {
 		return ""
 	}
-	return sourceText[pos+1 : end-1]
+	if end-1 > len(sourceText) || start+1 < 0 {
+		return ""
+	}
+	return sourceText[start+1 : end-1]
 }
 
-func jestTitleInner(n *ast.Node, sourceText string) (string, bool) {
+func jestTitleInner(sourceFile *ast.SourceFile, n *ast.Node) (string, bool) {
 	if n == nil {
 		return "", false
 	}
@@ -308,7 +313,7 @@ func jestTitleInner(n *ast.Node, sourceText string) (string, bool) {
 	case ast.KindStringLiteral:
 		return n.AsStringLiteral().Text, true
 	case ast.KindNoSubstitutionTemplateLiteral:
-		return rawTemplateLiteralText(n, sourceText), true
+		return rawTemplateLiteralText(sourceFile, n), true
 	default:
 		return "", false
 	}
@@ -416,7 +421,7 @@ var ValidTitleRule = rule.Rule{
 				}
 				arg := call.Arguments.Nodes[0]
 
-				title, ok := jestTitleInner(arg, ctx.SourceFile.Text())
+				title, ok := jestTitleInner(ctx.SourceFile, arg)
 				if !ok {
 					if binaryExprContainsStringLit(arg) {
 						return
