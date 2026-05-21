@@ -72,6 +72,7 @@ var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
 	"fdescribe":                 true,
 	"fdescribe.each":            true,
 	"fit":                       true,
+	"fit.concurrent":            true,
 	"fit.each":                  true,
 	"fit.failing":               true,
 	"fit.fails":                 true,
@@ -82,6 +83,7 @@ var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
 	"it.concurrent.skip.each":   true,
 	"it.each":                   true,
 	"it.failing":                true,
+	"it.failing.each":           true,
 	"it.fails":                  true,
 	"it.only":                   true,
 	"it.only.each":              true,
@@ -112,6 +114,7 @@ var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
 	"xdescribe":                 true,
 	"xdescribe.each":            true,
 	"xit":                       true,
+	"xit.concurrent":            true,
 	"xit.each":                  true,
 	"xit.failing":               true,
 	"xit.fails":                 true,
@@ -225,6 +228,77 @@ func getElementAccessName(node *ast.Node) string {
 		return node.AsStringLiteral().Text
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return node.AsNoSubstitutionTemplateLiteral().Text
+	default:
+		return ""
+	}
+}
+
+// CalleeChainName returns a dotted name for a call callee expression, mirroring
+// eslint-plugin-jest getNodeName for CallExpression callees (used by expect-expect
+// assertFunctionNames matching).
+//
+// It differs from GetJestFnMemberEntries / getElementAccessName: bracket notation
+// contributes a segment only when the index matches eslint-plugin-jest's
+// supported accessor names (identifier, string literal, or no-substitution
+// template). Unsupported keys break the chain entirely. NewExpression is peeled
+// so e.g. new (require('x')).y becomes a chain.
+func CalleeChainName(expr *ast.Node) string {
+	expr = ast.SkipParentheses(expr)
+	if expr == nil {
+		return ""
+	}
+
+	switch expr.Kind {
+	case ast.KindIdentifier:
+		return expr.AsIdentifier().Text
+	case ast.KindPropertyAccessExpression:
+		pa := expr.AsPropertyAccessExpression()
+		left := CalleeChainName(pa.Expression)
+		prop := pa.Name()
+		if prop == nil {
+			return left
+		}
+		pn := getPropertyName(prop)
+		if left == "" || pn == "" {
+			return left
+		}
+		return left + "." + pn
+	case ast.KindElementAccessExpression:
+		ea := expr.AsElementAccessExpression()
+		left := CalleeChainName(ea.Expression)
+		key := calleeChainLiteralElementKey(ast.SkipParentheses(ea.ArgumentExpression))
+		if left == "" || key == "" {
+			return ""
+		}
+		return left + "." + key
+	case ast.KindCallExpression:
+		return CalleeChainName(expr.AsCallExpression().Expression)
+	case ast.KindNewExpression:
+		ne := expr.AsNewExpression()
+		if ne == nil {
+			return ""
+		}
+		return CalleeChainName(ne.Expression)
+	case ast.KindTaggedTemplateExpression:
+		return CalleeChainName(expr.AsTaggedTemplateExpression().Tag)
+	default:
+		return ""
+	}
+}
+
+// calleeChainLiteralElementKey matches eslint-plugin-jest segments for
+// MemberExpression computed with a supported accessor name only.
+func calleeChainLiteralElementKey(n *ast.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch n.Kind {
+	case ast.KindIdentifier:
+		return n.AsIdentifier().Text
+	case ast.KindStringLiteral:
+		return n.AsStringLiteral().Text
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return n.AsNoSubstitutionTemplateLiteral().Text
 	default:
 		return ""
 	}
@@ -435,4 +509,41 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	}
 
 	return DefaultJestVersion
+}
+
+func IsFunction(node *ast.Node) bool {
+	return ast.IsFunctionDeclaration(node) ||
+		ast.IsFunctionExpressionOrArrowFunction(node) ||
+		node.Kind == ast.KindMethodDeclaration ||
+		node.Kind == ast.KindConstructor ||
+		node.Kind == ast.KindGetAccessor ||
+		node.Kind == ast.KindSetAccessor
+}
+
+func IsMemberAccessNode(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsStaticExpectMatcher reports static expect APIs such as expect.any(...) or
+// expect.not.stringContaining(...), but not assertion matchers like toBe.
+func IsStaticExpectMatcher(matcher string, headNode *ast.Node) bool {
+	if matcher == "" || headNode == nil || !IsMemberAccessNode(headNode.Parent) {
+		return false
+	}
+
+	switch matcher {
+	case "assertions", "hasAssertions":
+		return false
+	default:
+		return true
+	}
 }

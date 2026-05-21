@@ -31,6 +31,7 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 			{Code: `const jasmine = foo;`},
 			{Code: `(this as any).jasmine.foo()`},
 			{Code: `(this as any).jasmine.any()`},
+			{Code: `jasmine[1].any()`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -225,6 +226,26 @@ func TestNoJasmineGlobalsRule(t *testing.T) {
 			},
 			{
 				Code:   `jasmine.foo.any()`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
+				Code:   `jasmine.foo.addMatchers()`,
+				Output: []string{},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "illegalJasmine",
+					Message:   "Illegal usage of jasmine global",
+					Column:    1,
+					Line:      1,
+				}},
+			},
+			{
+				Code:   `jasmine.foo.createSpy()`,
 				Output: []string{},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "illegalJasmine",

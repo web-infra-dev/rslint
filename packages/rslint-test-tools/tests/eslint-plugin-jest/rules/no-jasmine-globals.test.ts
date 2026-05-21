@@ -20,6 +20,7 @@ ruleTester.run('no-jasmine-globals', {} as never, {
     { code: 'const jasmine = foo;' },
     { code: '(this as any).jasmine.foo()' },
     { code: '(this as any).jasmine.any()' },
+    { code: 'jasmine[1].any()' },
   ],
   invalid: [
     {
@@ -191,6 +192,16 @@ ruleTester.run('no-jasmine-globals', {} as never, {
     },
     {
       code: 'jasmine.foo.any()',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine.foo.addMatchers()',
+      output: null,
+      errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
+    },
+    {
+      code: 'jasmine.foo.createSpy()',
       output: null,
       errors: [{ messageId: 'illegalJasmine', column: 1, line: 1 }],
     },

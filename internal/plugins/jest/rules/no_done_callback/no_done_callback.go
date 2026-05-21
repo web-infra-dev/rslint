@@ -57,12 +57,6 @@ func findCallbackArgument(callExpr *ast.CallExpression, jestFnCall *utils.Parsed
 	return nil
 }
 
-func isFunction(node *ast.Node) bool {
-	return node.Kind == ast.KindFunctionDeclaration ||
-		node.Kind == ast.KindFunctionExpression ||
-		node.Kind == ast.KindArrowFunction
-}
-
 var NoDoneCallbackRule = rule.Rule{
 	Name: "jest/no-done-callback",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -91,7 +85,7 @@ var NoDoneCallbackRule = rule.Rule{
 				callback := findCallbackArgument(callExpr, jestFnCall, isJestEach)
 				callbackArgIndex := boolToInt(isJestEach)
 				if callback == nil ||
-					!isFunction(callback) ||
+					!utils.IsFunction(callback) ||
 					len(callback.Parameters()) == 0 ||
 					len(callback.Parameters()) != 1+callbackArgIndex {
 					return

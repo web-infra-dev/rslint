@@ -74,6 +74,23 @@ func jasmineRootCallChain(callee *ast.Node) (chain string, jasmineObj *ast.Node,
 		return "", nil, "", 0, false
 	}
 
+	// GetJestFnMemberEntries silently drops unsupported bracket accessors (e.g.
+	// numeric indices). Confirm the parsed chain depth matches the AST so
+	// jasmine[1].any() does not collapse to jasmine.any.
+	expected := len(entries)
+	actual := 1
+	for n := callee; ; {
+		obj := rslintutils.AccessExpressionObject(n)
+		if obj == nil {
+			break
+		}
+		actual++
+		n = obj
+	}
+	if actual != expected {
+		return "", nil, "", 0, false
+	}
+
 	return jestutils.JoinJestFnMemberEntries(entries), entries[0].Node, entries[len(entries)-1].Name, len(entries), true
 }
 
@@ -199,8 +216,16 @@ var NoJasmineGlobalsRule = rule.Rule{
 							rule.RuleFixReplace(ctx.SourceFile, jasmineObj, "expect"),
 						)
 					case "addMatchers":
+						if entryCount != 2 {
+							ctx.ReportNode(node, buildIllegalJasmineMessage())
+							return
+						}
 						ctx.ReportNode(node, buildIllegalMethodMessage(chain, "expect.extend"))
 					case "createSpy":
+						if entryCount != 2 {
+							ctx.ReportNode(node, buildIllegalJasmineMessage())
+							return
+						}
 						ctx.ReportNode(node, buildIllegalMethodMessage(chain, "jest.fn"))
 					default:
 						ctx.ReportNode(node, buildIllegalJasmineMessage())

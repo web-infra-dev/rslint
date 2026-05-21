@@ -8,6 +8,7 @@ export type RuleSeverity = 'off' | 'warn' | 'error';
  * Plugin declaration names recognized by rslint's loader.
  */
 export type KnownPlugin =
+  | '@stylistic'
   | '@typescript-eslint'
   | 'import'
   | 'jest'
@@ -101,6 +102,7 @@ export interface RslintConfigEntry {
    *
    * Each built-in value maps to the original ESLint plugin it ports rules from:
    *
+   * - `'@stylistic'`         → `@stylistic/eslint-plugin`
    * - `'@typescript-eslint'` → `@typescript-eslint/eslint-plugin`
    * - `'import'`             → `eslint-plugin-import`
    * - `'jest'`               → `eslint-plugin-jest`

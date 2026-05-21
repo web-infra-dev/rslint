@@ -1,6 +1,7 @@
 package jest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/expect_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_deprecated_functions"
@@ -11,6 +12,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_identical_title"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_jasmine_globals"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_mocks_import"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
@@ -23,6 +25,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		expect_expect.ExpectExpectRule,
 		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
 		no_disabled_tests.NoDisabledTestsRule,
@@ -33,6 +36,7 @@ func GetAllRules() []rule.Rule {
 		no_identical_title.NoIdenticalTitleRule,
 		no_jasmine_globals.NoJasmineGlobalsRule,
 		no_mocks_import.NoMocksImportRule,
+		no_standalone_expect.NoStandaloneExpectRule,
 		no_test_prefixes.NoTestPrefixesRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
