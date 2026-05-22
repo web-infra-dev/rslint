@@ -1,12 +1,12 @@
 package arrow_parens
 
 import (
-	"strings"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/stylisticutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -111,24 +111,6 @@ func findCloseParenPos(sf *ast.SourceFile, paramEnd int) int {
 		return rng.Pos()
 	}
 	return -1
-}
-
-// hasCommentsBetween reports whether the byte range [low, high) contains any
-// `//` or `/*` sequence. Between an arrow function's parens the only legal
-// content is identifier/comma trivia plus the param itself — no strings or
-// regexes can appear, so a plain substring search is safe.
-func hasCommentsBetween(text string, low, high int) bool {
-	if low < 0 {
-		low = 0
-	}
-	if high > len(text) {
-		high = len(text)
-	}
-	if low >= high {
-		return false
-	}
-	s := text[low:high]
-	return strings.Contains(s, "//") || strings.Contains(s, "/*")
 }
 
 // needsSpaceBeforeOpenParen reports whether the rune immediately before
@@ -239,7 +221,7 @@ var ArrowParensRule = rule.Rule{
 			if closeParenPos < 0 {
 				return
 			}
-			if hasCommentsBetween(text, openParenPos+1, closeParenPos) {
+			if stylisticutil.CommentsExistBetween(text, openParenPos+1, closeParenPos) {
 				return
 			}
 
