@@ -74,7 +74,7 @@ func checkCallExpression(ctx rule.RuleContext, opts Options, callNode *ast.Node,
 }
 
 func isInPromise(node *ast.Node) bool {
-	functionNode := nearestFunctionExpressionOrArrow(node)
+	functionNode := nearestFunctionBoundary(node)
 	if functionNode == nil {
 		return false
 	}
@@ -110,9 +110,15 @@ func isInPromise(node *ast.Node) bool {
 	return cur != nil && promiseutil.IsPromiseLikeCall(cur)
 }
 
-func nearestFunctionExpressionOrArrow(node *ast.Node) *ast.Node {
+func nearestFunctionBoundary(node *ast.Node) *ast.Node {
 	for cur := node.Parent; cur != nil; cur = cur.Parent {
-		if cur.Kind == ast.KindFunctionExpression || cur.Kind == ast.KindArrowFunction {
+		switch cur.Kind {
+		case ast.KindFunctionExpression,
+			ast.KindArrowFunction,
+			ast.KindMethodDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor,
+			ast.KindConstructor:
 			return cur
 		}
 	}
