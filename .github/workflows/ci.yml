@@ -155,6 +155,7 @@ jobs:
           pnpm --filter @rslint/core run build:js
           pnpm --filter @typescript-eslint/rule-tester build
           pnpm --filter rslint build
+          pnpm --filter @rslint/eslint-plugin-runner build
 
       - name: VSCode Test Cache
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
