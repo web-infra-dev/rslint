@@ -719,7 +719,7 @@ func checkCondition(ctx *rule.RuleContext, node *ast.Node, opts Options) {
 }
 
 // NoConstantConditionRule disallows constant expressions in conditions
-var NoConstantConditionRule = rule.CreateRule(rule.Rule{
+var NoConstantConditionRule = rule.Rule{
 	Name: "no-constant-condition",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
@@ -751,4 +751,4 @@ var NoConstantConditionRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

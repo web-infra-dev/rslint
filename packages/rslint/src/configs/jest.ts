@@ -5,7 +5,7 @@ import type { RslintConfigEntry } from '../define-config.js';
 const recommended: RslintConfigEntry = {
   plugins: ['jest'],
   rules: {
-    // 'jest/expect-expect': 'warn', // not implemented
+    'jest/expect-expect': 'warn',
     'jest/no-alias-methods': 'error',
     'jest/no-commented-out-tests': 'warn',
     // 'jest/no-conditional-expect': 'error', // not implemented
@@ -16,14 +16,14 @@ const recommended: RslintConfigEntry = {
     'jest/no-focused-tests': 'error',
     'jest/no-identical-title': 'error',
     // 'jest/no-interpolation-in-snapshots': 'error', // not implemented
-    // 'jest/no-jasmine-globals': 'error', // not implemented
+    'jest/no-jasmine-globals': 'error',
     'jest/no-mocks-import': 'error',
-    // 'jest/no-standalone-expect': 'error', // not implemented
+    'jest/no-standalone-expect': 'error',
     'jest/no-test-prefixes': 'error',
     'jest/valid-describe-callback': 'error',
     'jest/valid-expect': 'error',
     // 'jest/valid-expect-in-promise': 'error', // not implemented
-    // 'jest/valid-title': 'error', // not implemented
+    'jest/valid-title': 'error',
   },
 };
 

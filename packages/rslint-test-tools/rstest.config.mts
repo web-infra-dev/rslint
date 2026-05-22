@@ -425,6 +425,7 @@ export default defineConfig({
     './tests/eslint/rules/symbol-description.test.ts',
 
     // eslint-plugin-jest
+    './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-commented-out-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
@@ -433,7 +434,9 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
+    './tests/eslint-plugin-jest/rules/no-jasmine-globals.test.ts',
     './tests/eslint-plugin-jest/rules/no-mocks-import.test.ts',
+    './tests/eslint-plugin-jest/rules/no-standalone-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
@@ -442,9 +445,15 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
+
+    // eslint-plugin-stylistic
+    './tests/eslint-plugin-stylistic/rules/array-bracket-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/arrow-parens.test.ts',
+    './tests/eslint-plugin-stylistic/rules/arrow-spacing.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
