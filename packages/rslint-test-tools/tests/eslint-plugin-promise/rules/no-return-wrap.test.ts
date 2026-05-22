@@ -55,6 +55,33 @@ ruleTester.run('no-return-wrap', {} as never, {
     {
       code: 'doThing().then(function() { fn(function() { return Promise.resolve(4) }); return 1 })',
     },
+
+    // Upstream alignment: nested methods/accessors/constructors are separate
+    // function boundaries and should not be attributed to the outer promise callback.
+    {
+      code: 'doThing().then(function() { class Foo { method() { return Promise.resolve(4) } } return new Foo() })',
+    },
+    {
+      code: 'doThing().then(function() { class Foo { static method() { return Promise.resolve(4) } } return Foo })',
+    },
+    {
+      code: 'doThing().then(function() { class Foo { get x() { return Promise.resolve(4) } } return new Foo() })',
+    },
+    {
+      code: 'doThing().then(function() { class Foo { set x(value) { return Promise.resolve(value) } } return new Foo() })',
+    },
+    {
+      code: 'doThing().then(function() { class Foo { constructor() { return Promise.resolve(4) } } return new Foo() })',
+    },
+    {
+      code: 'doThing().then(function() { return { m() { return Promise.resolve(4) } } })',
+    },
+    {
+      code: 'doThing().then(function() { return { get x() { return Promise.resolve(4) } } })',
+    },
+    {
+      code: 'doThing().then(function() { return { set x(value) { return Promise.resolve(value) } } })',
+    },
   ],
 
   invalid: [

@@ -76,6 +76,18 @@ func TestNoReturnWrap(t *testing.T) {
 			// ---- Edge cases: allowReject + parens ----
 			// Parenthesized function with allowReject:true -> valid.
 			{Code: `doThing().then((function() { return Promise.reject(4) }))`, Options: map[string]interface{}{"allowReject": true}},
+
+			// ---- Upstream alignment: nested methods/accessors/constructors ----
+			// ESTree exposes these bodies through inner FunctionExpression nodes, so
+			// upstream treats them as separate function boundaries and stays silent.
+			{Code: `doThing().then(function() { class Foo { method() { return Promise.resolve(4) } } return new Foo() })`},
+			{Code: `doThing().then(function() { class Foo { static method() { return Promise.resolve(4) } } return Foo })`},
+			{Code: `doThing().then(function() { class Foo { get x() { return Promise.resolve(4) } } return new Foo() })`},
+			{Code: `doThing().then(function() { class Foo { set x(value) { return Promise.resolve(value) } } return new Foo() })`},
+			{Code: `doThing().then(function() { class Foo { constructor() { return Promise.resolve(4) } } return new Foo() })`},
+			{Code: `doThing().then(function() { return { m() { return Promise.resolve(4) } } })`},
+			{Code: `doThing().then(function() { return { get x() { return Promise.resolve(4) } } })`},
+			{Code: `doThing().then(function() { return { set x(value) { return Promise.resolve(value) } } })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ESLint upstream invalid cases ----
