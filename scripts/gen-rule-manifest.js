@@ -91,14 +91,98 @@ function getIncludedRules() {
   return included;
 }
 
-function isInsideTemplateLiteral(content, index) {
-  let count = 0;
-  for (let i = 0; i < index; i++) {
-    if (content[i] === '`' && content[i - 1] !== '\\') {
-      count++;
+function isEscaped(content, index) {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && content[i] === '\\'; i--) {
+    backslashes++;
+  }
+  return backslashes % 2 === 1;
+}
+
+function createParserState() {
+  return {
+    stack: [{ type: 'normal' }],
+  };
+}
+
+function getCurrentContext(state) {
+  return state.stack[state.stack.length - 1];
+}
+
+function isStatementLevel(state) {
+  return state.stack.length === 1 && getCurrentContext(state).type === 'normal';
+}
+
+function advanceParserState(state, content, start, end) {
+  for (let i = start; i < end; i++) {
+    const ch = content[i];
+    const next = content[i + 1];
+    const escaped = isEscaped(content, i);
+    const context = getCurrentContext(state);
+
+    if (context.type === 'lineComment') {
+      if (ch === '\n') {
+        state.stack.pop();
+      }
+      continue;
+    }
+    if (context.type === 'blockComment') {
+      if (ch === '*' && next === '/') {
+        state.stack.pop();
+        i++;
+      }
+      continue;
+    }
+    if (context.type === 'singleQuote') {
+      if (ch === "'" && !escaped) {
+        state.stack.pop();
+      }
+      continue;
+    }
+    if (context.type === 'doubleQuote') {
+      if (ch === '"' && !escaped) {
+        state.stack.pop();
+      }
+      continue;
+    }
+    if (context.type === 'templateLiteral') {
+      if (ch === '`' && !escaped) {
+        state.stack.pop();
+      } else if (ch === '$' && next === '{' && !escaped) {
+        state.stack.push({ type: 'templateExpression', braceDepth: 0 });
+        i++;
+      }
+      continue;
+    }
+    if (context.type === 'templateExpression') {
+      if (ch === '}' && !escaped) {
+        if (context.braceDepth === 0) {
+          state.stack.pop();
+        } else {
+          context.braceDepth--;
+        }
+        continue;
+      }
+      if (ch === '{' && !escaped) {
+        context.braceDepth++;
+        continue;
+      }
+    }
+
+    if (ch === '/' && next === '/' && !escaped) {
+      state.stack.push({ type: 'lineComment' });
+      i++;
+    } else if (ch === '/' && next === '*' && !escaped) {
+      state.stack.push({ type: 'blockComment' });
+      i++;
+    } else if (ch === "'" && !escaped) {
+      state.stack.push({ type: 'singleQuote' });
+    } else if (ch === '"' && !escaped) {
+      state.stack.push({ type: 'doubleQuote' });
+    } else if (ch === '`' && !escaped) {
+      state.stack.push({ type: 'templateLiteral' });
     }
   }
-  return count % 2 === 1;
 }
 
 function getStatementLevelSkipCases(content, relPath) {
@@ -106,24 +190,37 @@ function getStatementLevelSkipCases(content, relPath) {
   // RuleTester fixture strings (code/output properties or template literals).
   const skipCases = [];
   const lines = content.split('\n');
-  const stmtSkipRegex = /^\s*(?:it|describe)\.skip\s*\(['"]([^'"]+)['"]/;
-  const fixturePropertyRegex = /^\s*(?:code|output)\s*:/;
+  const stmtSkipRegex =
+    /(?:^|[^\w$])((?:it|describe)\.skip\s*\(['"]([^'"]+)['"])/g;
+  const state = createParserState();
   let offset = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineNum = i + 1;
+    let cursor = offset;
+    let match;
 
-    if (!fixturePropertyRegex.test(line)) {
-      const match = stmtSkipRegex.exec(line);
-      if (match && !isInsideTemplateLiteral(content, offset)) {
+    stmtSkipRegex.lastIndex = 0;
+    while ((match = stmtSkipRegex.exec(line))) {
+      const prefixLength = match[0].length - match[1].length;
+      const matchIndex = match.index + prefixLength;
+      const absoluteMatchIndex = offset + matchIndex;
+
+      advanceParserState(state, content, cursor, absoluteMatchIndex);
+      if (isStatementLevel(state)) {
         skipCases.push({
-          name: match[1],
+          name: match[2],
           url: `${relPath}#L${lineNum}`,
         });
       }
+      cursor = absoluteMatchIndex;
     }
 
+    advanceParserState(state, content, cursor, offset + line.length);
+    if (getCurrentContext(state).type === 'lineComment') {
+      state.stack.pop();
+    }
     offset += line.length + 1;
   }
 
@@ -213,4 +310,11 @@ function main() {
   console.log('rule-manifest.json generated at', MANIFEST_PATH);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  buildManifest,
+  getStatementLevelSkipCases,
+};
