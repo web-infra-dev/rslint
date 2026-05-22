@@ -425,6 +425,17 @@ func TestJsxCurlySpacingRule(t *testing.T) {
 		// `always` mode with surrounding spaces and non-ASCII content — valid.
 		{Code: `<App foo={ 中文 } />`, Tsx: true, Options: []interface{}{"always"}},
 		{Code: `<App foo={ "🚀" } />`, Tsx: true, Options: []interface{}{"always"}},
+
+		// ===== Unicode WhiteSpace + LineTerminator (ECMAScript §12.2/§12.3) =====
+		// NBSP (U+00A0) counts as ECMAScript WhiteSpace → satisfies `always`,
+		// triggers `never` extra. Parity with ESLint verified via local probe.
+		{Code: "<App foo={\u00A0bar\u00A0} />", Tsx: true, Options: []interface{}{"always"}},
+		// LS (U+2028) / PS (U+2029) count as LineTerminator → cross-line
+		// short-circuit on that side. Both modes valid when the OTHER side
+		// hugs the brace.
+		{Code: "<App foo={bar\u2028} />", Tsx: true, Options: []interface{}{"never"}},
+		{Code: "<App foo={\u2028bar} />", Tsx: true, Options: []interface{}{"never"}},
+		{Code: "<App foo={bar\u2029} />", Tsx: true, Options: []interface{}{"never"}},
 		// Template literal with `${ … }` substitutions — earlier impl using
 		// the bare tsgo Scanner without parser context mis-tokenized the
 		// closing `}` of a substitution as a real `}` token, corrupting
