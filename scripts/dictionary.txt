@@ -9,6 +9,7 @@ afoob
 agen
 alertdialog
 alink
+allman
 allowundefined
 anee
 apos
@@ -115,6 +116,9 @@ ESLint
 esmodule
 espree
 estree
+fontstack
+stroustrup
+stylisticutil
 Éurströmming
 exclam
 execdir
