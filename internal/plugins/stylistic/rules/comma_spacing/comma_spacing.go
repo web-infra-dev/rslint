@@ -72,19 +72,33 @@ func isTriviaSkip(k ast.Kind) bool {
 }
 
 // nextRealTokenKind reads the very next non-trivia, non-comment token at or
-// after `from`. Mirrors ESLint's `sourceCode.getTokenAfter(prev)` with
-// default options — comments are skipped. Used by both the null-array-element
-// walk (where the previous-token chain in upstream's
-// `addNullElementsToIgnoreList` uses default getTokenAfter, so comments
-// don't count) and the type-parameter-trailing-comma walk (same).
+// after `from`, using the supplied (already-configured) scanner. Mirrors
+// ESLint's `sourceCode.getTokenAfter(prev)` with default options — comments
+// are skipped. Used by both the null-array-element walk (where the previous-
+// token chain in upstream's `addNullElementsToIgnoreList` uses default
+// getTokenAfter, so comments don't count) and the type-parameter-trailing-
+// comma walk (same).
 //
-// `scanner.GetScannerForSourceFile` already calls Scan() once with default
-// SkipTrivia=true, so the first non-trivia / non-comment token at or after
-// `from` is already loaded in the scanner state when this returns — we
-// just read it via Token() / TokenStart(), no further Scan() needed.
-func nextRealTokenKind(sf *ast.SourceFile, from int) (ast.Kind, int) {
-	s := scanner.GetScannerForSourceFile(sf, from)
-	return s.Token(), s.TokenStart()
+// The scanner is passed in (and reused across calls) rather than freshly
+// allocated via `scanner.GetScannerForSourceFile`: in a single file each
+// array literal / pattern + each type-parameter list issues 1–N calls, so
+// allocating a Scanner per call wastes work proportional to AST size.
+// Callers configure `SetText` / `SetLanguageVariant` once and call
+// `ResetTokenState` per query (this function does the reset and scan).
+func nextRealTokenKind(s *scanner.Scanner, from int) (ast.Kind, int) {
+	s.ResetTokenState(from)
+	for {
+		k := s.Scan()
+		if k == ast.KindEndOfFile {
+			return k, s.TokenStart()
+		}
+		if isTriviaSkip(k) ||
+			k == ast.KindSingleLineCommentTrivia ||
+			k == ast.KindMultiLineCommentTrivia {
+			continue
+		}
+		return k, s.TokenStart()
+	}
 }
 
 // collectIgnoredCommas walks the AST and records the source positions of
@@ -110,6 +124,15 @@ func nextRealTokenKind(sf *ast.SourceFile, from int) (ast.Kind, int) {
 // just asks `ignored[pos]` once per comma.
 func collectIgnoredCommas(sf *ast.SourceFile) map[int]struct{} {
 	ignored := map[int]struct{}{}
+
+	// Single reusable scanner for all nextRealTokenKind lookups in this
+	// pass. Configured with SkipTrivia=false so we can loop manually past
+	// whitespace, line breaks, and comments — matching ESLint's default
+	// getTokenAfter (comments excluded).
+	s := scanner.NewScanner()
+	s.SetText(sf.Text())
+	s.SetLanguageVariant(sf.LanguageVariant)
+	s.SetSkipTrivia(false)
 
 	// isHoleElement reports whether an ArrayLiteral / ArrayBindingPattern
 	// element represents an elision (a "missing" slot like `[ , x]`).
@@ -159,7 +182,7 @@ func collectIgnoredCommas(sf *ast.SourceFile) map[int]struct{} {
 		scanFrom := trimmed.Pos() + 1 // just past `[`
 		for _, el := range elements {
 			if isHoleElement(el) {
-				k, pos := nextRealTokenKind(sf, scanFrom)
+				k, pos := nextRealTokenKind(s, scanFrom)
 				if k != ast.KindCommaToken {
 					// Defensive: malformed input — abandon this list.
 					return
@@ -175,7 +198,7 @@ func collectIgnoredCommas(sf *ast.SourceFile) map[int]struct{} {
 			// element (if any) so the next iteration sees the right
 			// "next token". For the last element this lands on `]`,
 			// which we ignore.
-			k, pos := nextRealTokenKind(sf, el.End())
+			k, pos := nextRealTokenKind(s, el.End())
 			if k == ast.KindCommaToken {
 				scanFrom = pos + 1
 			} else {
@@ -189,7 +212,7 @@ func collectIgnoredCommas(sf *ast.SourceFile) map[int]struct{} {
 			return
 		}
 		last := list.Nodes[len(list.Nodes)-1]
-		k, pos := nextRealTokenKind(sf, last.End())
+		k, pos := nextRealTokenKind(s, last.End())
 		if k == ast.KindCommaToken {
 			ignored[pos] = struct{}{}
 		}
@@ -197,17 +220,21 @@ func collectIgnoredCommas(sf *ast.SourceFile) map[int]struct{} {
 
 	// Any future FunctionLike kind picks up TypeParameterList support
 	// automatically via the shim's IsFunctionLike predicate; the explicit
-	// switch only covers the four non-function-like type-bearing kinds.
-	// `JSDocTemplateTag` is intentionally excluded — its commas live inside
-	// `/* */` block comments, which the raw scanner never emits as
-	// CommaToken in the first place.
+	// switch only covers the non-function-like type-bearing kinds.
+	// `KindJSTypeAliasDeclaration` covers JSDoc `@typedef`-style aliases in
+	// `.js` files (it routes through the same `AsTypeAliasDeclaration` getter
+	// as `KindTypeAliasDeclaration`, so we treat it the same).
+	// `KindJSDocTemplateTag` is intentionally excluded — its commas live
+	// inside `/* */` block comments and our gap-walker never enters comment
+	// content, so they cannot reach this check.
 	hasTypeParamList := func(n *ast.Node) bool {
 		if ast.IsFunctionLike(n) {
 			return true
 		}
 		switch n.Kind {
 		case ast.KindClassDeclaration, ast.KindClassExpression,
-			ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
+			ast.KindInterfaceDeclaration,
+			ast.KindTypeAliasDeclaration, ast.KindJSTypeAliasDeclaration:
 			return true
 		}
 		return false
@@ -249,8 +276,8 @@ func collectIgnoredCommas(sf *ast.SourceFile) map[int]struct{} {
 // **Why the gap-scan recursion instead of one flat full-file scan?**
 //
 // tsgo's raw scanner does not maintain template-mode state across calls.
-// Inside `` `a${e}\\\`(${typeof e})\` ``, after scanning the `}` that
-// closes `${e}`, the scanner re-enters default mode; the next `` ` ``
+// Inside “ `a${e}\\\`(${typeof e})\` “, after scanning the `}` that
+// closes `${e}`, the scanner re-enters default mode; the next “ ` “
 // (whether escaped-literal or real-closing) is treated as the START of a
 // brand-new template literal, and a long stretch of subsequent code is
 // silently swallowed as that fake template's content. Commas in that
@@ -303,10 +330,12 @@ func scanAllTokens(sf *ast.SourceFile) []tokenInfo {
 			if k == ast.KindEndOfFile {
 				return
 			}
-			// Bound to the gap: anything at or past `end` belongs to
-			// the next AST sibling and will be picked up by that
-			// sibling's walk.
-			if s.TokenStart() >= end {
+			// Bound to the gap on both sides: tokens that start at /
+			// past `end` belong to the next sibling, and tokens whose
+			// end straddles `end` (defensive — shouldn't happen for
+			// AST-sibling-aligned gaps, but matches HasSameTokens'
+			// `liveA` invariant for safety) are also excluded.
+			if s.TokenStart() >= end || s.TokenEnd() > end {
 				return
 			}
 			if isTriviaSkip(k) {
@@ -320,17 +349,43 @@ func scanAllTokens(sf *ast.SourceFile) []tokenInfo {
 		}
 	}
 
+	// `walk` recurses via `ForEachChild` directly — no per-node `[]*ast.Node`
+	// allocation. `prevEnd` and `hasKids` live in the closure variables so
+	// each non-leaf node uses O(1) extra memory regardless of arity. Matches
+	// the pattern other recursive walkers in this repo follow
+	// (e.g. internal/linter/linter.go's childVisitor,
+	// internal/plugins/react_hooks/.../exhaustive_deps.go's visit).
 	var walk func(n *ast.Node)
 	walk = func(n *ast.Node) {
 		if n == nil {
 			return
 		}
-		var kids []*ast.Node
-		n.ForEachChild(func(c *ast.Node) bool {
-			kids = append(kids, c)
+		prevEnd := n.Pos()
+		hasKids := false
+		n.ForEachChild(func(kid *ast.Node) bool {
+			hasKids = true
+			// Synthetic / parser-recovered children (e.g. an implicit
+			// QuestionDotToken slot on a non-optional CallExpression)
+			// have negative Pos. Skip them — they aren't backed by
+			// source bytes and would crash TrimNodeTextRange. Keep
+			// `hasKids` true so the parent is still treated as
+			// composite (we already entered the iteration).
+			if kid.Pos() < 0 || kid.End() < 0 {
+				return false
+			}
+			// Use the trimmed Pos of each kid (Pos() includes leading
+			// trivia, so content like comments that visually sit
+			// *between* two AST siblings is technically "inside" the
+			// next sibling's Pos range). Scanning up to the trimmed
+			// Pos pulls those comments back into the gap so the
+			// scanner sees them.
+			kidTrimmedPos := utils.TrimNodeTextRange(sf, kid).Pos()
+			scanGap(prevEnd, kidTrimmedPos)
+			walk(kid)
+			prevEnd = kid.End()
 			return false
 		})
-		if len(kids) == 0 {
+		if !hasKids {
 			// Leaf node — emit as a single token at its trimmed range
 			// (Pos() includes leading trivia we don't want).
 			// Zero-width leaves (OmittedExpression, empty BindingElement
@@ -352,25 +407,6 @@ func scanAllTokens(sf *ast.SourceFile) []tokenInfo {
 				})
 			}
 			return
-		}
-		// Use the trimmed Pos of each kid (Pos() includes leading trivia, so
-		// content like comments that visually sit *between* two AST siblings
-		// is technically "inside" the next sibling's Pos range. Scanning up
-		// to the trimmed Pos pulls those comments back into the gap so the
-		// scanner sees them.
-		prevEnd := n.Pos()
-		for _, kid := range kids {
-			// Synthetic / parser-recovered nodes (e.g. an implicit
-			// QuestionDotToken slot on a non-optional CallExpression)
-			// have negative Pos. Skip them — they aren't backed by
-			// source bytes and would crash TrimNodeTextRange.
-			if kid.Pos() < 0 || kid.End() < 0 {
-				continue
-			}
-			kidTrimmedPos := utils.TrimNodeTextRange(sf, kid).Pos()
-			scanGap(prevEnd, kidTrimmedPos)
-			walk(kid)
-			prevEnd = kid.End()
 		}
 		scanGap(prevEnd, n.End())
 	}
