@@ -70,12 +70,12 @@ Before starting, familiarize yourself with these key source locations:
 
 ### Core Infrastructure
 
-| File/Directory                        | Description                                                                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `internal/rule/rule.go`               | **Core rule interface** - `Rule`, `RuleContext`, `RuleListeners`, `RuleMessage`, `RuleFix`, `RuleSuggestion` definitions |
-| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                  |
-| `internal/config/config.go`           | Rule registration and config loading                                                                                     |
-| `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                  |
+| File/Directory                        | Description                                                                                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/rule/rule.go`               | **Core rule interface** - `Rule`, `RuleContext`, `RuleListeners`, `RuleMessage`, `RuleFix`, `RuleSuggestion` definitions                                   |
+| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
+| `internal/config/config.go`           | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 8 for where to add a new rule. |
+| `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
 
 ### AST & Type System
 
@@ -405,7 +405,7 @@ func parseOptions(options any) Options {
 }
 ```
 
-**Why this matters — the shape the CLI sends is different from Go tests.** `internal/config/config.go:414-420` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+**Why this matters — the shape the CLI sends is different from Go tests.** `parseArrayRuleConfig` in `internal/config/config.go` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
 
 **Anti-pattern — do not write this:**
 
@@ -617,17 +617,25 @@ rule_tester.InvalidTestCase{
 
 Add the new test file path to the `include` array.
 
-### Step 8: Register Rule in Config
+### Step 8: Register Rule
 
-**File**: `internal/config/config.go`
+**Where to add depends on rule type** (determined by Phase 1 Step 2):
 
-1. Import your new package
-2. Register in the appropriate function (determined by Phase 1 Step 2):
-   - **Core ESLint rules** (including deprecated typescript-eslint rules): `registerAllCoreEslintRules()` with `rule.Rule{}`
-   - **typescript-eslint rules** (active): `registerAllTypeScriptEslintPluginRules()` with `rule.CreateRule()`
-   - **Import plugin rules**: `registerAllEslintImportPluginRules()`
-3. Format: `GlobalRuleRegistry.Register("rule-name", package.RuleNameRule)`
-4. **Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status
+| Rule type                                              | File to edit                         | What to add                                                                |
+| ------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------- |
+| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `GetAllRules()`. |
+| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                            |
+| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                      |
+
+Each `all.go` exports a `GetAllRules() []rule.Rule` slice. `RegisterAllRules()` in `internal/config/config.go` iterates each slice and calls `GlobalRuleRegistry.Register(rule.Name, rule)` — **do not edit `config.go` for a new rule**.
+
+**Registration key vs `rule.Name` must match** — the registrar uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
+
+- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` registers as `"no-debugger"`.
+- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` registers as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently mis-register the rule key.
+- **Other plugins** — `rule.Rule{Name: "react/jsx-key", ...}` — the prefix is part of the literal `Name`, no factory.
+
+**Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
 
 ---
 
@@ -939,7 +947,7 @@ For complex rules (rules involving scope tracking, autofix, or many configuratio
 If JS tests fail with 0 diagnostics found:
 
 1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
-2. **Is the rule registered?** Check `internal/config/config.go`
+2. **Is the rule registered?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `GetAllRules()` are present.
 3. **Are test files included?** Check `rstest.config.mts`
 4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
 5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code

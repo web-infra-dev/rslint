@@ -318,6 +318,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-declare.test.ts',
     // './tests/typescript-eslint/rules/no-use-before-define.test.ts',
     './tests/typescript-eslint/rules/no-useless-constructor.test.ts',
+    './tests/typescript-eslint/rules/no-useless-default-assignment.test.ts',
     // './tests/typescript-eslint/rules/no-useless-empty-export.test.ts',
     // './tests/typescript-eslint/rules/no-var-requires.test.ts',
     './tests/typescript-eslint/rules/no-wrapper-object-types.test.ts',
@@ -327,9 +328,9 @@ export default defineConfig({
     './tests/typescript-eslint/rules/prefer-as-const.test.ts',
     './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
     './tests/typescript-eslint/rules/prefer-enum-initializers.test.ts',
-    // './tests/typescript-eslint/rules/prefer-find.test.ts',
+    './tests/typescript-eslint/rules/prefer-find.test.ts',
     './tests/typescript-eslint/rules/prefer-for-of.test.ts',
-    // './tests/typescript-eslint/rules/prefer-function-type.test.ts',
+    './tests/typescript-eslint/rules/prefer-function-type.test.ts',
     './tests/typescript-eslint/rules/prefer-includes.test.ts',
     './tests/typescript-eslint/rules/prefer-literal-enum-member.test.ts',
     './tests/typescript-eslint/rules/prefer-namespace-keyword.test.ts',
@@ -351,7 +352,8 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/restrict-template-expressions.test.ts',
     // './tests/typescript-eslint/rules/return-await.test.ts',
     // './tests/typescript-eslint/rules/sort-type-constituents.test.ts',
-    // './tests/typescript-eslint/rules/strict-boolean-expressions.test.ts',
+    './tests/typescript-eslint/rules/strict-boolean-expressions.test.ts',
+    './tests/typescript-eslint/rules/strict-void-return.test.ts',
     // './tests/typescript-eslint/rules/switch-exhaustiveness-check.test.ts',
     // './tests/typescript-eslint/rules/triple-slash-reference.test.ts',
     // './tests/typescript-eslint/rules/typedef.test.ts',
@@ -423,6 +425,7 @@ export default defineConfig({
     './tests/eslint/rules/symbol-description.test.ts',
 
     // eslint-plugin-jest
+    './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-commented-out-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
@@ -431,7 +434,9 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
+    './tests/eslint-plugin-jest/rules/no-jasmine-globals.test.ts',
     './tests/eslint-plugin-jest/rules/no-mocks-import.test.ts',
+    './tests/eslint-plugin-jest/rules/no-standalone-expect.test.ts',
     './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
@@ -439,10 +444,18 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
+    './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
+
+    // eslint-plugin-stylistic
+    './tests/eslint-plugin-stylistic/rules/array-bracket-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/arrow-parens.test.ts',
+    './tests/eslint-plugin-stylistic/rules/arrow-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/block-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/brace-style.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',

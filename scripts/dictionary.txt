@@ -9,6 +9,7 @@ afoob
 agen
 alertdialog
 alink
+allman
 allowundefined
 anee
 apos
@@ -39,6 +40,7 @@ bigints
 Bild
 binaryexpression
 biske
+bivariance
 bizz
 bleh
 bmatcuk
@@ -114,6 +116,9 @@ ESLint
 esmodule
 espree
 estree
+fontstack
+stroustrup
+stylisticutil
 Éurströmming
 exclam
 execdir
@@ -333,6 +338,7 @@ relinting
 relints
 renderable
 Reparsed
+reparser
 reqs
 rethrowing
 rivo
@@ -383,6 +389,7 @@ stype
 subclassing
 subtag
 subtests
+supertypes
 symb
 symbolname
 tabindex
@@ -488,6 +495,7 @@ Orya
 oxendict
 phonebk
 phonebook
+psdifjo
 subtags
 Taml
 tarask
@@ -503,6 +511,8 @@ xoff
 xtest
 yutil
 ZWNBSP
+ZWNJ
+ZWSP
 πfoo
 Πfoo
 дelta

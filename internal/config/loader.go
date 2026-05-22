@@ -90,7 +90,11 @@ func normalizeJSONConfig(config RslintConfig) RslintConfig {
 
 		// Auto-enable plugin rules as defaults
 		for _, plugin := range entry.Plugins {
-			for _, r := range GetPluginRules(NormalizePluginName(plugin)) {
+			info, ok := pluginByDeclName[plugin]
+			if !ok {
+				continue
+			}
+			for _, r := range info.getAllRules() {
 				if _, exists := entry.Rules[r.Name]; !exists {
 					entry.Rules[r.Name] = "error"
 				}

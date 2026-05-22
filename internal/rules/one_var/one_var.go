@@ -517,7 +517,7 @@ func fixSplit(view eslintVarDeclView, declList *ast.Node, kind string, sf *ast.S
 				core.NewTextRange(commaStart, commaEnd),
 				"; "+exportPrefix+kind+" ",
 			))
-		case strings.ContainsAny(between, "\n\r") ||
+		case utils.ContainsLineTerminator(between, 0, len(between)) ||
 			strings.Contains(between, "//") ||
 			strings.Contains(between, "/*"):
 			// Line break or comment between `,` and the next declarator —

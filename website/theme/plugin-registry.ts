@@ -101,6 +101,13 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     presetName: 'jsxA11yPlugin.configs.recommended',
     description: 'JSX a11y rules',
   },
+  {
+    prefix: '@stylistic',
+    group: '@stylistic/eslint-plugin',
+    importName: 'stylisticPlugin',
+    presetName: 'stylisticPlugin.configs.recommended',
+    description: 'Stylistic / formatting rules',
+  },
 ];
 
 /**

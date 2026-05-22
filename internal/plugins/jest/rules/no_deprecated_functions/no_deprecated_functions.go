@@ -43,17 +43,6 @@ func deprecatedFunctions(jestVersion int) map[string]string {
 	return m
 }
 
-func memberChainString(entries []utils.ParsedJestFnMemberEntry) string {
-	if len(entries) == 0 {
-		return ""
-	}
-	parts := make([]string, len(entries))
-	for i, e := range entries {
-		parts[i] = e.Name
-	}
-	return strings.Join(parts, ".")
-}
-
 // bracketStyleCalleeReplacement rewrites a dotted replacement callee for call sites that
 // used a string-literal property (e.g. jest['resetModules'] vs jest.resetModules).
 // It mirrors eslint-plugin-jest's two-segment case and extends it to longer chains:
@@ -104,7 +93,7 @@ var NoDeprecatedFunctionsRule = rule.Rule{
 					return
 				}
 
-				chain := memberChainString(entries)
+				chain := utils.JoinJestFnMemberEntries(entries)
 				replacement, ok := depMap[chain]
 				if !ok {
 					return

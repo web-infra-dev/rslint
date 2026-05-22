@@ -13,7 +13,7 @@ func buildAsyncMessage() rule.RuleMessage {
 }
 
 // NoAsyncPromiseExecutorRule disallows using an async function as a Promise executor
-var NoAsyncPromiseExecutorRule = rule.CreateRule(rule.Rule{
+var NoAsyncPromiseExecutorRule = rule.Rule{
 	Name: "no-async-promise-executor",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -92,4 +92,4 @@ var NoAsyncPromiseExecutorRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

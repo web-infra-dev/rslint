@@ -21,6 +21,7 @@ export {
   jestPlugin,
   unicornPlugin,
   jsxA11yPlugin,
+  stylisticPlugin,
 } from './configs/index.js';
 
 // Export the main RSLintService class for direct usage
