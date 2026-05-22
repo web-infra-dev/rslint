@@ -91,6 +91,45 @@ function getIncludedRules() {
   return included;
 }
 
+function isInsideTemplateLiteral(content, index) {
+  let count = 0;
+  for (let i = 0; i < index; i++) {
+    if (content[i] === '`' && content[i - 1] !== '\\') {
+      count++;
+    }
+  }
+  return count % 2 === 1;
+}
+
+function getStatementLevelSkipCases(content, relPath) {
+  // Match top-level it.skip/describe.skip only. Ignore Jest API calls embedded in
+  // RuleTester fixture strings (code/output properties or template literals).
+  const skipCases = [];
+  const lines = content.split('\n');
+  const stmtSkipRegex = /^\s*(?:it|describe)\.skip\s*\(['"]([^'"]+)['"]/;
+  const fixturePropertyRegex = /^\s*(?:code|output)\s*:/;
+  let offset = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+
+    if (!fixturePropertyRegex.test(line)) {
+      const match = stmtSkipRegex.exec(line);
+      if (match && !isInsideTemplateLiteral(content, offset)) {
+        skipCases.push({
+          name: match[1],
+          url: `${relPath}#L${lineNum}`,
+        });
+      }
+    }
+
+    offset += line.length + 1;
+  }
+
+  return skipCases;
+}
+
 function getSkipCases(rule, group) {
   // Return skip cases as [{name, url}]
   const testDir = groupToTestDir(group);
@@ -99,20 +138,6 @@ function getSkipCases(rule, group) {
   if (!fs.existsSync(testFile)) return [];
   const content = fs.readFileSync(testFile, 'utf-8');
   const relPath = `packages/rslint-test-tools/tests/${testDir}/rules/${rule.replace(/_/g, '-')}.test.ts`;
-  // Get current commit hash
-  let commit = process.env.GITHUB_SHA;
-  if (!commit) {
-    try {
-      commit = require('child_process')
-        .execSync('git rev-parse HEAD')
-        .toString()
-        .trim();
-    } catch {
-      commit = 'main';
-    }
-  }
-  // url is changed to relative path + line number
-  // Match { ... skip: true, name: 'xxx' } or it.skip('name', ...)
   const skipCases = [];
   // 1. Object case: { ..., skip: true, name: 'xxx' }
   const objCaseRegex =
@@ -127,30 +152,8 @@ function getSkipCases(rule, group) {
       url: `${relPath}#L${line}`,
     });
   }
-  // 2. it.skip('name', ...)
-  // 2. it.skip('name', ...)
-  const itSkipRegex = /it\.skip\(['"]([^'"]+)['"]/g;
-  while ((m = itSkipRegex.exec(content))) {
-    const idx = m.index;
-    const before = content.slice(0, idx);
-    const line = before.split('\n').length;
-    skipCases.push({
-      name: m[1],
-      url: `${relPath}#L${line}`,
-    });
-  }
-  // 3. describe.skip('name', ...)
-  // 3. describe.skip('name', ...)
-  const describeSkipRegex = /describe\.skip\(['"]([^'"]+)['"]/g;
-  while ((m = describeSkipRegex.exec(content))) {
-    const idx = m.index;
-    const before = content.slice(0, idx);
-    const line = before.split('\n').length;
-    skipCases.push({
-      name: m[1],
-      url: `${relPath}#L${line}`,
-    });
-  }
+  // 2. Top-level it.skip('name', ...) / describe.skip('name', ...)
+  skipCases.push(...getStatementLevelSkipCases(content, relPath));
   return skipCases;
 }
 
