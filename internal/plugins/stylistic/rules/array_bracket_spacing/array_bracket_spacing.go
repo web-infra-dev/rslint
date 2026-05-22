@@ -1,7 +1,7 @@
 package array_bracket_spacing
 
 import (
-	"strings"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -90,14 +90,6 @@ func isArrayType(node *ast.Node) bool {
 	return node.Kind == ast.KindArrayLiteralExpression || node.Kind == ast.KindArrayBindingPattern
 }
 
-func isWhitespaceByte(b byte) bool {
-	switch b {
-	case ' ', '\t', '\n', '\r', '\f', '\v':
-		return true
-	}
-	return false
-}
-
 // nextRealStart returns the position of the first non-trivia character at or
 // after `low`. Delegates to tsgo's scanner.SkipTrivia so we get UTF-8-safe
 // handling of every trivia form the parser itself recognizes (whitespace,
@@ -137,35 +129,38 @@ func nextRealStart(text string, low, high int) int {
 func prevRealEnd(text string, low, high int) int {
 	p := high
 	for p > low {
-		if isWhitespaceByte(text[p-1]) {
-			p--
-			continue
-		}
-		if p-2 >= low && text[p-2] == '*' && text[p-1] == '/' {
-			p -= 2
-			for p-2 >= low && (text[p-2] != '/' || text[p-1] != '*') {
+		// Fast path: ASCII trivia whitespace.
+		if text[p-1] < 0x80 {
+			if utils.IsTriviaWhitespaceByte(text[p-1]) {
 				p--
+				continue
 			}
-			if p-2 >= low {
+			// Block comment terminator `*/` — reverse-scan to the matching
+			// `/*` and continue. See function docstring for why this is
+			// safe here (callers guarantee the scan range is pure trivia).
+			if p-2 >= low && text[p-2] == '*' && text[p-1] == '/' {
 				p -= 2
-			} else {
-				p = low
+				for p-2 >= low && (text[p-2] != '/' || text[p-1] != '*') {
+					p--
+				}
+				if p-2 >= low {
+					p -= 2
+				} else {
+					p = low
+				}
+				continue
 			}
-			continue
+			break
 		}
-		break
+		// Slow path: non-ASCII rune — decode and dispatch to the
+		// Unicode-aware whitespace table (NBSP, IDEO, LS, PS, BOM, …).
+		r, size := utf8.DecodeLastRuneInString(text[:p])
+		if size == 0 || r == utf8.RuneError || !utils.IsTriviaWhitespaceRune(r) {
+			break
+		}
+		p -= size
 	}
 	return p
-}
-
-func containsNewline(text string, from, to int) bool {
-	if from < 0 {
-		from = 0
-	}
-	if to > len(text) {
-		to = len(text)
-	}
-	return strings.ContainsAny(text[from:to], "\n\r")
 }
 
 func elementsOf(node *ast.Node) []*ast.Node {
@@ -295,7 +290,7 @@ var ArrayBracketSpacingRule = rule.Rule{
 				secondStart = nextRealStart(text, innerLow, innerHigh)
 			}
 			hasSpaceAfterOpen := secondStart > innerLow
-			if containsNewline(text, innerLow, secondStart) {
+			if utils.ContainsLineTerminator(text, innerLow, secondStart) {
 				return
 			}
 
@@ -367,7 +362,7 @@ var ArrayBracketSpacingRule = rule.Rule{
 
 			penultimateEnd := prevRealEnd(text, scanLow, innerHigh)
 			hasSpaceBeforeClose := penultimateEnd < innerHigh
-			if containsNewline(text, penultimateEnd, innerHigh) {
+			if utils.ContainsLineTerminator(text, penultimateEnd, innerHigh) {
 				return
 			}
 

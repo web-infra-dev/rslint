@@ -453,6 +453,7 @@ export default defineConfig({
     './tests/eslint-plugin-stylistic/rules/array-bracket-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/arrow-parens.test.ts',
     './tests/eslint-plugin-stylistic/rules/arrow-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/block-spacing.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
