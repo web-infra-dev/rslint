@@ -6,11 +6,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/arrow_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/block_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/brace_style"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/comma_dangle"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		comma_dangle.CommaDangleRule,
 		array_bracket_spacing.ArrayBracketSpacingRule,
 		arrow_parens.ArrowParensRule,
 		arrow_spacing.ArrowSpacingRule,
