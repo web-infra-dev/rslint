@@ -292,6 +292,44 @@ func TestComputedPropertySpacingExtras(t *testing.T) {
 			{Code: `declare class A { [k]: number }`, Options: optsNever()},
 			{Code: `declare class A { [ k ]: number }`, Options: optsAlways()},
 
+			// ---- Assumption Q: multi-byte char positions (CJK + non-BMP emoji) ----
+			// Repository convention requires multi-byte char tests for any
+			// position-calculating rule. tsgo TokenStart/TokenEnd are byte
+			// offsets (see scanner.TokenText `s.text[tokenStart:pos]` in
+			// typescript-go), and `scanner.GetECMALineAndUTF16CharacterOfPosition`
+			// converts to UTF-16 column at the diagnostic-output boundary.
+			// Verify both layers cooperate: rule reports survive CJK (3-byte
+			// UTF-8, 1 UTF-16 unit) and non-BMP emoji (4-byte UTF-8, 2 UTF-16
+			// units = surrogate pair). One invalid case below asserts exact
+			// column numbers to lock the UTF-16 conversion.
+			{Code: "const 表情 = '🎉'; obj[表情]", Options: optsNever()},
+			{Code: "const 表情 = '🎉'; obj[ 表情 ]", Options: optsAlways()},
+			{Code: "const x = '🎉🚀'; obj[x]", Options: optsNever()},
+
+			// ---- Assumption R: abstract gate covers GetAccessor / SetAccessor (not just MethodDeclaration) ----
+			// containerGated.isAbstractMember must fire uniformly across all
+			// accessor variants — abstract get/set are silent like abstract
+			// methods.
+			{Code: `abstract class A { abstract get [ k ](): number }`, Options: optsNeverObj(map[string]interface{}{"enforceForClassMembers": true})},
+			{Code: `abstract class A { abstract set [ k ](v: number): void }`, Options: optsNeverObj(map[string]interface{}{"enforceForClassMembers": true})},
+			{Code: `abstract class A { abstract get [k](): number; abstract set [k](v: number) }`, Options: optsAlwaysObj(map[string]interface{}{"enforceForClassMembers": true})},
+
+			// ---- Assumption S: abstract `accessor` property (stage-3 accessor + abstract dual-modifier) ----
+			// PropertyDeclaration with both `abstract` and `accessor`.
+			// classMemberGated.isAbstractMember must win over the regular
+			// accessor-property reporting path.
+			{Code: `abstract class A { abstract accessor [ k ]: number }`, Options: optsNeverObj(map[string]interface{}{"enforceForClassMembers": true})},
+			{Code: `abstract class A { abstract accessor [k]: number }`, Options: optsAlwaysObj(map[string]interface{}{"enforceForClassMembers": true})},
+
+			// ---- Assumption T: inJSDoc covers ALL JSDoc tags, not just @type ----
+			// JSDoc `@param`, `@returns`, `@typedef`, `@property`, etc. all
+			// build type AST nodes with NodeFlagsJSDoc set. inJSDoc's flag
+			// check is tag-agnostic, so each tag's interior must skip
+			// uniformly.
+			{Code: "/** @param {Foo[K]} x */\nfunction f(x: any) {}", Options: optsAlways()},
+			{Code: "/** @returns {Foo[K]} */\nfunction f(): any {}", Options: optsAlways()},
+			{Code: "/** @typedef {{ x: Foo[K] }} T */", Options: optsAlways()},
+
 			// =====================================================================
 			//   Context-coverage lock-ins: each verifies the rule fires correctly
 			//   in a specific surrounding syntactic context. Listener dispatch is
@@ -697,6 +735,26 @@ func TestComputedPropertySpacingExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedSpaceAfter", Line: 1, Column: 20, EndLine: 1, EndColumn: 21},
 					{MessageId: "unexpectedSpaceBefore", Line: 1, Column: 22, EndLine: 1, EndColumn: 23},
+				},
+			},
+
+			// ---- Lock-in for Assumption Q: UTF-16 column output across CJK + non-BMP emoji ----
+			// Source: `const 表情 = '🎉'; obj[ 表情 ]`
+			//   UTF-16 cols 1-5 `const`, 6 space, 7-8 `表情`, 9 space, 10 `=`,
+			//   11 space, 12 `'`, 13-14 `🎉` (surrogate pair, 2 units),
+			//   15 `'`, 16 `;`, 17 space, 18-20 `obj`, 21 `[`, 22 space,
+			//   23-24 `表情`, 25 space, 26 `]`.
+			// unexpectedSpaceAfter loc = [innerLow, firstStart) = cols 22-23.
+			// unexpectedSpaceBefore loc = [lastEnd, innerHigh) = cols 25-26.
+			// If rslint accidentally byte-indexed or counted code points
+			// instead of UTF-16 units, the columns would shift.
+			{
+				Code:    "const 表情 = '🎉'; obj[ 表情 ]",
+				Output:  []string{"const 表情 = '🎉'; obj[表情]"},
+				Options: optsNever(),
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedSpaceAfter", Line: 1, Column: 22, EndLine: 1, EndColumn: 23},
+					{MessageId: "unexpectedSpaceBefore", Line: 1, Column: 25, EndLine: 1, EndColumn: 26},
 				},
 			},
 

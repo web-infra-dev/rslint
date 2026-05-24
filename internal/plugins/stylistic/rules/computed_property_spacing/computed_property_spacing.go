@@ -132,12 +132,15 @@ type pendingReport struct {
 	fix     rule.RuleFix
 }
 
-// isObjectLiteralGrandparent reports whether the member's enclosing container
-// is an ObjectLiteralExpression (`{ [k](){} }`) versus a class body
-// (`class A { [k](){} }`). Method / GetAccessor / SetAccessor share a kind
-// across object literals and classes in tsgo, so grandparent dispatch is the
-// only way to tell them apart for the enforceForClassMembers gate.
-func isObjectLiteralGrandparent(node *ast.Node) bool {
+// parentIsObjectLiteral reports whether the immediate parent of `node` is an
+// ObjectLiteralExpression. tsgo represents object-literal methods / accessors
+// directly as children of `ObjectLiteralExpression.Properties` (no
+// intermediate body node), and class methods / accessors directly as children
+// of `ClassDeclaration.Members`. The two kinds (MethodDeclaration /
+// GetAccessor / SetAccessor) are shared between both containers, so checking
+// `node.Parent.Kind` is the only way to tell an object-literal method from a
+// class method for the enforceForClassMembers gate.
+func parentIsObjectLiteral(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
@@ -392,7 +395,7 @@ var ComputedPropertySpacingRule = rule.Rule{
 		// MethodSignature there, a distinct kind).
 		containerGated := func(resolver func(*ast.Node) resolved) func(*ast.Node) resolved {
 			return func(node *ast.Node) resolved {
-				if isObjectLiteralGrandparent(node) {
+				if parentIsObjectLiteral(node) {
 					return resolver(node)
 				}
 				parent := node.Parent
