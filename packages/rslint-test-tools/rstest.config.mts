@@ -459,6 +459,7 @@ export default defineConfig({
     './tests/eslint-plugin-stylistic/rules/brace-style.test.ts',
     './tests/eslint-plugin-stylistic/rules/comma-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/computed-property-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/dot-location.test.ts',
     './tests/eslint-plugin-stylistic/rules/eol-last.test.ts',
 
     // eslint-plugin-unicorn
