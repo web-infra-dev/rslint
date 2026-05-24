@@ -12,14 +12,13 @@
   <a href="https://codspeed.io/web-infra-dev/rslint?utm_source=badge"><img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json" alt="CodSpeed"/></a>
 </p>
 
-> [!NOTE]
-> Think of Rslint as Rust Clippy but for TypeScript — more like a TypeScript extension than an ESLint plugin.
+Rslint is a high-performance, ESLint-compatible linter for JavaScript and TypeScript.
 
-Rslint is a high-performance JavaScript and TypeScript linter written in Go. It offers strong compatibility with the ESLint and TypeScript-ESLint ecosystem, allowing for seamless replacement, and provides lightning-fast linting speeds.
+Powered by [typescript-go](https://github.com/microsoft/typescript-go), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
 
 ## ✨ Goals
 
-- 🚀 **Lightning Fast**: Built with Go and typescript-go, delivering 20-40x faster linting performance compared to traditional ESLint setups.
+- 🚀 **Lightning Fast**: Powered by typescript-go, delivering 20-40x faster linting performance compared to traditional ESLint setups.
 - ⚡ **Minimal Configuration**: Typed linting enabled by default with minimal setup required — no complex configuration needed.
 - 📦 **Best Effort ESLint Compatible**: Compatible with most ESLint and TypeScript-ESLint configurations, significantly reducing migration costs.
 - 🎯 **TypeScript First**: Uses TypeScript Compiler semantics as the single source of truth, ensuring 100% consistency and eliminating edge-case bugs.
