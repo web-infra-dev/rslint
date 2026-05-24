@@ -451,6 +451,7 @@ export default defineConfig({
 
     // eslint-plugin-stylistic
     './tests/eslint-plugin-stylistic/rules/comma-dangle.test.ts',
+    './tests/eslint-plugin-stylistic/rules/comma-style.test.ts',
     './tests/eslint-plugin-stylistic/rules/array-bracket-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/arrow-parens.test.ts',
     './tests/eslint-plugin-stylistic/rules/arrow-spacing.test.ts',

@@ -8,6 +8,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/brace_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/comma_dangle"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/comma_spacing"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/comma_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/computed_property_spacing"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -21,6 +22,7 @@ func GetAllRules() []rule.Rule {
 		brace_style.BraceStyleRule,
 		comma_dangle.CommaDangleRule,
 		comma_spacing.CommaSpacingRule,
+		comma_style.CommaStyleRule,
 		computed_property_spacing.ComputedPropertySpacingRule,
 	}
 }
