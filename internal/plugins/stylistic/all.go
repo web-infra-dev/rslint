@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/comma_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/comma_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/computed_property_spacing"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/eol_last"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -24,5 +25,6 @@ func GetAllRules() []rule.Rule {
 		comma_spacing.CommaSpacingRule,
 		comma_style.CommaStyleRule,
 		computed_property_spacing.ComputedPropertySpacingRule,
+		eol_last.EolLastRule,
 	}
 }
