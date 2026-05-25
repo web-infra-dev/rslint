@@ -32,6 +32,12 @@ type ParsedJestFnCallHeadEntry struct {
 	Node  *ast.Node
 }
 
+const (
+	ExpectParseReasonNone            = ""
+	ExpectParseReasonMatcherNotFound = "matcher-not-found"
+	ExpectParseReasonModifierUnknown = "modifier-unknown"
+)
+
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
 	parsed := ParseJestFnCall(node, ctx)
 	if parsed == nil || len(kinds) == 0 {
@@ -146,7 +152,7 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 }
 
 func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
-	modifierEntries, matcher, err := findModifiersAndMatcher(parsed.MemberEntries)
+	modifierEntries, matcher, err := FindExpectModifiersAndMatcher(parsed.MemberEntries)
 	if err != "" {
 		return false
 	}
@@ -176,48 +182,48 @@ func isInnerExpectCall(node *ast.Node, localName string, members []string, setti
 	return GetJestKind(name) == JestFnTypeExpect
 }
 
-func findModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
+func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 	[]ParsedJestFnMemberEntry,
 	*ParsedJestFnMemberEntry,
 	string,
 ) {
 	if len(entries) == 0 {
-		return nil, nil, "matcher-not-found"
+		return nil, nil, ExpectParseReasonMatcherNotFound
 	}
 
 	modifiers := make([]ParsedJestFnMemberEntry, 0, len(entries))
 	for _, member := range entries {
 		parent := member.Node.Parent
 		if parent == nil {
-			return nil, nil, "modifier-unknown"
+			return nil, nil, ExpectParseReasonModifierUnknown
 		}
 
 		grandparent := parent.Parent
 		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
-			return modifiers, &member, ""
+			return modifiers, &member, ExpectParseReasonNone
 		}
 
 		switch len(modifiers) {
 		case 0:
 			if !EXPECT_MODIFIER_NAMES[member.Name] {
-				return nil, nil, "modifier-unknown"
+				return nil, nil, ExpectParseReasonModifierUnknown
 			}
 		case 1:
 			if member.Name != "not" {
-				return nil, nil, "modifier-unknown"
+				return nil, nil, ExpectParseReasonModifierUnknown
 			}
 			first := modifiers[0].Name
 			if first != "rejects" && first != "resolves" {
-				return nil, nil, "modifier-unknown"
+				return nil, nil, ExpectParseReasonModifierUnknown
 			}
 		default:
-			return nil, nil, "modifier-unknown"
+			return nil, nil, ExpectParseReasonModifierUnknown
 		}
 
 		modifiers = append(modifiers, member)
 	}
 
-	return nil, nil, "matcher-not-found"
+	return nil, nil, ExpectParseReasonMatcherNotFound
 }
 
 func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
