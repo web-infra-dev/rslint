@@ -56,24 +56,6 @@ const (
 	preferKindDefined
 )
 
-// unwrapTypeAssertions strips parentheses and TypeScript type assertions so
-// the resulting node matches what the upstream rule inspects at runtime.
-func unwrapTypeAssertions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		default:
-			return node
-		}
-	}
-	return node
-}
-
 // firstMatcherArgument returns expect(...).matcher(arg0)’s first argument
 // after peeling type assertions; nil if the matcher call has no arguments.
 func firstMatcherArgument(matcherCall *ast.Node) *ast.Node {
@@ -81,7 +63,7 @@ func firstMatcherArgument(matcherCall *ast.Node) *ast.Node {
 	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 		return nil
 	}
-	return unwrapTypeAssertions(call.Arguments.Nodes[0])
+	return utils.UnwrapBasicTypeAssertions(call.Arguments.Nodes[0])
 }
 
 func isNullLiteral(arg *ast.Node) bool {
@@ -102,7 +84,7 @@ func shouldUseToBe(arg *ast.Node) bool {
 	if arg.Kind == ast.KindPrefixUnaryExpression {
 		unary := arg.AsPrefixUnaryExpression()
 		if unary.Operator == ast.KindMinusToken {
-			arg = unwrapTypeAssertions(unary.Operand)
+			arg = utils.UnwrapBasicTypeAssertions(unary.Operand)
 		}
 	}
 	if arg == nil {
@@ -123,29 +105,12 @@ func shouldUseToBe(arg *ast.Node) bool {
 	}
 }
 
-func modifierReceiverParent(modEntry utils.ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
-	if modEntry.Node == nil || modEntry.Node.Parent == nil {
-		return nil, nil
-	}
-	parent := modEntry.Node.Parent
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		p := parent.AsPropertyAccessExpression()
-		return p.Expression, parent
-	case ast.KindElementAccessExpression:
-		p := parent.AsElementAccessExpression()
-		return p.Expression, parent
-	default:
-		return nil, nil
-	}
-}
-
 func appendRemoveNotModifierFix(fixes []rule.RuleFix, jestFnCall *utils.ParsedJestFnCall) []rule.RuleFix {
 	for _, modEntry := range jestFnCall.ModifierEntries {
 		if modEntry.Name != "not" || modEntry.Node == nil {
 			continue
 		}
-		receiver, parent := modifierReceiverParent(modEntry)
+		receiver, parent := utils.GetAccessorReceiverAndParent(&modEntry)
 		if receiver == nil || parent == nil {
 			continue
 		}
