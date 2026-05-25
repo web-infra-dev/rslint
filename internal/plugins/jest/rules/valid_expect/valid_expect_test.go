@@ -127,28 +127,28 @@ func TestValidExpectRule(t *testing.T) {
 			{
 				Code: "expect(\"something\", \"else\").toEqual(\"something\");",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 21, EndColumn: 26},
+					{MessageId: "tooManyArgs", Column: 21, EndColumn: 27},
 				},
 			},
 			{
 				Code:    "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
 				Options: map[string]interface{}{"maxArgs": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 29, EndColumn: 38},
+					{MessageId: "tooManyArgs", Column: 29, EndColumn: 39},
 				},
 			},
 			{
 				Code:    "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
 				Options: map[string]interface{}{"maxArgs": 2, "minArgs": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 29, EndColumn: 38},
+					{MessageId: "tooManyArgs", Column: 29, EndColumn: 39},
 				},
 			},
 			{
 				Code:    "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
 				Options: map[string]interface{}{"maxArgs": 2, "minArgs": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 29, EndColumn: 38},
+					{MessageId: "tooManyArgs", Column: 29, EndColumn: 39},
 				},
 			},
 			{
@@ -163,7 +163,7 @@ func TestValidExpectRule(t *testing.T) {
 				Options: map[string]interface{}{"maxArgs": 1, "minArgs": 3},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "notEnoughArgs", Column: 7, EndColumn: 8},
-					{MessageId: "tooManyArgs", Column: 21, EndColumn: 26},
+					{MessageId: "tooManyArgs", Column: 21, EndColumn: 27},
 				},
 			},
 			{

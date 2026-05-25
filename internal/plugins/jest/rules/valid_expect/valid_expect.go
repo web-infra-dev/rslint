@@ -3,6 +3,7 @@ package valid_expect
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -38,7 +39,7 @@ func buildErrorTooManyArgsMessage(amount int) rule.RuleMessage {
 		Id:          "tooManyArgs",
 		Description: fmt.Sprintf("Expect takes at most %d argument%s", amount, pluralSuffix(amount)),
 		Data: map[string]string{
-			"amount": fmt.Sprintf("%d", amount),
+			"amount": strconv.Itoa(amount),
 			"s":      pluralSuffix(amount),
 		},
 	}
@@ -49,7 +50,7 @@ func buildErrorNotEnoughArgsMessage(amount int) rule.RuleMessage {
 		Id:          "notEnoughArgs",
 		Description: fmt.Sprintf("Expect requires at least %d argument%s", amount, pluralSuffix(amount)),
 		Data: map[string]string{
-			"amount": fmt.Sprintf("%d", amount),
+			"amount": strconv.Itoa(amount),
 			"s":      pluralSuffix(amount),
 		},
 	}
@@ -278,9 +279,6 @@ func expectOpenParenRange(sourceFile *ast.SourceFile, call *ast.Node) core.TextR
 func tooManyArgsRange(sourceFile *ast.SourceFile, args []*ast.Node, maxArgs int) core.TextRange {
 	start := internalUtils.TrimNodeTextRange(sourceFile, args[maxArgs]).Pos()
 	end := internalUtils.TrimNodeTextRange(sourceFile, args[len(args)-1]).End()
-	if end > start {
-		end--
-	}
 	return core.NewTextRange(start, end)
 }
 

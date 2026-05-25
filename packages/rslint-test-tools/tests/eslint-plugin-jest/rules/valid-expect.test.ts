@@ -249,7 +249,7 @@ ruleTester.run('valid-expect', {} as never, {
       code: 'expect("something", "else").toEqual("something");',
       errors: [
         {
-          endColumn: 26,
+          endColumn: 27,
           column: 21,
           messageId: 'tooManyArgs',
           data: {
@@ -264,7 +264,7 @@ ruleTester.run('valid-expect', {} as never, {
       options: [{ maxArgs: 2 }],
       errors: [
         {
-          endColumn: 38,
+          endColumn: 39,
           column: 29,
           messageId: 'tooManyArgs',
           data: {
@@ -279,7 +279,7 @@ ruleTester.run('valid-expect', {} as never, {
       options: [{ maxArgs: 2, minArgs: 2 }],
       errors: [
         {
-          endColumn: 38,
+          endColumn: 39,
           column: 29,
           messageId: 'tooManyArgs',
           data: {
@@ -294,7 +294,7 @@ ruleTester.run('valid-expect', {} as never, {
       options: [{ maxArgs: 2, minArgs: 1 }],
       errors: [
         {
-          endColumn: 38,
+          endColumn: 39,
           column: 29,
           messageId: 'tooManyArgs',
           data: {
