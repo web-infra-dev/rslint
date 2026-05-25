@@ -2,6 +2,7 @@ package jsx_curly_spacing
 
 import (
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -245,27 +246,27 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	}
 
 	// secondPos: skip leading whitespace only.
-	p := low
-	for p < high && isWhitespaceByte(text[p]) {
-		p++
-	}
-	res.secondPos = p
+	res.secondPos = utils.SkipLeadingWhitespace(text, low, high)
 
 	// penultimateEnd: skip trailing whitespace only.
-	p = high
-	for p > low && isWhitespaceByte(text[p-1]) {
-		p--
-	}
-	res.penultimateEnd = p
+	res.penultimateEnd = utils.SkipTrailingWhitespace(text, low, high)
 
 	// nextRealStart: skip whitespace + leading-edge comments. The leading
 	// edge cannot contain string/template literals (those would BE the
 	// first token), so naive byte-level comment scanning is sufficient.
-	p = low
+	p := low
 	for p < high {
-		if isWhitespaceByte(text[p]) {
-			p++
-			continue
+		if text[p] < 0x80 {
+			if utils.IsTriviaWhitespaceByte(text[p]) {
+				p++
+				continue
+			}
+		} else {
+			r, size := utf8.DecodeRuneInString(text[p:])
+			if size > 0 && r != utf8.RuneError && utils.IsTriviaWhitespaceRune(r) {
+				p += size
+				continue
+			}
 		}
 		if p+1 < high && text[p] == '/' && text[p+1] == '*' {
 			p += 2
@@ -298,9 +299,17 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	// text. Aligned with upstream ESLint, which has the same gap.
 	p = high
 	for p > low {
-		if isWhitespaceByte(text[p-1]) {
-			p--
-			continue
+		if text[p-1] < 0x80 {
+			if utils.IsTriviaWhitespaceByte(text[p-1]) {
+				p--
+				continue
+			}
+		} else {
+			r, size := utf8.DecodeLastRuneInString(text[:p])
+			if size > 0 && r != utf8.RuneError && utils.IsTriviaWhitespaceRune(r) {
+				p -= size
+				continue
+			}
 		}
 		if p-2 >= low && text[p-2] == '*' && text[p-1] == '/' {
 			p -= 2
@@ -319,29 +328,6 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	res.prevRealEnd = p
 
 	return res
-}
-
-func isWhitespaceByte(b byte) bool {
-	switch b {
-	case ' ', '\t', '\n', '\r', '\f', '\v':
-		return true
-	}
-	return false
-}
-
-func containsNewline(text string, from, to int) bool {
-	if from < 0 {
-		from = 0
-	}
-	if to > len(text) {
-		to = len(text)
-	}
-	for i := from; i < to; i++ {
-		if text[i] == '\n' || text[i] == '\r' {
-			return true
-		}
-	}
-	return false
 }
 
 var (
@@ -451,8 +437,8 @@ var JsxCurlySpacingRule = rule.Rule{
 
 			hasSpaceAfterOpen := scan.secondPos > innerLow
 			hasSpaceBeforeClose := scan.penultimateEnd < innerHigh
-			multilineAfterOpen := containsNewline(text, innerLow, scan.secondPos)
-			multilineBeforeClose := containsNewline(text, scan.penultimateEnd, innerHigh)
+			multilineAfterOpen := utils.ContainsLineTerminator(text, innerLow, scan.secondPos)
+			multilineBeforeClose := utils.ContainsLineTerminator(text, scan.penultimateEnd, innerHigh)
 
 			reportNoBeginningSpace := func() {
 				toLoc := scan.nextRealStart

@@ -448,12 +448,25 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise
+    './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
 
     // eslint-plugin-stylistic
+    './tests/eslint-plugin-stylistic/rules/comma-dangle.test.ts',
+    './tests/eslint-plugin-stylistic/rules/comma-style.test.ts',
     './tests/eslint-plugin-stylistic/rules/array-bracket-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/arrow-parens.test.ts',
     './tests/eslint-plugin-stylistic/rules/arrow-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/block-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/brace-style.test.ts',
+    './tests/eslint-plugin-stylistic/rules/comma-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/computed-property-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/dot-location.test.ts',
+    './tests/eslint-plugin-stylistic/rules/eol-last.test.ts',
+    './tests/eslint-plugin-stylistic/rules/generator-star-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-closing-bracket-location.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-closing-tag-location.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-curly-brace-presence.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',

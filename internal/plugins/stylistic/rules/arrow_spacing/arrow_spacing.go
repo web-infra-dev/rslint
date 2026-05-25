@@ -44,56 +44,6 @@ func parseOptions(raw any) options {
 	return opts
 }
 
-func isWhitespaceByte(b byte) bool {
-	switch b {
-	case ' ', '\t', '\n', '\r', '\f', '\v':
-		return true
-	}
-	return false
-}
-
-// isWhitespaceRune handles the non-ASCII subset of ECMAScript's `\s` —
-// callers (`findBeforeToken` / `findAfterToken`) check ASCII bytes through
-// `isWhitespaceByte` on the fast path, so this function only sees runes
-// ≥ U+0080. The set is exactly:
-//
-//   - `WhiteSpace` (spec §12.2): U+00A0 NBSP, U+FEFF ZWNBSP, plus Unicode
-//     `Space_Separator` (Zs) — U+1680, U+2000-U+200A, U+202F, U+205F, U+3000.
-//   - `LineTerminator` (spec §12.3): U+2028 LS, U+2029 PS.
-//
-// Deliberately excluded — they are NOT matched by JS `\s` (verified
-// empirically against V8 with `/\s/.test('')` / `'​'`):
-//
-//   - U+0085 Next Line: in Unicode `\p{White_Space}` but NOT in ES
-//     `WhiteSpace` (only Zs and a specific allow-list count).
-//   - U+200B Zero Width Space: category Cf (Format), not Zs; tsgo's scanner
-//     treats it as whitespace internally, but that's a TypeScript-compiler
-//     quirk, not the ESLint behavior we mirror.
-func isWhitespaceRune(r rune) bool {
-	switch r {
-	case 0x00A0, // <No-Break Space>
-		0x1680, // <Ogham Space Mark>
-		0x2000, // <En Quad>
-		0x2001, // <Em Quad>
-		0x2002, // <En Space>
-		0x2003, // <Em Space>
-		0x2004, // <Three-Per-Em Space>
-		0x2005, // <Four-Per-Em Space>
-		0x2006, // <Six-Per-Em Space>
-		0x2007, // <Figure Space>
-		0x2008, // <Punctuation Space>
-		0x2009, // <Thin Space>
-		0x200A, // <Hair Space>
-		0x2028, // <Line Separator>
-		0x2029, // <Paragraph Separator>
-		0x202F, // <Narrow No-Break Space>
-		0x205F, // <Medium Mathematical Space>
-		0x3000, // <Ideographic Space>
-		0xFEFF: // <Byte Order Mark / Zero Width No-Break Space>
-		return true
-	}
-	return false
-}
 
 // findBeforeToken walks left from `arrowStart` through whitespace, then
 // locates the start of the previous token-or-comment. Returns the token range
@@ -130,14 +80,14 @@ func findBeforeToken(text string, arrowStart int) (beforeStart, beforeEnd int, i
 		// rune to catch Unicode whitespace (NBSP, ideographic space,
 		// line/paragraph separators, …) — same set ESLint's `\s` matches.
 		if text[p-1] < 0x80 {
-			if !isWhitespaceByte(text[p-1]) {
+			if !utils.IsTriviaWhitespaceByte(text[p-1]) {
 				break
 			}
 			p--
 			continue
 		}
 		r, size := utf8.DecodeLastRuneInString(text[:p])
-		if size == 0 || r == utf8.RuneError || !isWhitespaceRune(r) {
+		if size == 0 || r == utf8.RuneError || !utils.IsTriviaWhitespaceRune(r) {
 			break
 		}
 		p -= size
@@ -185,14 +135,14 @@ func findAfterToken(text string, arrowEnd int) (afterStart, afterEnd int, isSpac
 	p := arrowEnd
 	for p < len(text) {
 		if text[p] < 0x80 {
-			if !isWhitespaceByte(text[p]) {
+			if !utils.IsTriviaWhitespaceByte(text[p]) {
 				break
 			}
 			p++
 			continue
 		}
 		r, size := utf8.DecodeRuneInString(text[p:])
-		if size == 0 || r == utf8.RuneError || !isWhitespaceRune(r) {
+		if size == 0 || r == utf8.RuneError || !utils.IsTriviaWhitespaceRune(r) {
 			break
 		}
 		p += size

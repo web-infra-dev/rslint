@@ -305,6 +305,21 @@ func TestArrayBracketSpacingExtras(t *testing.T) {
 			// `=== !spaced` reference-equality check).
 			{Code: `var arr = [1];`, Options: []interface{}{"never", map[string]interface{}{"singleValue": "true"}}},
 			{Code: `var arr = [1];`, Options: []interface{}{"never", map[string]interface{}{"singleValue": 1}}},
+
+			// ---- Unicode WhiteSpace + LineTerminator (ECMAScript §12.2/§12.3) ----
+			// Parity with @stylistic/eslint-plugin's array-bracket-spacing
+			// (verified via local ESLint probe). NBSP / IDEO / ZWNBSP count
+			// as space → satisfy `always` mode; LS / PS count as line
+			// terminator → cross-line short-circuit (both modes valid).
+			// `always` with NBSP / IDEO / BOM inside brackets — valid.
+			{Code: "[\u00A0foo\u00A0]", Options: []interface{}{"always"}},
+			{Code: "[\u3000foo\u3000]", Options: []interface{}{"always"}},
+			{Code: "[\uFEFFfoo\uFEFF]", Options: []interface{}{"always"}},
+			// `never` + LS / PS one-side → that side cross-line; opposite
+			// side hugs the bracket so both sides valid.
+			{Code: "[foo\u2028]", Options: []interface{}{"never"}},
+			{Code: "[\u2028foo]", Options: []interface{}{"never"}},
+			{Code: "[foo\u2029]", Options: []interface{}{"never"}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Locks in upstream validateArraySpacing() arm:
