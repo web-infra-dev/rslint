@@ -114,6 +114,12 @@ oldValue;
 			},
 		},
 		{
+			Code: `/** @deprecated */ let oldValue = undefined; oldValue;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "deprecated", Line: 1, Column: 46},
+			},
+		},
+		{
 			Code: `
 /** @deprecated Use newValue instead. */
 const oldValue = 1;
@@ -242,4 +248,20 @@ oldValue;
 			t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
 		}
 	})
+}
+
+func TestNoDeprecatedReportsLetInitializedToUndefinedInTsxFixture(t *testing.T) {
+	t.Parallel()
+	diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+		"react.tsx": `
+        /** @deprecated */ let a = undefined;
+        a;
+      `,
+	}, "react.tsx", nil)
+	if len(diagnostics) != 1 {
+		t.Fatalf("expected 1 diagnostic, got %d", len(diagnostics))
+	}
+	if diagnostics[0].Message.Id != "deprecated" {
+		t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
+	}
 }

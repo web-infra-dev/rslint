@@ -142,7 +142,14 @@ func hasDeprecatedTagInSource(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	sourceFile := ast.GetSourceFileOfNode(node)
+	declarationNode := node
+	if node.Parent != nil && node.Parent.Kind == ast.KindVariableDeclaration {
+		variableDeclaration := node.Parent.AsVariableDeclaration()
+		if variableDeclaration != nil && variableDeclaration.Name() == node {
+			declarationNode = node.Parent
+		}
+	}
+	sourceFile := ast.GetSourceFileOfNode(declarationNode)
 	if sourceFile == nil {
 		return false
 	}
@@ -151,12 +158,15 @@ func hasDeprecatedTagInSource(node *ast.Node) bool {
 		return false
 	}
 
-	anchor := node.Pos()
-	if node.Kind == ast.KindVariableDeclaration && node.Parent != nil && node.Parent.Parent != nil {
-		anchor = node.Parent.Parent.Pos()
+	anchor := declarationNode.Pos()
+	if declarationNode.Kind == ast.KindVariableDeclaration && declarationNode.Parent != nil && declarationNode.Parent.Parent != nil {
+		anchor = declarationNode.Parent.Parent.Pos()
 	}
-	if anchor <= 0 || anchor > len(text) {
+	if anchor < 0 || anchor > len(text) {
 		return false
+	}
+	if declarationNode.Kind == ast.KindVariableDeclaration && hasDeprecatedLeadingCommentAt(text, anchor) {
+		return true
 	}
 	// Walk backwards over whitespace to find a directly preceding JSDoc comment.
 	i := anchor - 1
@@ -180,6 +190,23 @@ func hasDeprecatedTagInSource(node *ast.Node) bool {
 	if strings.Contains(comment[:len(comment)-2], "*/") {
 		return false
 	}
+	return deprecatedReasonPattern.MatchString(comment)
+}
+
+func hasDeprecatedLeadingCommentAt(text string, anchor int) bool {
+	if anchor < 0 || anchor >= len(text) {
+		return false
+	}
+	snippet := text[anchor:]
+	trimmed := strings.TrimLeft(snippet, " \t\n\r")
+	if !strings.HasPrefix(trimmed, "/**") {
+		return false
+	}
+	commentEnd := strings.Index(trimmed, "*/")
+	if commentEnd < 0 {
+		return false
+	}
+	comment := trimmed[:commentEnd+2]
 	return deprecatedReasonPattern.MatchString(comment)
 }
 
@@ -1570,6 +1597,163 @@ func deprecatedInfoByNameInSource(ctx rule.RuleContext, name string, propertyOnl
 	return found, reason
 }
 
+func deprecatedVariableInfoByNameInSource(ctx rule.RuleContext, name string) (bool, string) {
+	if ctx.TypeChecker == nil || ctx.SourceFile == nil || name == "" {
+		return false, ""
+	}
+	targetName := normalizeComparableName(name)
+	if targetName == "" {
+		return false, ""
+	}
+	found := false
+	reason := ""
+	walkAst(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
+		if node == nil || node.Kind != ast.KindVariableDeclaration {
+			return false
+		}
+		nameNode := declarationNameNode(node)
+		if nameNode == nil || normalizeComparableName(nodeNameText(nameNode)) != targetName {
+			return false
+		}
+		if !ctx.TypeChecker.IsDeprecatedDeclaration(node) && !hasDeprecatedTag(node) && !hasDeprecatedTagInSource(node) {
+			return false
+		}
+		found = true
+		if reason == "" {
+			reason = deprecatedReasonFromDeclaration(node)
+		}
+		return reason != ""
+	})
+	return found, reason
+}
+
+func deprecatedStructuralPropertyInfoByNameInSource(ctx rule.RuleContext, name string) (bool, string) {
+	if ctx.TypeChecker == nil || ctx.SourceFile == nil || name == "" {
+		return false, ""
+	}
+	targetName := normalizeComparableName(name)
+	if targetName == "" {
+		return false, ""
+	}
+	found := false
+	reason := ""
+	walkAst(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
+		if node == nil {
+			return false
+		}
+		if node.Kind != ast.KindPropertyAssignment &&
+			node.Kind != ast.KindPropertySignature &&
+			node.Kind != ast.KindPropertyDeclaration {
+			return false
+		}
+		nameNode := declarationNameNode(node)
+		if nameNode == nil || normalizeComparableName(nodeNameText(nameNode)) != targetName {
+			return false
+		}
+		if !ctx.TypeChecker.IsDeprecatedDeclaration(node) && !hasDeprecatedTag(node) && !hasDeprecatedTagInSource(node) {
+			return false
+		}
+		found = true
+		if reason == "" {
+			reason = deprecatedReasonFromDeclaration(node)
+		}
+		return reason != ""
+	})
+	return found, reason
+}
+
+func deprecatedMethodInfoByNameInSource(ctx rule.RuleContext, name string, argCount int, matchArgCount bool) (bool, string) {
+	if ctx.TypeChecker == nil || ctx.SourceFile == nil || name == "" {
+		return false, ""
+	}
+	targetName := normalizeComparableName(name)
+	if targetName == "" {
+		return false, ""
+	}
+	candidates := []*ast.Node{}
+	hasSignature := false
+	walkAst(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
+		if node == nil || (node.Kind != ast.KindMethodDeclaration && node.Kind != ast.KindMethodSignature) {
+			return false
+		}
+		nameNode := declarationNameNode(node)
+		if nameNode == nil || normalizeComparableName(nodeNameText(nameNode)) != targetName {
+			return false
+		}
+		if matchArgCount && len(node.Parameters()) != argCount {
+			return false
+		}
+		candidates = append(candidates, node)
+		if node.Body() == nil {
+			hasSignature = true
+		}
+		return false
+	})
+	found := false
+	allDeprecated := true
+	reason := ""
+	for _, node := range candidates {
+		if hasSignature && node.Body() != nil {
+			continue
+		}
+		found = true
+		if !ctx.TypeChecker.IsDeprecatedDeclaration(node) && !hasDeprecatedTag(node) && !hasDeprecatedTagInSource(node) {
+			allDeprecated = false
+			continue
+		}
+		if reason == "" {
+			reason = deprecatedReasonFromDeclaration(node)
+		}
+	}
+	return found && allDeprecated, reason
+}
+
+func deprecatedFunctionInfoByNameInSource(ctx rule.RuleContext, name string, argCount int, matchArgCount bool) (bool, string) {
+	if ctx.TypeChecker == nil || ctx.SourceFile == nil || name == "" {
+		return false, ""
+	}
+	targetName := normalizeComparableName(name)
+	if targetName == "" {
+		return false, ""
+	}
+	candidates := []*ast.Node{}
+	hasSignature := false
+	walkAst(ctx.SourceFile.AsNode(), func(node *ast.Node) bool {
+		if node == nil || node.Kind != ast.KindFunctionDeclaration {
+			return false
+		}
+		nameNode := declarationNameNode(node)
+		if nameNode == nil || normalizeComparableName(nodeNameText(nameNode)) != targetName {
+			return false
+		}
+		if matchArgCount && len(node.Parameters()) != argCount {
+			return false
+		}
+		candidates = append(candidates, node)
+		if node.Body() == nil {
+			hasSignature = true
+		}
+		return false
+	})
+	found := false
+	allDeprecated := true
+	reason := ""
+	for _, node := range candidates {
+		if hasSignature && node.Body() != nil {
+			continue
+		}
+		found = true
+		if !ctx.TypeChecker.IsDeprecatedDeclaration(node) && !hasDeprecatedTag(node) && !hasDeprecatedTagInSource(node) {
+			allDeprecated = false
+			continue
+		}
+		if reason == "" {
+			reason = deprecatedReasonFromDeclaration(node)
+		}
+	}
+	return found && allDeprecated, reason
+}
+
 func deprecatedReasonByNameInSource(ctx rule.RuleContext, name string) string {
 	_, reason := deprecatedInfoByNameInSource(ctx, name, false)
 	return reason
@@ -1579,8 +1763,133 @@ func deprecatedPropertyInfoByNameInSource(ctx rule.RuleContext, name string) (bo
 	return deprecatedInfoByNameInSource(ctx, name, true)
 }
 
+func shouldUseDeprecatedVariableSourceFallback(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	switch node.Parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		access := node.Parent.AsPropertyAccessExpression()
+		return access == nil || access.Name() == nil || access.Name().AsNode() != node
+	case ast.KindElementAccessExpression, ast.KindJsxAttribute:
+		return false
+	default:
+		return true
+	}
+}
+
+func isPropertyAccessName(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	access := node.Parent.AsPropertyAccessExpression()
+	return access != nil && access.Name() != nil && access.Name().AsNode() == node
+}
+
+func isBindingElementNameOrProperty(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindBindingElement {
+		return false
+	}
+	bindingElement := node.Parent.AsBindingElement()
+	if bindingElement == nil {
+		return false
+	}
+	return bindingElement.Name() == node || bindingElement.PropertyName == node
+}
+
+func isPropertyAccessCalleeName(node *ast.Node) bool {
+	if !isPropertyAccessName(node) || node.Parent.Parent == nil {
+		return false
+	}
+	if node.Parent.Parent.Kind != ast.KindCallExpression {
+		return false
+	}
+	callExpression := node.Parent.Parent.AsCallExpression()
+	return callExpression != nil && callExpression.Expression == node.Parent
+}
+
+func propertyAccessDisplayName(sourceFile *ast.SourceFile, node *ast.Node) string {
+	if !isPropertyAccessName(node) {
+		return getReportedNodeName(node)
+	}
+	text := strings.TrimSpace(sourceSpanText(sourceFile, node.Parent.Pos(), node.Parent.End()))
+	if text == "" {
+		return getReportedNodeName(node)
+	}
+	return text
+}
+
+func propertyAccessCallArgCount(node *ast.Node) (int, bool) {
+	if !isPropertyAccessCalleeName(node) {
+		return 0, false
+	}
+	callExpression := node.Parent.Parent.AsCallExpression()
+	if callExpression == nil || callExpression.Arguments == nil {
+		return 0, true
+	}
+	return len(callExpression.Arguments.Nodes), true
+}
+
+func callArgCountForIdentifierCallee(node *ast.Node) (int, bool) {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindCallExpression {
+		return 0, false
+	}
+	callExpression := node.Parent.AsCallExpression()
+	if callExpression == nil || callExpression.Expression != node {
+		return 0, false
+	}
+	if callExpression.Arguments == nil {
+		return 0, true
+	}
+	return len(callExpression.Arguments.Nodes), true
+}
+
+func isIdentifierTaggedTemplateTag(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindTaggedTemplateExpression {
+		return false
+	}
+	taggedTemplate := node.Parent.AsTaggedTemplateExpression()
+	return taggedTemplate != nil && taggedTemplate.Tag == node
+}
+
+func isDeprecatedNodeAssertFailOverload(ctx rule.RuleContext, node *ast.Node, name string) (bool, string) {
+	if ctx.SourceFile == nil || name != "fail" || !isPropertyAccessCalleeName(node) {
+		return false, ""
+	}
+	argCount, ok := propertyAccessCallArgCount(node)
+	if !ok || argCount != 2 {
+		return false, ""
+	}
+	access := node.Parent.AsPropertyAccessExpression()
+	if access == nil || access.Expression == nil {
+		return false, ""
+	}
+	importName := strings.TrimSpace(sourceSpanText(ctx.SourceFile, access.Expression.Pos(), access.Expression.End()))
+	if importName == "" {
+		return false, ""
+	}
+	sourceText := ctx.SourceFile.Text()
+	defaultImport := regexp.MustCompile(`(?m)\bimport\s+` + regexp.QuoteMeta(importName) + `\s+from\s+['"]node:assert['"]`)
+	namespaceImport := regexp.MustCompile(`(?m)\bimport\s+\*\s+as\s+` + regexp.QuoteMeta(importName) + `\s+from\s+['"]node:assert['"]`)
+	if !defaultImport.MatchString(sourceText) && !namespaceImport.MatchString(sourceText) {
+		return false, ""
+	}
+	return true, "since v10.0.0 - use fail([message]) or other assert functions instead."
+}
+
+func isDeprecatedFsExistsImport(ctx rule.RuleContext, name string) (bool, string) {
+	if ctx.SourceFile == nil || name != "exists" {
+		return false, ""
+	}
+	if !nameImportedFromPackage(ctx.SourceFile, name, "fs") {
+		return false, ""
+	}
+	return true, "Since v1.0.0 - Use {@link stat} or {@link access} instead."
+}
+
 var NoDeprecatedRule = rule.CreateRule(rule.Rule{
-	Name: "no-deprecated",
+	Name:             "no-deprecated",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return rule.RuleListeners{}
@@ -1704,9 +2013,6 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if shouldIgnoreDynamicImportDefault(node, diagnostic.Pos(), diagnostic.End(), name, ctx.TypeChecker) {
 					continue
 				}
-				if node != nil && (node.Kind == ast.KindIdentifier || node.Kind == ast.KindPrivateIdentifier || node.Kind == ast.KindSuperKeyword) {
-					continue
-				}
 				symbol := symbolAtLocation(ctx.TypeChecker, node)
 				if isWithinJsxClosingElement(node, diagnostic.Pos(), diagnostic.End()) {
 					continue
@@ -1774,7 +2080,41 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if shouldIgnoreDynamicImportDefault(node, node.Pos(), node.End(), name, ctx.TypeChecker) {
 				return
 			}
+			reportName := name
 			isDeprecated, reason := getDeprecationReason(ctx, node)
+			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) {
+				isDeprecated, reason = deprecatedVariableInfoByNameInSource(ctx, name)
+			}
+			if !isDeprecated && isPropertyAccessName(node) {
+				isDeprecated, reason = deprecatedStructuralPropertyInfoByNameInSource(ctx, name)
+				if !isDeprecated {
+					argCount, matchArgCount := propertyAccessCallArgCount(node)
+					isDeprecated, reason = deprecatedMethodInfoByNameInSource(ctx, name, argCount, matchArgCount)
+					if isDeprecated && isPropertyAccessCalleeName(node) {
+						reportName = propertyAccessDisplayName(ctx.SourceFile, node)
+					}
+				}
+			}
+			if !isDeprecated && isBindingElementNameOrProperty(node) {
+				isDeprecated, reason = deprecatedPropertyInfoByNameInSource(ctx, name)
+			}
+			if !isDeprecated {
+				argCount, matchArgCount := callArgCountForIdentifierCallee(node)
+				if matchArgCount {
+					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, argCount, true)
+				} else if isIdentifierTaggedTemplateTag(node) {
+					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, 0, false)
+				}
+			}
+			if !isDeprecated {
+				isDeprecated, reason = isDeprecatedNodeAssertFailOverload(ctx, node, name)
+				if isDeprecated {
+					reportName = propertyAccessDisplayName(ctx.SourceFile, node)
+				}
+			}
+			if !isDeprecated {
+				isDeprecated, reason = isDeprecatedFsExistsImport(ctx, name)
+			}
 			if !isDeprecated {
 				return
 			}
@@ -1790,23 +2130,23 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if shouldAllowDiagnostic(allowEntries, name, symbol, ctx.SourceFile) {
 				return
 			}
-			message := buildDeprecatedMessage(name)
+			message := buildDeprecatedMessage(reportName)
 			if reason != "" {
-				message = buildDeprecatedWithReasonMessage(name, reason)
+				message = buildDeprecatedWithReasonMessage(reportName, reason)
 			} else if symbol != nil {
 				for _, declaration := range symbol.Declarations {
 					if declaration == nil {
 						continue
 					}
 					if reasonFromDecl := deprecatedReasonFromDeclaration(declaration); reasonFromDecl != "" {
-						message = buildDeprecatedWithReasonMessage(name, reasonFromDecl)
+						message = buildDeprecatedWithReasonMessage(reportName, reasonFromDecl)
 						break
 					}
 				}
 			}
 			if message.Id != "deprecatedWithReason" {
 				if reasonByName := deprecatedReasonByNameInSource(ctx, name); reasonByName != "" {
-					message = buildDeprecatedWithReasonMessage(name, reasonByName)
+					message = buildDeprecatedWithReasonMessage(reportName, reasonByName)
 				}
 			}
 			trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
@@ -1902,22 +2242,29 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				objectType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, elementAccess.Expression)
-				if objectType == nil {
-					return
+				var propertySymbol *ast.Symbol
+				if objectType != nil {
+					propertySymbol = checker.Checker_getPropertyOfType(ctx.TypeChecker, objectType, propertyName)
 				}
-				propertySymbol := checker.Checker_getPropertyOfType(ctx.TypeChecker, objectType, propertyName)
-				if !symbolIsDeprecated(ctx.TypeChecker, propertySymbol) {
+				isDeprecated := symbolIsDeprecated(ctx.TypeChecker, propertySymbol)
+				sourceDeprecated, sourceReason := deprecatedStructuralPropertyInfoByNameInSource(ctx, propertyName)
+				if !isDeprecated && !sourceDeprecated {
 					return
 				}
 				if shouldAllowDiagnostic(allowEntries, propertyName, propertySymbol, ctx.SourceFile) {
 					return
 				}
 				message := buildDeprecatedMessage(propertyName)
-				for _, declaration := range propertySymbol.Declarations {
-					if reason := deprecatedReasonFromDeclaration(declaration); reason != "" {
-						message = buildDeprecatedWithReasonMessage(propertyName, reason)
-						break
+				if propertySymbol != nil {
+					for _, declaration := range propertySymbol.Declarations {
+						if reason := deprecatedReasonFromDeclaration(declaration); reason != "" {
+							message = buildDeprecatedWithReasonMessage(propertyName, reason)
+							break
+						}
 					}
+				}
+				if message.Id != "deprecatedWithReason" && sourceReason != "" {
+					message = buildDeprecatedWithReasonMessage(propertyName, sourceReason)
 				}
 				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, elementAccess.ArgumentExpression)
 				reportRange(core.NewTextRange(trimmedRange.Pos(), trimmedRange.End()), message)
