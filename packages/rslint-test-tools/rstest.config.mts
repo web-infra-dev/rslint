@@ -462,6 +462,7 @@ export default defineConfig({
     './tests/eslint-plugin-stylistic/rules/dot-location.test.ts',
     './tests/eslint-plugin-stylistic/rules/eol-last.test.ts',
     './tests/eslint-plugin-stylistic/rules/generator-star-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-closing-bracket-location.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
