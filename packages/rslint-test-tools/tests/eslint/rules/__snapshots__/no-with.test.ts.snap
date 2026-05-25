@@ -1,0 +1,752 @@
+// Rstest Snapshot v1
+
+exports[`no-with > invalid 1`] = `
+{
+  "code": "with(foo) { bar() }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 2`] = `
+{
+  "code": "with(foo) bar();",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 3`] = `
+{
+  "code": "with(a) { with(b) { c() } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 4`] = `
+{
+  "code": "function f() { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 5`] = `
+{
+  "code": "var f = () => { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 6`] = `
+{
+  "code": "if (true) { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 7`] = `
+{
+  "code": "for (;;) { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 8`] = `
+{
+  "code": "while (true) { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 9`] = `
+{
+  "code": "try { with(obj) { x; } } catch(e) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 10`] = `
+{
+  "code": "switch(a) { case 1: with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 11`] = `
+{
+  "code": "with(a.b) { c(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 12`] = `
+{
+  "code": "with(a()) { b(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 13`] = `
+{
+  "code": "with(a) { x; }
+with(b) { y; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 14`] = `
+{
+  "code": "with (obj) {
+  foo();
+  bar();
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 15`] = `
+{
+  "code": "with(obj) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 16`] = `
+{
+  "code": "class C { method() { with(obj) { x; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 17`] = `
+{
+  "code": "class C { constructor() { with(obj) { x; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 18`] = `
+{
+  "code": "class C { static { with(obj) { x; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 19`] = `
+{
+  "code": "do { with(obj) { x; } } while(true)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 20`] = `
+{
+  "code": "for (var k in obj) { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 21`] = `
+{
+  "code": "for (var v of arr) { with(v) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 22`] = `
+{
+  "code": "if (false) {} else { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 23`] = `
+{
+  "code": "try {} finally { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 24`] = `
+{
+  "code": "try {} catch(e) { with(obj) { x; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 25`] = `
+{
+  "code": "label: with(obj) { x; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 26`] = `
+{
+  "code": "/* 🚀 */ with(obj) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-with > invalid 27`] = `
+{
+  "code": "with(a) { function f() { if (true) { with(b) { x; } } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+    {
+      "message": "Unexpected use of 'with' statement.",
+      "messageId": "unexpectedWith",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-with",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

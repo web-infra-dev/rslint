@@ -1,0 +1,3875 @@
+// Rstest Snapshot v1
+
+exports[`strict-void-return > invalid 1`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+foo(() => null);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 2`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+foo(() => (((true))));
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 3`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+foo(() => {
+  if (maybe) {
+    return (((1) + 1));
+  }
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 4`] = `
+{
+  "code": "
+declare function foo(arg: number, cb: () => void): void;
+foo(0, () => 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 5`] = `
+{
+  "code": "
+declare function foo(cb?: { (): void }): void;
+foo(() => () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 6`] = `
+{
+  "code": "
+declare const obj: { foo(cb: () => void) } | null;
+obj?.foo(() => JSON.parse('{}'));
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 7`] = `
+{
+  "code": "
+((cb: () => void) => cb())!(() => 1);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 8`] = `
+{
+  "code": "
+declare function foo(cb: { (): void }): void;
+declare function cb(): string;
+foo(cb);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 9`] = `
+{
+  "code": "
+type AnyFunc = (...args: unknown[]) => unknown;
+declare function foo<F extends AnyFunc>(cb: F): void;
+foo(async () => ({}));
+foo<() => void>(async () => ({}));
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 5,
+        },
+        "start": {
+          "column": 26,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 10`] = `
+{
+  "code": "
+function foo<T extends {}>(arg: T, cb: () => T);
+function foo(arg: null, cb: () => void);
+function foo(arg: any, cb: () => any) {}
+
+foo(null, () => Math.random());
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 11`] = `
+{
+  "code": "
+declare function foo<T extends {}>(arg: T, cb: () => T): void;
+declare function foo(arg: any, cb: () => void): void;
+
+foo(null, async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 12`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+declare function foo(cb: () => any): void;
+foo(async () => {
+  return Math.random();
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 13`] = `
+{
+  "code": "
+declare function f<T extends void>(arg: T, cb: () => T): void;
+
+f(undefined, () => 'test');
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 14`] = `
+{
+  "code": "
+declare function foo(cb: { (): void }): void;
+foo(cb);
+async function cb() {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 15`] = `
+{
+  "code": "
+declare function foo<Cb extends (...args: any[]) => void>(cb: Cb): void;
+foo(() => {
+  console.log('a');
+  return 1;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 16`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+function bar<Cb extends () => number>(cb: Cb) {
+  foo(cb);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 17`] = `
+{
+  "code": "
+declare function foo(cb: { (): void }): void;
+const cb = () => dunno;
+foo!(cb);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 18`] = `
+{
+  "code": "
+declare const foo: {
+  (arg: boolean, cb: () => void): void;
+};
+foo(false, () => Promise.resolve(undefined));
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 19`] = `
+{
+  "code": "
+declare const foo: {
+  bar(cb1: () => any, cb2: () => void): void;
+};
+foo.bar(
+  () => Promise.resolve(1),
+  () => Promise.resolve(1),
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 20`] = `
+{
+  "code": "
+declare const Foo: {
+  new (cb: () => void): void;
+};
+new Foo(async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 21`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+foo(() => {
+  label: while (maybe) {
+    for (const i of [1, 2, 3]) {
+      if (maybe) return null;
+      else return null;
+    }
+  }
+  return void 0;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 18,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 22`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+foo(() => {
+  do {
+    try {
+      throw 1;
+    } catch (e) {
+      return null;
+    } finally {
+      console.log('finally');
+    }
+  } while (maybe);
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 8,
+        },
+        "start": {
+          "column": 7,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 23`] = `
+{
+  "code": "
+declare function foo(cb: () => void): void;
+foo(async () => {
+  try {
+    await Promise.resolve();
+  } catch {
+    console.error('fail');
+  }
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 24`] = `
+{
+  "code": "
+declare const Foo: {
+  new (cb: () => void): void;
+  (cb: () => unknown): void;
+};
+new Foo(() => false);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 25`] = `
+{
+  "code": "
+declare const Foo: {
+  new (cb: () => any): void;
+  (cb: () => void): void;
+};
+Foo(() => false);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 26`] = `
+{
+  "code": "
+interface Cb {
+  (arg: string): void;
+  (arg: number): void;
+}
+declare function foo(cb: Cb): void;
+foo(cb);
+function cb() {
+  return true;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 27`] = `
+{
+  "code": "
+declare function foo(
+  cb: ((arg: number) => void) | ((arg: string) => void),
+): void;
+foo(cb);
+function cb() {
+  return 1 + 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 28`] = `
+{
+  "code": "
+declare function foo(cb: (() => void) | null): void;
+declare function cb(): boolean;
+foo(cb);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 29`] = `
+{
+  "code": "
+declare function foo(...cbs: Array<() => void>): void;
+foo(
+  () => {},
+  () => false,
+  () => 0,
+  () => '',
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 30`] = `
+{
+  "code": "
+declare function foo(...cbs: [() => void, () => void, (() => void)?]): void;
+foo(
+  () => {},
+  () => Math.random(),
+  () => (1).toString(),
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 31`] = `
+{
+  "code": "
+interface Ev {}
+interface EvMap {
+  DOMContentLoaded: Ev;
+}
+type EvListOrEvListObj = EvList | EvListObj;
+interface EvList {
+  (evt: Event): void;
+}
+interface EvListObj {
+  handleEvent(object: Ev): void;
+}
+interface Win {
+  addEventListener<K extends keyof EvMap>(
+    type: K,
+    listener: (ev: EvMap[K]) => any,
+  ): void;
+  addEventListener(type: string, listener: EvListOrEvListObj): void;
+}
+declare const win: Win;
+win.addEventListener('DOMContentLoaded', ev => ev);
+win.addEventListener('custom', ev => ev);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 21,
+        },
+        "start": {
+          "column": 48,
+          "line": 21,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 22,
+        },
+        "start": {
+          "column": 38,
+          "line": 22,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 32`] = `
+{
+  "code": "
+declare function foo(x: null, cb: () => void): void;
+declare function foo(x: unknown, cb: () => any): void;
+foo({}, async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 33`] = `
+{
+  "code": "
+const arr = [1, 2];
+arr.forEach(async x => {
+  console.log(x);
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 34`] = `
+{
+  "code": "
+[1, 2].forEach(async x => console.log(x));
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 35`] = `
+{
+  "code": "
+const foo: () => void = () => false;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 31,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 36`] = `
+{
+  "code": "
+const { name }: () => void = function foo() {
+  return false;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 37`] = `
+{
+  "code": "
+declare const foo: Record<string, () => void>;
+foo['a' + 'b'] = () => true;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 38`] = `
+{
+  "code": "
+const foo: () => void = async () => Promise.resolve(true);
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 39`] = `
+{
+  "code": "const cb: () => void = (): Array<number> => [];",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 40`] = `
+{
+  "code": "
+const cb: () => void = (): Array<number> => {
+  return [];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 2,
+        },
+        "start": {
+          "column": 28,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 41`] = `
+{
+  "code": "const cb: () => void = function*foo() {}",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 42`] = `
+{
+  "code": "const cb: () => void = (): Promise<number> => Promise.resolve(1);",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 43`] = `
+{
+  "code": "
+const cb: () => void = async (): Promise<number> => {
+  try {
+    return Promise.resolve(1);
+  } catch {}
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 2,
+        },
+        "start": {
+          "column": 50,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 44`] = `
+{
+  "code": "const cb: () => void = async (): Promise<number> => Promise.resolve(1);",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 45`] = `
+{
+  "code": "
+const foo: () => void = async () => {
+  try {
+    return 1;
+  } catch {}
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 46`] = `
+{
+  "code": "
+const foo: () => void = async (): Promise<void> => {
+  try {
+    await Promise.resolve();
+  } finally {
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 2,
+        },
+        "start": {
+          "column": 49,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 47`] = `
+{
+  "code": "
+const foo: () => void = async () => {
+  try {
+    await Promise.resolve();
+  } catch (err) {
+    console.error(err);
+  }
+  console.log('ok');
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 34,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 48`] = `
+{
+  "code": "const foo: () => void = (): number => {};",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 49`] = `
+{
+  "code": "
+declare function cb(): boolean;
+const foo: () => void = cb;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 50`] = `
+{
+  "code": "
+const foo: () => void = function () {
+  if (maybe) {
+    return null;
+  } else {
+    return null;
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 51`] = `
+{
+  "code": "
+const foo: () => void = function () {
+  if (maybe) {
+    console.log('elo');
+    return { [1]: Math.random() };
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 52`] = `
+{
+  "code": "
+const foo: { (arg: number): void; (arg: string): void } = arg => {
+  console.log('foo');
+  switch (typeof arg) {
+    case 'number':
+      return 0;
+    case 'string':
+      return '';
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 6,
+        },
+        "start": {
+          "column": 7,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 8,
+        },
+        "start": {
+          "column": 7,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 53`] = `
+{
+  "code": "
+const foo: ((arg: number) => void) | ((arg: string) => void) = async () => {
+  return 1;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 2,
+        },
+        "start": {
+          "column": 73,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 54`] = `
+{
+  "code": "
+type Foo = () => void;
+const foo: Foo = cb;
+function cb() {
+  return [1, 2, 3];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 55`] = `
+{
+  "code": "
+interface Foo {
+  (): void;
+}
+const foo: Foo = cb;
+function cb() {
+  return { a: 1 };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 56`] = `
+{
+  "code": "
+declare function cb(): unknown;
+declare let foo: () => void;
+foo = cb;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 57`] = `
+{
+  "code": "
+declare let foo: { arg?: string; cb?: () => void };
+foo.cb = () => {
+  return 'siema';
+  console.log('siema');
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 58`] = `
+{
+  "code": "
+declare function cb(): unknown;
+let foo: (() => void) | null = null;
+foo ??= cb;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 59`] = `
+{
+  "code": "
+declare function cb(): unknown;
+let foo: (() => void) | boolean = false;
+foo ||= cb;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 60`] = `
+{
+  "code": "
+declare function cb(): unknown;
+let foo: (() => void) | boolean = false;
+foo &&= cb;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 61`] = `
+{
+  "code": "
+declare function Foo(props: { cb: () => void }): unknown;
+return <Foo cb={() => 1} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 62`] = `
+{
+  "code": "
+declare function Foo(props: { cb: () => void }): unknown;
+declare function getNull(): null;
+return (
+  <Foo
+    cb={() => {
+      if (maybe) return Math.random();
+      else return getNull();
+    }}
+  />
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 18,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 8,
+        },
+        "start": {
+          "column": 12,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 63`] = `
+{
+  "code": "
+type Cb = () => void;
+declare function Foo(props: { cb: Cb; s: string }): unknown;
+return <Foo cb={async function () {}} s="!@#jp2gmd" />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 64`] = `
+{
+  "code": "
+type Cb = () => void;
+declare function Foo(props: { n: number; cb?: Cb }): unknown;
+return <Foo n={2137} cb={function* () {}} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 4,
+        },
+        "start": {
+          "column": 26,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 65`] = `
+{
+  "code": "
+type Cb = ((arg: string) => void) | ((arg: number) => void);
+declare function Foo(props: { cb?: Cb }): unknown;
+return (
+  <Foo
+    cb={async function* (arg) {
+      await arg;
+      yield arg;
+    }}
+  />
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 66`] = `
+{
+  "code": "
+interface Props {
+  cb: ((arg: unknown) => void) | boolean;
+}
+declare function Foo(props: Props): unknown;
+return <Foo cb={x => x} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 22,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 67`] = `
+{
+  "code": "
+type EventHandler<E> = { bivarianceHack(event: E): void }['bivarianceHack'];
+interface ButtonProps {
+  onClick?: EventHandler<unknown> | undefined;
+}
+declare function Button(props: ButtonProps): unknown;
+function App() {
+  return <Button onClick={x => x} />;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 8,
+        },
+        "start": {
+          "column": 32,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 68`] = `
+{
+  "code": "
+declare function foo(cbs: { arg: number; cb: () => void }): void;
+foo({ arg: 1, cb: () => 1 });
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 69`] = `
+{
+  "code": "
+declare let foo: { arg?: string; cb: () => void };
+foo = {
+  cb: () => {
+    let x = 'siema';
+    return x;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 70`] = `
+{
+  "code": "
+declare let foo: { cb: (n: number) => void };
+foo = {
+  cb(n) {
+    return n;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 71`] = `
+{
+  "code": "
+declare let foo: { 1234: (n: number) => void };
+foo = {
+  1234(n) {
+    return n;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 72`] = `
+{
+  "code": "
+declare let foo: { '1e+21': () => void };
+foo = {
+  1_000_000_000_000_000_000_000: () => 1,
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 40,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 73`] = `
+{
+  "code": "
+declare let foo: { cb: (() => void) | number };
+foo = {
+  cb: async () => {
+    if (maybe) {
+      return 'asd';
+    }
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 74`] = `
+{
+  "code": "
+declare function cb(): number;
+const foo: Record<string, () => void> = {
+  cb1: cb,
+  cb2: cb,
+  ...cb,
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 8,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 75`] = `
+{
+  "code": "
+declare function cb(): number;
+const foo: Array<(() => void) | false> = [false, cb, () => cb()];
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 3,
+        },
+        "start": {
+          "column": 50,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 3,
+        },
+        "start": {
+          "column": 60,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 76`] = `
+{
+  "code": "
+declare function cb(): number;
+const foo: [string, () => void, (() => void)?] = ['asd', cb];
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 3,
+        },
+        "start": {
+          "column": 58,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 77`] = `
+{
+  "code": "
+const foo: { cbs: Array<() => void> | null } = {
+  cbs: [
+    function* () {
+      yield 1;
+    },
+    async () => {
+      await 1;
+    },
+    null,
+  ],
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 78`] = `
+{
+  "code": "
+const foo: { cb: () => void } = class {
+  static cb = () => ({});
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 79`] = `
+{
+  "code": "
+class Foo {
+  foo: () => void = () => [];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 80`] = `
+{
+  "code": "
+class Foo {
+  static foo: () => void = Math.random;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 81`] = `
+{
+  "code": "
+class Foo {
+  cb = () => {};
+}
+class Bar extends Foo {
+  cb = Math.random;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 8,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 82`] = `
+{
+  "code": "
+const foo = () =>
+  class {
+    cb = () => {};
+  };
+class Bar extends foo() {
+  cb = Math.random;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 8,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 83`] = `
+{
+  "code": "
+class Foo {
+  cb() {
+    console.log('siema');
+  }
+}
+const method = 'cb' as const;
+class Bar extends Foo {
+  [method]() {
+    return 'nara';
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 10,
+        },
+        "start": {
+          "column": 5,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 84`] = `
+{
+  "code": "
+class Bar {
+  foo() {}
+}
+class Foo extends Bar {
+  get foo() {
+    return () => 1;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 85`] = `
+{
+  "code": "
+class Foo {
+  cb() {}
+}
+void class extends Foo {
+  cb() {
+    return Math.random();
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 86`] = `
+{
+  "code": "
+class Foo {
+  cb1 = () => {};
+}
+class Bar extends Foo {
+  cb2() {}
+}
+class Baz extends Bar {
+  cb1 = () => Math.random();
+  cb2() {
+    return Math.random();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 9,
+        },
+        "start": {
+          "column": 15,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 11,
+        },
+        "start": {
+          "column": 5,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 87`] = `
+{
+  "code": "
+declare function f(): Promise<void>;
+interface Foo {
+  cb: () => void;
+}
+class Bar {
+  cb = () => {};
+}
+class Baz extends Bar implements Foo {
+  cb: () => void = f;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 10,
+        },
+        "start": {
+          "column": 20,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 88`] = `
+{
+  "code": "
+class Foo {
+  fn() {
+    return 'a';
+  }
+  cb() {}
+}
+class Bar extends Foo {
+  cb() {
+    if (maybe) {
+      return Promise.resolve('siema');
+    } else {
+      return Promise.resolve('nara');
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 7,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 13,
+        },
+        "start": {
+          "column": 7,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 89`] = `
+{
+  "code": "
+abstract class Foo {
+  abstract cb(): void;
+}
+class Bar extends Foo {
+  async cb() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 90`] = `
+{
+  "code": "
+class Foo {
+  fn() {
+    return 'a';
+  }
+  cb() {}
+}
+class Bar extends Foo {
+  *cb() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 91`] = `
+{
+  "code": "
+interface Foo {
+  cb: () => void;
+}
+class Bar implements Foo {
+  cb = Math.random;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 8,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 92`] = `
+{
+  "code": "
+const o = { cb() {} };
+type O = typeof o;
+class Bar implements O {
+  cb = Math.random;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 8,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 93`] = `
+{
+  "code": "
+class Foo {
+  cb() {}
+}
+class Bar extends Foo {
+  async*cb() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 94`] = `
+{
+  "code": "
+interface Foo {
+  cb(): void;
+}
+class Bar implements Foo {
+  async cb(): Promise<string> {
+    return Promise.resolve('siema');
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 95`] = `
+{
+  "code": "
+interface Foo {
+  cb(): void;
+}
+class Bar implements Foo {
+  async cb() {
+    try {
+      return { a: ['asdf', 1234] };
+    } catch {
+      console.error('error');
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 96`] = `
+{
+  "code": "
+interface Foo {
+  cb(): void;
+}
+class Bar implements Foo {
+  cb() {
+    if (maybe) {
+      return Promise.resolve(1);
+    } else {
+      return;
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 8,
+        },
+        "start": {
+          "column": 7,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 97`] = `
+{
+  "code": "
+interface Foo1 {
+  cb1(): void;
+}
+interface Foo2 {
+  cb2: () => void;
+}
+class Bar implements Foo1, Foo2 {
+  async cb1() {}
+  async *cb2() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 98`] = `
+{
+  "code": "
+interface Foo1 {
+  cb1(): void;
+}
+interface Foo2 {
+  cb2: () => void;
+}
+class Baz {
+  cb3() {}
+}
+class Bar extends Baz implements Foo1, Foo2 {
+  async cb1() {}
+  async *cb2() {}
+  cb3() {
+    return Math.random();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 15,
+        },
+        "start": {
+          "column": 5,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 99`] = `
+{
+  "code": "
+class A extends class {
+  cb() {}
+} {
+  cb() {
+    return Math.random();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 100`] = `
+{
+  "code": "
+class A extends class B {
+  cb() {}
+} {
+  cb() {
+    return Math.random();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 101`] = `
+{
+  "code": "
+interface Foo1 {
+  cb1(): void;
+}
+interface Foo2 extends Foo1 {
+  cb2: () => void;
+}
+class Bar implements Foo2 {
+  async cb1() {}
+  async *cb2() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 102`] = `
+{
+  "code": "
+declare let foo: () => () => void;
+foo = () => () => 1 + 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 103`] = `
+{
+  "code": "
+declare let foo: () => () => void;
+foo = () => () => Math.random();
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 104`] = `
+{
+  "code": "
+declare let foo: () => () => void;
+declare const cb: () => null | false;
+foo = () => cb;
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 105`] = `
+{
+  "code": "
+declare let foo: { f(): () => void };
+foo = {
+  f() {
+    return () => cb;
+  },
+};
+function cb() {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 106`] = `
+{
+  "code": "
+declare let foo: { f(): () => void };
+foo.f = function () {
+  return () => {
+    return null;
+  };
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 107`] = `
+{
+  "code": "
+declare let foo: () => (() => void) | string;
+foo = () => () => {
+  return 'asd' + 'zxc';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 108`] = `
+{
+  "code": "
+declare function foo(cb: () => () => void): void;
+foo(function () {
+  return async () => {};
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Async function used in a context where a void function is expected.",
+      "messageId": "asyncFunc",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 19,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 109`] = `
+{
+  "code": "
+declare function foo(cb: () => () => void): void;
+foo(() => () => {
+  if (n == 1) {
+    console.log('asd')
+    return [1].map(x => x)
+  }
+  if (n == 2) {
+    console.log('asd')
+    return -Math.random()
+  }
+  if (n == 3) {
+    console.log('asd')
+    return \`x\`.toUpperCase()
+  }
+  return <i>{Math.random()}</i>
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 10,
+        },
+        "start": {
+          "column": 5,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 14,
+        },
+        "start": {
+          "column": 5,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+    {
+      "message": "Value returned in a context where a void return is expected.",
+      "messageId": "nonVoidReturn",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 16,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-void-return > invalid 110`] = `
+{
+  "code": "
+declare function foo(cb: (arg: string) => () => void): void;
+declare function foo(cb: (arg: number) => () => boolean): void;
+foo((arg: string) => {
+  return cb;
+});
+async function* cb() {
+  yield true;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Value-returning function used in a context where a void function is expected.",
+      "messageId": "nonVoidFunc",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 10,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-void-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

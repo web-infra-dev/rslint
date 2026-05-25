@@ -1,0 +1,2050 @@
+// Rstest Snapshot v1
+
+exports[`no-invalid-this > invalid 1`] = `
+{
+  "code": "
+interface SomeType {
+  prop: string;
+}
+function foo() {
+  this.prop;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 2`] = `
+{
+  "code": "
+console.log(this);
+z(x => console.log(x, this));
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 3`] = `
+{
+  "code": "
+console.log(this);
+z(x => console.log(x, this));
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 4`] = `
+{
+  "code": "
+(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 5`] = `
+{
+  "code": "
+function foo() {
+  console.log(this);
+  z(x => console.log(x, this));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 6`] = `
+{
+  "code": "
+function foo() {
+  console.log(this);
+  z(x => console.log(x, this));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 7`] = `
+{
+  "code": "
+function Foo() {
+  console.log(this);
+  z(x => console.log(x, this));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 8`] = `
+{
+  "code": "
+function foo() {
+  'use strict';
+  console.log(this);
+  z(x => console.log(x, this));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 9`] = `
+{
+  "code": "
+function Foo() {
+  'use strict';
+  console.log(this);
+  z(x => console.log(x, this));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 10`] = `
+{
+  "code": "
+return function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 11`] = `
+{
+  "code": "
+var foo = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+}.bar(obj);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 12`] = `
+{
+  "code": "
+var obj = {
+  foo: function () {
+    function foo() {
+      console.log(this);
+      z(x => console.log(x, this));
+    }
+    foo();
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 13`] = `
+{
+  "code": "
+var obj = {
+  foo() {
+    function foo() {
+      console.log(this);
+      z(x => console.log(x, this));
+    }
+    foo();
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 14`] = `
+{
+  "code": "
+var obj = {
+  foo: function () {
+    return function () {
+      console.log(this);
+      z(x => console.log(x, this));
+    };
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 15`] = `
+{
+  "code": "
+var obj = {
+  foo: function () {
+    'use strict';
+    return function () {
+      console.log(this);
+      z(x => console.log(x, this));
+    };
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 19,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 7,
+        },
+        "start": {
+          "column": 29,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 16`] = `
+{
+  "code": "
+obj.foo = function () {
+  return function () {
+    console.log(this);
+    z(x => console.log(x, this));
+  };
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 17`] = `
+{
+  "code": "
+obj.foo = function () {
+  'use strict';
+  return function () {
+    console.log(this);
+    z(x => console.log(x, this));
+  };
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 6,
+        },
+        "start": {
+          "column": 27,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 18`] = `
+{
+  "code": "
+class A {
+  foo() {
+    return function () {
+      console.log(this);
+      z(x => console.log(x, this));
+    };
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 19`] = `
+{
+  "code": "
+class A {
+  b = new Array(1, 2, function () {
+    console.log(this);
+    z(x => console.log(x, this));
+  });
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 20`] = `
+{
+  "code": "
+class A {
+  b = () => {
+    function c() {
+      console.log(this);
+      z(x => console.log(x, this));
+    }
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 21`] = `
+{
+  "code": "
+obj.foo = (function () {
+  return () => {
+    console.log(this);
+    z(x => console.log(x, this));
+  };
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 22`] = `
+{
+  "code": "
+obj.foo = (() => () => {
+  console.log(this);
+  z(x => console.log(x, this));
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 23`] = `
+{
+  "code": "
+var foo = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+}.bind(null);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 24`] = `
+{
+  "code": "
+(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+}).call(undefined);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 25`] = `
+{
+  "code": "
+(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+}).apply(void 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 26`] = `
+{
+  "code": "
+Array.from([], function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 27`] = `
+{
+  "code": "
+foo.every(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 28`] = `
+{
+  "code": "
+foo.filter(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 29`] = `
+{
+  "code": "
+foo.find(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 30`] = `
+{
+  "code": "
+foo.findIndex(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 31`] = `
+{
+  "code": "
+foo.forEach(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 32`] = `
+{
+  "code": "
+foo.map(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 33`] = `
+{
+  "code": "
+foo.some(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 34`] = `
+{
+  "code": "
+foo.forEach(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+}, null);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 35`] = `
+{
+  "code": "
+/** @returns {void} */ function foo() {
+  console.log(this);
+  z(x => console.log(x, this));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 36`] = `
+{
+  "code": "
+/** @this Obj */ foo(function () {
+  console.log(this);
+  z(x => console.log(x, this));
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 37`] = `
+{
+  "code": "
+var Ctor = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 38`] = `
+{
+  "code": "
+var func = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 39`] = `
+{
+  "code": "
+var func = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 40`] = `
+{
+  "code": "
+Ctor = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 41`] = `
+{
+  "code": "
+func = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 42`] = `
+{
+  "code": "
+func = function () {
+  console.log(this);
+  z(x => console.log(x, this));
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 43`] = `
+{
+  "code": "
+function foo(
+  func = function () {
+    console.log(this);
+    z(x => console.log(x, this));
+  },
+) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 44`] = `
+{
+  "code": "
+[
+  func = function () {
+    console.log(this);
+    z(x => console.log(x, this));
+  },
+] = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+    {
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

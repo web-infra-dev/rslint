@@ -1,0 +1,139 @@
+// Rstest Snapshot v1
+
+exports[`prefer-enum-initializers > invalid 1`] = `
+{
+  "code": "
+enum Direction {
+  Up,
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The value of the member 'Up' should be explicitly defined.",
+      "messageId": "defineInitializer",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-enum-initializers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-enum-initializers > invalid 2`] = `
+{
+  "code": "
+enum Direction {
+  Up,
+  Down,
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The value of the member 'Up' should be explicitly defined.",
+      "messageId": "defineInitializer",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-enum-initializers",
+    },
+    {
+      "message": "The value of the member 'Down' should be explicitly defined.",
+      "messageId": "defineInitializer",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-enum-initializers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-enum-initializers > invalid 3`] = `
+{
+  "code": "
+enum Direction {
+  Up = 'Up',
+  Down,
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The value of the member 'Down' should be explicitly defined.",
+      "messageId": "defineInitializer",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-enum-initializers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-enum-initializers > invalid 4`] = `
+{
+  "code": "
+enum Direction {
+  Up,
+  Down = 'Down',
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The value of the member 'Up' should be explicitly defined.",
+      "messageId": "defineInitializer",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-enum-initializers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

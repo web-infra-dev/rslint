@@ -1,0 +1,645 @@
+// Rstest Snapshot v1
+
+exports[`no-empty-object-type > invalid 1`] = `
+{
+  "code": "interface Base {}",
+  "diagnostics": [
+    {
+      "message": "An empty interface declaration allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowInterfaces' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyInterface",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 2`] = `
+{
+  "code": "interface Base {}",
+  "diagnostics": [
+    {
+      "message": "An empty interface declaration allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowInterfaces' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyInterface",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 3`] = `
+{
+  "code": "
+interface Base {
+  props: string;
+}
+
+interface Derived extends Base {}
+
+class Other {}
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 4`] = `
+{
+  "code": "
+interface Base {
+  props: string;
+}
+
+interface Derived extends Base {}
+
+class Derived {}
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 5`] = `
+{
+  "code": "
+interface Base {
+  props: string;
+}
+
+interface Derived extends Base {}
+
+const derived = class Derived {};
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 6`] = `
+{
+  "code": "
+interface Base {
+  name: string;
+}
+
+interface Derived extends Base {}
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 7`] = `
+{
+  "code": "interface Base extends Array<number> {}",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 8`] = `
+{
+  "code": "interface Base extends Array<number | {}> {}",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 9`] = `
+{
+  "code": "
+interface Derived {
+  property: string;
+}
+interface Base extends Array<Derived> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 10`] = `
+{
+  "code": "
+type R = Record<string, unknown>;
+interface Base extends R {}
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 11`] = `
+{
+  "code": "interface Base<T> extends Derived<T> {}",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 12`] = `
+{
+  "code": "
+declare namespace BaseAndDerived {
+  type Base = typeof base;
+  export interface Derived extends Base {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 13`] = `
+{
+  "code": "type Base = {};",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 14`] = `
+{
+  "code": "type Base = {};",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 15`] = `
+{
+  "code": "let value: {};",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 16`] = `
+{
+  "code": "let value: {};",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 17`] = `
+{
+  "code": "
+let value: {
+  /* ... */
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 18`] = `
+{
+  "code": "type MyUnion<T> = T | {};",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 19`] = `
+{
+  "code": "type Base = {} | null;",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 20`] = `
+{
+  "code": "type Base = {};",
+  "diagnostics": [
+    {
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowObjectTypes' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 21`] = `
+{
+  "code": "interface Base {}",
+  "diagnostics": [
+    {
+      "message": "An empty interface declaration allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the 'allowInterfaces' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyInterface",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

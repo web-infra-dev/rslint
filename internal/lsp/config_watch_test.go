@@ -40,6 +40,66 @@ func TestIsRslintConfigURI(t *testing.T) {
 	}
 }
 
+// ======== isTsConfigURI tests ========
+
+func TestIsTsConfigURI(t *testing.T) {
+	tests := []struct {
+		uri      string
+		expected bool
+	}{
+		{"file:///project/tsconfig.json", true},
+		{"file:///project/jsconfig.json", true},
+		{"file:///project/tsconfig.build.json", true},
+		{"file:///project/tsconfig.app.json", true},
+		{"file:///project/sub/tsconfig.json", true},
+		{"file:///project/package.json", false},
+		{"file:///project/rslint.json", false},
+		{"file:///project/src/some.ts", false},
+		{"file:///project/other-config.json", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.uri, func(t *testing.T) {
+			if got := isTsConfigURI(tt.uri); got != tt.expected {
+				t.Errorf("isTsConfigURI(%q) = %v, want %v", tt.uri, got, tt.expected)
+			}
+		})
+	}
+}
+
+// ======== reloadConfigAndRelint guard tests ========
+
+func TestReloadConfigAndRelint_SkipsWhenJSConfigsActive(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{"/project/rslint.json": true}}
+	s.cwd = "/project"
+	// Simulate JS configs being active
+	s.jsConfigs["file:///project"] = config.RslintConfig{{}}
+
+	s.reloadConfigAndRelint()
+
+	// Should NOT load JSON config because JS configs take priority
+	if s.rslintConfigPath != "" {
+		t.Errorf("expected empty config path (skipped), got %q", s.rslintConfigPath)
+	}
+}
+
+func TestReloadConfigAndRelint_ClearsTypeInfoFiles(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	s.cwd = "/project"
+	s.rslintConfigPath = "/project/rslint.json"
+	// Set stale tsConfigPaths
+	s.tsConfigPaths = []string{"/project/old-tsconfig.json"}
+
+	s.reloadConfigAndRelint()
+
+	// Config deleted → tsConfigPaths should be cleared
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths cleared, got %v", s.tsConfigPaths)
+	}
+}
+
 // ======== handleDidChangeWatchedFiles tests ========
 
 func TestHandleDidChangeWatchedFiles_NilParams(t *testing.T) {
@@ -131,6 +191,51 @@ func TestHandleDidChangeWatchedFiles_DetectsConfigFiles(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestHandleDidChangeWatchedFiles_TsConfigChangeRebuildsTypeInfoFiles(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	s.cwd = "/project"
+	// Set stale tsConfigPaths
+	s.tsConfigPaths = []string{"/project/old-tsconfig.json"}
+
+	ctx := context.Background()
+	err := s.handleDidChangeWatchedFiles(ctx, &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{
+			{Uri: "file:///project/tsconfig.json", Type: lsproto.FileChangeTypeChanged},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// rebuildTsConfigPaths should have run → no config → tsConfigPaths cleared
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths cleared after tsconfig change, got %v", s.tsConfigPaths)
+	}
+}
+
+func TestHandleDidChangeWatchedFiles_TsConfigVariantDetected(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	s.cwd = "/project"
+	s.tsConfigPaths = []string{"/project/old-tsconfig.json"}
+
+	ctx := context.Background()
+	// tsconfig.build.json should also trigger rebuild
+	err := s.handleDidChangeWatchedFiles(ctx, &lsproto.DidChangeWatchedFilesParams{
+		Changes: []*lsproto.FileEvent{
+			{Uri: "file:///project/tsconfig.build.json", Type: lsproto.FileChangeTypeChanged},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths cleared after tsconfig.build.json change")
 	}
 }
 

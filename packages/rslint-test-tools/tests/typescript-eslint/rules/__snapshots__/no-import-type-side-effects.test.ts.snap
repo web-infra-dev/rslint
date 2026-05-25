@@ -1,0 +1,109 @@
+// Rstest Snapshot v1
+
+exports[`no-import-type-side-effects > invalid 1`] = `
+{
+  "code": "import { type A } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "messageId": "useTopLevelQualifier",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-import-type-side-effects",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "import type { A } from 'mod';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-type-side-effects > invalid 2`] = `
+{
+  "code": "import { type A as AA } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "messageId": "useTopLevelQualifier",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-import-type-side-effects",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "import type { A as AA } from 'mod';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-type-side-effects > invalid 3`] = `
+{
+  "code": "import { type A, type B } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "messageId": "useTopLevelQualifier",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-import-type-side-effects",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "import type { A, B } from 'mod';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-type-side-effects > invalid 4`] = `
+{
+  "code": "import { type A as AA, type B as BB } from 'mod';",
+  "diagnostics": [
+    {
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "messageId": "useTopLevelQualifier",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-import-type-side-effects",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "import type { A as AA, B as BB } from 'mod';",
+  "ruleCount": 1,
+}
+`;

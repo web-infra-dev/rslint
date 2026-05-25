@@ -1,8 +1,8 @@
 package explicit_member_accessibility
 
 import (
-	"fmt"
 	"strings"
+	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -14,416 +14,460 @@ import (
 type accessibilityLevel string
 
 const (
-	accessibilityExplicit accessibilityLevel = "explicit"
-	accessibilityNoPublic accessibilityLevel = "no-public"
-	accessibilityOff      accessibilityLevel = "off"
-	defaultAccessibility                     = accessibilityExplicit
+	levelExplicit accessibilityLevel = "explicit"
+	levelNoPublic accessibilityLevel = "no-public"
+	levelOff      accessibilityLevel = "off"
 )
 
 type overrides struct {
-	Accessors           accessibilityLevel
-	Constructors        accessibilityLevel
-	Methods             accessibilityLevel
-	ParameterProperties accessibilityLevel
-	Properties          accessibilityLevel
+	accessors           accessibilityLevel
+	constructors        accessibilityLevel
+	methods             accessibilityLevel
+	parameterProperties accessibilityLevel
+	properties          accessibilityLevel
 }
 
 type options struct {
-	Accessibility      accessibilityLevel
-	Overrides          overrides
-	IgnoredMethodNames map[string]struct{}
-}
-
-func parseAccessibility(value any) accessibilityLevel {
-	if s, ok := value.(string); ok {
-		switch accessibilityLevel(s) {
-		case accessibilityExplicit, accessibilityNoPublic, accessibilityOff:
-			return accessibilityLevel(s)
-		}
-	}
-	return ""
+	accessibility      accessibilityLevel
+	ignoredMethodNames map[string]bool
+	overrides          overrides
 }
 
 func parseOptions(rawOpts any) options {
 	opts := options{
-		Accessibility: defaultAccessibility,
-		Overrides:     overrides{},
+		accessibility:      levelExplicit,
+		ignoredMethodNames: map[string]bool{},
 	}
-	if rawOpts == nil {
-		return opts
-	}
-
-	var optsMap map[string]interface{}
-	if arr, ok := rawOpts.([]interface{}); ok && len(arr) > 0 {
-		if m, ok := arr[0].(map[string]interface{}); ok {
-			optsMap = m
-		}
-	} else if m, ok := rawOpts.(map[string]interface{}); ok {
-		optsMap = m
-	}
-
+	optsMap := utils.GetOptionsMap(rawOpts)
 	if optsMap == nil {
 		return opts
 	}
-
-	if v := parseAccessibility(optsMap["accessibility"]); v != "" {
-		opts.Accessibility = v
+	if v, ok := optsMap["accessibility"].(string); ok {
+		opts.accessibility = accessibilityLevel(v)
 	}
-
-	if ignored, ok := optsMap["ignoredMethodNames"]; ok {
-		opts.IgnoredMethodNames = parseIgnoredMethodNames(ignored)
-	}
-
-	if overridesMap, ok := optsMap["overrides"].(map[string]interface{}); ok {
-		if v := parseAccessibility(overridesMap["accessors"]); v != "" {
-			opts.Overrides.Accessors = v
-		}
-		if v := parseAccessibility(overridesMap["constructors"]); v != "" {
-			opts.Overrides.Constructors = v
-		}
-		if v := parseAccessibility(overridesMap["methods"]); v != "" {
-			opts.Overrides.Methods = v
-		}
-		if v := parseAccessibility(overridesMap["parameterProperties"]); v != "" {
-			opts.Overrides.ParameterProperties = v
-		}
-		if v := parseAccessibility(overridesMap["properties"]); v != "" {
-			opts.Overrides.Properties = v
+	if v, ok := optsMap["ignoredMethodNames"].([]interface{}); ok {
+		for _, n := range v {
+			if s, ok := n.(string); ok {
+				opts.ignoredMethodNames[s] = true
+			}
 		}
 	}
-
+	if ov, ok := optsMap["overrides"].(map[string]interface{}); ok {
+		if v, ok := ov["accessors"].(string); ok {
+			opts.overrides.accessors = accessibilityLevel(v)
+		}
+		if v, ok := ov["constructors"].(string); ok {
+			opts.overrides.constructors = accessibilityLevel(v)
+		}
+		if v, ok := ov["methods"].(string); ok {
+			opts.overrides.methods = accessibilityLevel(v)
+		}
+		if v, ok := ov["parameterProperties"].(string); ok {
+			opts.overrides.parameterProperties = accessibilityLevel(v)
+		}
+		if v, ok := ov["properties"].(string); ok {
+			opts.overrides.properties = accessibilityLevel(v)
+		}
+	}
 	return opts
 }
 
-func parseIgnoredMethodNames(value any) map[string]struct{} {
-	ignored := map[string]struct{}{}
-	switch v := value.(type) {
-	case []interface{}:
-		for _, item := range v {
-			if s, ok := item.(string); ok {
-				ignored[s] = struct{}{}
-			}
-		}
-	case []string:
-		for _, item := range v {
-			ignored[item] = struct{}{}
-		}
+func resolveCheck(base, override accessibilityLevel) accessibilityLevel {
+	if override != "" {
+		return override
 	}
-	if len(ignored) == 0 {
-		return nil
-	}
-	return ignored
+	return base
 }
 
-func resolveOverride(value accessibilityLevel, base accessibilityLevel) accessibilityLevel {
-	if value == "" {
-		return base
-	}
-	return value
-}
-
-func messageMissingAccessibility(memberType string, name string) rule.RuleMessage {
+func buildMissingAccessibilityMessage(nodeType, name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "missingAccessibility",
-		Description: fmt.Sprintf("Missing accessibility modifier on %s.", formatMemberDescription(memberType, name)),
+		Description: "Missing accessibility modifier on " + nodeType + " " + name + ".",
 	}
 }
 
-func messageUnwantedPublic(memberType string, name string) rule.RuleMessage {
+func buildUnwantedPublicAccessibilityMessage(nodeType, name string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unwantedPublicAccessibility",
-		Description: fmt.Sprintf("Public accessibility modifier on %s.", formatMemberDescription(memberType, name)),
+		Description: "Public accessibility modifier on " + nodeType + " " + name + ".",
 	}
 }
 
-func messageAddExplicitAccessibility(accessibility string) rule.RuleMessage {
+func buildAddExplicitAccessibilityMessage(accessibility string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "addExplicitAccessibility",
-		Description: fmt.Sprintf("Add '%s' accessibility modifier", accessibility),
+		Description: "Add '" + accessibility + "' accessibility modifier",
 	}
 }
 
-func formatMemberDescription(memberType string, name string) string {
-	if name == "" {
-		return memberType
+// requiresQuoting reports whether the given name must be quoted to be a valid
+// JavaScript property identifier (e.g. contains spaces or special chars).
+// Mirrors the upstream `requiresQuoting` in @typescript-eslint/type-utils.
+func requiresQuoting(s string) bool {
+	if s == "" {
+		return true
 	}
-	return fmt.Sprintf("%s %s", memberType, name)
-}
-
-func getLastDecorator(node *ast.Node) *ast.Node {
-	decorators := node.Decorators()
-	if len(decorators) == 0 {
-		return nil
+	runes := []rune(s)
+	if !isIdentifierStart(runes[0]) {
+		return true
 	}
-	return decorators[len(decorators)-1]
-}
-
-func getMemberStartPos(ctx rule.RuleContext, node *ast.Node) int {
-	if decorator := getLastDecorator(node); decorator != nil {
-		return scanner.SkipTrivia(ctx.SourceFile.Text(), decorator.End())
+	for _, r := range runes[1:] {
+		if !isIdentifierPart(r) {
+			return true
+		}
 	}
-	return utils.TrimNodeTextRange(ctx.SourceFile, node).Pos()
+	return false
 }
 
-func getMemberHeadRange(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node) core.TextRange {
-	start := getMemberStartPos(ctx, node)
-	var end int
-	if nameNode != nil {
-		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-		end = nameRange.End()
-	} else {
-		end = scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, start).End()
+func isIdentifierStart(r rune) bool {
+	return r == '$' || r == '_' || unicode.IsLetter(r)
+}
+
+func isIdentifierPart(r rune) bool {
+	return isIdentifierStart(r) || unicode.IsDigit(r)
+}
+
+// getMemberName returns the diagnostic-friendly member name, matching upstream
+// getNameFromMember in @typescript-eslint/eslint-plugin/util/misc.ts.
+//
+// tsgo's AST differs from ESLint's ESTree in two ways relevant here:
+//   - ConstructorDeclaration has no Name() — ESLint synthesizes an Identifier
+//     "constructor" as the key.
+//   - A computed property name `[x]` is wrapped in a ComputedPropertyName node
+//     in tsgo, whereas ESLint exposes the inner expression directly as
+//     `member.key`. We unwrap to match.
+func getMemberName(sf *ast.SourceFile, member *ast.Node) string {
+	if member.Kind == ast.KindConstructor {
+		return "constructor"
 	}
-	return core.NewTextRange(start, end)
-}
-
-func getParameterPropertyHeadRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
-	start := getMemberStartPos(ctx, node)
-	end := start
-	param := node.AsParameterDeclaration()
-	if param != nil && param.Name() != nil {
-		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, param.Name())
-		end = nameRange.End()
+	nameNode := member.Name()
+	if nameNode == nil {
+		return ""
 	}
-	return core.NewTextRange(start, end)
-}
-
-func ruleFixInsertAt(pos int, text string) rule.RuleFix {
-	return rule.RuleFixReplaceRange(core.NewTextRange(pos, pos), text)
-}
-
-func buildAccessibilitySuggestions(ctx rule.RuleContext, node *ast.Node) []rule.RuleSuggestion {
-	insertPos := getMemberStartPos(ctx, node)
-	suggestions := make([]rule.RuleSuggestion, 0, 3)
-	for _, accessibility := range []string{"public", "private", "protected"} {
-		suggestions = append(suggestions, rule.RuleSuggestion{
-			Message:  messageAddExplicitAccessibility(accessibility),
-			FixesArr: []rule.RuleFix{ruleFixInsertAt(insertPos, accessibility+" ")},
-		})
+	if nameNode.Kind == ast.KindComputedPropertyName {
+		expr := nameNode.AsComputedPropertyName().Expression
+		if expr != nil {
+			nameNode = expr
+		}
 	}
-	return suggestions
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		return nameNode.AsIdentifier().Text
+	case ast.KindPrivateIdentifier:
+		return "#" + nameNode.AsPrivateIdentifier().Text
+	case ast.KindStringLiteral:
+		text := nameNode.AsStringLiteral().Text
+		if requiresQuoting(text) {
+			return `"` + text + `"`
+		}
+		return text
+	case ast.KindNumericLiteral:
+		text := nameNode.AsNumericLiteral().Text
+		if requiresQuoting(text) {
+			return `"` + text + `"`
+		}
+		return text
+	case ast.KindBigIntLiteral:
+		// Upstream's `${member.key.value}` for a BigInt literal coerces
+		// to the decimal string without the `n` suffix. tsgo stores the
+		// raw text including `n`, so strip it.
+		text := nameNode.AsBigIntLiteral().Text
+		text = strings.TrimSuffix(text, "n")
+		if requiresQuoting(text) {
+			return `"` + text + `"`
+		}
+		return text
+	}
+	r := utils.TrimNodeTextRange(sf, nameNode)
+	return sf.Text()[r.Pos():r.End()]
 }
 
-func getAccessibility(node *ast.Node) string {
-	flags := ast.GetCombinedModifierFlags(node)
-	if flags&ast.ModifierFlagsPublic != 0 {
+// memberHeadStart is the position to use as the start of the report range
+// when emitting `missingAccessibility`. It matches upstream getMemberHeadLoc:
+// the position of the first non-decorator modifier, or — when only decorators
+// are present (or no modifiers at all) — the position of the next token.
+func memberHeadStart(sf *ast.SourceFile, node *ast.Node) int {
+	mods := node.Modifiers()
+	if mods != nil {
+		var lastDecoratorEnd = -1
+		for _, m := range mods.Nodes {
+			if m.Kind == ast.KindDecorator {
+				lastDecoratorEnd = m.End()
+				continue
+			}
+			return utils.TrimNodeTextRange(sf, m).Pos()
+		}
+		if lastDecoratorEnd >= 0 {
+			return scanner.SkipTrivia(sf.Text(), lastDecoratorEnd)
+		}
+	}
+	return utils.TrimNodeTextRange(sf, node).Pos()
+}
+
+// methodOrPropertyHeadEnd is the position of the end of the head range
+// (the end of the member key for methods/properties, or the end of the
+// `constructor` keyword for constructors).
+func methodOrPropertyHeadEnd(sf *ast.SourceFile, node *ast.Node) int {
+	if node.Kind == ast.KindConstructor {
+		// Compute position of the `constructor` keyword: it is the next token
+		// after any modifiers. Then add the length of the keyword.
+		text := sf.Text()
+		ctorStart := utils.TrimNodeTextRange(sf, node).Pos()
+		if mods := node.Modifiers(); mods != nil && len(mods.Nodes) > 0 {
+			ctorStart = scanner.SkipTrivia(text, mods.Nodes[len(mods.Nodes)-1].End())
+		}
+		return ctorStart + len("constructor")
+	}
+	if name := node.Name(); name != nil {
+		return name.End()
+	}
+	return node.End()
+}
+
+// findPublicKeyword locates the `public` modifier on a class member or parameter
+// property and returns its keyword range, plus the range that an autofix should
+// remove (keyword + trailing whitespace, stopping at the first comment).
+func findPublicKeyword(sf *ast.SourceFile, node *ast.Node) (kwRange, removeRange core.TextRange, ok bool) {
+	mods := node.Modifiers()
+	if mods == nil {
+		return core.TextRange{}, core.TextRange{}, false
+	}
+	for _, m := range mods.Nodes {
+		if m.Kind != ast.KindPublicKeyword {
+			continue
+		}
+		kwRange = utils.TrimNodeTextRange(sf, m)
+		text := sf.Text()
+		end := m.End()
+		for end < len(text) {
+			c := text[end]
+			if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+				end++
+				continue
+			}
+			break
+		}
+		removeRange = core.NewTextRange(kwRange.Pos(), end)
+		return kwRange, removeRange, true
+	}
+	return core.TextRange{}, core.TextRange{}, false
+}
+
+// accessibilityOf returns the explicit accessibility keyword on a node ("public",
+// "private", or "protected"), or "" when no accessibility modifier is present.
+// Uses HasSyntacticModifier — same convention as the rest of the plugin
+// (parameter_properties.go, member_ordering.go, etc.) — instead of walking the
+// modifier list manually.
+func accessibilityOf(node *ast.Node) string {
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsPublic) {
 		return "public"
 	}
-	if flags&ast.ModifierFlagsPrivate != 0 {
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate) {
 		return "private"
 	}
-	if flags&ast.ModifierFlagsProtected != 0 {
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsProtected) {
 		return "protected"
 	}
 	return ""
 }
 
-func hasReadonly(node *ast.Node) bool {
-	return ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsReadonly != 0
+func hasReadonlyModifier(node *ast.Node) bool {
+	return ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly)
 }
 
-func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRange, core.TextRange, bool) {
-	start := getMemberStartPos(ctx, node)
-	s := scanner.GetScannerForSourceFile(ctx.SourceFile, start)
-	text := ctx.SourceFile.Text()
-
-	for s.TokenStart() < node.End() {
-		if s.Token() == ast.KindPublicKeyword {
-			keywordRange := core.NewTextRange(s.TokenStart(), s.TokenEnd())
-			var removeEnd int
-
-			i := s.TokenEnd()
-			for i < len(text) && utils.IsStrWhiteSpace(rune(text[i])) {
-				i++
-			}
-			if i+1 < len(text) && text[i] == '/' && (text[i+1] == '/' || text[i+1] == '*') {
-				removeEnd = i
-			} else {
-				removeEnd = scanner.SkipTrivia(text, s.TokenEnd())
-			}
-
-			removeRange := core.NewTextRange(s.TokenStart(), removeEnd)
-			return keywordRange, removeRange, true
+// missingAccessibilitySuggestions returns the three "Add 'public/private/protected' "
+// suggestion fixes for a member or parameter-property node.
+func missingAccessibilitySuggestions(sf *ast.SourceFile, node *ast.Node) []rule.RuleSuggestion {
+	insertPos := memberHeadStart(sf, node)
+	insertRange := core.NewTextRange(insertPos, insertPos)
+	build := func(accessibility string) rule.RuleSuggestion {
+		return rule.RuleSuggestion{
+			Message:  buildAddExplicitAccessibilityMessage(accessibility),
+			FixesArr: []rule.RuleFix{rule.RuleFixReplaceRange(insertRange, accessibility+" ")},
 		}
-		s.Scan()
 	}
-	return core.TextRange{}, core.TextRange{}, false
+	return []rule.RuleSuggestion{build("public"), build("private"), build("protected")}
 }
 
-func getMemberName(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node) string {
-	if node.Kind == ast.KindConstructor {
-		return "constructor"
+func memberNodeType(kind ast.Kind) string {
+	switch kind {
+	case ast.KindGetAccessor:
+		return "get property accessor"
+	case ast.KindSetAccessor:
+		return "set property accessor"
+	default:
+		return "method definition"
 	}
-	if nameNode == nil {
-		return ""
-	}
-	name, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
-	return name
 }
 
-func getParameterPropertyName(ctx rule.RuleContext, node *ast.Node) string {
-	param := node.AsParameterDeclaration()
-	if param == nil || param.Name() == nil {
-		return ""
-	}
-	nameNode := param.Name()
-	if nameNode.Kind == ast.KindIdentifier {
-		return nameNode.AsIdentifier().Text
-	}
-	nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-	return strings.TrimSpace(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
-}
-
-func isPrivateIdentifierName(nameNode *ast.Node) bool {
-	return nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier
-}
-
-func isConstructorParameter(node *ast.Node) bool {
-	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindConstructor
-}
-
-func isParameterProperty(node *ast.Node) bool {
-	if !ast.IsParameter(node) {
+// isClassMember reports whether the given node is a direct member of a class
+// declaration / class expression. Several listener kinds (KindMethodDeclaration,
+// KindGetAccessor, KindSetAccessor, KindPropertyDeclaration) also fire for
+// object literal members in tsgo, but the upstream rule only inspects class
+// members (its ESTree selectors are MethodDefinition / PropertyDefinition,
+// neither of which exists for object literals or interfaces).
+func isClassMember(node *ast.Node) bool {
+	if node.Parent == nil {
 		return false
 	}
-	if !isConstructorParameter(node) {
-		return false
+	switch node.Parent.Kind {
+	case ast.KindClassDeclaration, ast.KindClassExpression:
+		return true
 	}
-	flags := ast.GetCombinedModifierFlags(node)
-	return flags&(ast.ModifierFlagsPublic|ast.ModifierFlagsPrivate|ast.ModifierFlagsProtected|ast.ModifierFlagsReadonly) != 0
-}
-
-func isClassMemberNode(node *ast.Node) bool {
-	return node != nil && node.Parent != nil && ast.IsClassLike(node.Parent)
-}
-
-func checkMemberAccessibility(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, check accessibilityLevel, memberType string, ignored map[string]struct{}) {
-	if isPrivateIdentifierName(nameNode) {
-		return
-	}
-
-	memberName := getMemberName(ctx, node, nameNode)
-	if len(ignored) > 0 {
-		if _, ok := ignored[memberName]; ok {
-			return
-		}
-	}
-
-	if check == accessibilityOff {
-		return
-	}
-
-	accessibility := getAccessibility(node)
-	if check == accessibilityNoPublic && accessibility == "public" {
-		keywordRange, removeRange, ok := findPublicKeywordRange(ctx, node)
-		if !ok {
-			return
-		}
-		ctx.ReportRangeWithFixes(keywordRange, messageUnwantedPublic(memberType, memberName), rule.RuleFixRemoveRange(removeRange))
-		return
-	}
-
-	if check == accessibilityExplicit && accessibility == "" {
-		headRange := getMemberHeadRange(ctx, node, nameNode)
-		ctx.ReportRangeWithSuggestions(headRange, messageMissingAccessibility(memberType, memberName), buildAccessibilitySuggestions(ctx, node)...)
-	}
-}
-
-func checkPropertyAccessibility(ctx rule.RuleContext, node *ast.Node, check accessibilityLevel) {
-	if check == accessibilityOff {
-		return
-	}
-	property := node.AsPropertyDeclaration()
-	if property == nil {
-		return
-	}
-	nameNode := property.Name()
-	if isPrivateIdentifierName(nameNode) {
-		return
-	}
-	propertyName := getMemberName(ctx, node, nameNode)
-	accessibility := getAccessibility(node)
-	if check == accessibilityNoPublic && accessibility == "public" {
-		keywordRange, removeRange, ok := findPublicKeywordRange(ctx, node)
-		if !ok {
-			return
-		}
-		ctx.ReportRangeWithFixes(keywordRange, messageUnwantedPublic("class property", propertyName), rule.RuleFixRemoveRange(removeRange))
-		return
-	}
-	if check == accessibilityExplicit && accessibility == "" {
-		headRange := getMemberHeadRange(ctx, node, nameNode)
-		ctx.ReportRangeWithSuggestions(headRange, messageMissingAccessibility("class property", propertyName), buildAccessibilitySuggestions(ctx, node)...)
-	}
-}
-
-func checkParameterPropertyAccessibility(ctx rule.RuleContext, node *ast.Node, check accessibilityLevel) {
-	if check == accessibilityOff || !isParameterProperty(node) {
-		return
-	}
-
-	name := getParameterPropertyName(ctx, node)
-	accessibility := getAccessibility(node)
-	if check == accessibilityNoPublic {
-		if accessibility == "public" && hasReadonly(node) {
-			keywordRange, removeRange, ok := findPublicKeywordRange(ctx, node)
-			if !ok {
-				return
-			}
-			ctx.ReportRangeWithFixes(keywordRange, messageUnwantedPublic("parameter property", name), rule.RuleFixRemoveRange(removeRange))
-		}
-		return
-	}
-
-	if check == accessibilityExplicit && accessibility == "" {
-		headRange := getParameterPropertyHeadRange(ctx, node)
-		ctx.ReportRangeWithSuggestions(headRange, messageMissingAccessibility("parameter property", name), buildAccessibilitySuggestions(ctx, node)...)
-	}
+	return false
 }
 
 var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 	Name: "explicit-member-accessibility",
-	Run: func(ctx rule.RuleContext, rawOpts any) rule.RuleListeners {
-		opts := parseOptions(rawOpts)
-		if opts.IgnoredMethodNames == nil {
-			opts.IgnoredMethodNames = map[string]struct{}{}
+	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+		opts := parseOptions(rawOptions)
+		sf := ctx.SourceFile
+
+		baseCheck := opts.accessibility
+		ctorCheck := resolveCheck(baseCheck, opts.overrides.constructors)
+		accessorCheck := resolveCheck(baseCheck, opts.overrides.accessors)
+		methodCheck := resolveCheck(baseCheck, opts.overrides.methods)
+		propCheck := resolveCheck(baseCheck, opts.overrides.properties)
+		paramPropCheck := resolveCheck(baseCheck, opts.overrides.parameterProperties)
+
+		checkMethod := func(node *ast.Node) {
+			if !isClassMember(node) {
+				return
+			}
+			nameNode := node.Name()
+			if nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier {
+				return
+			}
+
+			var check accessibilityLevel
+			nodeType := memberNodeType(node.Kind)
+			switch node.Kind {
+			case ast.KindMethodDeclaration:
+				check = methodCheck
+			case ast.KindConstructor:
+				check = ctorCheck
+			case ast.KindGetAccessor, ast.KindSetAccessor:
+				check = accessorCheck
+			default:
+				check = methodCheck
+			}
+
+			methodName := getMemberName(sf, node)
+			if check == levelOff || opts.ignoredMethodNames[methodName] {
+				return
+			}
+
+			accessibility := accessibilityOf(node)
+
+			if check == levelNoPublic && accessibility == "public" {
+				kwRange, removeRange, ok := findPublicKeyword(sf, node)
+				if !ok {
+					return
+				}
+				ctx.ReportRangeWithFixes(
+					kwRange,
+					buildUnwantedPublicAccessibilityMessage(nodeType, methodName),
+					rule.RuleFixRemoveRange(removeRange),
+				)
+				return
+			}
+			if check == levelExplicit && accessibility == "" {
+				start := memberHeadStart(sf, node)
+				end := methodOrPropertyHeadEnd(sf, node)
+				ctx.ReportRangeWithSuggestions(
+					core.NewTextRange(start, end),
+					buildMissingAccessibilityMessage(nodeType, methodName),
+					missingAccessibilitySuggestions(sf, node)...,
+				)
+			}
 		}
 
-		baseCheck := opts.Accessibility
-		ctorCheck := resolveOverride(opts.Overrides.Constructors, baseCheck)
-		accessorCheck := resolveOverride(opts.Overrides.Accessors, baseCheck)
-		methodCheck := resolveOverride(opts.Overrides.Methods, baseCheck)
-		propCheck := resolveOverride(opts.Overrides.Properties, baseCheck)
-		paramPropCheck := resolveOverride(opts.Overrides.ParameterProperties, baseCheck)
+		checkProperty := func(node *ast.Node) {
+			if !isClassMember(node) {
+				return
+			}
+			nameNode := node.Name()
+			if nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier {
+				return
+			}
+
+			nodeType := "class property"
+			propertyName := getMemberName(sf, node)
+			accessibility := accessibilityOf(node)
+
+			if propCheck == levelNoPublic && accessibility == "public" {
+				kwRange, removeRange, ok := findPublicKeyword(sf, node)
+				if !ok {
+					return
+				}
+				ctx.ReportRangeWithFixes(
+					kwRange,
+					buildUnwantedPublicAccessibilityMessage(nodeType, propertyName),
+					rule.RuleFixRemoveRange(removeRange),
+				)
+				return
+			}
+			if propCheck == levelExplicit && accessibility == "" {
+				start := memberHeadStart(sf, node)
+				end := methodOrPropertyHeadEnd(sf, node)
+				ctx.ReportRangeWithSuggestions(
+					core.NewTextRange(start, end),
+					buildMissingAccessibilityMessage(nodeType, propertyName),
+					missingAccessibilitySuggestions(sf, node)...,
+				)
+			}
+		}
+
+		checkParameterProperty := func(node *ast.Node) {
+			if node.Parent == nil || !ast.IsParameterPropertyDeclaration(node, node.Parent) {
+				return
+			}
+			paramName := node.Name()
+			if paramName == nil || paramName.Kind != ast.KindIdentifier {
+				return
+			}
+			nodeType := "parameter property"
+			nodeName := paramName.AsIdentifier().Text
+			accessibility := accessibilityOf(node)
+
+			switch paramPropCheck {
+			case levelExplicit:
+				if accessibility != "" {
+					return
+				}
+				start := memberHeadStart(sf, node)
+				end := paramName.End()
+				ctx.ReportRangeWithSuggestions(
+					core.NewTextRange(start, end),
+					buildMissingAccessibilityMessage(nodeType, nodeName),
+					missingAccessibilitySuggestions(sf, node)...,
+				)
+			case levelNoPublic:
+				// Upstream only flags `public readonly` parameter properties under
+				// no-public. A bare `public x` parameter would lose its parameter-
+				// property semantics if `public` were removed, so it is left alone.
+				if accessibility != "public" || !hasReadonlyModifier(node) {
+					return
+				}
+				kwRange, removeRange, ok := findPublicKeyword(sf, node)
+				if !ok {
+					return
+				}
+				ctx.ReportRangeWithFixes(
+					kwRange,
+					buildUnwantedPublicAccessibilityMessage(nodeType, nodeName),
+					rule.RuleFixRemoveRange(removeRange),
+				)
+			}
+		}
 
 		return rule.RuleListeners{
-			ast.KindMethodDeclaration: func(node *ast.Node) {
-				if !isClassMemberNode(node) {
-					return
-				}
-				checkMemberAccessibility(ctx, node, node.AsMethodDeclaration().Name(), methodCheck, "method definition", opts.IgnoredMethodNames)
-			},
-			ast.KindConstructor: func(node *ast.Node) {
-				checkMemberAccessibility(ctx, node, nil, ctorCheck, "method definition", opts.IgnoredMethodNames)
-			},
-			ast.KindGetAccessor: func(node *ast.Node) {
-				if !isClassMemberNode(node) {
-					return
-				}
-				checkMemberAccessibility(ctx, node, node.AsGetAccessorDeclaration().Name(), accessorCheck, "get property accessor", opts.IgnoredMethodNames)
-			},
-			ast.KindSetAccessor: func(node *ast.Node) {
-				if !isClassMemberNode(node) {
-					return
-				}
-				checkMemberAccessibility(ctx, node, node.AsSetAccessorDeclaration().Name(), accessorCheck, "set property accessor", opts.IgnoredMethodNames)
-			},
-			ast.KindPropertyDeclaration: func(node *ast.Node) {
-				checkPropertyAccessibility(ctx, node, propCheck)
-			},
-			ast.KindParameter: func(node *ast.Node) {
-				checkParameterPropertyAccessibility(ctx, node, paramPropCheck)
-			},
+			ast.KindMethodDeclaration: checkMethod,
+			ast.KindConstructor:       checkMethod,
+			ast.KindGetAccessor:       checkMethod,
+			ast.KindSetAccessor:       checkMethod,
+			ast.KindPropertyDeclaration: checkProperty,
+			ast.KindParameter:           checkParameterProperty,
 		}
 	},
 })

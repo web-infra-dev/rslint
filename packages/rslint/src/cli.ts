@@ -1,12 +1,13 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { parseArgs as nodeParseArgs } from 'node:util';
+import { loadConfigFile, normalizeConfig } from './config-loader.js';
+import { parseArgs, classifyArgs, isJSConfigFile } from './utils/args.js';
 import {
-  loadConfigFile,
-  normalizeConfig,
-  findJSConfig,
-} from './config-loader.js';
+  discoverConfigs,
+  filterConfigsByParentIgnores,
+  type ConfigEntry,
+} from './utils/config-discovery.js';
 
 /**
  * Pass-through execution of the Go binary with stdio inherited.
@@ -33,77 +34,69 @@ function isExecError(
   );
 }
 
-function parseArgs(argv: string[]) {
-  const { values, tokens } = nodeParseArgs({
-    args: argv,
-    strict: false,
-    tokens: true,
-    options: {
-      config: { type: 'string' },
-      init: { type: 'boolean' },
-    },
-  });
-
-  // Collect args that are not --config or --init for pass-through to Go
-  const rest: string[] = [];
-  for (const token of tokens) {
-    if (token.kind === 'option') {
-      if (token.name === 'config' || token.name === 'init') continue;
-      rest.push(token.rawName);
-      if (token.value != null) rest.push(token.value);
-    } else if (token.kind === 'option-terminator') {
-      rest.push('--');
-    } else if (token.kind === 'positional') {
-      rest.push(token.value);
-    }
-  }
-
-  return {
-    raw: argv,
-    config: (values.config as string) ?? null,
-    init: (values.init as boolean) ?? false,
-    rest,
-  };
-}
-
-function isJSConfigFile(filePath: string): boolean {
-  return /\.(ts|mts|js|mjs)$/.test(filePath);
-}
-
 /**
- * Load JS config, serialize to JSON, and pipe to Go binary via stdin.
+ * Load multiple JS configs and pipe to Go binary via stdin.
+ * Tolerates individual config load failures — skips broken configs with a
+ * warning and continues with the remaining configs.
  */
-async function runWithJSConfig(
+async function runWithJSConfigs(
   binPath: string,
-  configPath: string,
-  restArgs: string[],
+  configs: Map<string, string>,
+  goArgs: string[],
   cwd: string,
 ): Promise<number> {
-  let rawConfig: unknown;
-  try {
-    rawConfig = await loadConfigFile(configPath);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(
-      `Error: failed to load config ${configPath}: ${msg}\n`,
-    );
-    return 1;
+  const configEntries: ConfigEntry[] = [];
+  const isSingleConfig = configs.size === 1;
+
+  for (const [configPath, configDir] of configs) {
+    let rawConfig: unknown;
+    try {
+      rawConfig = await loadConfigFile(configPath);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isSingleConfig) {
+        process.stderr.write(
+          `Error: failed to load config ${configPath}: ${msg}\n`,
+        );
+        return 1;
+      }
+      process.stderr.write(`Warning: skipping config ${configPath}: ${msg}\n`);
+      continue;
+    }
+
+    let entries: ConfigEntry['entries'];
+    try {
+      entries = normalizeConfig(rawConfig);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (isSingleConfig) {
+        process.stderr.write(
+          `Error: invalid config in ${configPath}: ${msg}\n`,
+        );
+        return 1;
+      }
+      process.stderr.write(`Warning: skipping config ${configPath}: ${msg}\n`);
+      continue;
+    }
+
+    configEntries.push({ configDirectory: configDir, entries });
   }
 
-  let entries: unknown[];
-  try {
-    entries = normalizeConfig(rawConfig);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    process.stderr.write(`Error: invalid config in ${configPath}: ${msg}\n`);
-    return 1;
+  // All configs failed to load — fall back to Go binary (JSON config path)
+  if (configEntries.length === 0) {
+    return execBinary(binPath, goArgs);
   }
 
-  const configDir = path.dirname(path.resolve(cwd, configPath));
-  const payload = JSON.stringify({ configDirectory: configDir, entries });
+  // Filter out nested configs whose directory is covered by a parent config's
+  // global ignores. This aligns with ESLint v10 behavior: when walking the
+  // directory tree, global ignores prevent entering directories, so nested
+  // configs in ignored directories are never discovered.
+  const filteredEntries = filterConfigsByParentIgnores(configEntries);
+
+  const payload = JSON.stringify({ configs: filteredEntries });
 
   try {
-    execFileSync(binPath, ['--config-stdin', ...restArgs], {
+    execFileSync(binPath, ['--config-stdin', ...goArgs], {
       input: payload,
       stdio: ['pipe', 'inherit', 'inherit'],
       cwd,
@@ -116,7 +109,11 @@ async function runWithJSConfig(
   }
 }
 
-export async function run(binPath: string, argv: string[]): Promise<number> {
+export async function run(
+  binPath: string,
+  argv: string[],
+  startTime: number,
+): Promise<number> {
   const cwd = process.cwd();
   const args = parseArgs(argv);
 
@@ -125,23 +122,45 @@ export async function run(binPath: string, argv: string[]): Promise<number> {
     return execBinary(binPath, ['--init']);
   }
 
-  // Determine config file
-  let configPath: string | null = null;
+  // Validate explicit --config flag
   if (args.config) {
-    configPath = path.resolve(cwd, args.config);
+    const configPath = path.resolve(cwd, args.config);
     if (!fs.existsSync(configPath)) {
       process.stderr.write(`Error: config file not found: ${configPath}\n`);
       return 1;
     }
-  } else {
-    configPath = findJSConfig(cwd);
   }
 
-  // JS config file: load + stdin pipe
-  if (configPath && isJSConfigFile(configPath)) {
-    return runWithJSConfig(binPath, configPath, args.rest, cwd);
+  // Build Go args: start-time flag BEFORE positional args, because Go's
+  // flag.Parse stops at the first positional argument. If --start-time comes
+  // after positionals, it gets treated as a file path.
+  const goArgs = [`--start-time=${startTime}`, ...args.rest];
+
+  // Classify positional arguments into files and directories
+  const { files, dirs } = classifyArgs(args.positionals, cwd);
+
+  // Discover JS/TS configs
+  const configs = discoverConfigs(files, dirs, cwd, args.config);
+
+  // Check if any discovered config is a JS/TS config.
+  // NOTE: If any JS config is found (even in subdirectories), the entire flow
+  // switches to the JS config path. A root JSON config (rslint.json) will be
+  // bypassed in this case. This is a known limitation of mixing JSON and JS
+  // config formats. JSON config is deprecated — projects should migrate to JS.
+  const jsConfigs = new Map<string, string>();
+  for (const [configPath, configDir] of configs) {
+    if (isJSConfigFile(configPath)) {
+      jsConfigs.set(configPath, configDir);
+    }
+  }
+
+  if (jsConfigs.size > 0) {
+    return runWithJSConfigs(binPath, jsConfigs, goArgs, cwd);
   }
 
   // Fall back to Go binary (handles JSON config + deprecation warning)
-  return execBinary(binPath, args.raw);
+  const jsonGoArgs = args.config
+    ? ['--config', args.config, ...goArgs]
+    : goArgs;
+  return execBinary(binPath, jsonGoArgs);
 }

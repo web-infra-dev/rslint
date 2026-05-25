@@ -1,0 +1,313 @@
+// Rstest Snapshot v1
+
+exports[`no-undef-init > invalid 1`] = `
+{
+  "code": "var a = undefined;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'a' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 2`] = `
+{
+  "code": "var a = undefined, b = 1;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'a' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 3`] = `
+{
+  "code": "var a = 1, b = undefined, c = 5;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'b' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 4`] = `
+{
+  "code": "var [a] = undefined;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize '[a]' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 5`] = `
+{
+  "code": "var {a} = undefined;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize '{a}' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 6`] = `
+{
+  "code": "for(var i in [1,2,3]){var a = undefined; for(var j in [1,2,3]){}}",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'a' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 7`] = `
+{
+  "code": "let a = undefined;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'a' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 8`] = `
+{
+  "code": "let a = undefined, b = 1;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'a' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 9`] = `
+{
+  "code": "let a = 1, b = undefined, c = 5;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'b' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 10`] = `
+{
+  "code": "let [a] = undefined;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize '[a]' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 11`] = `
+{
+  "code": "let {a} = undefined;",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize '{a}' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef-init > invalid 12`] = `
+{
+  "code": "for(var i in [1,2,3]){let a = undefined; for(var j in [1,2,3]){}}",
+  "diagnostics": [
+    {
+      "message": "It's not necessary to initialize 'a' to undefined.",
+      "messageId": "unnecessaryUndefinedInit",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef-init",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,537 @@
+// Rstest Snapshot v1
+
+exports[`no-delete-var > invalid 1`] = `
+{
+  "code": "delete x",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 2`] = `
+{
+  "code": "var x; delete x;",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 3`] = `
+{
+  "code": "let y = 1; delete y;",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 4`] = `
+{
+  "code": "delete (x);",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 5`] = `
+{
+  "code": "delete ((x));",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 6`] = `
+{
+  "code": "var x; if (true) { delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 7`] = `
+{
+  "code": "function f() { delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 8`] = `
+{
+  "code": "const f = () => { delete x; };",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 9`] = `
+{
+  "code": "for (;;) { delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 10`] = `
+{
+  "code": "try { delete x; } catch(e) {}",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 11`] = `
+{
+  "code": "class C { m() { delete x; } }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 12`] = `
+{
+  "code": "delete x; delete y;",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 13`] = `
+{
+  "code": "delete arguments;",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 14`] = `
+{
+  "code": "delete NaN;",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 15`] = `
+{
+  "code": "if (true) { delete (x); }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 16`] = `
+{
+  "code": "switch(0) { case 0: delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 17`] = `
+{
+  "code": "while (false) { delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 18`] = `
+{
+  "code": "async function f() { delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 19`] = `
+{
+  "code": "function* g() { delete x; }",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-delete-var > invalid 20`] = `
+{
+  "code": "delete
+x",
+  "diagnostics": [
+    {
+      "message": "Variables should not be deleted.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-delete-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

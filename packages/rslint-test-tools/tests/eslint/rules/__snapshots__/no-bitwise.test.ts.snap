@@ -1,0 +1,934 @@
+// Rstest Snapshot v1
+
+exports[`no-bitwise > invalid 1`] = `
+{
+  "code": "a ^ b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '^'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 2`] = `
+{
+  "code": "a | b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 3`] = `
+{
+  "code": "a & b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '&'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 4`] = `
+{
+  "code": "a << b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '<<'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 5`] = `
+{
+  "code": "a >> b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '>>'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 6`] = `
+{
+  "code": "a >>> b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '>>>'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 7`] = `
+{
+  "code": "a|0",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 8`] = `
+{
+  "code": "~a",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '~'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 9`] = `
+{
+  "code": "a ^= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '^='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 10`] = `
+{
+  "code": "a |= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 11`] = `
+{
+  "code": "a &= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '&='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 12`] = `
+{
+  "code": "a <<= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '<<='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 13`] = `
+{
+  "code": "a >>= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '>>='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 14`] = `
+{
+  "code": "a >>>= b",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '>>>='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 15`] = `
+{
+  "code": "a | b | c",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 16`] = `
+{
+  "code": "~~a",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '~'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+    {
+      "message": "Unexpected use of '~'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 17`] = `
+{
+  "code": "~(a | b)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '~'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 18`] = `
+{
+  "code": "(a | b)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 19`] = `
+{
+  "code": "a | 1",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 20`] = `
+{
+  "code": "a | 0x10",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 21`] = `
+{
+  "code": "a | 1.0",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 22`] = `
+{
+  "code": "0 | a",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 23`] = `
+{
+  "code": "a & 0",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '&'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 24`] = `
+{
+  "code": "a | -0",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 25`] = `
+{
+  "code": "a | 0n",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 26`] = `
+{
+  "code": "enum E { A = 1 << 0, B = 1 << 1 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '<<'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+    {
+      "message": "Unexpected use of '<<'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 27`] = `
+{
+  "code": "const o = { [a | b]: 1 }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 28`] = `
+{
+  "code": "class C { m() { return a | b; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 29`] = `
+{
+  "code": "~a",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '~'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 30`] = `
+{
+  "code": "a + b & c",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '&'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 31`] = `
+{
+  "code": "a |= b |= c",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+    {
+      "message": "Unexpected use of '|='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 32`] = `
+{
+  "code": "obj[a | b]",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-bitwise > invalid 33`] = `
+{
+  "code": "\`\${a | b}\`",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of '|'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-bitwise",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

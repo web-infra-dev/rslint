@@ -58,7 +58,7 @@ for (let i = 0; i < 10; i += 1) {
 });
 
 // Forked from https://github.com/eslint/eslint/blob/89a4a0a260b8eb11487fe3d5d4d80f4630933eb3/tests/lib/rules/no-loop-func.js
-ruleTester.run('no-loop-func ESLint tests', {
+ruleTester.run('no-loop-func', {
   valid: [
     "string = 'function a() {}';",
     `
@@ -862,4 +862,81 @@ foo();
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
     },
   ],
-});
+}, { description: 'ESLint tests' });
+
+// Lock-ins for the @typescript-eslint plugin's intentional divergences from
+// the latest ESLint core no-loop-func: `using` / `await using` are NOT treated
+// as constant bindings, and repeated unsafe variable names are NOT deduped.
+ruleTester.run('no-loop-func', {
+  valid: [],
+  invalid: [
+    {
+      code: `
+async function f(bar: any) {
+  for (var i = 0; i < 10; ++i) {
+    using foo = bar(i);
+    (function () { foo; });
+  }
+}
+      `,
+      errors: [
+        {
+          data: { varNames: "'foo'" },
+          messageId: 'unsafeRefs',
+        },
+      ],
+    },
+    {
+      code: `
+async function g(bar: any) {
+  for (var i = 0; i < 10; ++i) {
+    await using x = bar(i);
+    (function () { x; });
+  }
+}
+      `,
+      errors: [
+        {
+          data: { varNames: "'x'" },
+          messageId: 'unsafeRefs',
+        },
+      ],
+    },
+    {
+      code: `async function h(foo: any) { for (using i of foo) { (function () { i; }); } }`,
+      errors: [
+        {
+          data: { varNames: "'i'" },
+          messageId: 'unsafeRefs',
+        },
+      ],
+    },
+    {
+      code: `async function h(foo: any) { for (await using i of foo) { (function () { i; }); } }`,
+      errors: [
+        {
+          data: { varNames: "'i'" },
+          messageId: 'unsafeRefs',
+        },
+      ],
+    },
+    {
+      code: `for (var i = 0; i < 10; i++) { (function () { i; i; i; }); }`,
+      errors: [
+        {
+          data: { varNames: "'i', 'i', 'i'" },
+          messageId: 'unsafeRefs',
+        },
+      ],
+    },
+    {
+      code: `var a, b; for (var i = 0; i < l; i++) { a = i; b = i; (function () { a + b; a + b; }); }`,
+      errors: [
+        {
+          data: { varNames: "'a', 'b', 'a', 'b'" },
+          messageId: 'unsafeRefs',
+        },
+      ],
+    },
+  ],
+}, { description: 'plugin divergences' });

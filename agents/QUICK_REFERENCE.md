@@ -19,6 +19,7 @@ A quick reference for common commands, file locations, and checklists when porti
 | Lint check    | `pnpm lint`                                                                       |
 | Format check  | `pnpm format:check`                                                               |
 | Format fix    | `pnpm format`                                                                     |
+| Spell check   | `pnpm -w run check-spell`                                                         |
 | Go lint check | `pnpm lint:go`                                                                    |
 | Go format fix | `pnpm format:go`                                                                  |
 
@@ -37,34 +38,43 @@ A quick reference for common commands, file locations, and checklists when porti
 
 ## Rule Registration
 
-Location: `internal/config/config.go`
+Each rule lives in a per-group `all.go` that exports a `GetAllRules() []rule.Rule` slice. Append your rule there; `config.go` iterates each slice automatically — **do not edit `config.go`**.
 
-| Rule Type            | Registration Function                      | Name Format                            |
-| -------------------- | ------------------------------------------ | -------------------------------------- |
-| ESLint Core          | `registerAllCoreEslintRules()`             | `"no-debugger"`                        |
-| @typescript-eslint   | `registerAllTypeScriptEslintPluginRules()` | `"@typescript-eslint/no-explicit-any"` |
-| eslint-plugin-import | `registerAllEslintImportPluginRules()`     | `"import/no-self-import"`              |
+| Rule Type                                                                               | File to edit                         | Final registered key                                 |
+| --------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| ESLint Core                                                                             | `internal/rules/all.go`              | `"no-debugger"`                                      |
+| `@typescript-eslint`                                                                    | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
+| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, stylistic, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
 
-**Registration Format**:
+**How to add a rule**: in the relevant `all.go`, add the import path and append the rule var to the `GetAllRules()` return slice:
 
 ```go
-GlobalRuleRegistry.Register("rule-name", package.RuleNameRule)
+import "github.com/web-infra-dev/rslint/internal/.../my_rule"
+
+func GetAllRules() []rule.Rule {
+    return []rule.Rule{
+        // …existing entries…
+        my_rule.MyRuleRule,
+    }
+}
 ```
+
+The registration key comes from `rule.Name`. Core rules use `rule.Rule{Name: "…"}` (bare). `@typescript-eslint` rules use `rule.CreateRule(rule.Rule{Name: "…"})` which auto-prefixes `@typescript-eslint/`; **never** use `rule.CreateRule` outside `@typescript-eslint/` — it silently mis-registers the key.
 
 ---
 
 ## Naming Conventions
 
-| Item                          | Convention                     | Example                                                      |
-| ----------------------------- | ------------------------------ | ------------------------------------------------------------ |
-| Go directory name             | snake_case                     | `no_empty_interface/`                                        |
-| Go file name                  | snake_case                     | `no_empty_interface.go`                                      |
-| Go variable name (Rule)       | PascalCase + Rule suffix       | `NoEmptyInterfaceRule`                                       |
-| Rule name (ESLint Core)       | kebab-case                     | `"no-debugger"`                                              |
-| Rule name (typescript-eslint) | kebab-case (auto-prefixed)     | `"no-explicit-any"` → `"@typescript-eslint/no-explicit-any"` |
-| Rule name (import)            | kebab-case (manually prefixed) | `"import/no-self-import"`                                    |
-| JS test file name             | kebab-case                     | `no-empty-interface.test.ts`                                 |
-| MessageId                     | camelCase                      | `"unexpectedAny"`, `"missingSuper"`                          |
+| Item                          | Convention                     | Example                                                                       |
+| ----------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| Go directory name             | snake_case                     | `no_empty_interface/`                                                         |
+| Go file name                  | snake_case                     | `no_empty_interface.go`                                                       |
+| Go variable name (Rule)       | PascalCase + Rule suffix       | `NoEmptyInterfaceRule`                                                        |
+| Rule name (ESLint Core)       | kebab-case                     | `"no-debugger"`                                                               |
+| Rule name (typescript-eslint) | kebab-case (auto-prefixed)     | `"no-explicit-any"` → `"@typescript-eslint/no-explicit-any"`                  |
+| Rule name (import)            | kebab-case (manually prefixed) | `"import/no-self-import"`                                                     |
+| JS test file name             | kebab-case                     | `no-empty-interface.test.ts`                                                  |
+| MessageId                     | camelCase                      | `"unexpectedAny"`, `"missingSuper"` (JS rule-tester auto-converts kebab-case) |
 
 ---
 
@@ -97,13 +107,15 @@ import (
 
 - [ ] Go tests pass (`go test -count=1 ./internal/rules/<name>`)
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
+- [ ] JS snapshots generated (`npx rstest run <name> -u`)
 - [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)
 - [ ] Go/JS test coverage aligned (same invalid cases, including comments/multi-line/nested)
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
+- [ ] Spell check passes (`pnpm -w run check-spell`)
 - [ ] Format check passes (`pnpm format:check`)
 - [ ] Go lint check passes (`pnpm lint:go`)
-- [ ] Rule registered (`internal/config/config.go`)
+- [ ] Rule registered (in the appropriate `all.go`: `internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise)
 - [ ] Test file registered (`packages/rslint-test-tools/rstest.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
 

@@ -1,0 +1,1116 @@
+// Rstest Snapshot v1
+
+exports[`default-case-last > invalid 1`] = `
+{
+  "code": "switch (foo) { default: bar(); break; case 1: baz(); break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 2`] = `
+{
+  "code": "switch (foo) { default: break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 3`] = `
+{
+  "code": "switch (foo) { default: case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 4`] = `
+{
+  "code": "switch (foo) { default: case 1: }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 5`] = `
+{
+  "code": "switch (foo) { case 1: break; default: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 6`] = `
+{
+  "code": "switch (foo) { case 1: default: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 7`] = `
+{
+  "code": "switch (foo) { case 1: default: case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 8`] = `
+{
+  "code": "switch (foo) { case 1: default: case 2: }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 9`] = `
+{
+  "code": "switch (foo) { default: break; case 1: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 10`] = `
+{
+  "code": "switch (foo) { default: case 1: case 2: }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 11`] = `
+{
+  "code": "switch (a) { default: switch (b) { case 2: break; default: break; } break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 12`] = `
+{
+  "code": "switch (a) { case 1: switch (b) { default: break; case 2: break; } break; default: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 13`] = `
+{
+  "code": "switch (a) { default: switch (b) { default: break; case 2: break; } break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 14`] = `
+{
+  "code": "switch (a) { case 1: switch (b) { case 2: switch (c) { default: break; case 3: break; } break; default: break; } break; default: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 15`] = `
+{
+  "code": "switch (a) { default: switch (b) { default: switch (c) { default: break; case 3: break; } break; case 2: break; } break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 121,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 97,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 16`] = `
+{
+  "code": "function f() { switch (a) { default: return 0; case 1: return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 17`] = `
+{
+  "code": "const f = () => { switch (a) { default: return 0; case 1: return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 18`] = `
+{
+  "code": "class C { m() { switch (a) { default: break; case 1: break; } } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 19`] = `
+{
+  "code": "if (x) { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 20`] = `
+{
+  "code": "for (let i = 0; i < 10; i++) { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 21`] = `
+{
+  "code": "while (x) { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 22`] = `
+{
+  "code": "try { switch (a) { default: break; case 1: break; } } catch (e) { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 95,
+          "line": 1,
+        },
+        "start": {
+          "column": 80,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 23`] = `
+{
+  "code": "(function() { switch (a) { default: break; case 1: break; } })()",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 24`] = `
+{
+  "code": "label: switch (a) { default: break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 25`] = `
+{
+  "code": "switch (a) { case 1: break; default: switch (b) { default: break; case 2: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 26`] = `
+{
+  "code": "switch (x) { default: break; case 1: break; } switch (y) { default: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 27`] = `
+{
+  "code": "function f() { switch (a) { default: throw new Error("no"); case 1: return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 28`] = `
+{
+  "code": "switch (a) { default: case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 29`] = `
+{
+  "code": "switch (a) { case 1: default: case 2: case 3: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 30`] = `
+{
+  "code": "function f() { for (let i = 0; i < 10; i++) { if (i > 5) { try { switch (a) { default: break; case 1: break; } } catch (e) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 94,
+          "line": 1,
+        },
+        "start": {
+          "column": 79,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 31`] = `
+{
+  "code": "do { switch (a) { default: break; case 1: break; } } while (false)",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 32`] = `
+{
+  "code": "for (const k in obj) { switch (k) { default: break; case "a": break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 33`] = `
+{
+  "code": "for (const v of arr) { switch (v) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 34`] = `
+{
+  "code": "class G { get x() { switch (a) { default: return 1; case 1: return 0; } } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 35`] = `
+{
+  "code": "class S { set x(v: any) { switch (v) { default: break; case 1: break; } } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 36`] = `
+{
+  "code": "class SB { static { switch (a) { default: break; case 1: break; } } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 37`] = `
+{
+  "code": "function* gen() { switch (a) { default: yield 0; break; case 1: yield 1; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 38`] = `
+{
+  "code": "async function af() { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 39`] = `
+{
+  "code": "try {} finally { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 40`] = `
+{
+  "code": "namespace NS { switch (a) { default: break; case 1: break; } }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

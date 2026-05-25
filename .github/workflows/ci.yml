@@ -30,12 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner:
-          [
-            rspack-ubuntu-22.04-large,
-            rspack-windows-2022-large,
-            rspack-darwin-14-medium,
-          ]
+        runner: [rspack-ubuntu-22.04-large, rspack-darwin-14-medium]
         go-version: ['1.26.0']
     steps:
       - name: Checkout code
@@ -52,33 +47,49 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: test-go
-      - name: Unit Test (Windows)
-        if: runner.os == 'Windows'
+          cache-name: ci-test-go
+      - name: Unit Test
+        run: go test -parallel 8 ./internal/...
+
+  test-go-windows:
+    name: Test Go (rspack-windows-2022-large)
+    runs-on: rspack-windows-2022-large
+    strategy:
+      matrix:
+        go-version: ['1.26.0']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+          fetch-depth: 1
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-name: ci-go-windows
+
+      - name: Unit Test
         shell: pwsh
         run: |
           # Pre-build shared dependencies to warm the build cache
           go build ./internal/...
 
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 50
+          $batchSize = 100
           $batch = @()
-          $cacheDir = go env GOCACHE
 
           foreach ($pkg in $packages) {
             $batch += $pkg
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
-              $marker = New-TemporaryFile
               go test -parallel 4 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-              # Remove only test-generated cache files, keeping build cache warm
-              Get-ChildItem -Path $cacheDir -Recurse -File |
-                Where-Object { $_.LastWriteTime -gt $marker.LastWriteTime } |
-                Remove-Item -Force -ErrorAction SilentlyContinue
-              Remove-Item $marker -Force
               $batch = @()
             }
           }
@@ -90,9 +101,72 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
-      - name: Unit Test
-        if: runner.os != 'Windows'
-        run: go test -parallel 8 ./internal/...
+  build-rslint-windows:
+    name: Build rslint.exe (Windows)
+    runs-on: rspack-windows-2022-large
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: ci-go-windows-build
+
+      - name: Build rslint.exe
+        shell: pwsh
+        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
+
+      - name: Upload rslint.exe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-test-rslint-windows-amd64
+          path: packages/rslint/bin/rslint.exe
+          retention-days: 1
+          if-no-files-found: error
+
+  test-node-windows:
+    name: Test npm packages (windows-latest)
+    runs-on: windows-latest
+    needs: build-rslint-windows
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Download rslint.exe
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ci-test-rslint-windows-amd64
+          path: packages/rslint/bin
+
+      - name: Build JS packages
+        shell: bash
+        run: |
+          pnpm --filter @rslint/api build
+          pnpm --filter @rslint/core run build:js
+          pnpm --filter @typescript-eslint/rule-tester build
+          pnpm --filter rslint build
+
+      - name: VSCode Test Cache
+        uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
+        with:
+          path: packages/vscode-extension/.vscode-test
+          key: vscode-test-windows
+          restore-keys: |
+            vscode-test-windows-
+
+      - name: Test
+        run: pnpm run test
+
   lint:
     name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
@@ -109,13 +183,13 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: 1.26.0
-          cache-name: go-lint
+          cache-name: ci-go-lint
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
-          version: v2.11.3
-          args: --timeout=5m ./cmd/... ./internal/...
+          version: v2.12.2
+          args: --timeout=10m ./cmd/... ./internal/...
 
       - name: go vet
         run: npm run lint:go
@@ -132,7 +206,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [rspack-ubuntu-22.04-large, windows-latest]
+        os: [rspack-ubuntu-22.04-large]
         go-version: ['1.26.0']
     steps:
       - name: Checkout code
@@ -144,7 +218,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: test-node
+          cache-name: ci-test-node
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -199,7 +273,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: 1.26.0
-          cache-name: test-wasm
+          cache-name: ci-test-wasm
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -222,15 +296,20 @@ jobs:
           submodules: true
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
         with:
           components: rustfmt, clippy
 
       - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
         with:
           workspaces: '.'
           cache-on-failure: true
+          # Workaround for Swatinem/rust-cache#341: on the new macos runner image
+          # caching ~/.cargo/bin restores a broken `cargo` shim that resolves to
+          # rustup-init, causing `cargo fmt`/`clippy` to fail with
+          # "unexpected argument 'fmt' found / Usage: rustup-init[EXE] [OPTIONS]".
+          cache-bin: 'false'
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -243,35 +322,38 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: 1.26.0
-          cache-name: test-wasm
+          cache-name: ci-test-wasm
       - name: Build
         run: |
           pnpm --filter '@rslint/tsgo' build
 
       - name: Run tests
         run: cargo test --verbose
-  website:
-    name: Build Website
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+  benchmark-go:
+    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/benchmark-go.yml
 
-      - name: Build
-        run: pnpm run build:website
+  benchmark-cli:
+    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/benchmark-cli.yml
+
   done:
     needs:
       - test-go
+      - test-go-windows
+      - build-rslint-windows
       - test-node
+      - test-node-windows
       - lint
       - test-wasm
       - test-rust
-      - website
     if: always()
     runs-on: ubuntu-latest
     name: CI Done

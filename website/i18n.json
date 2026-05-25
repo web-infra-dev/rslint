@@ -12,7 +12,7 @@
     "zh": "The Linter for TypeScript"
   },
   "slogan": {
-    "en": "Go Fast. Go Typed.",
-    "zh": "Go Fast. Go Typed."
+    "en": "Faster Linting. Type-Aware by Design",
+    "zh": "更快的 Lint，类型驱动"
   }
 }

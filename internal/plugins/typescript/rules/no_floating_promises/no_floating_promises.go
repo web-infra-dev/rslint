@@ -78,28 +78,25 @@ func buildFloatingVoidMessage() rule.RuleMessage {
 }
 
 var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
-	Name: "no-floating-promises",
+	Name:             "no-floating-promises",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoFloatingPromisesOptions)
 		if !ok {
-			// try convert options to JSON and back to struct
 			opts = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
 				AllowForKnownSafeCallsInline:    []string{},
 				AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
 				AllowForKnownSafePromisesInline: []string{},
 			}
-			// get first element of options
-			options_array, _ := options.([]interface{})
-			// if options_array has at least one element, try to unmarshal it
-			if len(options_array) > 0 {
-				optsJSON, err := json.Marshal(options_array[0])
-				if err == nil {
-					json.Unmarshal(optsJSON, &opts)
+			// Options from JS configs may arrive as either an array
+			// (`[{ checkThenables: true }]`) or a bare object (`{ checkThenables: true }`).
+			// GetOptionsMap normalizes both shapes.
+			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+				if optsJSON, err := json.Marshal(optsMap); err == nil {
+					_ = json.Unmarshal(optsJSON, &opts)
 				}
-
 			}
-
 		}
 		if opts.CheckThenables == nil {
 			opts.CheckThenables = utils.Ref(false)

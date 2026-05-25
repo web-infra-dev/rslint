@@ -3,6 +3,8 @@ import { test, describe, expect } from '@rstest/core';
 import { lint, type LintResponse } from '@rslint/core';
 import assert from 'node:assert';
 
+import { buildConfigForSettings } from '../src/util/load-test-config';
+
 interface TsDiagnostic {
   line?: number;
   column?: number;
@@ -12,7 +14,7 @@ interface TsDiagnostic {
 }
 
 function toCamelCase(name: string): string {
-  return name.replace(/-([a-z])/g, g => g[1].toUpperCase());
+  return name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
 function checkDiagnosticEqual(
@@ -87,11 +89,11 @@ export class RuleTester {
   ) {
     describe(ruleName, () => {
       const cwd = path.resolve(import.meta.dirname);
-      const config = path.resolve(cwd, './rslint.json');
+      const config = path.resolve(cwd, './rslint.config.mjs');
 
       let hasOnly =
-        cases.valid.some(x => typeof x === 'object' && x.only) ||
-        cases.invalid.some(x => x.only);
+        cases.valid.some((x) => typeof x === 'object' && x.only) ||
+        cases.invalid.some((x) => x.only);
 
       test('valid', async () => {
         for (const validCase of cases.valid) {
@@ -105,14 +107,27 @@ export class RuleTester {
             typeof validCase === 'object' ? validCase.options : undefined;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
-          const diags = await lint({
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: { [virtual_entry]: code },
-            ruleOptions: {
-              [ruleName]: options ? [options] : [],
-            } as any,
-          });
+            undefined,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: { [virtual_entry]: code },
+              ruleOptions: {
+                [ruleName]: options
+                  ? Array.isArray(options)
+                    ? options
+                    : [options]
+                  : [],
+              } as any,
+            });
+          } finally {
+            cleanup();
+          }
 
           assert(
             diags.diagnostics?.length === 0,
@@ -129,14 +144,27 @@ export class RuleTester {
           const { code, errors, options } = item;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
-          const diags = await lint({
+          const { configPath, cleanup } = await buildConfigForSettings(
             config,
-            workingDirectory: cwd,
-            fileContents: { [virtual_entry]: code },
-            ruleOptions: {
-              [ruleName]: options ? [options] : [],
-            } as any,
-          });
+            undefined,
+          );
+          let diags;
+          try {
+            diags = await lint({
+              config: configPath,
+              workingDirectory: cwd,
+              fileContents: { [virtual_entry]: code },
+              ruleOptions: {
+                [ruleName]: options
+                  ? Array.isArray(options)
+                    ? options
+                    : [options]
+                  : [],
+              } as any,
+            });
+          } finally {
+            cleanup();
+          }
 
           assert(
             diags.diagnostics?.length > 0,

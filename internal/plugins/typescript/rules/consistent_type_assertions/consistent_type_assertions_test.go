@@ -61,6 +61,16 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 		{Code: `const x = { bar: 5 } as const;`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
 		{Code: `function foo() { throw { bar: 5 } as Foo; }`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
 		{Code: `const foo = (x = { bar: 5 } as Foo) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const foo = ({ x = { bar: 5 } as Foo } = {}) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const foo = ({ x = {} as Record<string, string[]> }) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const foo = ([x = {} as Foo]) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `function b({ x = {} as Foo.Bar }) {}`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const foo = ({ a: { b = {} as Foo } = {} }) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `print?.({ bar: 5 } as Foo);`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `print?.call({ bar: 5 } as Foo);`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: "print`${{ bar: 5 } as Foo}`;", Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const bar = <Foo style={{ bar: 5 } as Bar} />;`, Tsx: true, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `foo(({ bar: 5 } as Foo));`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}}},
 
 		// arrayLiteralTypeAssertions: 'never'
 		{Code: `const x: string[] = [];`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "never"}}},
@@ -71,6 +81,14 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 
 		// arrayLiteralTypeAssertions: 'allow-as-parameter'
 		{Code: `const x: string[] = [];`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const foo = ({ x = [] as string[] }) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const foo = ([x = [] as string[]]) => {};`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `function b(x = [5] as Foo.Bar) {}`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `print?.([5] as Foo);`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `print?.call([5] as Foo);`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: "print`${[5] as Foo}`;", Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `const bar = <Foo style={[5] as Bar} />;`, Tsx: true, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
+		{Code: `foo(([5] as Foo));`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
 		{Code: `foo([] as string[]);`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
 		{Code: `new Foo([] as string[]);`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
 		{Code: `throw [] as string[];`, Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "arrayLiteralTypeAssertions": "allow-as-parameter"}}},
@@ -241,6 +259,27 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "object-literal-with-type-annotation"},
+			},
+		},
+		{
+			Code:    `class C { x = {} as Foo; }`,
+			Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "object-literal-with-type-annotation"},
+			},
+		},
+		{
+			Code:    `const foo = () => ({ bar: 5 } as Foo);`,
+			Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "never-object-literal"},
+			},
+		},
+		{
+			Code:    `const x = [{ a: {} as Foo }];`,
+			Options: []interface{}{map[string]interface{}{"assertionStyle": "as", "objectLiteralTypeAssertions": "allow-as-parameter"}},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "never-object-literal"},
 			},
 		},
 		{

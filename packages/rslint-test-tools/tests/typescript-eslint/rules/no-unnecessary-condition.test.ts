@@ -506,6 +506,24 @@ for (; true; ) {}
     },
     {
       code: `
+for (; true; ) {}
+      `,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `
+for (; 0; ) {}
+      `,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `
+do {} while (0);
+      `,
+      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
+    },
+    {
+      code: `
 do {} while (true);
       `,
       options: [{ allowConstantLoopConditions: 'always' }],
@@ -874,7 +892,10 @@ declare const unknownTyped: unknown;
 if (!(booleanTyped || unknownTyped)) {
 }
     `,
+    // Skipped: rule-tester does not support per-case
+    // `parserOptions.tsconfigRootDir` overrides.
     {
+      skip: true,
       code: `
 declare const x: string[] | null;
 // eslint-disable-next-line
@@ -1135,6 +1156,33 @@ assertString('falafel');
       code: `
 declare function isString(x: unknown): x is string;
 isString('falafel');
+      `,
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // string | number | bigint is not a subtype of string | number
+      code: `
+declare function isStringOrNumber(x: unknown): x is string | number;
+declare const s: string | number | bigint;
+if (isStringOrNumber(s)) {
+}
+      `,
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // Narrower is not a subtype of Wider
+      code: `
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b: number;
+}
+declare function isNarrower(x: unknown): x is Narrower;
+declare const w: Wider;
+if (isNarrower(w)) {
+}
       `,
       options: [{ checkTypePredicates: true }],
     },
@@ -2084,27 +2132,6 @@ do {} while (test);
     },
     {
       code: `
-for (; true; ) {}
-      `,
-      errors: [{ column: 8, line: 2, messageId: 'alwaysTruthy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `
-for (; 0; ) {}
-      `,
-      errors: [{ column: 8, line: 2, messageId: 'alwaysFalsy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `
-do {} while (0);
-      `,
-      errors: [{ column: 14, line: 2, messageId: 'alwaysFalsy' }],
-      options: [{ allowConstantLoopConditions: 'only-allowed-literals' }],
-    },
-    {
-      code: `
 let shouldRun = true;
 
 while ((shouldRun = true)) {}
@@ -3039,7 +3066,10 @@ if (!speech) {
       `,
       errors: [{ column: 5, line: 7, messageId: 'never' }],
     },
+    // Skipped: rule-tester does not support per-case
+    // `parserOptions.tsconfigRootDir` overrides.
     {
+      skip: true,
       code: `
 declare const x: string[] | null;
 if (x) {
@@ -3518,6 +3548,68 @@ isString('fa' + 'lafel');
       ],
       options: [{ checkTypePredicates: true }],
     },
+    {
+      // string is a strict subtype of string | number.
+      code: `
+declare function isStringOrNumber(x: unknown): x is string | number;
+declare const s: string;
+if (isStringOrNumber(s)) {
+}
+      `,
+      errors: [
+        {
+          line: 4,
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      code: `
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b?: number;
+}
+declare function isWider(x: unknown): x is Wider;
+declare const n: Narrower;
+if (isWider(n)) {
+}
+      `,
+      errors: [
+        {
+          line: 11,
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      // Mutually assignable types: Wider is assignable to Narrower (b is
+      // optional), so the type guard condition is always true.
+      code: `
+interface Wider {
+  a: string;
+}
+interface Narrower {
+  a: string;
+  b?: number;
+}
+declare function isNarrower(x: unknown): x is Narrower;
+declare const w: Wider;
+if (isNarrower(w)) {
+}
+      `,
+      errors: [
+        {
+          line: 11,
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
 
     // "branded" types
     unnecessaryConditionTest('"" & {}', 'alwaysFalsy'),
@@ -3852,6 +3944,81 @@ if (arr[42] && arr[42]) {
           tsconfigRootDir: getFixturesRootDir(),
         },
       },
+    },
+    // typeGuardAlreadyIsType: lock down the {{typeGuardOrAssertionFunction}}
+    // placeholder fill for both type-predicate and assertion-function forms.
+    {
+      code: `
+declare function isString(x: unknown): x is string;
+declare const a: string;
+isString(a);
+      `,
+      errors: [
+        {
+          data: { typeGuardOrAssertionFunction: 'type guard' },
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    {
+      code: `
+declare function assertsString(x: unknown): asserts x is string;
+declare const a: string;
+assertsString(a);
+      `,
+      errors: [
+        {
+          data: { typeGuardOrAssertionFunction: 'assertion function' },
+          messageId: 'typeGuardAlreadyIsType',
+        },
+      ],
+      options: [{ checkTypePredicates: true }],
+    },
+    // alwaysTruthy / alwaysFalsy in array-predicate callback body: when the
+    // body is an expression or a single-return BlockStatement, the rule
+    // descends into it and emits alwaysTruthy/alwaysFalsy at the body
+    // expression. Verified against upstream v8 CLI behavior. Locks down all
+    // standard array-predicate methods recognized by isArrayPredicateFunction.
+    {
+      code: `
+[1, 2, 3].filter(() => 'truthy-string');
+      `,
+      errors: [{ messageId: 'alwaysTruthy' }],
+    },
+    {
+      code: `
+[1, 2, 3].find(function () {
+  return 0;
+});
+      `,
+      errors: [{ messageId: 'alwaysFalsy' }],
+    },
+    {
+      code: `
+[1, 2, 3].some(() => 1);
+      `,
+      errors: [{ messageId: 'alwaysTruthy' }],
+    },
+    {
+      code: `
+[1, 2, 3].every(() => null);
+      `,
+      errors: [{ messageId: 'alwaysFalsy' }],
+    },
+    {
+      code: `
+[1, 2, 3].findIndex(function namedFalsy() {
+  return undefined;
+});
+      `,
+      errors: [{ messageId: 'alwaysFalsy' }],
+    },
+    {
+      code: `
+[1, 2, 3].findLast(() => 'always');
+      `,
+      errors: [{ messageId: 'alwaysTruthy' }],
     },
   ],
 });

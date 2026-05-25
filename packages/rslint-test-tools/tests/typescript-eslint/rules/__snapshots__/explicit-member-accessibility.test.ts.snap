@@ -1003,7 +1003,7 @@ class Test {
       ",
   "diagnostics": [
     {
-      "message": "Public accessibility modifier on class property 'foo'.",
+      "message": "Public accessibility modifier on class property foo.",
       "messageId": "unwantedPublicAccessibility",
       "range": {
         "end": {
@@ -1018,7 +1018,7 @@ class Test {
       "ruleName": "@typescript-eslint/explicit-member-accessibility",
     },
     {
-      "message": "Public accessibility modifier on class property 'foo foo'.",
+      "message": "Public accessibility modifier on class property "foo foo".",
       "messageId": "unwantedPublicAccessibility",
       "range": {
         "end": {
@@ -1033,7 +1033,7 @@ class Test {
       "ruleName": "@typescript-eslint/explicit-member-accessibility",
     },
     {
-      "message": "Public accessibility modifier on method definition 'bar'.",
+      "message": "Public accessibility modifier on method definition bar.",
       "messageId": "unwantedPublicAccessibility",
       "range": {
         "end": {
@@ -1048,7 +1048,7 @@ class Test {
       "ruleName": "@typescript-eslint/explicit-member-accessibility",
     },
     {
-      "message": "Public accessibility modifier on method definition 'bar bar'.",
+      "message": "Public accessibility modifier on method definition "bar bar".",
       "messageId": "unwantedPublicAccessibility",
       "range": {
         "end": {

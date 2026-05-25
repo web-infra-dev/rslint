@@ -27,7 +27,8 @@ func isInTypeContext(node *ast.Node) bool {
 }
 
 var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
-	Name: "no-unnecessary-type-arguments",
+	Name:             "no-unnecessary-type-arguments",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		getTypeParametersFromType := func(node *ast.Node, nodeName *ast.Node) []*ast.Node {
 			symbol := ctx.TypeChecker.GetSymbolAtLocation(nodeName)
@@ -110,7 +111,7 @@ var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 			arg := arguments.Nodes[i]
 			param := parameters[i]
 
-			defaultType := param.AsTypeParameter().DefaultType
+			defaultType := param.AsTypeParameterDeclaration().DefaultType
 			if defaultType == nil {
 				return
 			}
@@ -144,7 +145,7 @@ var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 				checkArgsAndParameters(expr.TypeArguments, getTypeParametersFromType(node, expr.Expression))
 			},
 			ast.KindTypeReference: func(node *ast.Node) {
-				expr := node.AsTypeReference()
+				expr := node.AsTypeReferenceNode()
 				checkArgsAndParameters(expr.TypeArguments, getTypeParametersFromType(node, expr.TypeName))
 			},
 

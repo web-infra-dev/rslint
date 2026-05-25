@@ -1,0 +1,46 @@
+name: Benchmark CLI
+
+on:
+  workflow_call:
+
+jobs:
+  benchmark-cli:
+    name: Run CLI benchmarks
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GOMAXPROCS: 8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: '1.26.0'
+          cache-name: benchmark-cli
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Build JS package
+        run: pnpm --filter @rslint/core run build
+
+      - name: Run CLI benchmarks
+        uses: CodSpeedHQ/action@d872884a306dd4853acf0f584f4b706cf0cc72a2
+        timeout-minutes: 30
+        env:
+          RAYON_NUM_THREADS: 1
+          CODSPEED_EXPERIMENTAL_FAIR_SCHED: true
+          GH_MATRIX: '${{ toJson(matrix) }}'
+          GH_STRATEGY: '${{ toJson(strategy) }}'
+        with:
+          mode: walltime
+          run: pnpm run bench:cli
+          runner-version: 4.13.0
+          go-runner-version: 1.1.0

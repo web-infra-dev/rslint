@@ -62,14 +62,41 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	allowedFiles := []string{}
+	var allowedFiles []string
+	seenAllowedFiles := make(map[string]struct{})
+
+	resolveRequestPath := func(filePath string) string {
+		if tspath.PathIsAbsolute(filePath) {
+			return tspath.NormalizePath(filePath)
+		}
+		return tspath.ResolvePath(currentDirectory, filePath)
+	}
+
+	addAllowedFile := func(filePath string) string {
+		normalizedPath := resolveRequestPath(filePath)
+		if _, exists := seenAllowedFiles[normalizedPath]; exists {
+			return normalizedPath
+		}
+		seenAllowedFiles[normalizedPath] = struct{}{}
+		allowedFiles = append(allowedFiles, normalizedPath)
+		return normalizedPath
+	}
+
+	if req.Files != nil {
+		allowedFiles = make([]string, 0, len(req.Files)+len(req.FileContents))
+		for _, filePath := range req.Files {
+			addAllowedFile(filePath)
+		}
+	}
 	// Apply file contents if provided
 	if len(req.FileContents) > 0 {
+		if allowedFiles == nil {
+			allowedFiles = make([]string, 0, len(req.FileContents))
+		}
 		fileContents := make(map[string]string, len(req.FileContents))
 		for k, v := range req.FileContents {
-			normalizePath := tspath.NormalizePath(k)
-			fileContents[normalizePath] = v
-			allowedFiles = append(allowedFiles, normalizePath)
+			normalizedPath := addAllowedFile(k)
+			fileContents[normalizedPath] = v
 		}
 		fs = utils.NewOverlayVFS(fs, fileContents)
 
@@ -156,7 +183,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
-
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
 
@@ -206,29 +232,35 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Run linter
-	lintedFilesCount, err := linter.RunLinter(
-		programs,
-		false, // Don't use single-threaded mode for IPC
-		allowedFiles,
-		utils.ExcludePaths,
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+		Programs:       programs,
+		SingleThreaded: false, // Don't use single-threaded mode for IPC
+		Scope:          linter.FileScope{Files: allowedFiles},
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
 			filePath := tspath.ConvertToRelativePath(sourceFile.FileName(), comparePathOptions)
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
+
+			var settings map[string]interface{}
+			if merged := rslintConfig.GetConfigForFile(sourceFile.FileName(), configDirectory); merged != nil && len(merged.Settings) > 0 {
+				settings = rslintconfig.CloneSettings(merged.Settings)
+			}
+
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
 				return linter.ConfiguredRule{
-					Name: r.rule.Name,
+					Name:     r.rule.Name,
+					Settings: settings,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return r.rule.Run(ctx, r.option)
 					},
 				}
 			})
 		},
-		diagnosticCollector,
-	)
+		OnDiagnostic: diagnosticCollector,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %w", err)
 	}
@@ -251,7 +283,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	response := &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
-		FileCount:   int(lintedFilesCount),
+		FileCount:   int(lintResult.LintedFileCount),
 		RuleCount:   len(rulesWithOptions),
 	}
 	// Only include encoded source files if requested

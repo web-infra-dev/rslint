@@ -18,6 +18,7 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/microsoft/typescript-go/shim/collections"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/diagnostics"
 	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
@@ -160,9 +161,16 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	jsConfigs        map[string]config.RslintConfig                // configDirectory -> config entries (from JS/TS configs)
+	jsConfigs        map[string]config.RslintConfig                // configDirectory URI -> config entries (from JS/TS configs)
 	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
 	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
+	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
+	// For the JSON-config path this is a single global list.
+	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
+	// which keys per-config-directory so a nested config with no tsconfig
+	// does not disable filtering for files under other configs.
+	tsConfigPaths         []string
+	tsConfigPathsByConfig map[string][]string // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
 	documents        map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
@@ -216,10 +224,9 @@ func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers 
 	_, err := s.sendRequest(ctx, lsproto.MethodClientRegisterCapability, &lsproto.RegistrationParams{
 		Registrations: []*lsproto.Registration{
 			{
-				Id:     string(id),
-				Method: string(lsproto.MethodWorkspaceDidChangeWatchedFiles),
+				Id: string(id),
 				RegisterOptions: &lsproto.RegisterOptions{
-					DidChangeWatchedFiles: &lsproto.DidChangeWatchedFilesRegistrationOptions{
+					WorkspaceDidChangeWatchedFiles: &lsproto.DidChangeWatchedFilesRegistrationOptions{
 						Watchers: watchers,
 					},
 				},
@@ -287,6 +294,20 @@ func (s *Server) RefreshCodeLens(ctx context.Context) error {
 	return nil
 }
 
+// ProgressStart implements project.Client.
+func (s *Server) ProgressStart(message *diagnostics.Message, args ...any) {}
+
+// ProgressFinish implements project.Client.
+func (s *Server) ProgressFinish(message *diagnostics.Message, args ...any) {}
+
+// SendTelemetry implements project.Client.
+func (s *Server) SendTelemetry(ctx context.Context, telemetry lsproto.TelemetryEvent) error {
+	return nil
+}
+
+// IsActive implements project.Client.
+func (s *Server) IsActive() bool { return s.session != nil }
+
 func (s *Server) Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -331,7 +352,12 @@ func (s *Server) readLoop(ctx context.Context) error {
 		if s.initializeParams == nil && msg.Kind == jsonrpc.MessageKindRequest {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodInitialize {
-				resp, err := s.handleInitialize(ctx, req.Params.(*lsproto.InitializeParams))
+				initParams, ok := req.Params.(*lsproto.InitializeParams)
+				if !ok {
+					s.sendError(req.ID, lsproto.ErrorCodeInvalidParams)
+					continue
+				}
+				resp, err := s.handleInitialize(ctx, initParams)
 				if err != nil {
 					return err
 				}
@@ -354,7 +380,9 @@ func (s *Server) readLoop(ctx context.Context) error {
 		} else {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodCancelRequest {
-				s.cancelRequest(req.Params.(*lsproto.CancelParams).Id)
+				if cancelParams, ok := req.Params.(*lsproto.CancelParams); ok {
+					s.cancelRequest(cancelParams.Id)
+				}
 			} else {
 				s.requestQueue <- req
 			}
@@ -566,7 +594,11 @@ func registerNotificationHandler[Req any](handlers handlerMap, info lsproto.Noti
 		var params Req
 		// Ignore empty params; all generated params are either pointers or any.
 		if req.Params != nil {
-			params = req.Params.(Req)
+			p, ok := req.Params.(Req)
+			if !ok {
+				return fmt.Errorf("unexpected params type %T for %s", req.Params, info.Method)
+			}
+			params = p
 		}
 		if err := fn(s, ctx, params); err != nil {
 			return err
@@ -580,7 +612,11 @@ func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.Req
 		var params Req
 		// Ignore empty params.
 		if req.Params != nil {
-			params = req.Params.(Req)
+			p, ok := req.Params.(Req)
+			if !ok {
+				return fmt.Errorf("unexpected params type %T for %s", req.Params, info.Method)
+			}
+			params = p
 		}
 		resp, err := fn(s, ctx, params)
 		if err != nil {
@@ -594,12 +630,12 @@ func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.Req
 	}
 }
 
-func (s *Server) handleShutdown(ctx context.Context, params any) (lsproto.ShutdownResponse, error) {
+func (s *Server) handleShutdown(ctx context.Context, params lsproto.NoParams) (lsproto.ShutdownResponse, error) {
 	s.session.Close()
 	return lsproto.ShutdownResponse{}, nil
 }
 
-func (s *Server) handleExit(ctx context.Context, params any) error {
+func (s *Server) handleExit(ctx context.Context, params lsproto.NoParams) error {
 	return io.EOF
 }
 
