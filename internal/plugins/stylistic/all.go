@@ -14,6 +14,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/eol_last"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/generator_star_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_closing_bracket_location"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_closing_tag_location"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -32,5 +33,6 @@ func GetAllRules() []rule.Rule {
 		eol_last.EolLastRule,
 		generator_star_spacing.GeneratorStarSpacingRule,
 		jsx_closing_bracket_location.JsxClosingBracketLocationRule,
+		jsx_closing_tag_location.JsxClosingTagLocationRule,
 	}
 }
