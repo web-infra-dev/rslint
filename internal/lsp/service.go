@@ -21,13 +21,29 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/project/logging"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	util "github.com/web-infra-dev/rslint/internal/utils"
 )
+
+const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
+
+// ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
+// source file's line map for position encoding.
+func ruleFixToTextEdit(sourceFile *ast.SourceFile, fix rule.RuleFix) *lsproto.TextEdit {
+	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.Pos())
+	endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.End())
+	return &lsproto.TextEdit{
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
+			End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
+		},
+		NewText: fix.Text,
+	}
+}
 
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
 	log.Printf("handle initialize with pid: %d\n", os.Getpid())
@@ -63,7 +79,13 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 				},
 			},
 			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
-				Boolean: ptrTo(true),
+				CodeActionOptions: &lsproto.CodeActionOptions{
+					CodeActionKinds: &[]lsproto.CodeActionKind{
+						lsproto.CodeActionKindQuickFix,
+						lsproto.CodeActionKindSourceFixAll,
+						codeActionKindSourceFixAllRslint,
+					},
+				},
 			},
 		},
 	}
@@ -98,8 +120,8 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		ParseCache: s.parseCache,
 	})
 
-	// Register all rules before loading config so that normalizeJSONConfig
-	// can inject default core/plugin rules into the registry.
+	// Populate the global rule registry once per process; the LSP request path
+	// resolves rule names against it after config merging.
 	config.RegisterAllRules()
 
 	// Try to load JSON config as fallback.
@@ -117,8 +139,10 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 }
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
-// Unlike the CLI, the LSP does not need tsConfigs here — the session discovers
-// tsconfig files on its own via projectService.
+// The LSP session discovers tsconfig files on its own via projectService for
+// providing type information. However, we still need to know which files are
+// covered by parserOptions.project so that type-aware rules (e.g. require-await)
+// are only enabled for files in the configured tsconfigs — matching CLI behavior.
 func (s *Server) reloadConfig() error {
 	loader := config.NewConfigLoader(s.fs, s.cwd)
 	rslintConfig, _, err := loader.LoadRslintConfig(s.rslintConfigPath)
@@ -126,6 +150,7 @@ func (s *Server) reloadConfig() error {
 		return fmt.Errorf("could not load rslint config: %w", err)
 	}
 	s.jsonConfig = rslintConfig
+	s.rebuildTsConfigPaths()
 	return nil
 }
 
@@ -166,6 +191,8 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	s.rslintConfigPath = ""
 	log.Printf("[rslint] Config updated from JS/TS configs (%d config files)", len(payload.Configs))
 
+	s.rebuildTsConfigPaths()
+
 	// Ask the client to re-pull diagnostics with the updated config.
 	if err := s.RefreshDiagnostics(ctx); err != nil {
 		log.Printf("[rslint] Failed to refresh diagnostics after config update: %v", err)
@@ -187,13 +214,24 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		s.session.DidChangeWatchedFiles(ctx, params.Changes)
 	}
 
-	// Check for rslint config changes — these need immediate handling
-	// because Session doesn't know about rslint.json.
+	// Check for config file changes that affect rslint.
+	needsTypeInfoRebuild := false
 	for _, change := range params.Changes {
-		if isRslintConfigURI(string(change.Uri)) {
+		uri := string(change.Uri)
+		if isRslintConfigURI(uri) {
+			// rslint config changed — reload config + typeInfoFiles + relint all.
 			s.reloadConfigAndRelint()
 			return nil
 		}
+		if isTsConfigURI(uri) {
+			needsTypeInfoRebuild = true
+		}
+	}
+	if needsTypeInfoRebuild {
+		// tsconfig changed — rebuild tsConfigPaths so type-aware rule filtering
+		// stays in sync. Session already handles the project state update and
+		// triggers RefreshDiagnostics for relinting.
+		s.rebuildTsConfigPaths()
 	}
 
 	return nil
@@ -204,9 +242,63 @@ func isRslintConfigURI(uri string) bool {
 	return strings.HasSuffix(uri, "/rslint.json") || strings.HasSuffix(uri, "/rslint.jsonc")
 }
 
-// reloadConfigAndRelint re-discovers and reloads the rslint config, then
-// re-lints all open documents.
+// isTsConfigURI returns true if the URI points to a tsconfig/jsconfig file,
+// including variants like tsconfig.build.json, tsconfig.app.json, etc.
+func isTsConfigURI(uri string) bool {
+	idx := strings.LastIndex(uri, "/")
+	if idx < 0 {
+		return false
+	}
+	name := uri[idx+1:]
+	return (strings.HasPrefix(name, "tsconfig") || strings.HasPrefix(name, "jsconfig")) &&
+		strings.HasSuffix(name, ".json")
+}
+
+// resolveTsConfigPaths resolves parserOptions.project from a config and
+// normalizes paths with realpath for cross-platform consistency.
+func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) []string {
+	paths, _ := config.ResolveTsConfigPaths(cfg, cwd, s.fs)
+	for i, p := range paths {
+		paths[i] = tspath.NormalizePath(s.fs.Realpath(p))
+	}
+	return paths
+}
+
+// rebuildTsConfigPaths resolves parserOptions.project from the current config.
+// Called when a tsconfig or rslint config changes so that type-aware rule
+// filtering stays in sync.
+//
+// For JS/TS configs we resolve per-config directory into tsConfigPathsByConfig.
+// A config whose parserOptions.project is empty and has no auto-detected
+// tsconfig resolves to nil — this disables type-aware-rule filtering only for
+// files governed by that config, not globally across the workspace. A nested
+// template / fixture config without a tsconfig must not relax filtering for
+// other configs' files.
+func (s *Server) rebuildTsConfigPaths() {
+	if len(s.jsConfigs) > 0 {
+		byConfig := make(map[string][]string, len(s.jsConfigs))
+		for dir, entries := range s.jsConfigs {
+			configDir := uriToPath(lsproto.DocumentUri(dir))
+			byConfig[dir] = s.resolveTsConfigPaths(entries, configDir)
+		}
+		s.tsConfigPathsByConfig = byConfig
+		s.tsConfigPaths = nil
+	} else if s.rslintConfigPath != "" {
+		s.tsConfigPaths = s.resolveTsConfigPaths(s.jsonConfig, s.cwd)
+		s.tsConfigPathsByConfig = nil
+	} else {
+		s.tsConfigPaths = nil
+		s.tsConfigPathsByConfig = nil
+	}
+}
+
+// reloadConfigAndRelint re-discovers and reloads the rslint JSON config, then
+// re-lints all open documents. Skips when JS/TS configs are active — those
+// take priority and are managed by handleConfigUpdate.
 func (s *Server) reloadConfigAndRelint() {
+	if len(s.jsConfigs) > 0 {
+		return
+	}
 	log.Printf("Reloading rslint config...")
 
 	configPath, found := findRslintConfig(s.fs, s.cwd)
@@ -214,6 +306,7 @@ func (s *Server) reloadConfigAndRelint() {
 		log.Printf("rslint config file no longer exists, clearing config")
 		s.jsonConfig = config.RslintConfig{}
 		s.rslintConfigPath = ""
+		s.tsConfigPaths = nil
 	} else {
 		s.rslintConfigPath = configPath
 		if err := s.reloadConfig(); err != nil {
@@ -292,6 +385,10 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 		s.documents[uri] = *params.Text
 	}
 
+	// Clear pending debounce lint for this URI — pushDiagnostics below
+	// will lint it immediately, so the debounce would be redundant.
+	delete(s.pendingLintURIs, uri)
+
 	// Notify session about the save event
 	if s.session != nil {
 		s.session.DidSaveFile(ctx, uri)
@@ -323,6 +420,11 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActionParams) (lsproto.CodeActionResponse, error) {
 	log.Printf("Handling codeAction: %+v,%+v", params, ctx)
 	uri := params.TextDocument.Uri
+
+	// Handle source.fixAll requests (triggered by editor.codeActionsOnSave)
+	if isFixAllRequest(params.Context) {
+		return s.handleFixAllCodeAction(ctx, uri)
+	}
 
 	// Get stored diagnostics for this document
 	ruleDiagnostics, exists := s.diagnostics[uri]
@@ -378,7 +480,123 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	}, nil
 }
 
-func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
+// isFixAllRequest returns true if the code action context requests source.fixAll actions.
+func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
+	if ctx == nil || ctx.Only == nil {
+		return false
+	}
+	for _, kind := range *ctx.Only {
+		if kind == lsproto.CodeActionKindSourceFixAll || kind == codeActionKindSourceFixAllRslint {
+			return true
+		}
+	}
+	return false
+}
+
+// maxFixPasses is the maximum number of lint-fix cycles to prevent infinite loops
+// when two rules produce fixes that undo each other.
+const maxFixPasses = 10
+
+// handleFixAllCodeAction computes all auto-fixes for the given URI using
+// multi-pass fixing: each pass lints → applies fixes → updates the session
+// overlay, repeating until no more fixes are found or maxFixPasses is reached.
+// This handles cascading fixes (e.g. ban-types fix triggers no-inferrable-types).
+// It does NOT push diagnostics or update s.diagnostics — that is left to the
+// subsequent didSave handler in the normal save flow.
+func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.DocumentUri) (lsproto.CodeActionResponse, error) {
+	empty := lsproto.CodeActionResponse{CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{}}
+
+	// Clear pending debounce for this URI — we are about to lint it fresh,
+	// so any scheduled debounce lint for the same content is redundant.
+	delete(s.pendingLintURIs, uri)
+
+	if s.session == nil {
+		return empty, nil
+	}
+	if !isTypeScriptFile(string(uri)) {
+		return empty, nil
+	}
+
+	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	tsConfigPaths := s.tsConfigPathsForURI(uri)
+	originalContent := s.documents[uri]
+	currentContent := originalContent
+
+	for pass := range maxFixPasses {
+		// For passes after the first, update the session overlay so that
+		// runLintWithSession sees the fixed content from the previous pass.
+		if pass > 0 {
+			s.session.DidChangeFile(ctx, uri, int32(pass), []lsproto.TextDocumentContentChangePartialOrWholeDocument{
+				{WholeDocument: &lsproto.TextDocumentContentChangeWholeDocument{Text: currentContent}},
+			})
+		}
+
+		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
+		if err != nil {
+			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
+			break
+		}
+
+		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
+		if !wasFixed {
+			break
+		}
+		currentContent = fixedContent
+		if currentContent == originalContent {
+			break // cycle detected — fixes reverted to original content
+		}
+	}
+
+	if currentContent == originalContent {
+		return empty, nil
+	}
+
+	// Produce a single TextEdit that replaces the entire document content.
+	// Individual per-fix TextEdits can't be composed across passes (offsets shift),
+	// so we replace the whole document with the final result.
+	lastLine, lastChar := computeEndPosition(originalContent)
+
+	codeAction := &lsproto.CodeAction{
+		Title: "Fix all rslint auto-fixable problems",
+		Kind:  ptrTo(codeActionKindSourceFixAllRslint),
+		Edit: &lsproto.WorkspaceEdit{
+			Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+				uri: {
+					{
+						Range: lsproto.Range{
+							Start: lsproto.Position{Line: 0, Character: 0},
+							End:   lsproto.Position{Line: uint32(lastLine), Character: uint32(lastChar)},
+						},
+						NewText: currentContent,
+					},
+				},
+			},
+		},
+	}
+
+	return lsproto.CodeActionResponse{
+		CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{
+			{CodeAction: codeAction},
+		},
+	}, nil
+}
+
+// computeEndPosition returns the line and UTF-16 character offset of the end
+// of a text string, suitable for constructing an LSP Range that covers the
+// entire document. Uses core.UTF16Len for correct UTF-16 code unit counting.
+func computeEndPosition(text string) (int, int) {
+	line := 0
+	lastLineStart := 0
+	for i := range len(text) {
+		if text[i] == '\n' {
+			line++
+			lastLineStart = i + 1
+		}
+	}
+	return line, int(core.UTF16Len(text[lastLineStart:]))
+}
+
+func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
 	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
@@ -452,8 +670,14 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
 	filename := uriToPath(uri)
+
+	// Files excluded by the config's `ignores` patterns produce no diagnostics,
+	// matching CLI behavior. Return early before spinning up the language service.
+	if rslintConfig.IsFileIgnored(filename, cwd) {
+		return []rule.RuleDiagnostic{}, nil
+	}
 
 	// GetLanguageService flushes any pending changes (from DidChangeFile) and
 	// returns a language service whose program reflects the latest overlay content.
@@ -462,6 +686,27 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		return nil, fmt.Errorf("failed to get language service: %w", err)
 	}
 	program := languageService.GetProgram()
+
+	// Determine if this file has type information from the configured tsconfigs.
+	// The session's program has a ConfigFilePath (the tsconfig it was created from).
+	// If that tsconfig is NOT in parserOptions.project, type-aware rules should
+	// be filtered out — matching CLI behavior.
+	hasTypeInfo := true
+	if tsConfigPaths != nil {
+		configFilePath := program.Options().ConfigFilePath
+		if configFilePath != "" {
+			configFilePath = fs.Realpath(configFilePath)
+		}
+		programConfig := tspath.NormalizePath(configFilePath)
+		hasTypeInfo = false
+		for _, tc := range tsConfigPaths {
+			if tc == programConfig {
+				hasTypeInfo = true
+				break
+			}
+		}
+	}
+
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
@@ -473,11 +718,18 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		diagnostics = append(diagnostics, d)
 	}
 
-	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+	linter.LintSingleFile(linter.LintSingleFileOptions{
+		Program: program,
+		File:    filename,
+		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
+			if !hasTypeInfo {
+				activeRules = linter.FilterNonTypeAwareRules(activeRules)
+			}
 			return activeRules
-		}, diagnosticCollector)
+		},
+		OnDiagnostic: diagnosticCollector,
+	})
 
 	if diagnostics == nil {
 		diagnostics = []rule.RuleDiagnostic{}
@@ -506,17 +758,7 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
-
-		textEdit := &lsproto.TextEdit{
-			Range: lsproto.Range{
-				Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
-				End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
-			},
-			NewText: fix.Text,
-		}
-		textEdits = append(textEdits, textEdit)
+		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix))
 	}
 
 	// Create workspace edit
@@ -526,25 +768,11 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 		},
 	}
 
-	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
-	lspDiagnostic := &lsproto.Diagnostic{
-		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
-		},
-		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
-		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
-	}
-
 	return &lsproto.CodeAction{
 		Title:       "Fix: " + ruleDiag.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
-		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag)},
 		IsPreferred: ptrTo(true), // Mark auto-fixes as preferred
 	}
 }
@@ -559,17 +787,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
-
-		textEdit := &lsproto.TextEdit{
-			Range: lsproto.Range{
-				Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
-				End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
-			},
-			NewText: fix.Text,
-		}
-		textEdits = append(textEdits, textEdit)
+		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix))
 	}
 
 	// Create workspace edit
@@ -579,25 +797,11 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 		},
 	}
 
-	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
-	lspDiagnostic := &lsproto.Diagnostic{
-		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
-		},
-		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
-		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
-	}
-
 	return &lsproto.CodeAction{
 		Title:       "Suggestion: " + suggestion.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
-		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag)},
 		IsPreferred: ptrTo(false), // Mark suggestions as not preferred
 	}
 }
@@ -606,19 +810,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []lsproto.CommandOrCodeAction {
 	var actions []lsproto.CommandOrCodeAction
 
-	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
-	lspDiagnostic := &lsproto.Diagnostic{
-		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
-		},
-		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
-		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
-	}
+	lspDiagnostic := convertRuleDiagnosticToLSP(ruleDiag)
 
 	// Action 1: Disable rule for this line
 	disableLineAction := createDisableRuleForLineAction(ruleDiag, uri, lspDiagnostic)
@@ -646,8 +838,8 @@ func createDisableRuleForLineAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 	// Get the line where the diagnostic occurs
 	lineStart := lspDiagnostic.Range.Start.Line
 
-	// Create text edit to add eslint-disable-next-line comment
-	disableComment := fmt.Sprintf("// eslint-disable-next-line %s\n", ruleDiag.RuleName)
+	// Create text edit to add rslint-disable-next-line comment
+	disableComment := fmt.Sprintf("// rslint-disable-next-line %s\n", ruleDiag.RuleName)
 
 	// Find the start of the line to insert the comment
 	lineStartPos := lsproto.Position{Line: lineStart, Character: 0}
@@ -677,8 +869,8 @@ func createDisableRuleForLineAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 
 // Helper function to create a "disable rule for entire file" action
 func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, lspDiagnostic *lsproto.Diagnostic) *lsproto.CodeAction {
-	// Create text edit to add eslint-disable comment at the top of the file
-	disableComment := fmt.Sprintf("/* eslint-disable %s */\n", ruleDiag.RuleName)
+	// Create text edit to add rslint-disable comment at the top of the file
+	disableComment := fmt.Sprintf("/* rslint-disable %s */\n", ruleDiag.RuleName)
 
 	// Insert at the very beginning of the file
 	fileStartPos := lsproto.Position{Line: 0, Character: 0}
@@ -733,6 +925,31 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 	return s.jsonConfig, s.cwd, false
 }
 
+// tsConfigPathsForURI returns the resolved parserOptions.project tsconfig
+// paths for the rslint config that governs the given URI. It walks parents
+// the same way getConfigForURI does so a nested config with no tsconfig
+// does not leak its "allow-all" fallback into sibling configs.
+//
+// A nil return means the governing config has no resolved tsconfig; callers
+// should treat this as "disable type-aware filtering for this file only".
+func (s *Server) tsConfigPathsForURI(uri lsproto.DocumentUri) []string {
+	if len(s.jsConfigs) > 0 {
+		dir := uriDirname(string(uri))
+		for {
+			if _, ok := s.jsConfigs[dir]; ok {
+				return s.tsConfigPathsByConfig[dir]
+			}
+			parent := uriDirname(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+		return nil
+	}
+	return s.tsConfigPaths
+}
+
 // uriDirname returns the parent directory of a URI string.
 // e.g. "file:///project/src/index.ts" → "file:///project/src"
 func uriDirname(uri string) string {
@@ -757,14 +974,14 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	}
 
 	ctx := s.backgroundCtx
-	content := s.documents[uri]
 
 	if !isTypeScriptFile(string(uri)) {
 		return
 	}
 
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
-	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig)
+	tsConfigPaths := s.tsConfigPathsForURI(uri)
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		return
@@ -775,7 +992,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	// Must use empty slice (not nil) so JSON serializes as [] instead of null
 	lspDiags := make([]*lsproto.Diagnostic, 0, len(ruleDiags))
 	for _, d := range ruleDiags {
-		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d, content))
+		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d))
 	}
 
 	if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{

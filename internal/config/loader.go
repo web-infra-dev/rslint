@@ -90,7 +90,11 @@ func normalizeJSONConfig(config RslintConfig) RslintConfig {
 
 		// Auto-enable plugin rules as defaults
 		for _, plugin := range entry.Plugins {
-			for _, r := range GetPluginRules(NormalizePluginName(plugin)) {
+			info, ok := pluginByDeclName[plugin]
+			if !ok {
+				continue
+			}
+			for _, r := range info.getAllRules() {
 				if _, exists := entry.Rules[r.Name]; !exists {
 					entry.Rules[r.Name] = "error"
 				}
@@ -155,6 +159,29 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 	return tsConfigs, nil
 }
 
+// ResolveTsConfigPaths extracts tsconfig paths from a rslint config's parserOptions.project,
+// with an auto-detection fallback to tsconfig.json in the config directory.
+// Returns (nil, nil) when no tsconfigs are found. Returns (nil, err) when
+// config validation fails (e.g. glob matched no files, tsconfig doesn't exist).
+func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]string, error) {
+	if fs == nil {
+		return nil, nil
+	}
+	loader := NewConfigLoader(fs, cwd)
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, cwd)
+	if err != nil {
+		return nil, err
+	}
+	if len(tsConfigs) == 0 {
+		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")
+		if fs.FileExists(defaultTsConfig) {
+			return []string{defaultTsConfig}, nil
+		}
+		return nil, nil
+	}
+	return tsConfigs, nil
+}
+
 func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {
 	normalizedPath := tspath.NormalizePath(configPath)
 	if _, exists := seenPaths[normalizedPath]; exists {
@@ -173,7 +200,11 @@ func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern st
 	}
 
 	relativePattern := strings.TrimPrefix(resolvedPattern, searchRoot+"/")
-	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot}
+	// expandProjectGlob historically follows symlinks (e.g. tsconfig
+	// referenced via packages/*/tsconfig.json where packages may be
+	// symlinks in pnpm workspaces). It runs single-threaded under
+	// doublestar.GlobWalk, so the cycle dedupe is deterministic.
+	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot, followSymlinks: true}
 
 	matches := []string{}
 	err := doublestar.GlobWalk(fsys, relativePattern, func(path string, d fs.DirEntry) error {

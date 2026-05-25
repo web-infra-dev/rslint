@@ -1,0 +1,1017 @@
+// Rstest Snapshot v1
+
+exports[`no-sequences > invalid 1`] = `
+{
+  "code": "1, 2;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 2`] = `
+{
+  "code": "a = 1, 2",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 3`] = `
+{
+  "code": "do {} while (doSomething(), !!test);",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 4`] = `
+{
+  "code": "for (; doSomething(), !!test; );",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 5`] = `
+{
+  "code": "if (doSomething(), !!test);",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 6`] = `
+{
+  "code": "switch (doSomething(), val) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 7`] = `
+{
+  "code": "while (doSomething(), !!test);",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 8`] = `
+{
+  "code": "with (doSomething(), val) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 9`] = `
+{
+  "code": "a => (doSomething(), a)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 10`] = `
+{
+  "code": "(1), 2",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 11`] = `
+{
+  "code": "((1)) , (2)",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 12`] = `
+{
+  "code": "while((1) , 2);",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 13`] = `
+{
+  "code": "var foo = (1, 2);",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 14`] = `
+{
+  "code": "(0,eval)("foo()");",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 15`] = `
+{
+  "code": "foo(a, (b, c), d);",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 16`] = `
+{
+  "code": "do {} while ((doSomething(), !!test));",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 17`] = `
+{
+  "code": "for (; (doSomething(), !!test); );",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 18`] = `
+{
+  "code": "if ((doSomething(), !!test));",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 19`] = `
+{
+  "code": "switch ((doSomething(), val)) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 20`] = `
+{
+  "code": "while ((doSomething(), !!test));",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 21`] = `
+{
+  "code": "with ((doSomething(), val)) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 22`] = `
+{
+  "code": "a => ((doSomething(), a))",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 23`] = `
+{
+  "code": "for (x in a, b) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 24`] = `
+{
+  "code": "for (x in (a, b)) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 25`] = `
+{
+  "code": "for (x of (a, b)) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 26`] = `
+{
+  "code": "function f() { throw a, b; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 27`] = `
+{
+  "code": "function f() { return a, b; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 28`] = `
+{
+  "code": "() => { throw a, b; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 29`] = `
+{
+  "code": "a, b as number;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 30`] = `
+{
+  "code": "a, b satisfies number;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 31`] = `
+{
+  "code": "\`\${a, b}\`;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 32`] = `
+{
+  "code": "tag\`\${a, b}\`;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 33`] = `
+{
+  "code": "foo[a, b];",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 34`] = `
+{
+  "code": "foo?.[a, b];",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 35`] = `
+{
+  "code": "a ? b : c, d;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 36`] = `
+{
+  "code": "'🍎', 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 37`] = `
+{
+  "code": "中, 文;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 38`] = `
+{
+  "code": "function f() {
+  return "🍎", 1;
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-sequences > invalid 39`] = `
+{
+  "code": "a, b, c, d;",
+  "diagnostics": [
+    {
+      "message": "Unexpected use of comma operator.",
+      "messageId": "unexpectedCommaExpression",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-sequences",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

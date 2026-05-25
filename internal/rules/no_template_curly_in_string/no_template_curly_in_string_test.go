@@ -12,7 +12,7 @@ func TestNoTemplateCurlyInString(t *testing.T) {
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,
-		&NoTemplateCurlyInString,
+		&NoTemplateCurlyInStringRule,
 		// Valid cases - ported from ESLint
 		[]rule_tester.ValidTestCase{
 			{Code: "`Hello, ${name}`;"},

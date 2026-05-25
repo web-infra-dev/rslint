@@ -19,10 +19,10 @@ import (
 const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
 
 type ExtraShim struct {
-	ExtraFunctions  []string
-	ExtraMethods    map[string]([]string)
-	ExtraFields     map[string]([]string)
-	IgnoreFunctions []string
+	ExtraFunctions  []string              `json:"ExtraFunctions"`
+	ExtraMethods    map[string]([]string) `json:"ExtraMethods"`
+	ExtraFields     map[string]([]string) `json:"ExtraFields"`
+	IgnoreFunctions []string              `json:"IgnoreFunctions"`
 }
 
 // check whether signature can be exported
@@ -51,13 +51,17 @@ func main() {
 		"checker",
 		"compiler",
 		"core",
+		"diagnostics",
+		"evaluator",
 		"jsonrpc",
 		"scanner",
 		"tsoptions",
 		"tspath",
+		"transformers/jsxtransforms",
 		"vfs",
 		"vfs/cachedvfs",
 		"vfs/osvfs",
+		"vfs/vfsmatch",
 		"collections",
 		"lsp/lsproto",
 		"ls",
@@ -65,7 +69,6 @@ func main() {
 		"project/logging",
 		"api",
 		"api/encoder",
-		"api/proto",
 	}
 
 	packagesToShimFullNames := make([]string, len(packagesToShim))
@@ -209,10 +212,9 @@ func main() {
 				shimBuilder.WriteString("\n")
 			}
 
-			switch object.(type) {
+			switch object := object.(type) {
 			case *types.TypeName:
-				typeName := object.(*types.TypeName)
-				t := typeName.Type()
+				t := object.Type()
 				named, isNamed := t.(*types.Named)
 				if isNamed {
 					_, nameWithTypeParams, _ := strings.Cut(types.TypeString(named, qualifierOnlyPackageName), ".")
@@ -286,9 +288,6 @@ func main() {
 					importPackage("unsafe", true)
 
 					matchedExtraFields[name] = true
-					if err != nil {
-						log.Fatalf("error formatting %v struct body: %v", name, err)
-					}
 					mirrorStructName := "extra_" + name
 
 					var emitExtraStruct func(name string, s *types.Struct)
@@ -326,10 +325,11 @@ func main() {
 								}
 							}
 
-							shimBuilder.WriteString(
-								// TODO: move to extra-shim.json
-								strings.ReplaceAll(types.TypeString(field.Type(), qualifierOnlyPackageName), "checker.thisAssignmentDeclarationKind", "int32"),
-							)
+							// TODO: move to extra-shim.json
+							typeStr := types.TypeString(field.Type(), qualifierOnlyPackageName)
+							typeStr = strings.ReplaceAll(typeStr, "checker.thisAssignmentDeclarationKind", "int32")
+							typeStr = strings.ReplaceAll(typeStr, "checker.symbolTableID", "uint64")
+							shimBuilder.WriteString(typeStr)
 						}
 						shimBuilder.WriteString("\n}\n")
 
@@ -381,8 +381,7 @@ func main() {
 				printReexport("var")
 			case *types.Func:
 				if !slices.Contains(extraShim.IgnoreFunctions, name) {
-					funcType := object.(*types.Func)
-					emitLinkedFunction(funcType)
+					emitLinkedFunction(object)
 				}
 			}
 		}

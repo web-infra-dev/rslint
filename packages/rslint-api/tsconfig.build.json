@@ -7,14 +7,23 @@
     "lib": ["esnext", "dom"],
     "noImplicitReturns": false,
     "noImplicitOverride": false,
-    "rootDir": "../.."
+    "rootDir": "../..",
+    "baseUrl": ".",
+    // No source file in `src/**` references `#enums/*`. The mapping exists
+    // purely so api-extractor (rslib's d.ts bundler) can resolve the Node
+    // subpath imports inside transitively pulled `_packages/native-preview`
+    // sources — `dts.alias` in rslib.config.ts is a no-op for `bundle: true`
+    // because api-extractor reads its own tsconfig fresh from disk.
+    "paths": {
+      "#enums/*": [
+        "../../typescript-go/_packages/native-preview/src/enums/*.enum.ts"
+      ]
+    }
   },
 
   "include": [
     "src/**/*.ts",
-    "../../typescript-go/_packages/api/src/node/node.ts",
-    "../../typescript-go/_packages/api/src/node/msgpack.ts",
-    "../../typescript-go/_packages/api/src/node/protocol.ts"
+    "../../typescript-go/_packages/native-preview/src/**/*.ts"
   ],
   "references": []
 }

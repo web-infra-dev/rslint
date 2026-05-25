@@ -1,0 +1,837 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-imports > invalid 1`] = `
+{
+  "code": "import foo from 'import1';",
+  "diagnostics": [
+    {
+      "message": "'import1' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 2`] = `
+{
+  "code": "import foo = require('import1');",
+  "diagnostics": [
+    {
+      "message": "'import1' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 3`] = `
+{
+  "code": "export { foo } from 'import1';",
+  "diagnostics": [
+    {
+      "message": "'import1' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 4`] = `
+{
+  "code": "import foo from 'import1';",
+  "diagnostics": [
+    {
+      "message": "'import1' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 5`] = `
+{
+  "code": "export { foo } from 'import1';",
+  "diagnostics": [
+    {
+      "message": "'import1' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 6`] = `
+{
+  "code": "import foo from 'import1/private/foo';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/foo' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 7`] = `
+{
+  "code": "export { foo } from 'import1/private/foo';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/foo' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 8`] = `
+{
+  "code": "import foo from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used. Please use import-bar instead.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 9`] = `
+{
+  "code": "export { foo } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used. Please use import-bar instead.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 10`] = `
+{
+  "code": "import { Bar } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 11`] = `
+{
+  "code": "export { Bar } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 12`] = `
+{
+  "code": "import foo from 'import1/private/foo';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/foo' import is restricted from being used by a pattern. usage of import1 private modules not allowed.",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 13`] = `
+{
+  "code": "export { foo } from 'import1/private/foo';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/foo' import is restricted from being used by a pattern. usage of import1 private modules not allowed.",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 14`] = `
+{
+  "code": "import 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 15`] = `
+{
+  "code": "import 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 16`] = `
+{
+  "code": "import foo from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used. Please use import-bar instead.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 17`] = `
+{
+  "code": "import foo = require('import-foo');",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used. Please use import-bar instead.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 18`] = `
+{
+  "code": "import { Bar } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 19`] = `
+{
+  "code": "export { Bar } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 20`] = `
+{
+  "code": "import foo from 'import1/private/bar';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/bar' import is restricted from being used by a pattern. usage of import1 private modules not allowed.",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 21`] = `
+{
+  "code": "export { foo } from 'import1/private/bar';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/bar' import is restricted from being used by a pattern. usage of import1 private modules not allowed.",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 22`] = `
+{
+  "code": "export { foo } from 'import1/private/bar';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/bar' import is restricted from being used by a pattern. usage of import1 private modules not allowed.",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 23`] = `
+{
+  "code": "import { foo } from 'import1/private-package';",
+  "diagnostics": [
+    {
+      "message": "'import1/private-package' import is restricted from being used by a pattern. usage of import1 private modules not allowed.",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 24`] = `
+{
+  "code": "export * from 'import1';",
+  "diagnostics": [
+    {
+      "message": "'import1' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 25`] = `
+{
+  "code": "import type { InvalidTestCase } from '@typescript-eslint/utils/dist/ts-eslint';",
+  "diagnostics": [
+    {
+      "message": "'@typescript-eslint/utils/dist/ts-eslint' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 26`] = `
+{
+  "code": "import { Bar, type Baz } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar and Baz from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 27`] = `
+{
+  "code": "import { Bar, type Baz } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar and Baz from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+    {
+      "message": "'Baz' import from 'import-foo' is restricted. Please use Bar and Baz from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 28`] = `
+{
+  "code": "export { Bar, type Baz } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar and Baz from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 29`] = `
+{
+  "code": "export { Bar, type Baz } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted. Please use Bar and Baz from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+    {
+      "message": "'Baz' import from 'import-foo' is restricted. Please use Bar and Baz from /import-bar/baz/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 30`] = `
+{
+  "code": "import x = require('foo');",
+  "diagnostics": [
+    {
+      "message": "'default' import from 'foo' is restricted.",
+      "messageId": "importName",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 31`] = `
+{
+  "code": "import x = require('foo');",
+  "diagnostics": [
+    {
+      "message": "'default' import from 'foo' is restricted because only 'namedX' is allowed.",
+      "messageId": "allowedImportName",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

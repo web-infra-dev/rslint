@@ -1,0 +1,775 @@
+// Rstest Snapshot v1
+
+exports[`max-depth > invalid 1`] = `
+{
+  "code": "function foo() { if (true) { if (false) { if (true) { } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 2`] = `
+{
+  "code": "var foo = () => { if (true) { if (false) { if (true) { } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 3`] = `
+{
+  "code": "function foo() { if (true) {} else { for(;;) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 4`] = `
+{
+  "code": "function foo() { while (true) { if (true) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 5`] = `
+{
+  "code": "function foo() { for (let x of foo) { if (true) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 6`] = `
+{
+  "code": "function foo() { while (true) { if (true) { if (false) { } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 7`] = `
+{
+  "code": "function foo() { if (true) { if (false) { if (true) { if (false) { if (true) { } } } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 68,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 8`] = `
+{
+  "code": "function foo() { if (true) { if (false) { if (true) { } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 9`] = `
+{
+  "code": "function foo() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (5). Maximum allowed is 4.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 10`] = `
+{
+  "code": "function foo() { if (true) {} }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (1). Maximum allowed is 0.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 11`] = `
+{
+  "code": "class C { static { if (1) { if (2) { if (3) {} } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 12`] = `
+{
+  "code": "if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 13`] = `
+{
+  "code": "function foo() { if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 14`] = `
+{
+  "code": "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } if (2) { if (3) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 89,
+          "line": 1,
+        },
+        "start": {
+          "column": 80,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 15`] = `
+{
+  "code": "if (a) { if (b) { if (c) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 16`] = `
+{
+  "code": "(function () { if (a) { if (b) { if (c) {} } } })()",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 17`] = `
+{
+  "code": "async function f() { if (a) { if (b) { if (c) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 18`] = `
+{
+  "code": "function* g() { if (a) { if (b) { if (c) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 19`] = `
+{
+  "code": "function f() { try { } catch (e) { if (a) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 20`] = `
+{
+  "code": "function f() { try { } finally { if (a) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 21`] = `
+{
+  "code": "function f() { switch (x) { case 1: { for (;;) { if (a) {} } break; } case 2: break; } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 22`] = `
+{
+  "code": "function a() { if (1) { if (2) { if (3) {} } } }
+function b() { while (1) { while (2) { while (3) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 2,
+        },
+        "start": {
+          "column": 40,
+          "line": 2,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 23`] = `
+{
+  "code": "function f() { if (1) { if (2) { if (3) {} } if (4) { if (5) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 24`] = `
+{
+  "code": "function foo() { if (a) { if (b) { if (c) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 25`] = `
+{
+  "code": "function f() { if (a) {} else { if (b) {} } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (2). Maximum allowed is 1.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 26`] = `
+{
+  "code": "function f() { while (true) if (a) for (;;) {} }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 27`] = `
+{
+  "code": "var C = class { method() { if (a) { if (b) { if (c) {} } } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-depth > invalid 28`] = `
+{
+  "code": "namespace N { if (a) { if (b) { if (c) {} } } }",
+  "diagnostics": [
+    {
+      "message": "Blocks are nested too deeply (3). Maximum allowed is 2.",
+      "messageId": "tooDeeply",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-depth",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

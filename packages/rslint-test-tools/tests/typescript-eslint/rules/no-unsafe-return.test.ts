@@ -171,6 +171,41 @@ function foo(): Set<number> {
         }
       }
     `,
+    `
+      function foo(): readonly [1, 2] {
+        return [1, 2] as const;
+      }
+    `,
+    `
+      function foo(): unknown {
+        return 1 as unknown;
+      }
+    `,
+    `
+      function foo(this: { n: number }) {
+        return this;
+      }
+    `,
+    `
+      function foo(): void {
+        return undefined;
+      }
+    `,
+    `
+      type AsArray<T> = T extends any[] ? T : [T];
+      interface Hook<T> {
+        call(data: AsArray<T>[0]): AsArray<T>[0];
+      }
+      declare function getHooks<T>(): Hook<T>[];
+      function reduceHooks<T>(
+        data: AsArray<T>[0],
+        fn: (hook: Hook<T>, data: AsArray<T>[0]) => AsArray<T>[0],
+      ): AsArray<T>[0] {
+        return getHooks<T>().reduce((d, hook) => {
+          return fn(hook, d);
+        }, data);
+      }
+    `,
   ],
   invalid: [
     {
@@ -729,6 +764,205 @@ async function foo() {
           line: 8,
           messageId: 'unsafeReturn',
         },
+      ],
+    },
+    {
+      code: `
+class Foo {
+  bar() {
+    return 1 as any;
+  }
+}
+      `,
+      errors: [
+        { column: 5, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+class Foo {
+  bar(): string {
+    return 1 as any;
+  }
+}
+      `,
+      errors: [
+        { column: 5, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+class Foo {
+  get val() {
+    return 1 as any;
+  }
+}
+      `,
+      errors: [
+        { column: 5, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function* gen() {
+  return 1 as any;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 3, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+async function* gen() {
+  return 1 as any;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 3, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function outer() {
+  function inner() {
+    return 1 as any;
+  }
+  return 1;
+}
+      `,
+      errors: [
+        { column: 5, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function foo(): string {
+  return 1 as unknown as any;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 3, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function foo(): string {
+  const x: any = 1;
+  return x satisfies any;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function foo(): string {
+  const x: any = 1;
+  return x!;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+declare const cond: boolean;
+function foo(): string {
+  return cond ? (1 as any) : 'x';
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function foo(): string {
+  try {
+    return 1 as any;
+  } catch {
+    return 'x';
+  }
+}
+      `,
+      errors: [
+        { column: 5, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function foo(n: number): string {
+  switch (n) {
+    case 1:
+      return 1 as any;
+    default:
+      return 'x';
+  }
+}
+      `,
+      errors: [
+        { column: 7, data: { type: '`any`' }, line: 5, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+function foo(x: boolean): string {
+  if (x) return 'y';
+  return 1 as any;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+class Foo {
+  make: () => Set<string> = () => new Set<any>();
+}
+      `,
+      errors: [
+        {
+          column: 35,
+          data: { receiver: 'Set<string>', sender: 'Set<any>' },
+          line: 3,
+          messageId: 'unsafeReturnAssignment',
+        },
+      ],
+    },
+    {
+      code: `
+const f: () => Promise<number> = async () => 1 as any;
+      `,
+      errors: [
+        { column: 46, data: { type: '`any`' }, line: 2, messageId: 'unsafeReturn' },
+      ],
+    },
+    {
+      code: `
+const obj = {
+  foo() {
+    return this;
+  },
+};
+      `,
+      errors: [
+        { column: 5, data: { type: '`any`' }, line: 4, messageId: 'unsafeReturnThis' },
+      ],
+    },
+    {
+      code: `
+function overload(x: number): number;
+function overload(x: string): string;
+function overload(x: any): any {
+  return x;
+}
+      `,
+      errors: [
+        { column: 3, data: { type: '`any`' }, line: 5, messageId: 'unsafeReturn' },
       ],
     },
   ],

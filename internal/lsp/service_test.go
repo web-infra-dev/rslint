@@ -1292,3 +1292,260 @@ func TestCloseAndReopen(t *testing.T) {
 		t.Error("stale diagnostics should not reappear after reopen")
 	}
 }
+
+
+// ======== tsConfigPaths lifecycle tests ========
+
+func TestHandleConfigUpdate_RebuildsTsConfigPaths(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	ctx := context.Background()
+
+	// Set stale state
+	s.tsConfigPathsByConfig = map[string][]string{"file:///old": {"/old/tsconfig.json"}}
+
+	// Config update with no parserOptions.project and no tsconfig.json (mockFS has no files)
+	// → ResolveTsConfigPaths returns nil → per-config entry should be nil, and
+	// stale entries should be dropped.
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{
+						"rules": map[string]any{"no-console": "error"},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if _, stale := s.tsConfigPathsByConfig["file:///old"]; stale {
+		t.Errorf("expected stale config entry to be dropped, still present in %v", s.tsConfigPathsByConfig)
+	}
+	entry, ok := s.tsConfigPathsByConfig["file:///project"]
+	if !ok {
+		t.Fatalf("expected per-config entry for file:///project, got %v", s.tsConfigPathsByConfig)
+	}
+	if entry != nil {
+		t.Errorf("expected nil tsconfig paths for config with no project/auto-detect, got %v", entry)
+	}
+}
+
+func TestHandleConfigUpdate_EmptyConfigs_ClearsTsConfigPaths(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	ctx := context.Background()
+
+	s.tsConfigPathsByConfig = map[string][]string{"file:///project": {"/project/tsconfig.json"}}
+
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if len(s.tsConfigPathsByConfig) != 0 {
+		t.Errorf("expected tsConfigPathsByConfig empty after clearing configs, got %v", s.tsConfigPathsByConfig)
+	}
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths nil after empty config update, got %v", s.tsConfigPaths)
+	}
+}
+
+func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{"/project-a/tsconfig.json": true}}
+
+	// Config A has a project that resolves; Config B has neither a project
+	// nor an auto-detectable tsconfig. The two must be tracked independently
+	// so B's missing tsconfig does not disable filtering for A's files.
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///project-a": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+		"file:///project-b": {
+			{
+				Rules: config.Rules{"no-console": "error"},
+			},
+		},
+	}
+
+	s.rebuildTsConfigPaths()
+
+	entryA := s.tsConfigPathsByConfig["file:///project-a"]
+	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
+		t.Errorf("expected project-a to resolve to its tsconfig, got %v", entryA)
+	}
+	if entry, ok := s.tsConfigPathsByConfig["file:///project-b"]; !ok || entry != nil {
+		t.Errorf("expected project-b entry present and nil (no tsconfig), got present=%v value=%v", ok, entry)
+	}
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected legacy tsConfigPaths nil in JS-config mode, got %v", s.tsConfigPaths)
+	}
+}
+
+func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{
+		"/project-a/tsconfig.json": true,
+		"/project-b/tsconfig.json": true,
+	}}
+
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///project-a": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+		"file:///project-b": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+	}
+
+	s.rebuildTsConfigPaths()
+
+	entryA := s.tsConfigPathsByConfig["file:///project-a"]
+	if len(entryA) != 1 || entryA[0] != "/project-a/tsconfig.json" {
+		t.Errorf("expected project-a → /project-a/tsconfig.json, got %v", entryA)
+	}
+	entryB := s.tsConfigPathsByConfig["file:///project-b"]
+	if len(entryB) != 1 || entryB[0] != "/project-b/tsconfig.json" {
+		t.Errorf("expected project-b → /project-b/tsconfig.json, got %v", entryB)
+	}
+}
+
+// Regression test: a nested config without any resolvable tsconfig must not
+// cascade its "allow-all" fallback onto files under OTHER configs.
+// See https://github.com/web-infra-dev/rslint/issues/671 — the create-rstack
+// workspace ships a `template-rslint/` starter directory with its own
+// rslint.config.ts but no tsconfig.json, which used to flip the whole
+// workspace into allow-all and incorrectly run type-aware rules on files
+// under the root config.
+func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
+
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///project": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+		"file:///project/template-rslint": {
+			{
+				Rules: config.Rules{"no-console": "error"},
+			},
+		},
+	}
+
+	s.rebuildTsConfigPaths()
+
+	// File under root config → root's resolved tsconfig.
+	rootPaths := s.tsConfigPathsForURI("file:///project/test/skills.test.ts")
+	if len(rootPaths) != 1 || rootPaths[0] != "/project/tsconfig.json" {
+		t.Errorf("expected root-config file to see [/project/tsconfig.json], got %v", rootPaths)
+	}
+
+	// File under nested template config → nil (allow-all) but scoped to this
+	// config only; the root config's list above must remain unaffected.
+	nestedPaths := s.tsConfigPathsForURI("file:///project/template-rslint/foo.ts")
+	if nestedPaths != nil {
+		t.Errorf("expected nested-config file to see nil tsconfig paths (allow-all), got %v", nestedPaths)
+	}
+}
+
+func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+
+	// No jsConfigs, no rslintConfigPath
+	s.rebuildTsConfigPaths()
+
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths nil when no config, got %v", s.tsConfigPaths)
+	}
+}
+
+// ======== runLintWithSession: ignored-file short-circuit ========
+
+// runLintWithSession must early-return for files matching the config's
+// `ignores` patterns, WITHOUT touching the session. This test proves the
+// guard semantically (not just by coincidence of a no-op session):
+//
+//  1. Positive: call with session=nil AND an ignored path. The call must
+//     return empty diagnostics with no error. Passing a nil session is the
+//     key trick — if the guard is removed, the very next line dereferences
+//     session and panics, making the test fail loudly rather than silently.
+//  2. Control: call with session=nil AND a non-ignored path. The call MUST
+//     panic (runtime nil-pointer dereference). This proves the only thing
+//     keeping the positive case alive is the ignore early-return, not some
+//     accidental nil-session tolerance downstream.
+func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
+	ctx := context.Background()
+	cwd := "/project"
+	cfg := config.RslintConfig{
+		// Global ignores entry: hides everything under lib/.
+		{Ignores: []string{"lib/**"}},
+	}
+
+	ignoredURI := lsproto.DocumentUri("file:///project/lib/util.ts")
+	normalURI := lsproto.DocumentUri("file:///project/src/main.ts")
+
+	t.Run("ignored file returns empty without touching session", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("runLintWithSession panicked on ignored file (early-return missing?): %v", r)
+			}
+		}()
+
+		diags, err := runLintWithSession(ignoredURI, nil, ctx, cfg, cwd, false, nil, nil)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if diags == nil {
+			t.Fatal("expected non-nil empty slice (LSP protocol expects [], not null)")
+		}
+		if len(diags) != 0 {
+			t.Errorf("expected 0 diagnostics for ignored file, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("non-ignored file falls through to session (nil-session → panic)", func(t *testing.T) {
+		// This control test asserts the inverse: without a matching ignore,
+		// the function proceeds to `session.GetLanguageService(...)` which
+		// must nil-dereference. If this test stops panicking, it means some
+		// other short-circuit has crept in and the positive test above may
+		// be passing for the wrong reason.
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic when non-ignored file is given a nil session, got none — the ignore short-circuit may be matching too broadly")
+			}
+		}()
+		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+	})
+}

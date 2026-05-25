@@ -607,6 +607,363 @@ function test(a?: boolean): boolean {
         };
       `,
     },
+    // basic === true
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean === true) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+    },
+    // basic === false
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean === false) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // basic !== true
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean !== true) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'negated',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // loose == true
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean == true) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+    },
+    // loose == false
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean == false) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // loose != true
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean != true) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'negated',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // loose != false
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (varBoolean != false) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'negated',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+    },
+    // loose == with literal on left
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (true == varBoolean) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+    },
+    // strict === with true literal on left
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (true === varBoolean) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+    },
+    // strict === with false literal on left
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (false === varBoolean) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // loose == with false literal on left
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (false == varBoolean) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // loose != with true literal on left
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (true != varBoolean) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'negated',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+    },
+    // loose != with false literal on left (existing)
+    {
+      code: `
+        declare const varBoolean: boolean;
+        if (false != varBoolean) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'negated',
+        },
+      ],
+      output: `
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+    },
+    // literal false type
+    {
+      code: `
+        declare const varFalse: false;
+        if (varFalse === false) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'direct',
+        },
+      ],
+      output: `
+        declare const varFalse: false;
+        if (!varFalse) {
+        }
+      `,
+    },
+    // both nullable options false — comparing to true
+    {
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === true) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'comparingNullableToTrueDirect',
+        },
+      ],
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull) {
+        }
+      `,
+    },
+    // both nullable options false — comparing to false
+    {
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === false) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'comparingNullableToFalse',
+        },
+      ],
+      options: [
+        {
+          allowComparingNullableBooleansToTrue: false,
+          allowComparingNullableBooleansToFalse: false,
+        },
+      ],
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
+    },
+    // nullable with literal on left side
+    {
+      code: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (true === varBooleanOrUndefined) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'comparingNullableToTrueDirect',
+        },
+      ],
+      options: [{ allowComparingNullableBooleansToTrue: false }],
+      output: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (varBooleanOrUndefined) {
+        }
+      `,
+    },
+    // nullable with false literal on left side
+    {
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (false === varBooleanOrNull) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'comparingNullableToFalse',
+        },
+      ],
+      options: [{ allowComparingNullableBooleansToFalse: false }],
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
+    },
+    // nullable + unary negation + !== false: both ! and ?? true blocks fire
+    {
+      code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull !== false)) {
+        }
+      `,
+      errors: [
+        {
+          messageId: 'comparingNullableToFalse',
+        },
+      ],
+      options: [{ allowComparingNullableBooleansToFalse: false }],
+      output: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
+    },
     {
       // Skip: requires per-test-case tsconfigRootDir which the test framework doesn't support
       skip: true,

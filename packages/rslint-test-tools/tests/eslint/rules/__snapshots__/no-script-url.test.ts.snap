@@ -1,0 +1,745 @@
+// Rstest Snapshot v1
+
+exports[`no-script-url > invalid 1`] = `
+{
+  "code": "var a = 'javascript:void(0);';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 2`] = `
+{
+  "code": "var a = 'javascript:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 3`] = `
+{
+  "code": "var a = "JavaScript:void(0)";",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 4`] = `
+{
+  "code": "var a = 'JAVASCRIPT:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 5`] = `
+{
+  "code": "var a = 'jAvAsCrIpT:void(0)';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 6`] = `
+{
+  "code": "var a = \`javascript:\`;",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 7`] = `
+{
+  "code": "var a = \`JavaScript:\`;",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 8`] = `
+{
+  "code": "location.href = 'javascript:void(0)';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 9`] = `
+{
+  "code": "location.href = \`javascript:void(0)\`;",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 10`] = `
+{
+  "code": "var obj = { href: 'javascript:void(0)' };",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 11`] = `
+{
+  "code": "var arr = ['javascript:'];",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 12`] = `
+{
+  "code": "fn('javascript:');",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 13`] = `
+{
+  "code": "function f() { return 'javascript:'; }",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 14`] = `
+{
+  "code": "var a = x ? 'javascript:' : 'safe';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 15`] = `
+{
+  "code": "function f(url = 'javascript:') {}",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 16`] = `
+{
+  "code": "class A { url = 'javascript:' }",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 17`] = `
+{
+  "code": "enum E { A = 'javascript:' }",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 18`] = `
+{
+  "code": "a('javascript:', 'javascript:void(0)');",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 19`] = `
+{
+  "code": "tag\`\${'javascript:'}\`;",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 20`] = `
+{
+  "code": "tag\`\${\`javascript:\`}\`;",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 21`] = `
+{
+  "code": "const f = () => 'javascript:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 22`] = `
+{
+  "code": "var a = x ?? 'javascript:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 23`] = `
+{
+  "code": "var a = x || 'javascript:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 24`] = `
+{
+  "code": "var a = obj['javascript:'];",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 25`] = `
+{
+  "code": "var obj = { ['javascript:']: 1 };",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 26`] = `
+{
+  "code": "type T = 'javascript:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 27`] = `
+{
+  "code": "var a = 'javascript:' + path;",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-script-url > invalid 28`] = `
+{
+  "code": "var a =
+  'javascript:';",
+  "diagnostics": [
+    {
+      "message": "Script URL is a form of eval.",
+      "messageId": "unexpectedScriptURL",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-script-url",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

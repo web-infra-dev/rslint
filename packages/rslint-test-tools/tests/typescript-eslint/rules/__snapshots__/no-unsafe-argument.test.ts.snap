@@ -37,7 +37,7 @@ foo(error);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "message": "Unsafe argument of type error typed assigned to a parameter of type number.",
       "messageId": "unsafeArgument",
       "range": {
         "end": {
@@ -293,7 +293,7 @@ foo(...x);
       ",
   "diagnostics": [
     {
-      "message": "Unsafe spread of a tuple type. The argument is of type any and is assigned to a parameter of type number.",
+      "message": "Unsafe spread of a tuple type. The argument is error typed and is assigned to a parameter of type number.",
       "messageId": "unsafeTupleSpread",
       "range": {
         "end": {

@@ -222,7 +222,7 @@ func getExpectedDirection(testExpr *ast.Node, counterOnLeft bool) int {
 }
 
 // ForDirectionRule enforces that for loop update clauses move the counter in the right direction
-var ForDirectionRule = rule.CreateRule(rule.Rule{
+var ForDirectionRule = rule.Rule{
 	Name: "for-direction",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -313,4 +313,4 @@ var ForDirectionRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

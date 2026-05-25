@@ -1,4 +1,4 @@
-# react/jsx-closing-tag-location
+# jsx-closing-tag-location
 
 ## Rule Details
 

@@ -47,7 +47,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 11,
+          "column": 3,
           "line": 3,
         },
       },
@@ -77,7 +77,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 13,
+          "column": 3,
           "line": 3,
         },
       },
@@ -107,7 +107,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 12,
+          "column": 3,
           "line": 3,
         },
       },
@@ -137,7 +137,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 20,
+          "column": 3,
           "line": 3,
         },
       },
@@ -167,7 +167,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 22,
+          "column": 3,
           "line": 3,
         },
       },
@@ -189,7 +189,7 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private method #method.",
+      "message": "Expected 'this' to be used by class private method '#method'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -309,7 +309,7 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private getter #getter.",
+      "message": "Expected 'this' to be used by class private getter '#getter'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -429,7 +429,7 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private setter #setter.",
+      "message": "Expected 'this' to be used by class private setter '#setter'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -489,7 +489,7 @@ class Foo implements Bar {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private method #method.",
+      "message": "Expected 'this' to be used by class private method '#method'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -527,7 +527,7 @@ class Foo implements Bar {
           "line": 3,
         },
         "start": {
-          "column": 11,
+          "column": 3,
           "line": 3,
         },
       },
@@ -557,7 +557,7 @@ class Foo implements Bar {
           "line": 3,
         },
         "start": {
-          "column": 13,
+          "column": 3,
           "line": 3,
         },
       },
@@ -609,7 +609,7 @@ class Foo implements Bar {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private getter #getter.",
+      "message": "Expected 'this' to be used by class private getter '#getter'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -729,7 +729,7 @@ class Foo implements Bar {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private setter #setter.",
+      "message": "Expected 'this' to be used by class private setter '#setter'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -827,7 +827,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 12,
+          "column": 3,
           "line": 3,
         },
       },
@@ -917,7 +917,7 @@ class Foo implements Bar {
           "line": 3,
         },
         "start": {
-          "column": 12,
+          "column": 3,
           "line": 3,
         },
       },
@@ -1029,7 +1029,7 @@ class Foo implements Bar {
       ",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private method #property.",
+      "message": "Expected 'this' to be used by class private method '#property'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -1067,7 +1067,7 @@ class Foo {
           "line": 3,
         },
         "start": {
-          "column": 12,
+          "column": 3,
           "line": 3,
         },
       },
@@ -1097,7 +1097,7 @@ class Foo implements Bar {
           "line": 3,
         },
         "start": {
-          "column": 12,
+          "column": 3,
           "line": 3,
         },
       },
@@ -1127,7 +1127,7 @@ class Foo implements Bar {
           "line": 3,
         },
         "start": {
-          "column": 11,
+          "column": 3,
           "line": 3,
         },
       },
@@ -1157,7 +1157,7 @@ class Foo implements Bar {
           "line": 3,
         },
         "start": {
-          "column": 13,
+          "column": 3,
           "line": 3,
         },
       },

@@ -280,7 +280,7 @@ exports[`class-methods-use-this > invalid 11`] = `
       "ruleName": "@typescript-eslint/class-methods-use-this",
     },
     {
-      "message": "Expected 'this' to be used by class private method #bar.",
+      "message": "Expected 'this' to be used by class private method '#bar'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -504,7 +504,7 @@ exports[`class-methods-use-this > invalid 15`] = `
   "code": "class A { #foo = function() {} }",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private method #foo.",
+      "message": "Expected 'this' to be used by class private method '#foo'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -530,7 +530,7 @@ exports[`class-methods-use-this > invalid 16`] = `
   "code": "class A { #foo = () => {} }",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private method #foo.",
+      "message": "Expected 'this' to be used by class private method '#foo'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -556,7 +556,7 @@ exports[`class-methods-use-this > invalid 17`] = `
   "code": "class A { #foo() {} }",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private method #foo.",
+      "message": "Expected 'this' to be used by class private method '#foo'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -582,7 +582,7 @@ exports[`class-methods-use-this > invalid 18`] = `
   "code": "class A { get #foo() {} }",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private getter #foo.",
+      "message": "Expected 'this' to be used by class private getter '#foo'.",
       "messageId": "missingThis",
       "range": {
         "end": {
@@ -608,7 +608,7 @@ exports[`class-methods-use-this > invalid 19`] = `
   "code": "class A { set #foo(x) {} }",
   "diagnostics": [
     {
-      "message": "Expected 'this' to be used by class private setter #foo.",
+      "message": "Expected 'this' to be used by class private setter '#foo'.",
       "messageId": "missingThis",
       "range": {
         "end": {

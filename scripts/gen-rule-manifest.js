@@ -25,8 +25,8 @@ function getCoreRuleEntries() {
 
   return fs
     .readdirSync(CORE_RULES_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-    .map(d => ({ rule: d.name, group: 'eslint', pluginDir: null }));
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => ({ rule: d.name, group: 'eslint', pluginDir: null }));
 }
 
 function getPluginRuleEntries() {
@@ -34,8 +34,8 @@ function getPluginRuleEntries() {
   if (!fs.existsSync(PLUGINS_DIR)) return [];
   const plugins = fs
     .readdirSync(PLUGINS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-    .map(d => d.name);
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => d.name);
   const entries = [];
   const pluginNameCache = new Map();
   function getPluginDisplayName(plugin) {
@@ -60,10 +60,10 @@ function getPluginRuleEntries() {
     const ruleDirs = fs
       .readdirSync(rulesDir, { withFileTypes: true })
       .filter(
-        d =>
+        (d) =>
           d.isDirectory() && d.name !== 'fixtures' && !d.name.startsWith('.'),
       )
-      .map(d => d.name);
+      .map((d) => d.name);
     for (const rule of ruleDirs) {
       entries.push({ rule, group: pluginDisplayName, pluginDir: plugin });
     }
@@ -91,6 +91,142 @@ function getIncludedRules() {
   return included;
 }
 
+function isEscaped(content, index) {
+  let backslashes = 0;
+  for (let i = index - 1; i >= 0 && content[i] === '\\'; i--) {
+    backslashes++;
+  }
+  return backslashes % 2 === 1;
+}
+
+function createParserState() {
+  return {
+    stack: [{ type: 'normal' }],
+  };
+}
+
+function getCurrentContext(state) {
+  return state.stack[state.stack.length - 1];
+}
+
+function isStatementLevel(state) {
+  return state.stack.length === 1 && getCurrentContext(state).type === 'normal';
+}
+
+function advanceParserState(state, content, start, end) {
+  for (let i = start; i < end; i++) {
+    const ch = content[i];
+    const next = content[i + 1];
+    const escaped = isEscaped(content, i);
+    const context = getCurrentContext(state);
+
+    if (context.type === 'lineComment') {
+      if (ch === '\n') {
+        state.stack.pop();
+      }
+      continue;
+    }
+    if (context.type === 'blockComment') {
+      if (ch === '*' && next === '/') {
+        state.stack.pop();
+        i++;
+      }
+      continue;
+    }
+    if (context.type === 'singleQuote') {
+      if (ch === "'" && !escaped) {
+        state.stack.pop();
+      }
+      continue;
+    }
+    if (context.type === 'doubleQuote') {
+      if (ch === '"' && !escaped) {
+        state.stack.pop();
+      }
+      continue;
+    }
+    if (context.type === 'templateLiteral') {
+      if (ch === '`' && !escaped) {
+        state.stack.pop();
+      } else if (ch === '$' && next === '{' && !escaped) {
+        state.stack.push({ type: 'templateExpression', braceDepth: 0 });
+        i++;
+      }
+      continue;
+    }
+    if (context.type === 'templateExpression') {
+      if (ch === '}' && !escaped) {
+        if (context.braceDepth === 0) {
+          state.stack.pop();
+        } else {
+          context.braceDepth--;
+        }
+        continue;
+      }
+      if (ch === '{' && !escaped) {
+        context.braceDepth++;
+        continue;
+      }
+    }
+
+    if (ch === '/' && next === '/' && !escaped) {
+      state.stack.push({ type: 'lineComment' });
+      i++;
+    } else if (ch === '/' && next === '*' && !escaped) {
+      state.stack.push({ type: 'blockComment' });
+      i++;
+    } else if (ch === "'" && !escaped) {
+      state.stack.push({ type: 'singleQuote' });
+    } else if (ch === '"' && !escaped) {
+      state.stack.push({ type: 'doubleQuote' });
+    } else if (ch === '`' && !escaped) {
+      state.stack.push({ type: 'templateLiteral' });
+    }
+  }
+}
+
+function getStatementLevelSkipCases(content, relPath) {
+  // Match top-level it.skip/describe.skip only. Ignore Jest API calls embedded in
+  // RuleTester fixture strings (code/output properties or template literals).
+  const skipCases = [];
+  const lines = content.split('\n');
+  const stmtSkipRegex =
+    /(?:^|[^\w$])((?:it|describe)\.skip\s*\(['"]([^'"]+)['"])/g;
+  const state = createParserState();
+  let offset = 0;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+    let cursor = offset;
+    let match;
+
+    stmtSkipRegex.lastIndex = 0;
+    while ((match = stmtSkipRegex.exec(line))) {
+      const prefixLength = match[0].length - match[1].length;
+      const matchIndex = match.index + prefixLength;
+      const absoluteMatchIndex = offset + matchIndex;
+
+      advanceParserState(state, content, cursor, absoluteMatchIndex);
+      if (isStatementLevel(state)) {
+        skipCases.push({
+          name: match[2],
+          url: `${relPath}#L${lineNum}`,
+        });
+      }
+      cursor = absoluteMatchIndex;
+    }
+
+    advanceParserState(state, content, cursor, offset + line.length);
+    if (getCurrentContext(state).type === 'lineComment') {
+      state.stack.pop();
+    }
+    offset += line.length + 1;
+  }
+
+  return skipCases;
+}
+
 function getSkipCases(rule, group) {
   // Return skip cases as [{name, url}]
   const testDir = groupToTestDir(group);
@@ -99,20 +235,6 @@ function getSkipCases(rule, group) {
   if (!fs.existsSync(testFile)) return [];
   const content = fs.readFileSync(testFile, 'utf-8');
   const relPath = `packages/rslint-test-tools/tests/${testDir}/rules/${rule.replace(/_/g, '-')}.test.ts`;
-  // Get current commit hash
-  let commit = process.env.GITHUB_SHA;
-  if (!commit) {
-    try {
-      commit = require('child_process')
-        .execSync('git rev-parse HEAD')
-        .toString()
-        .trim();
-    } catch {
-      commit = 'main';
-    }
-  }
-  // url is changed to relative path + line number
-  // Match { ... skip: true, name: 'xxx' } or it.skip('name', ...)
   const skipCases = [];
   // 1. Object case: { ..., skip: true, name: 'xxx' }
   const objCaseRegex =
@@ -127,30 +249,8 @@ function getSkipCases(rule, group) {
       url: `${relPath}#L${line}`,
     });
   }
-  // 2. it.skip('name', ...)
-  // 2. it.skip('name', ...)
-  const itSkipRegex = /it\.skip\(['"]([^'"]+)['"]/g;
-  while ((m = itSkipRegex.exec(content))) {
-    const idx = m.index;
-    const before = content.slice(0, idx);
-    const line = before.split('\n').length;
-    skipCases.push({
-      name: m[1],
-      url: `${relPath}#L${line}`,
-    });
-  }
-  // 3. describe.skip('name', ...)
-  // 3. describe.skip('name', ...)
-  const describeSkipRegex = /describe\.skip\(['"]([^'"]+)['"]/g;
-  while ((m = describeSkipRegex.exec(content))) {
-    const idx = m.index;
-    const before = content.slice(0, idx);
-    const line = before.split('\n').length;
-    skipCases.push({
-      name: m[1],
-      url: `${relPath}#L${line}`,
-    });
-  }
+  // 2. Top-level it.skip('name', ...) / describe.skip('name', ...)
+  skipCases.push(...getStatementLevelSkipCases(content, relPath));
   return skipCases;
 }
 
@@ -177,7 +277,7 @@ function buildManifest() {
   }
   const rules = Array.from(seen.keys())
     .sort((a, b) => a.localeCompare(b))
-    .map(rule => {
+    .map((rule) => {
       const entry = seen.get(rule);
       let status = 'full';
       let failing_case = [];
@@ -210,4 +310,11 @@ function main() {
   console.log('rule-manifest.json generated at', MANIFEST_PATH);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  buildManifest,
+  getStatementLevelSkipCases,
+};

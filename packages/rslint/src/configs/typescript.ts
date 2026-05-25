@@ -1,12 +1,16 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
+const base: RslintConfigEntry = {
+  files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+  plugins: ['@typescript-eslint'],
+};
+
 // Aligned with official @typescript-eslint/recommended.
 // Includes the eslint-recommended override layer (disables core rules handled by TS,
 // enables TS-beneficial rules).
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
-  files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
-  plugins: ['@typescript-eslint'],
+  ...base,
   languageOptions: {
     parserOptions: {
       projectService: true,
@@ -21,45 +25,45 @@ const recommended: RslintConfigEntry = {
     'no-class-assign': 'off',
     'no-const-assign': 'off',
     'no-dupe-args': 'off',
-    // 'no-dupe-class-members': 'off', // not implemented
+    'no-dupe-class-members': 'off',
     'no-dupe-keys': 'off',
-    // 'no-func-assign': 'off', // not implemented
-    // 'no-import-assign': 'off', // not implemented
-    // 'no-new-native-nonconstructor': 'off', // not implemented
-    // 'no-new-symbol': 'off', // not implemented (deprecated, use no-new-native-nonconstructor)
-    // 'no-obj-calls': 'off', // not implemented
-    // 'no-redeclare': 'off', // not implemented
-    // 'no-setter-return': 'off', // not implemented
-    // 'no-this-before-super': 'off', // not implemented
-    // 'no-undef': 'off', // not implemented
-    // 'no-unreachable': 'off', // not implemented
-    // 'no-unsafe-negation': 'off', // not implemented
-    // 'no-with': 'off', // not implemented
+    'no-func-assign': 'off',
+    'no-import-assign': 'off',
+    'no-new-native-nonconstructor': 'off',
+    'no-new-symbol': 'off',
+    'no-obj-calls': 'off',
+    'no-redeclare': 'off',
+    'no-setter-return': 'off',
+    'no-this-before-super': 'off',
+    'no-undef': 'off',
+    'no-unreachable': 'off',
+    'no-unsafe-negation': 'off',
+    'no-with': 'off',
 
     // TS-beneficial rules enabled by eslint-recommended override
-    // 'no-var': 'error', // not implemented
-    // 'prefer-const': 'error', // not implemented
-    // 'prefer-rest-params': 'error', // not implemented
-    // 'prefer-spread': 'error', // not implemented
+    'no-var': 'error',
+    'prefer-const': 'error',
+    'prefer-rest-params': 'error',
+    'prefer-spread': 'error',
 
     // Remaining eslint:recommended rules (not turned off by TS)
     // 'no-control-regex': 'error', // not implemented
-    // 'no-delete-var': 'error', // not implemented
+    'no-delete-var': 'error',
     // 'no-dupe-else-if': 'error', // not implemented
-    // 'no-empty-character-class': 'error', // not implemented
+    'no-empty-character-class': 'error',
     // 'no-empty-static-block': 'error', // not implemented
-    // 'no-ex-assign': 'error', // not implemented
+    'no-ex-assign': 'error',
     // 'no-extra-boolean-cast': 'error', // not implemented
     // 'no-fallthrough': 'error', // not implemented
-    // 'no-global-assign': 'error', // not implemented
-    // 'no-invalid-regexp': 'error', // not implemented
+    'no-global-assign': 'error',
+    'no-invalid-regexp': 'error',
     // 'no-irregular-whitespace': 'error', // not implemented
     // 'no-misleading-character-class': 'error', // not implemented
     // 'no-nonoctal-decimal-escape': 'error', // not implemented
     // 'no-octal': 'error', // not implemented
     // 'no-prototype-builtins': 'error', // not implemented
     // 'no-regex-spaces': 'error', // not implemented
-    // 'no-self-assign': 'error', // not implemented
+    'no-self-assign': 'error',
     // 'no-shadow-restricted-names': 'error', // not implemented
     // 'no-unexpected-multiline': 'error', // not implemented
     // 'no-unsafe-finally': 'error', // not implemented
@@ -73,7 +77,7 @@ const recommended: RslintConfigEntry = {
     // 'no-useless-escape': 'error', // not implemented
     // 'preserve-caught-error': 'error', // not implemented
     // 'require-yield': 'error', // not implemented
-    // 'use-isnan': 'error', // not implemented
+    'use-isnan': 'error',
     // 'valid-typeof': 'error', // not implemented
     'for-direction': 'error',
     'no-async-promise-executor': 'error',
@@ -102,13 +106,19 @@ const recommended: RslintConfigEntry = {
     '@typescript-eslint/no-non-null-asserted-optional-chain': 'error',
     '@typescript-eslint/no-require-imports': 'error',
     '@typescript-eslint/no-this-alias': 'error',
-    // '@typescript-eslint/no-unnecessary-type-constraint': 'error', // not implemented
+    '@typescript-eslint/no-unnecessary-type-constraint': 'error',
     // '@typescript-eslint/no-unsafe-declaration-merging': 'error', // not implemented
     // '@typescript-eslint/no-unsafe-function-type': 'error', // not implemented
-    // 'no-unused-expressions': 'off', // not implemented
-    // '@typescript-eslint/no-unused-expressions': 'error', // not implemented
+    'no-unused-expressions': 'off',
+    '@typescript-eslint/no-unused-expressions': 'error',
     'no-unused-vars': 'off',
-    '@typescript-eslint/no-unused-vars': 'error',
+    // Differs from typescript-eslint recommended (which uses bare 'error').
+    // Ignoring _-prefixed vars/args is a widely adopted community convention,
+    // so we include it in our default recommended config for better DX.
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+    ],
     // '@typescript-eslint/no-wrapper-object-types': 'error', // not implemented
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
@@ -116,4 +126,4 @@ const recommended: RslintConfigEntry = {
   },
 };
 
-export { recommended };
+export { base, recommended };

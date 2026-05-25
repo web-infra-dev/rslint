@@ -43,7 +43,8 @@ func buildAwaitUsingOfNonAsyncDisposableMessage() rule.RuleMessage {
 }
 
 var AwaitThenableRule = rule.CreateRule(rule.Rule{
-	Name: "await-thenable",
+	Name:             "await-thenable",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindAwaitExpression: func(node *ast.Node) {

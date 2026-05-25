@@ -1,0 +1,2153 @@
+// Rstest Snapshot v1
+
+exports[`no-proto > invalid 1`] = `
+{
+  "code": "var a = obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 2`] = `
+{
+  "code": "obj.__proto__ = b;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 3`] = `
+{
+  "code": "var a = obj["__proto__"];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 4`] = `
+{
+  "code": "obj["__proto__"] = b;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 5`] = `
+{
+  "code": "var a = obj['__proto__'];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 6`] = `
+{
+  "code": "var a = obj[\`__proto__\`];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 7`] = `
+{
+  "code": "obj?.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 8`] = `
+{
+  "code": "obj?.["__proto__"];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 9`] = `
+{
+  "code": "var a = foo.bar.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 10`] = `
+{
+  "code": "obj.__proto__.hasOwnProperty("foo");",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 11`] = `
+{
+  "code": "obj.__proto__.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 12`] = `
+{
+  "code": "a.b.c.d.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 13`] = `
+{
+  "code": "obj?.__proto__?.toString();",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 14`] = `
+{
+  "code": "obj.__proto__();",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 15`] = `
+{
+  "code": "obj["__proto__"]();",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 16`] = `
+{
+  "code": "var a = this.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 17`] = `
+{
+  "code": "this["__proto__"];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 18`] = `
+{
+  "code": "(obj).__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 19`] = `
+{
+  "code": "(obj)["__proto__"];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 20`] = `
+{
+  "code": "(obj as any).__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 21`] = `
+{
+  "code": "(<any>obj).__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 22`] = `
+{
+  "code": "obj!.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 23`] = `
+{
+  "code": "(obj satisfies any).__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 24`] = `
+{
+  "code": "foo(obj.__proto__);",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 25`] = `
+{
+  "code": "console.log(obj["__proto__"]);",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 26`] = `
+{
+  "code": "new (obj.__proto__)();",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 27`] = `
+{
+  "code": "async function f() { await obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 28`] = `
+{
+  "code": "function* g() { yield obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 29`] = `
+{
+  "code": "obj.__proto__\`tagged\`;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 30`] = `
+{
+  "code": "++obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 31`] = `
+{
+  "code": "obj.__proto__++;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 32`] = `
+{
+  "code": "var s = \`\${obj.__proto__}\`;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 33`] = `
+{
+  "code": "var a = x ? obj.__proto__ : null;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 34`] = `
+{
+  "code": "var a = obj.__proto__ || default_;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 35`] = `
+{
+  "code": "var a = x && obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 36`] = `
+{
+  "code": "var a = obj.__proto__ ?? default_;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 37`] = `
+{
+  "code": "(0, obj.__proto__);",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 38`] = `
+{
+  "code": ""x" in obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 39`] = `
+{
+  "code": "obj.__proto__ instanceof Object;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 40`] = `
+{
+  "code": "typeof obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 41`] = `
+{
+  "code": "void obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 42`] = `
+{
+  "code": "delete obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 43`] = `
+{
+  "code": "var a = { ...obj.__proto__ };",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 44`] = `
+{
+  "code": "var a = [...obj.__proto__];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 45`] = `
+{
+  "code": "obj.__proto__ += "";",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 46`] = `
+{
+  "code": "obj.__proto__ ||= x;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 47`] = `
+{
+  "code": "obj.__proto__ &&= x;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 48`] = `
+{
+  "code": "obj.__proto__ ??= x;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 49`] = `
+{
+  "code": "var { a = obj.__proto__ } = b;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 50`] = `
+{
+  "code": "[obj.__proto__] = [1];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 51`] = `
+{
+  "code": "var a = { key: obj.__proto__ };",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 52`] = `
+{
+  "code": "var a = [obj.__proto__];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 53`] = `
+{
+  "code": "var a = { [obj.__proto__]: 1 };",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 54`] = `
+{
+  "code": "for (obj.__proto__ in x) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 55`] = `
+{
+  "code": "for (obj.__proto__ of x) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 56`] = `
+{
+  "code": "function f() { return obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 57`] = `
+{
+  "code": "var f = () => obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 58`] = `
+{
+  "code": "async function f() { return obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 59`] = `
+{
+  "code": "class C { method() { return this.__proto__; } }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 60`] = `
+{
+  "code": "class C { constructor() { this.__proto__ = null; } }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 61`] = `
+{
+  "code": "class C { get p() { return obj.__proto__; } }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 62`] = `
+{
+  "code": "class C { static { obj.__proto__; } }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 63`] = `
+{
+  "code": "class C { x = obj.__proto__ }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 64`] = `
+{
+  "code": "(function() { return obj.__proto__; })();",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 65`] = `
+{
+  "code": "var f = () => ({ a: obj.__proto__ });",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 66`] = `
+{
+  "code": "namespace N { var a = obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 67`] = `
+{
+  "code": "export default obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 68`] = `
+{
+  "code": "if (obj.__proto__) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 69`] = `
+{
+  "code": "for (var x in obj.__proto__) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 70`] = `
+{
+  "code": "for (var x of obj.__proto__) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 71`] = `
+{
+  "code": "while (obj.__proto__) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 72`] = `
+{
+  "code": "switch (obj.__proto__) { case 0: break; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 73`] = `
+{
+  "code": "throw obj.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 74`] = `
+{
+  "code": "do {} while (obj.__proto__);",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 75`] = `
+{
+  "code": "try { obj.__proto__; } catch(e) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 76`] = `
+{
+  "code": "try {} catch(e) { obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 77`] = `
+{
+  "code": "try {} finally { obj.__proto__; }",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 78`] = `
+{
+  "code": "for (obj.__proto__ = 0;;) {}",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 79`] = `
+{
+  "code": "a.__proto__;
+b.__proto__;",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 80`] = `
+{
+  "code": "obj.__proto__; obj["__proto__"];",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-proto > invalid 81`] = `
+{
+  "code": "/* 🚀 */ obj.__proto__",
+  "diagnostics": [
+    {
+      "message": "The '__proto__' property is deprecated.",
+      "messageId": "unexpectedProto",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-proto",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -825,15 +825,60 @@ import type { foo } from 'import2/private/bar';
       ],
     },
     {
+      // allowTypeImports=true: only the value `Bar` is reported; `type Baz` is exempted.
       code: "import { Bar, type Baz } from 'import-foo';",
       errors: [
         {
           messageId: 'importNameWithCustomMessage',
-          type: AST_NODE_TYPES.ImportDeclaration,
+          type: AST_NODE_TYPES.ImportSpecifier,
+        },
+      ],
+      options: [
+        {
+          paths: [
+            {
+              allowTypeImports: true,
+              importNames: ['Bar', 'Baz'],
+              message: 'Please use Bar and Baz from /import-bar/baz/ instead.',
+              name: 'import-foo',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      // allowTypeImports=false: both `Bar` and `type Baz` are reported.
+      code: "import { Bar, type Baz } from 'import-foo';",
+      errors: [
+        {
+          messageId: 'importNameWithCustomMessage',
+          type: AST_NODE_TYPES.ImportSpecifier,
         },
         {
           messageId: 'importNameWithCustomMessage',
-          type: AST_NODE_TYPES.ImportDeclaration,
+          type: AST_NODE_TYPES.ImportSpecifier,
+        },
+      ],
+      options: [
+        {
+          paths: [
+            {
+              allowTypeImports: false,
+              importNames: ['Bar', 'Baz'],
+              message: 'Please use Bar and Baz from /import-bar/baz/ instead.',
+              name: 'import-foo',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      // allowTypeImports=true on export: only `Bar` is reported.
+      code: "export { Bar, type Baz } from 'import-foo';",
+      errors: [
+        {
+          messageId: 'importNameWithCustomMessage',
+          type: AST_NODE_TYPES.ExportSpecifier,
         },
       ],
       options: [
@@ -854,23 +899,44 @@ import type { foo } from 'import2/private/bar';
       errors: [
         {
           messageId: 'importNameWithCustomMessage',
-          type: AST_NODE_TYPES.ExportNamedDeclaration,
+          type: AST_NODE_TYPES.ExportSpecifier,
         },
         {
           messageId: 'importNameWithCustomMessage',
-          type: AST_NODE_TYPES.ExportNamedDeclaration,
+          type: AST_NODE_TYPES.ExportSpecifier,
         },
       ],
       options: [
         {
           paths: [
             {
-              allowTypeImports: true,
+              allowTypeImports: false,
               importNames: ['Bar', 'Baz'],
               message: 'Please use Bar and Baz from /import-bar/baz/ instead.',
               name: 'import-foo',
             },
           ],
+        },
+      ],
+    },
+    // import-equals is rewritten to a default specifier — `importNames: ['default']`
+    // and `allowImportNames` apply to `import x = require(...)`, matching upstream
+    // typescript-eslint behavior. ESLint base would not fire on this.
+    {
+      code: "import x = require('foo');",
+      errors: [{ messageId: 'importName' }],
+      options: [
+        {
+          paths: [{ name: 'foo', importNames: ['default'] }],
+        },
+      ],
+    },
+    {
+      code: "import x = require('foo');",
+      errors: [{ messageId: 'allowedImportName' }],
+      options: [
+        {
+          paths: [{ name: 'foo', allowImportNames: ['namedX'] }],
         },
       ],
     },
