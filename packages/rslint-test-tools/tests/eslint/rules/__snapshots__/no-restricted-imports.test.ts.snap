@@ -1,0 +1,1505 @@
+// Rstest Snapshot v1
+
+exports[`no-restricted-imports > invalid 1`] = `
+{
+  "code": "import "fs"",
+  "diagnostics": [
+    {
+      "message": "'fs' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 2`] = `
+{
+  "code": "import os from "os ";",
+  "diagnostics": [
+    {
+      "message": "'os' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 3`] = `
+{
+  "code": "import "foo/bar";",
+  "diagnostics": [
+    {
+      "message": "'foo/bar' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 4`] = `
+{
+  "code": "import withPaths from "foo/bar";",
+  "diagnostics": [
+    {
+      "message": "'foo/bar' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 5`] = `
+{
+  "code": "import withPatterns from "foo/bar";",
+  "diagnostics": [
+    {
+      "message": "'foo/bar' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 6`] = `
+{
+  "code": "import withPatterns from "foo/bar";",
+  "diagnostics": [
+    {
+      "message": "'foo/bar' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 7`] = `
+{
+  "code": "import withPatterns from "foo/baz";",
+  "diagnostics": [
+    {
+      "message": "'foo/baz' import is restricted from being used by a pattern. foo is forbidden, use foo/bar instead",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 8`] = `
+{
+  "code": "import x from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'foo' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 9`] = `
+{
+  "code": "import x from "foo/bar";",
+  "diagnostics": [
+    {
+      "message": "'foo/bar' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 10`] = `
+{
+  "code": "export * from "fs";",
+  "diagnostics": [
+    {
+      "message": "'fs' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 11`] = `
+{
+  "code": "export * as ns from "fs";",
+  "diagnostics": [
+    {
+      "message": "'fs' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 12`] = `
+{
+  "code": "export {a} from "fs";",
+  "diagnostics": [
+    {
+      "message": "'fs' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 13`] = `
+{
+  "code": "export {foo as b} from "fs";",
+  "diagnostics": [
+    {
+      "message": "'foo' import from 'fs' is restricted. Don't import 'foo'.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 14`] = `
+{
+  "code": "import x from "foo";",
+  "diagnostics": [
+    {
+      "message": "'foo' import is restricted from being used. Please import from 'bar' instead.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 15`] = `
+{
+  "code": "import DisallowedObject from "foo";",
+  "diagnostics": [
+    {
+      "message": "'default' import from 'foo' is restricted. Please import the default import of 'foo' from /bar/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 16`] = `
+{
+  "code": "import * as All from "foo";",
+  "diagnostics": [
+    {
+      "message": "* import is invalid because 'DisallowedObject' from 'foo' is restricted. Please import 'DisallowedObject' from /bar/ instead.",
+      "messageId": "everythingWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 17`] = `
+{
+  "code": "import { DisallowedObject } from "foo";",
+  "diagnostics": [
+    {
+      "message": "'DisallowedObject' import from 'foo' is restricted. Please import 'DisallowedObject' from /bar/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 18`] = `
+{
+  "code": "import { DisallowedObject as AllowedObject } from "foo";",
+  "diagnostics": [
+    {
+      "message": "'DisallowedObject' import from 'foo' is restricted. Please import 'DisallowedObject' from /bar/ instead.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 19`] = `
+{
+  "code": "import { DisallowedObjectOne, DisallowedObjectTwo, AllowedObject } from "foo";",
+  "diagnostics": [
+    {
+      "message": "'DisallowedObjectOne' import from 'foo' is restricted.",
+      "messageId": "importName",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+    {
+      "message": "'DisallowedObjectTwo' import from 'foo' is restricted.",
+      "messageId": "importName",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 20`] = `
+{
+  "code": "import relative from '../foo';",
+  "diagnostics": [
+    {
+      "message": "'../foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 21`] = `
+{
+  "code": "import x from "foo/baz";",
+  "diagnostics": [
+    {
+      "message": "'foo/baz' import is restricted from being used by a pattern. foo is forbidden, use bar instead",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 22`] = `
+{
+  "code": "import x from "foo";",
+  "diagnostics": [
+    {
+      "message": "'foo' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 23`] = `
+{
+  "code": "import x from "foo/baz";",
+  "diagnostics": [
+    {
+      "message": "'foo/baz' import is restricted from being used by a pattern. foo is forbidden, use bar instead",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 24`] = `
+{
+  "code": "import { Foo } from '../../my/relative-module';",
+  "diagnostics": [
+    {
+      "message": "'Foo' import from '../../my/relative-module' is restricted from being used by a pattern.",
+      "messageId": "patternAndImportName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 25`] = `
+{
+  "code": "import { Foo } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'Foo' import from 'foo' is restricted from being used by a pattern.",
+      "messageId": "patternAndImportName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 26`] = `
+{
+  "code": "import * as All from 'foo-bar-baz';",
+  "diagnostics": [
+    {
+      "message": "* import is invalid because 'Foo' and 'Bar' from 'foo-bar-baz' are restricted from being used by a pattern.",
+      "messageId": "patternAndEverything",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 27`] = `
+{
+  "code": "import { AllowedObject, DisallowedObject } from "foo";",
+  "diagnostics": [
+    {
+      "message": "'DisallowedObject' import from 'foo' is restricted because only 'AllowedObject' is allowed.",
+      "messageId": "allowedImportName",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 28`] = `
+{
+  "code": "import * as AllowedObject from "foo";",
+  "diagnostics": [
+    {
+      "message": "* import is invalid because only 'AllowedObject' from 'foo' is allowed.",
+      "messageId": "everythingWithAllowImportNames",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 29`] = `
+{
+  "code": "import { AllowedObject, DisallowedObject } from "foo";",
+  "diagnostics": [
+    {
+      "message": "'DisallowedObject' import from 'foo' is restricted because only 'AllowedObject' is allowed.",
+      "messageId": "allowedImportName",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 30`] = `
+{
+  "code": "import { Bar } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'foo' is restricted because only imports that match the pattern '/^Foo/u' are allowed from 'foo'.",
+      "messageId": "allowedImportNamePattern",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 31`] = `
+{
+  "code": "export { Bar } from 'foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'foo' is restricted because only imports that match the pattern '/^Foo/u' are allowed from 'foo'.",
+      "messageId": "allowedImportNamePattern",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 32`] = `
+{
+  "code": "import * as Foo from 'foo';",
+  "diagnostics": [
+    {
+      "message": "* import is invalid because only imports that match the pattern '/^Foo/u' from 'foo' are allowed.",
+      "messageId": "everythingWithAllowedImportNamePattern",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 33`] = `
+{
+  "code": "import * as Foo from 'foo';",
+  "diagnostics": [
+    {
+      "message": "* import is invalid because import name matching '/^Foo/u' pattern from 'foo' is restricted from being used.",
+      "messageId": "patternAndEverythingWithRegexImportName",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 34`] = `
+{
+  "code": "import foo from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 35`] = `
+{
+  "code": "import foo = require('import-foo');",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 36`] = `
+{
+  "code": "import type { bar } from "mod";",
+  "diagnostics": [
+    {
+      "message": "'bar' import from 'mod' is restricted. don't import 'bar' at all",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 37`] = `
+{
+  "code": "import { Bar, type Baz } from "import-foo";",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted.",
+      "messageId": "importName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 38`] = `
+{
+  "code": "import 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 39`] = `
+{
+  "code": "import foo = require('import-foo');",
+  "diagnostics": [
+    {
+      "message": "'import-foo' import is restricted from being used. Please use import-bar instead.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 40`] = `
+{
+  "code": "export { Bar, type Baz } from 'import-foo';",
+  "diagnostics": [
+    {
+      "message": "'Bar' import from 'import-foo' is restricted.",
+      "messageId": "importName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 41`] = `
+{
+  "code": "export type * from "foo";
+export * from "foo";",
+  "diagnostics": [
+    {
+      "message": "'foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 42`] = `
+{
+  "code": "export { } from "mod";
+export type { } from "mod";",
+  "diagnostics": [
+    {
+      "message": "'mod' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 43`] = `
+{
+  "code": "import { Foo } from 'restricted-path';
+import type { Bar } from 'restricted-path';",
+  "diagnostics": [
+    {
+      "message": "'restricted-path' import is restricted from being used. This import is restricted.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+    {
+      "message": "'restricted-path' import is restricted from being used. This import is restricted.",
+      "messageId": "pathWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 44`] = `
+{
+  "code": "import fs = require("fs");",
+  "diagnostics": [
+    {
+      "message": "'fs' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 45`] = `
+{
+  "code": "export type { InvalidTestCase } from '@typescript-eslint/utils/dist/ts-eslint';",
+  "diagnostics": [
+    {
+      "message": "'@typescript-eslint/utils/dist/ts-eslint' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 46`] = `
+{
+  "code": "import { baz } from "foo";",
+  "diagnostics": [
+    {
+      "message": "'baz' import from 'foo' is restricted because only 'bar' is allowed.",
+      "messageId": "allowedImportName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 47`] = `
+{
+  "code": "import { Foo, type Bar } from "import/private/bar";",
+  "diagnostics": [
+    {
+      "message": "'Foo' import from 'import/private/bar' is restricted from being used by a pattern.",
+      "messageId": "patternAndImportName",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 48`] = `
+{
+  "code": "export type { bar } from "mod";",
+  "diagnostics": [
+    {
+      "message": "'bar' import from 'mod' is restricted. don't import 'bar' at all",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 49`] = `
+{
+  "code": "import foo from 'import1/private/foo';",
+  "diagnostics": [
+    {
+      "message": "'import1/private/foo' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+    {
+      "message": "'import1/private/foo' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 50`] = `
+{
+  "code": "import { foo } from '@app/api/bar';",
+  "diagnostics": [
+    {
+      "message": "'@app/api/bar' import is restricted from being used by a pattern.",
+      "messageId": "patterns",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 51`] = `
+{
+  "code": "import { Foo_Enum } from '@app/api';",
+  "diagnostics": [
+    {
+      "message": "'Foo_Enum' import from '@app/api' is restricted from being used by a pattern.",
+      "messageId": "patternAndImportName",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 52`] = `
+{
+  "code": "export { 'foo' as b } from "fs";",
+  "diagnostics": [
+    {
+      "message": "'foo' import from 'fs' is restricted. Don't import 'foo'.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 53`] = `
+{
+  "code": "export { 'foo' } from "fs";",
+  "diagnostics": [
+    {
+      "message": "'foo' import from 'fs' is restricted. Don't import 'foo'.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 54`] = `
+{
+  "code": "export { '' } from "fs";",
+  "diagnostics": [
+    {
+      "message": "'' import from 'fs' is restricted. Don't import ''.",
+      "messageId": "importNameWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 55`] = `
+{
+  "code": "import * as All from 'foo-bar-baz';",
+  "diagnostics": [
+    {
+      "message": "* import is invalid because 'Foo' and 'Bar' from 'foo-bar-baz' are restricted from being used by a pattern. Use only 'Baz'.",
+      "messageId": "patternAndEverythingWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-restricted-imports > invalid 56`] = `
+{
+  "code": "import x from "foo/baz";",
+  "diagnostics": [
+    {
+      "message": "'foo/baz' import is restricted from being used by a pattern. some foo subimports are restricted",
+      "messageId": "patternWithCustomMessage",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

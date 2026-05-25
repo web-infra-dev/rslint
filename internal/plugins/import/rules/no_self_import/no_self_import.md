@@ -1,4 +1,4 @@
-# import/no-self-import
+# no-self-import
 
 ## Rule Details
 

@@ -4,7 +4,7 @@ import { RuleTester } from '@typescript-eslint/rule-tester';
 
 const ruleTester = new RuleTester();
 
-ruleTester.run('member-ordering-natural-order', {
+ruleTester.run('member-ordering', {
   invalid: [
     {
       code: `

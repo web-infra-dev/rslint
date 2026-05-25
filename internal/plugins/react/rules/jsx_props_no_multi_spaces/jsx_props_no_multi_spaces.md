@@ -1,4 +1,4 @@
-# react/jsx-props-no-multi-spaces
+# jsx-props-no-multi-spaces
 
 ## Rule Details
 

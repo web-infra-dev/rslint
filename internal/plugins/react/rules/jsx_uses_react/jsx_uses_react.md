@@ -1,4 +1,4 @@
-# react/jsx-uses-react
+# jsx-uses-react
 
 ## Rule Details
 

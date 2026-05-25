@@ -1,0 +1,582 @@
+// Rstest Snapshot v1
+
+exports[`max-nested-callbacks > invalid 1`] = `
+{
+  "code": "foo(function() { bar(thing, function(data) { baz(function() {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 2`] = `
+{
+  "code": "foo(function() { bar(thing, (data) => { baz(function() {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 3`] = `
+{
+  "code": "foo(() => { bar(thing, (data) => { baz( () => {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 4`] = `
+{
+  "code": "foo(function() { if (isTrue) { bar(function(data) { baz(function() {}); }); } });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 5`] = `
+{
+  "code": "foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {});});});});});});});});});});});",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (11). Maximum allowed is 10.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 178,
+          "line": 1,
+        },
+        "start": {
+          "column": 165,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 6`] = `
+{
+  "code": "foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {});});});});});});});});});});});",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (11). Maximum allowed is 10.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 178,
+          "line": 1,
+        },
+        "start": {
+          "column": 165,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 7`] = `
+{
+  "code": "foo(function() {})",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 8`] = `
+{
+  "code": "foo(function() { bar(thing, function(data) { baz(function() {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 9`] = `
+{
+  "code": "(function() { foo(function() { bar(function() {}); }); })();",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 10`] = `
+{
+  "code": "foo((function() { bar((function() { baz((function() {})); })); }));",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 11`] = `
+{
+  "code": "foo(() => bar(function() { baz(() => {}); }));",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 12`] = `
+{
+  "code": "foo?.(function() { bar?.(function() { baz?.(function() {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 13`] = `
+{
+  "code": "foo(function() { bar(function() { baz(function() {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 14`] = `
+{
+  "code": "foo(function() { bar(function() { baz(function() {}); }); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 15`] = `
+{
+  "code": "app.get('/x', function(req, res) {
+  db.connect(function(err, client) {
+    client.query('SELECT', function(err, rows) {
+      rows.forEach(function(row) {
+        process(row);
+      });
+    });
+  });
+});",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 6,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 16`] = `
+{
+  "code": "fs.readFile('a', function(err, a) {
+  fs.readFile('b', function(err, b) {
+    fs.readFile('c', function(err, c) {
+      fs.writeFile('out', a + b + c, function(err) {});
+    });
+  });
+});",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+    {
+      "message": "Too many nested callbacks (4). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 4,
+        },
+        "start": {
+          "column": 38,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 17`] = `
+{
+  "code": "setTimeout(function() {
+  setTimeout(function() {
+    setTimeout(function() {
+      setTimeout(function() {});
+    }, 10);
+  }, 10);
+}, 10);",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 18`] = `
+{
+  "code": "foo(() => bar(() => baz(() => qux(() => {}))));",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 19`] = `
+{
+  "code": "foo?.(function() { bar?.((function() { baz?.((function() {})); })); });",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 20`] = `
+{
+  "code": "(((function() { (((function() { (((function() {})))(); })))(); })))();",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (3). Maximum allowed is 2.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-nested-callbacks > invalid 21`] = `
+{
+  "code": "foo({...x, cb: function(){}}, function(){});",
+  "diagnostics": [
+    {
+      "message": "Too many nested callbacks (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "max-nested-callbacks",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

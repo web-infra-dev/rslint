@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "target": "esnext",
+    "module": "commonjs",
+    "strict": false,
+    "esModuleInterop": true,
+    "lib": ["es2015", "es2017", "esnext"]
+  },
+  "include": ["src/virtual.tsx", "src/virtual.ts"]
+}

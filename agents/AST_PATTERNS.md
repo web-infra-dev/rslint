@@ -85,6 +85,131 @@ rule.RuleListeners{
 
 ---
 
+## AST Shape Essentials
+
+The tsgo AST differs from ESTree (ESLint's AST) in a few systematic ways. Most porting bugs trace back to one of these shape differences. Work through each section before and after implementing a rule.
+
+### ParenthesizedExpression
+
+tsgo keeps parentheses as an explicit `KindParenthesizedExpression` node; ESTree drops them during parsing. Any time a rule reads a child expression, parentheses may be sitting in between.
+
+**Primary helpers** (from `shim/ast`, prefer these over hand-rolled loops):
+
+- `ast.SkipParentheses(node)` — returns the innermost non-paren expression.
+- `ast.WalkUpParenthesizedExpressions(node)` — returns the first non-paren ancestor.
+
+```go
+inner := ast.SkipParentheses(node.AsCallExpression().Expression)
+// `inner` is the callee without any `( … )` wrapping
+```
+
+**Trap sites** — any expression-typed child can be parenthesised. The table below lists high-frequency offenders. The principle is universal: if you are about to read an expression-typed child and do anything with its kind/text/structure, unwrap it first.
+
+| Kind                                                                                                                                                                 | Children to unwrap                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `BinaryExpression`                                                                                                                                                   | `Left`, `Right`                           |
+| `PrefixUnaryExpression` / `PostfixUnaryExpression`                                                                                                                   | `Operand`                                 |
+| `CallExpression` / `NewExpression`                                                                                                                                   | `Expression` (callee)                     |
+| `ElementAccessExpression`                                                                                                                                            | `Expression`, `ArgumentExpression`        |
+| `PropertyAccessExpression`                                                                                                                                           | `Expression` (object)                     |
+| `TemplateSpan`                                                                                                                                                       | `Expression`                              |
+| `SpreadElement` / `AwaitExpression` / `YieldExpression` / `TypeOfExpression` / `VoidExpression` / `DeleteExpression`                                                 | `Expression`                              |
+| `ConditionalExpression`                                                                                                                                              | `Condition`, `WhenTrue`, `WhenFalse`      |
+| `VariableDeclaration` / `PropertyAssignment` / `BindingElement`                                                                                                      | `Initializer`                             |
+| `IfStatement` / `WhileStatement` / `DoStatement` / `SwitchStatement` / `CaseClause` / `WithStatement` / `ReturnStatement` / `ThrowStatement` / `ExpressionStatement` | `Expression`                              |
+| `ForStatement`                                                                                                                                                       | `Initializer`, `Condition`, `Incrementor` |
+| `ForInStatement` / `ForOfStatement`                                                                                                                                  | `Initializer`, `Expression`               |
+
+A helper that embeds the check (e.g. `isNumeric`, `isStringType`) should call `ast.SkipParentheses` at the top rather than require every call site to unwrap — otherwise one forgotten caller is a silent divergence.
+
+### Optional Chain
+
+tsgo does not have a `ChainExpression` wrapper. Instead, every link in an optional chain (`PropertyAccess` / `ElementAccess` / `Call` / `NonNullExpression`) carries `NodeFlagsOptionalChain`. Parentheses break the chain — `(foo?.bar)(x)` parses as an ordinary call whose callee happens to be a paren-wrapped optional chain.
+
+- `ast.IsOptionalChain(node)` — true iff node is a link in an optional chain.
+- `ast.IsOptionalChainRoot(node)` — true iff node introduces the chain (holds the leading `?.`).
+- `ast.IsOutermostOptionalChain(node)` — true iff node is the top of its chain.
+
+When porting a rule that switches on "is the argument a `ChainExpression`?", translate to `ast.IsOptionalChain(arg)` on the tsgo-side argument after `ast.SkipParentheses`.
+
+### Literal Kinds
+
+ESTree uses one `Literal` node carrying a typed `value`. tsgo splits the literal family across kinds, and booleans / null are keyword tokens rather than literal nodes:
+
+| Value                   | tsgo kind                              | Text accessor                                                                                                                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Number                  | `KindNumericLiteral`                   | `node.AsNumericLiteral().Text` is **decimal-normalized at parse time** (`0x1`, `1e2`, `1.0` are all stored as their canonical decimal string — `"1"`, `"100"`, `"1"`). If you need the raw source form (e.g. for ESLint token-level parity), use `scanner.GetSourceTextOfNodeFromSourceFile(sf, node, false)` instead. |
+| String                  | `KindStringLiteral`                    | `node.AsStringLiteral().Text` (cooked)                                                                                                                                                                                                                                                                                 |
+| BigInt                  | `KindBigIntLiteral`                    | `node.AsBigIntLiteral().Text` retains the `n` suffix. Same caveat as NumericLiteral regarding base normalization — use `scanner.GetSourceTextOfNodeFromSourceFile` for raw form.                                                                                                                                       |
+| Regex                   | `KindRegularExpressionLiteral`         | `node.Text()`                                                                                                                                                                                                                                                                                                          |
+| `true` / `false`        | `KindTrueKeyword` / `KindFalseKeyword` | —                                                                                                                                                                                                                                                                                                                      |
+| `null`                  | `KindNullKeyword`                      | —                                                                                                                                                                                                                                                                                                                      |
+| `` `…` `` without `${}` | `KindNoSubstitutionTemplateLiteral`    | `node.AsNoSubstitutionTemplateLiteral().Text` (cooked)                                                                                                                                                                                                                                                                 |
+| `` `…${x}…` ``          | `KindTemplateExpression`               | `Head.Text()` + each `TemplateSpan.Literal.Text()` (all cooked)                                                                                                                                                                                                                                                        |
+
+Common translations:
+
+- ESTree `node.type === "Literal" && typeof node.value === "number"` → `node.Kind == ast.KindNumericLiteral`.
+- ESTree's `isStringLiteral` helper (StringLiteral + TemplateLiteral) → `ast.IsStringLiteralLike(node)` covers `StringLiteral` + `NoSubstitutionTemplateLiteral`. For TemplateExpression add it explicitly.
+- Comparing numeric literal value (e.g. "is this `1`"): since `.Text` is already normalized, `node.AsNumericLiteral().Text == "1"` works — or call `utils.NormalizeNumericLiteral(text)` for an explicit, intent-revealing comparison.
+- Distinguishing source forms (`0x1` vs `1` — rare, only when porting an ESLint rule that compares tokens by raw value): use `scanner.GetSourceTextOfNodeFromSourceFile(sf, node, false)`; `.Text` cannot be used for this.
+
+### Binary Operator Kinds
+
+tsgo uses `BinaryExpression` for the entire family of binary operators, including assignment and comma:
+
+- `a + b`, `a * b`, `a && b`, `a ?? b`, … — plain arithmetic / logical
+- `a, b` — sequence (ESTree `SequenceExpression`) via `OperatorToken.Kind == ast.KindCommaToken`
+- `a = b`, `a += b`, `a **= b`, … — assignment (ESTree `AssignmentExpression`) via `ast.KindEqualsToken`, `ast.KindPlusEqualsToken`, etc.
+
+For a rule that registers separate ESTree listeners for `AssignmentExpression` / `SequenceExpression`, collapse into one `BinaryExpression` listener and switch on `OperatorToken.Kind`. Do not rely on `IsBinaryExpression` alone to exclude assignments.
+
+### Node Text and Positions
+
+Raw `node.Pos()` and `node.End()` include leading trivia (whitespace, comments, line breaks). This is almost never what a rule wants — reading source text across `node.Pos()..node.End()` yields leading blanks, and reporting at `node.Pos()` positions the diagnostic on the trivia.
+
+Prefer:
+
+- `utils.TrimNodeTextRange(sourceFile, node)` — range with leading trivia skipped.
+- `utils.TrimmedNodeText(sourceFile, node)` — source text over that trimmed range.
+- `ctx.ReportNode(node, msg)` — diagnostic range already uses the trimmed span; no manual adjustment needed.
+
+For fixes:
+
+- `rule.RuleFixReplace(sf, node, text)` — replaces the trimmed span.
+- `rule.RuleFixReplaceRange(range, text)` — replaces a specific range (useful for precision edits across multiple nodes).
+
+### Object Literal Member Kinds
+
+ESTree collapses several distinct object-literal members into a single `Property` node with `method` / `shorthand` / `computed` flags. tsgo uses **five different kinds**, and a rule that filters only on `KindPropertyAssignment` will silently miss the other four:
+
+| Source                               | tsgo kind                             | ESTree equivalent                            |
+| ------------------------------------ | ------------------------------------- | -------------------------------------------- |
+| `{ a: b }`                           | `KindPropertyAssignment`              | `Property { kind: "init" }`                  |
+| `{ a() {} }` (method shorthand)      | `KindMethodDeclaration`               | `Property { kind: "init", method: true }`    |
+| `{ a }` (shorthand property)         | `KindShorthandPropertyAssignment`     | `Property { kind: "init", shorthand: true }` |
+| `{ get a() {} }` / `{ set a(v) {} }` | `KindGetAccessor` / `KindSetAccessor` | `Property { kind: "get"/"set" }`             |
+| `{ ...x }` (spread)                  | `KindSpreadAssignment`                | `SpreadElement`                              |
+
+When porting a rule that uses `p.type === "Property" && p.kind === "init"` to collect "init-shape" members (e.g. `Object.defineProperty` descriptor detection), include all three of `KindPropertyAssignment`, `KindMethodDeclaration`, and `KindShorthandPropertyAssignment` — otherwise method-shorthand and shorthand-property forms silently go missing.
+
+### ComputedPropertyName as a Wrapper
+
+ESTree marks computed keys with `Property.computed = true` and puts the inner expression directly in `Property.key`. tsgo wraps the inner expression in a separate `KindComputedPropertyName` node:
+
+```go
+// { [x + 1]: ... }  or  class A { get [x + 1]() {} }
+nameNode := node.Name()                          // → KindComputedPropertyName
+if nameNode.Kind == ast.KindComputedPropertyName {
+    expr := nameNode.AsComputedPropertyName().Expression  // the actual key expression
+    expr = ast.SkipParentheses(expr)             // and don't forget parens
+}
+```
+
+`utils.GetStaticPropertyName` already handles the wrapper and returns the static name for `[ 'a' ]` / `[ 1e2 ]` / `[ true ]` / `[ null ]` / `[ /re/ ]` / ``[`a`]`` forms — prefer it over hand-unwrapping.
+
+---
+
 ## AST Traversal Patterns
 
 ### 1. ForEachChild - Iterate Direct Children
@@ -183,29 +308,56 @@ if node.Kind == ast.KindPropertyAccessExpression {
 
 ## Using TypeChecker
 
-For rules that need type information, access `TypeChecker` via `RuleContext`:
+For rules that need type information, access `TypeChecker` via `RuleContext`.
+
+### RequiresTypeInfo vs nil check
+
+How you handle TypeChecker availability depends on the rule type:
+
+| Rule type                           | Approach                                          | Reason                                                                                                                             |
+| ----------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **@typescript-eslint** (type-aware) | Set `RequiresTypeInfo: true` in the `Rule` struct | The linter automatically skips the rule on files without a type checker. `ctx.TypeChecker` is guaranteed non-nil inside listeners. |
+| **Core ESLint**                     | Check `ctx.TypeChecker == nil` at the call site   | Core rules must run on JS files (no type checker). They either degrade gracefully or return early. Do NOT set `RequiresTypeInfo`.  |
+
+**Type-aware @typescript-eslint rule** — set `RequiresTypeInfo: true`, no nil check needed:
 
 ```go
-Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-    return rule.RuleListeners{
-        ast.KindCallExpression: func(node *ast.Node) {
-            if ctx.TypeChecker == nil {
-                return // TypeChecker may not be available
-            }
+var MyTSRule = rule.CreateRule(rule.Rule{
+    Name:             "my-ts-rule",
+    RequiresTypeInfo: true,
+    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+        return rule.RuleListeners{
+            ast.KindCallExpression: func(node *ast.Node) {
+                // ctx.TypeChecker is guaranteed non-nil
+                exprType := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+                // ...
+            },
+        }
+    },
+})
+```
 
-            // Get the type of an expression
-            callExpr := node.AsCallExpression()
-            exprType := ctx.TypeChecker.GetTypeAtLocation(callExpr.Expression)
+**Core ESLint rule** — nil check required, do NOT set `RequiresTypeInfo`:
 
-            // Check if it's a Promise type
-            if exprType != nil {
-                typeStr := ctx.TypeChecker.TypeToString(exprType)
-                // Use type information for analysis
-            }
-        },
-    }
+```go
+var MyCoreRule = rule.Rule{
+    Name: "my-core-rule",
+    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+        return rule.RuleListeners{
+            ast.KindCallExpression: func(node *ast.Node) {
+                if ctx.TypeChecker == nil {
+                    return // TypeChecker not available — degrade gracefully
+                }
+
+                exprType := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+                // ...
+            },
+        }
+    },
 }
 ```
+
+> **Why the distinction?** The linter uses `RequiresTypeInfo` to filter rules via `FilterNonTypeAwareRules` (see `internal/linter/linter.go`). Setting it on a core ESLint rule would prevent it from running on JS files entirely, which breaks `eslint:recommended` behavior.
 
 ### Common TypeChecker Methods
 
@@ -264,6 +416,47 @@ func checkCallbackReturn(funcNode *ast.Node) bool {
     return hasReturn
 }
 ```
+
+### Scope Stack Pattern
+
+Reference: `internal/rules/no_extra_bind/no_extra_bind.go`
+
+For rules that track state across nested scopes (e.g., `this` usage, variable declarations), use enter/exit listeners with a linked-list stack:
+
+```go
+type scopeInfo struct {
+    // Per-scope state
+    thisFound bool
+    upper     *scopeInfo // Link to parent scope
+}
+
+var scope *scopeInfo
+
+enterScope := func(node *ast.Node) {
+    scope = &scopeInfo{upper: scope}
+}
+
+exitScope := func(node *ast.Node) {
+    if scope != nil {
+        // Check scope state before popping
+        scope = scope.upper
+    }
+}
+
+return rule.RuleListeners{
+    ast.KindFunctionExpression:                       enterScope,
+    rule.ListenerOnExit(ast.KindFunctionExpression):  exitScope,
+    ast.KindFunctionDeclaration:                      enterScope,
+    rule.ListenerOnExit(ast.KindFunctionDeclaration): exitScope,
+    // Arrow functions do NOT create a new `this` scope — handle separately
+}
+```
+
+**Key considerations**:
+
+- Different node kinds may create different scope types (e.g., function vs method vs arrow)
+- Arrow functions inherit `this` from the enclosing scope — typically should NOT push a new scope
+- Class methods, getters, setters, and constructors create their own `this` scope
 
 ### Type Annotation Checking
 
@@ -364,13 +557,39 @@ rule.RuleFixRemove(ctx.SourceFile, node)
 rule.RuleFixRemoveRange(textRange)
 ```
 
+### Multi-Range Fixes
+
+To remove or replace multiple non-contiguous ranges in a single fix, pass multiple `RuleFix` values:
+
+```go
+// Example: remove ".bind" and "(arg)" separately from "fn.bind(arg)"
+ctx.ReportNodeWithFixes(node, msg,
+    rule.RuleFixRemoveRange(core.NewTextRange(dotStart, bindEnd)),   // removes ".bind"
+    rule.RuleFixRemoveRange(core.NewTextRange(parenStart, parenEnd)), // removes "(arg)"
+)
+```
+
 ---
 
 ## Token Scanning
 
-When implementing auto-fixes that need to locate specific tokens (parentheses, brackets, operators), use the `scanner.GetScannerForSourceFile` API instead of manual character iteration.
+When implementing auto-fixes that need to locate specific tokens (parentheses, brackets, operators), use the scanner utilities from `shim/scanner/` instead of manual character iteration.
 
-### Basic Scanner Usage
+### SkipTrivia — Quick Token Position Lookup
+
+When you just need to find the start position of the next token (skipping whitespace and comments), use `scanner.SkipTrivia`:
+
+```go
+import "github.com/microsoft/typescript-go/shim/scanner"
+
+// Skip whitespace, line/block comments, BOM, shebang, and conflict markers
+sourceText := ctx.SourceFile.Text()
+nextTokenPos := scanner.SkipTrivia(sourceText, startPos)
+```
+
+This is simpler and more efficient than creating a full scanner when you only need a position.
+
+### Full Scanner — Token-by-Token Scanning
 
 ```go
 import "github.com/microsoft/typescript-go/shim/scanner"

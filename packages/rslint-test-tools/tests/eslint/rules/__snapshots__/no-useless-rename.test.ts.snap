@@ -1,0 +1,644 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-rename > invalid 1`] = `
+{
+  "code": "let {foo: foo} = obj;",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 2`] = `
+{
+  "code": "let {foo: foo, bar: bar} = obj;",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+    {
+      "message": "Destructuring assignment bar unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 3`] = `
+{
+  "code": "let {foo: {bar: bar}} = obj;",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment bar unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 4`] = `
+{
+  "code": "let {'foo': foo} = obj;",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 5`] = `
+{
+  "code": "let {foo: foo = 1} = obj;",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 6`] = `
+{
+  "code": "function func({foo: foo}) {}",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 7`] = `
+{
+  "code": "({foo: foo}) => {}",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 8`] = `
+{
+  "code": "({foo: foo} = obj);",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 9`] = `
+{
+  "code": "({foo: (foo)} = obj);",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 10`] = `
+{
+  "code": "({foo: foo = 1} = obj);",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 11`] = `
+{
+  "code": "const {foo: foo, ...stuff} = myObject;",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 12`] = `
+{
+  "code": "import {foo as foo} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Import foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 13`] = `
+{
+  "code": "import {'foo' as foo} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Import foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 14`] = `
+{
+  "code": "import {foo as foo, bar as baz} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Import foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 15`] = `
+{
+  "code": "import {foo as foo, bar as bar} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Import foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+    {
+      "message": "Import bar unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 16`] = `
+{
+  "code": "var foo = 0; export {foo as foo};",
+  "diagnostics": [
+    {
+      "message": "Export foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 17`] = `
+{
+  "code": "var foo = 0; export {foo as 'foo'};",
+  "diagnostics": [
+    {
+      "message": "Export foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 18`] = `
+{
+  "code": "export {'foo' as 'foo'} from 'bar';",
+  "diagnostics": [
+    {
+      "message": "Export foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 19`] = `
+{
+  "code": "export {foo as foo} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Export foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 20`] = `
+{
+  "code": "export {foo as foo, bar as bar} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Export foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+    {
+      "message": "Export bar unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 21`] = `
+{
+  "code": "({foo/**/ : foo} = {});",
+  "diagnostics": [
+    {
+      "message": "Destructuring assignment foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 22`] = `
+{
+  "code": "import {foo/**/ as foo} from 'foo';",
+  "diagnostics": [
+    {
+      "message": "Import foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-rename > invalid 23`] = `
+{
+  "code": "let foo; export {foo/**/as foo};",
+  "diagnostics": [
+    {
+      "message": "Export foo unnecessarily renamed.",
+      "messageId": "unnecessarilyRenamed",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-rename",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

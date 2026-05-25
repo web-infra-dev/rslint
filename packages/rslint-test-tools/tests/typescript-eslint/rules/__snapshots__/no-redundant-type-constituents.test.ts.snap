@@ -514,7 +514,7 @@ exports[`no-redundant-type-constituents > invalid 20`] = `
   "code": "type T = '' | string;",
   "diagnostics": [
     {
-      "message": " is overridden by string in this union type.",
+      "message": """ is overridden by string in this union type.",
       "messageId": "literalOverridden",
       "range": {
         "end": {
@@ -543,7 +543,7 @@ exports[`no-redundant-type-constituents > invalid 21`] = `
       ",
   "diagnostics": [
     {
-      "message": ""\\"b\\"" is overridden by string in this union type.",
+      "message": ""b" is overridden by string in this union type.",
       "messageId": "literalOverridden",
       "range": {
         "end": {
@@ -731,7 +731,7 @@ exports[`no-redundant-type-constituents > invalid 28`] = `
       ",
   "diagnostics": [
     {
-      "message": "literal type is overridden by boolean in this union type.",
+      "message": "false is overridden by boolean in this union type.",
       "messageId": "literalOverridden",
       "range": {
         "end": {
@@ -757,7 +757,7 @@ exports[`no-redundant-type-constituents > invalid 29`] = `
   "code": "type T = false | boolean;",
   "diagnostics": [
     {
-      "message": "literal type is overridden by boolean in this union type.",
+      "message": "false is overridden by boolean in this union type.",
       "messageId": "literalOverridden",
       "range": {
         "end": {
@@ -783,7 +783,7 @@ exports[`no-redundant-type-constituents > invalid 30`] = `
   "code": "type T = true | boolean;",
   "diagnostics": [
     {
-      "message": "literal type is overridden by boolean in this union type.",
+      "message": "true is overridden by boolean in this union type.",
       "messageId": "literalOverridden",
       "range": {
         "end": {
@@ -809,7 +809,7 @@ exports[`no-redundant-type-constituents > invalid 31`] = `
   "code": "type T = false & boolean;",
   "diagnostics": [
     {
-      "message": "boolean is overridden by the literal type in this intersection type.",
+      "message": "boolean is overridden by the false in this intersection type.",
       "messageId": "primitiveOverridden",
       "range": {
         "end": {
@@ -893,7 +893,7 @@ exports[`no-redundant-type-constituents > invalid 34`] = `
   "code": "type T = true & boolean;",
   "diagnostics": [
     {
-      "message": "boolean is overridden by the literal type in this intersection type.",
+      "message": "boolean is overridden by the true in this intersection type.",
       "messageId": "primitiveOverridden",
       "range": {
         "end": {
@@ -1156,7 +1156,7 @@ exports[`no-redundant-type-constituents > invalid 44`] = `
   "code": "type T = '' & string;",
   "diagnostics": [
     {
-      "message": "string is overridden by the  in this intersection type.",
+      "message": "string is overridden by the "" in this intersection type.",
       "messageId": "primitiveOverridden",
       "range": {
         "end": {
@@ -1266,7 +1266,7 @@ exports[`no-redundant-type-constituents > invalid 48`] = `
       ",
   "diagnostics": [
     {
-      "message": ""\\"a\\"" | "\\"b\\"" is overridden by the string in this intersection type.",
+      "message": ""a" | "b" is overridden by the string in this intersection type.",
       "messageId": "primitiveOverridden",
       "range": {
         "end": {

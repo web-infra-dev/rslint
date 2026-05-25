@@ -140,7 +140,7 @@ if (returnsPromise?.call()) {
     `},
 		{Code: "Promise.resolve() ?? false;"},
 		{Code: `
-function test(a: Promise<void> | undefinded) {
+function test(a: Promise<void> | undefined) {
   const foo = a ?? Promise.reject();
 }
     `},
@@ -1070,6 +1070,13 @@ declare const useCallback: <T extends (...args: unknown[]) => unknown>(
   fn: T,
 ) => T;
 useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
+    `},
+		{Code: `
+Promise.reject(3).finally(async () => {});
+    `},
+		{Code: `
+const f = 'finally';
+Promise.reject(3)[f](async () => {});
     `},
 	}, []rule_tester.InvalidTestCase{
 		{
@@ -2668,6 +2675,23 @@ const obj: O = {
 					Column:    16,
 					EndLine:   4,
 					EndColumn: 31,
+				},
+			},
+		},
+		{
+			Code: `
+type A = { f: () => void } | undefined;
+const a: A = {
+  async f() {},
+};
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "voidReturnProperty",
+					Line:      4,
+					Column:    3,
+					EndLine:   4,
+					EndColumn: 10,
 				},
 			},
 		},

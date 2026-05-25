@@ -16,7 +16,7 @@ export const fileExists = async (uri: Uri): Promise<boolean> => {
   try {
     const stat = await workspace.fs.stat(uri);
     return (stat.type & FileType.File) > 0;
-  } catch (_err) {
+  } catch {
     return false;
   }
 };

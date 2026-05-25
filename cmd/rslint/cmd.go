@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
@@ -27,16 +28,12 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
-
-const spaces = "                                                                                                    "
 
 // ColorScheme contains all the color functions for different UI elements
 type ColorScheme struct {
@@ -100,7 +97,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 			continue
 		}
 		diag := rule.RuleDiagnostic{
-			RuleName:   fmt.Sprintf("TS%d", d.Code()),
+			RuleName:   fmt.Sprintf("TypeScript(TS%d)", d.Code()),
 			SourceFile: d.File(),
 			Range:      d.Loc(),
 			Message:    rule.RuleMessage{Description: d.String()},
@@ -157,6 +154,13 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 		escapeData(d.Message.Description),
 	)
 	w.WriteString(output)
+}
+
+func pluralize(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
 }
 
 func escapeData(str string) string {
@@ -272,15 +276,21 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	w.WriteString(severityColor("[%s] ", d.Severity.String()))
 
-	// Message handling
+	// Message handling — multi-line continuation:
+	// - PreFormatted (e.g. tsc diagnostics): 2-space indent, message already has indentation
+	// - Lint rules: │ border aligned after rule name
 	messageLineStart := 0
 	for i, char := range d.Message.Description {
 		if char == '\n' {
 			w.WriteString(d.Message.Description[messageLineStart : i+1])
 			messageLineStart = i + 1
-			w.WriteString("    ")
-			w.WriteString(colors.BorderText("│"))
-			w.WriteString(spaces[:len(d.RuleName)+1])
+			if d.PreFormatted {
+				w.WriteString("  ")
+			} else {
+				w.WriteString("    ")
+				w.WriteString(colors.BorderText("│"))
+				w.WriteString(strings.Repeat(" ", len(d.RuleName)+1))
+			}
 		}
 	}
 	if messageLineStart <= len(d.Message.Description) {
@@ -307,14 +317,19 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineStarts := make([]int, numLines)
 	lineEnds := make([]int, numLines)
 
-	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
-	// but track byte positions for string slicing
+	// Iterate by runes to correctly handle multi-byte UTF-8 characters.
+	// Use utf8.DecodeRuneInString to get the true byte width of each rune
+	// (including invalid UTF-8 bytes, which decode as RuneError with size=1).
+	// `for _, char := range str` plus `utf8.RuneLen(char)` is unsafe here
+	// because invalid bytes yield RuneError (U+FFFD) and RuneLen returns 3
+	// (the encoded length of U+FFFD), throwing off the byte counter and
+	// eventually slicing past len(text).
 	codeboxText := text[codeboxStart:codeboxEnd]
-	bytePos := codeboxStart
-	for _, char := range codeboxText {
-		charBytes := utf8.RuneLen(char)
-		current, next := bytePos, bytePos+charBytes
-		bytePos = next
+	for i := 0; i < len(codeboxText); {
+		char, size := utf8.DecodeRuneInString(codeboxText[i:])
+		current := codeboxStart + i
+		next := current + size
+		i += size
 
 		if char == '\n' {
 			if line != codeboxEndLine {
@@ -338,6 +353,14 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	if line == codeboxEndLine {
 		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+	}
+	// If no non-space content was seen anywhere in the codebox,
+	// `indentSize` was never updated from the math.MaxInt sentinel.
+	// Clamping to 0 prevents `lineMap[line] + indentSize` from overflowing
+	// int in the render loop below (which would wrap to a large negative
+	// number and slice out of bounds).
+	if indentSize == math.MaxInt {
+		indentSize = 0
 	}
 
 	diagnosticHighlightActive := false
@@ -407,22 +430,218 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString("\n\n")
 }
 
+// repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
+type repeatedFlag []string
+
+func (f *repeatedFlag) String() string   { return strings.Join(*f, ", ") }
+func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
+
 const usage = `🚀 Rslint - Rocket Speed Linter
 
 Usage:
-  rslint [OPTIONS]
+  rslint [OPTIONS] [files...]
 
 Options:
   --init                Initialize a default config in the current directory.
   --config PATH         Which rslint config file to use.
   --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
+  --type-check          Enable TypeScript type checking
+  --type-check-only     Run only TypeScript type checking (skip all lint rules)
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
   --max-warnings Int    Number of warnings to trigger nonzero exit code
+  --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
 `
+
+// groupDiagsByFile groups a flat slice of diagnostics by their source file name.
+func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
+	m := make(map[string][]rule.RuleDiagnostic)
+	for _, d := range diags {
+		f := d.SourceFile.FileName()
+		m[f] = append(m[f], d)
+	}
+	return m
+}
+
+// applyFixPass applies auto-fixes for all files in diagnosticsByFile,
+// writes fixed content to disk, and returns the number of issues fixed.
+func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
+	fixed := 0
+	for fileName, fileDiagnostics := range diagnosticsByFile {
+		var diagnosticsWithFixes []rule.RuleDiagnostic
+		for _, d := range fileDiagnostics {
+			if len(d.Fixes()) > 0 {
+				diagnosticsWithFixes = append(diagnosticsWithFixes, d)
+			}
+		}
+		if len(diagnosticsWithFixes) == 0 {
+			continue
+		}
+
+		originalContent := diagnosticsWithFixes[0].SourceFile.Text()
+		fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+
+		if wasFixed {
+			err := os.WriteFile(fileName, []byte(fixedContent), 0644)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
+			} else {
+				fixed += len(diagnosticsWithFixes) - len(unapplied)
+			}
+		}
+	}
+	return fixed
+}
+
+// allowFileWarningKind categorizes why a CLI-specified file won't have lint
+// rules applied. These are Phase-1 (lint) concepts; Phase 2 (type-check) is
+// not affected by either case (it runs program-wide regardless of CLI scope
+// and rslint ignores).
+type allowFileWarningKind int
+
+const (
+	allowFileNotInProgram allowFileWarningKind = iota
+	allowFileIgnored
+)
+
+// allowFileWarning is the structured form of a "this CLI-specified file
+// won't be linted" diagnostic. Returned by collectAllowFileWarnings so the
+// emission policy (skip in --type-check-only, format with relative paths,
+// etc.) can be unit-tested without capturing stderr.
+type allowFileWarning struct {
+	Path string // absolute, normalized — matches what was put in allowFiles
+	Kind allowFileWarningKind
+}
+
+// formatAllowFileWarning renders an allowFileWarning for stderr emission,
+// resolving the absolute path against comparePathOptions. Returns "" for
+// unknown kinds so callers can safely ignore the empty case.
+func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions) string {
+	rel := tspath.ConvertToRelativePath(w.Path, opts)
+	switch w.Kind {
+	case allowFileNotInProgram:
+		return fmt.Sprintf("warning: %s was not found in the project, skipping", rel)
+	case allowFileIgnored:
+		return fmt.Sprintf("warning: %s is ignored because of a matching ignore pattern", rel)
+	}
+	return ""
+}
+
+// collectAllowFileWarnings explains, for each CLI-specified file in
+// allowFiles, why it won't be visited by Phase 1 (lint). A file lands in
+// the result if it is outside every Program, or if it is in some Program
+// but the nearest config's `ignores` patterns exclude it. Returns nil for
+// empty allowFiles.
+//
+// This is a Phase-1 concern only. In --type-check-only mode the lint phase
+// is skipped, so callers MUST gate emission on `!typeCheckOnly` — otherwise
+// users see misleading messages like "is ignored because of a matching
+// ignore pattern" while Phase 2 happily reports type errors for that same
+// file. See website/docs/en/guide/type-checking.md ("type-check is not
+// constrained by `files`/`ignores`").
+func collectAllowFileWarnings(
+	allowFiles []string,
+	programs []*compiler.Program,
+	configMap map[string]rslintconfig.RslintConfig,
+	rslintConfig rslintconfig.RslintConfig,
+	currentDirectory string,
+) []allowFileWarning {
+	if len(allowFiles) == 0 {
+		return nil
+	}
+	programFiles := make(map[string]struct{})
+	for _, prog := range programs {
+		for _, sf := range prog.GetSourceFiles() {
+			programFiles[sf.FileName()] = struct{}{}
+		}
+	}
+
+	// Cache FindNearestConfig results by directory to avoid redundant lookups
+	// when many files are in the same directory (e.g., lint-staged).
+	type cachedConfig struct {
+		cfgDir string
+		cfg    rslintconfig.RslintConfig
+	}
+	dirConfigCache := make(map[string]*cachedConfig)
+
+	var out []allowFileWarning
+	for _, f := range allowFiles {
+		if _, inProgram := programFiles[f]; !inProgram {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotInProgram})
+			continue
+		}
+		// File is in a Program — check if config would assign rules
+		var merged *rslintconfig.MergedConfig
+		if configMap != nil {
+			dir := tspath.GetDirectoryPath(f)
+			cached, ok := dirConfigCache[dir]
+			if !ok {
+				cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
+				cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
+				dirConfigCache[dir] = cached
+			}
+			if cached.cfg != nil {
+				merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
+			}
+		} else {
+			merged = rslintConfig.GetConfigForFile(f, currentDirectory)
+		}
+		if merged == nil {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
+		}
+	}
+	return out
+}
+
+// shouldShortCircuitOutput returns true when rslint should bail early
+// without printing diagnostics or a summary. The short-circuit exists so
+// that e.g. `rslint nonexistent-file.ts` returns 0 with no spurious output
+// when Phase 1 visited zero files.
+//
+// Any type-check mode (`--type-check` or `--type-check-only`) must NOT take
+// the short-circuit: Phase 2 runs program-wide and is not gated by the CLI
+// Scope/PerProgramFilter that drives lintedFileCount, so lintedFileCount==0
+// is a normal state in which Phase 2 may still have produced diagnostics.
+// Short-circuiting there would silently drop type errors that the user
+// explicitly asked for — see website/docs/en/guide/type-checking.md.
+func shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {
+	if typeCheckOnly || typeCheck {
+		return false
+	}
+	return scopeRestricted && lintedFileCount == 0
+}
+
+// validateTypeCheckOnlyFlags rejects --type-check-only combined with flags
+// whose semantics depend on the lint phase that this mode disables. Returns
+// (0, "") when the combination is valid (or --type-check-only isn't set);
+// otherwise returns (exitCode > 0, stderr message). Pulled out as a pure
+// function so the policy can be exercised in unit tests.
+func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (int, string) {
+	if !typeCheckOnly {
+		return 0, ""
+	}
+	if fix {
+		return 2, "error: --fix cannot be combined with --type-check-only (no lint rules run, nothing to fix)"
+	}
+	if len(ruleFlags) > 0 {
+		return 2, "error: --rule cannot be combined with --type-check-only (no lint rules run)"
+	}
+	return 0, ""
+}
+
+// resolveStartTime returns the start time for timing output.
+// If startTimeMs (epoch millis from the Node.js entry point) is positive,
+// it is used so the reported duration covers end-to-end execution.
+// Otherwise falls back to time.Now().
+func resolveStartTime(startTimeMs int64) time.Time {
+	if startTimeMs > 0 {
+		return time.UnixMilli(startTimeMs)
+	}
+	return time.Now()
+}
 
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
@@ -432,7 +651,9 @@ func runCMD() int {
 		help        bool
 		config      string
 		configStdin bool
-		fix         bool
+		fix           bool
+		typeCheck     bool
+		typeCheckOnly bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -442,12 +663,16 @@ func runCMD() int {
 		forceColor     bool
 		quiet          bool
 		maxWarnings    int
+		startTimeMs    int64
+		ruleFlags      repeatedFlag
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
 	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
+	flag.BoolVar(&typeCheck, "type-check", false, "enable TypeScript type checking")
+	flag.BoolVar(&typeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
@@ -458,8 +683,50 @@ func runCMD() int {
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
 	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
+	flag.Int64Var(&startTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
+	flag.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 
 	flag.Parse()
+
+	// --type-check-only implies --type-check and skips all lint rules.
+	// Reject incompatible flag combinations before doing any work.
+	if code, msg := validateTypeCheckOnlyFlags(typeCheckOnly, fix, []string(ruleFlags)); code != 0 {
+		fmt.Fprintln(os.Stderr, msg)
+		return code
+	}
+	if typeCheckOnly {
+		typeCheck = true
+	}
+
+	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
+	var allowFiles []string
+	var allowDirs []string
+	if args := flag.Args(); len(args) > 0 {
+		for _, arg := range args {
+			absPath, err := filepath.Abs(arg)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
+				return 1
+			}
+			// NOTE: we intentionally do NOT call filepath.EvalSymlinks here.
+			// EvalSymlinks resolves symlinks (macOS /tmp → /private/tmp) and
+			// Windows 8.3 short names to long names, but the rest
+			// of the pipeline (os.Getwd, TypeScript file names, configDir)
+			// uses unresolved CWD-based paths. Resolving only file args would
+			// create a format mismatch causing failures in gap file detection,
+			// config matching, dir scoping, and gitignore checks.
+			// Edge cases (e.g. user passes a symlink-resolved absolute path)
+			// are handled by isFileAllowed's os.SameFile fallback in linter.go
+			// and CollectProgramFiles's Realpath'd keys in create_program.go.
+			normalized := tspath.NormalizePath(absPath)
+			info, statErr := os.Stat(absPath)
+			if statErr == nil && info.IsDir() {
+				allowDirs = append(allowDirs, normalized)
+			} else {
+				allowFiles = append(allowFiles, normalized)
+			}
+		}
+	}
 
 	if help {
 		flag.Usage()
@@ -475,7 +742,7 @@ func runCMD() int {
 	}
 
 	enableVirtualTerminalProcessing()
-	timeBefore := time.Now()
+	timeBefore := resolveStartTime(startTimeMs)
 
 	if traceOut != "" {
 		f, err := os.Create(traceOut)
@@ -522,7 +789,15 @@ func runCMD() int {
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
 	var rslintConfig rslintconfig.RslintConfig
-	var tsConfigs []string
+
+	// configMap holds per-directory configs for multi-config (monorepo) support.
+	// Only populated in the configStdin path; nil otherwise (single-config mode).
+	var configMap map[string]rslintconfig.RslintConfig
+
+	programs := []*compiler.Program{}
+	// programConfigDirs tracks which configDir each program belongs to (parallel to programs).
+	// Used for ownership-based file deduplication in multi-config mode.
+	var programConfigDirs []string
 
 	if configStdin {
 		// Read config JSON from stdin (sent by JS config loader).
@@ -538,108 +813,445 @@ func runCMD() int {
 			return 1
 		}
 
-		var payload struct {
-			ConfigDirectory string                    `json:"configDirectory"`
-			Entries         rslintconfig.RslintConfig `json:"entries"`
-		}
-		if err := json.Unmarshal(data, &payload); err != nil {
-			fmt.Fprintf(os.Stderr, "error parsing config from stdin: %v\n", err)
+		payload, parseErr := parseConfigPayload(data)
+		if parseErr != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", parseErr)
 			return 1
 		}
 
-		rslintConfig = payload.Entries
-		currentDirectory = payload.ConfigDirectory
+		if payload.IsMultiConfig {
+			// Multi-config format
+			configMap = payload.ConfigMap
 
-		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
-		tsConfigs, err = loader.LoadTsConfigsFromRslintConfig(rslintConfig, currentDirectory)
+			// Inject .gitignore patterns as global ignores for each config.
+			// Each config independently reads its own .gitignore tree:
+			// ReadGitignoreAsGlobs walks UP (ancestor inheritance) and DOWN
+			// (nested .gitignore) from each configDir. Sibling configs are
+			// fully isolated — they never share gitignore patterns.
+			//
+			// Config ignores are passed so that directories which are
+			// directory-level blocked (e.g. **/tests/**) are pruned during
+			// the .gitignore scan. This is safe because isDirPathBlocked is
+			// the same function used by the linter — blocked dirs' files
+			// are never linted, so their .gitignore patterns are irrelevant.
+			//
+			// Concurrency:
+			//   - When singleThreaded is set, both stages run sequentially in
+			//     the main goroutine (no goroutines spawned at all).
+			//   - Otherwise, gitignore reads run in parallel across configs
+			//     (independent FS reads via cachedvfs, which is concurrent-
+			//     safe). createProgramsForConfig still runs serially in the
+			//     main goroutine — typescript-go's API is invoked one config
+			//     at a time. The two stages overlap: gitignore goroutines
+			//     run alongside the createPrograms loop.
+			//
+			// configMap is NOT mutated by gitignore goroutines; results are
+			// collected via channel and merged in the main goroutine after
+			// the createPrograms loop, so the createPrograms loop sees the
+			// pre-augmentation entries (createProgramsForConfig only reads
+			// languageOptions.parserOptions.project — Ignores entries are
+			// no-ops for it; verified in LoadTsConfigsFromRslintConfig).
+			type giResult struct {
+				configDir string
+				globs     []string
+			}
+			var (
+				giResults chan giResult
+				giWG      sync.WaitGroup
+			)
+			if singleThreaded {
+				// Inline serial gitignore reads.
+				giResults = nil
+				for configDir, entries := range configMap {
+					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+					globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores)
+					if len(globs) > 0 {
+						configMap[configDir] = append(
+							rslintconfig.RslintConfig{{Ignores: globs}},
+							configMap[configDir]...,
+						)
+					}
+				}
+			} else {
+				giResults = make(chan giResult, len(configMap))
+				for configDir, entries := range configMap {
+					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+					giWG.Add(1)
+					go func(dir string, ignores []string) {
+						defer giWG.Done()
+						globs := rslintconfig.ReadGitignoreAsGlobs(dir, fs, ignores)
+						giResults <- giResult{configDir: dir, globs: globs}
+					}(configDir, configIgnores)
+				}
+				go func() { giWG.Wait(); close(giResults) }()
+			}
+
+			seenTsConfigs := make(map[string]struct{})
+
+			for configDir, entries := range configMap {
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs)
+				if exitCode != 0 {
+					return exitCode
+				}
+				for range progs {
+					programConfigDirs = append(programConfigDirs, configDir)
+				}
+				programs = append(programs, progs...)
+			}
+
+			// Drain gitignore results (parallel path only) and merge into
+			// configMap. Must complete before DiscoverGapFiles, which relies
+			// on the augmented configMap.
+			if giResults != nil {
+				for r := range giResults {
+					if len(r.globs) > 0 {
+						configMap[r.configDir] = append(
+							rslintconfig.RslintConfig{{Ignores: r.globs}},
+							configMap[r.configDir]...,
+						)
+					}
+				}
+			}
+		} else {
+			// Legacy single-config format
+			rslintConfig = payload.SingleConfig
+			currentDirectory = payload.SingleConfigDir
+
+			// Inject .gitignore patterns as global ignores. Run gitignore
+			// reading in parallel with createProgramsForConfig — they're
+			// independent (createProgramsForConfig only reads
+			// languageOptions.parserOptions.project, not Ignores).
+			var (
+				progs    []*compiler.Program
+				exitCode int
+			)
+			rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
+				rslintConfig, currentDirectory, fs, singleThreaded, nil,
+			)
+			if exitCode != 0 {
+				return exitCode
+			}
+			programs = append(programs, progs...)
+		}
+	} else {
+		// Load configuration from file (JSON config path, isJSConfig stays false)
+		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+
+		// Inject .gitignore patterns as global ignores. Run gitignore reading
+		// in parallel with createProgramsForConfig (see comment above).
+		var (
+			progs    []*compiler.Program
+			exitCode int
+		)
+		rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
+			rslintConfig, currentDirectory, fs, singleThreaded, nil,
+		)
+		if exitCode != 0 {
+			return exitCode
+		}
+		programs = append(programs, progs...)
+	}
+
+	// Apply --rule CLI overrides by appending a synthetic ConfigEntry (no files = matches all).
+	if len(ruleFlags) > 0 {
+		cliEntry, err := rslintconfig.BuildCLIRuleEntry(ruleFlags)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			return 1
 		}
-	} else {
-		// Load configuration from file (JSON config path, isJSConfig stays false)
-		rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
-	}
-
-	// When no tsconfig is specified in rslint config, auto-detect tsconfig.json in the working directory.
-	if len(tsConfigs) == 0 {
-		defaultTsConfig := tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if fs.FileExists(defaultTsConfig) {
-			tsConfigs = []string{defaultTsConfig}
+		if cliEntry != nil {
+			if configMap != nil {
+				for dir, cfg := range configMap {
+					configMap[dir] = append(cfg, *cliEntry)
+				}
+			} else {
+				rslintConfig = append(rslintConfig, *cliEntry)
+			}
 		}
 	}
 
-	host := utils.CreateCompilerHost(currentDirectory, fs)
+	// Use CWD for display paths (not any config directory).
+	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
+	// so it already holds the normalized CWD.
+	cwd := currentDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          host.GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
+		CurrentDirectory:          cwd,
+		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
 	}
-	programs := []*compiler.Program{}
-	if len(tsConfigs) > 0 {
-		for _, configFileName := range tsConfigs {
-			program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, comparePathOptions) {
-					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-				}
-				return 1
-			}
-			programs = append(programs, program)
+
+	// No args → implicit CWD scoping (same as `rslint .`).
+	// Only applies to multi-config stdin path. In this mode, configs may include
+	// parent or nested configs, so Programs may contain files outside CWD.
+	// Without scoping, all those files would be linted unexpectedly.
+	if len(allowFiles) == 0 && len(allowDirs) == 0 && configStdin && configMap != nil {
+		allowDirs = []string{cwd}
+	}
+
+	// --- Gap file discovery and fallback Program ---
+	// Discover files that match config `files` patterns but are not in any
+	// tsconfig Program. These "gap" files get a fallback Program (AST-only,
+	// no type info) and only run non-type-aware rules.
+	var typeInfoFiles map[string]struct{}
+	var capturedGapFiles []string // retained for --fix rebuild
+	fallbackProgramIndex := -1    // index of the gap-file fallback program (if any) within `programs`
+
+	{
+		programFiles := utils.CollectProgramFiles(programs, fs)
+
+		var gapFiles []string
+		if configMap != nil {
+			gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded)
+		} else {
+			gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded)
 		}
-	} else {
-		// No tsconfig available — create program in memory for pure JS projects.
-		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
-		excludes := []string{"node_modules"}
-		includes := []string{"**/*"}
-		rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
-		if len(rootFiles) > 0 {
-			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, comparePathOptions) {
-					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
-				}
-				return 1
+
+		// CLI file args bypass config `files` patterns (ESLint behavior):
+		// if a user explicitly passes a file, lint it even if no config entry
+		// has a matching `files` pattern.
+		if gapFiles != nil && len(allowFiles) > 0 {
+			gapSet := make(map[string]struct{}, len(gapFiles))
+			for _, f := range gapFiles {
+				gapSet[f] = struct{}{}
 			}
-			programs = append(programs, program)
+			for _, f := range allowFiles {
+				nf := tspath.NormalizePath(f)
+				if _, inProgram := programFiles[nf]; inProgram {
+					continue
+				}
+				if _, alreadyGap := gapSet[nf]; alreadyGap {
+					continue
+				}
+				// Check if config would assign any rules to this file.
+				var merged *rslintconfig.MergedConfig
+				if configMap != nil {
+					cfgDir, cfg := rslintconfig.FindNearestConfig(nf, configMap)
+					if cfg != nil {
+						merged = cfg.GetConfigForFile(nf, cfgDir)
+					}
+				} else {
+					merged = rslintConfig.GetConfigForFile(nf, currentDirectory)
+				}
+				if merged != nil {
+					gapFiles = append(gapFiles, nf)
+				}
+			}
+		}
+
+		if gapFiles != nil {
+			// Build type-info set from existing (tsconfig) Programs BEFORE
+			// appending the fallback, so fallback files are NOT in this set.
+			typeInfoFiles = utils.CollectProgramFiles(programs, fs)
+			capturedGapFiles = gapFiles
+
+			if len(gapFiles) > 0 {
+				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs)
+				if fallback != nil {
+					programs = append(programs, fallback)
+					fallbackProgramIndex = len(programs) - 1
+				}
+			}
 		}
 	}
 
-	var wg sync.WaitGroup
+	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
+	// Returns the program slice and the index of the fallback gap-file program
+	// (or -1 if none), so callers can mark it skipped during type-check.
+	createPrograms := func() ([]*compiler.Program, int, error) {
+		var baseProgs []*compiler.Program
+		if configMap != nil {
+			seen := make(map[string]struct{})
+			for configDir, entries := range configMap {
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen)
+				if exitCode != 0 {
+					return nil, -1, fmt.Errorf("failed to create programs for %s", configDir)
+				}
+				baseProgs = append(baseProgs, progs...)
+			}
+		} else {
+			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+			if exitCode != 0 {
+				return nil, -1, errors.New("failed to create programs")
+			}
+			baseProgs = append(baseProgs, progs...)
+		}
 
-	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
-	errorsCount := 0
-	warningsCount := 0
+		// Rebuild fallback Program for gap files (content may have changed after fixes).
+		fallbackIdx := -1
+		if len(capturedGapFiles) > 0 {
+			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs)
+			if fallback != nil {
+				baseProgs = append(baseProgs, fallback)
+				fallbackIdx = len(baseProgs) - 1
+			}
+		}
+
+		return baseProgs, fallbackIdx, nil
+	}
+
+	// Phase 1: Collect all diagnostics (no printing yet).
+	// Like ESLint, diagnostics are collected first, then printed at the end.
+	// This ensures --fix only shows remaining unfixed issues.
+	var allDiags []rule.RuleDiagnostic
+	var diagsMu sync.Mutex
 	fixedCount := 0
 
-	// Store diagnostics by file for fixing
-	var diagnosticsByFile map[string][]rule.RuleDiagnostic
-	if fix {
-		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
-	}
-
+	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w := bufio.NewWriterSize(os.Stdout, 4096*100)
-		defer w.Flush()
 		for d := range diagnosticsChan {
+			allDiags = append(allDiags, d)
+		}
+	}()
+
+	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
+	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		filePath := sourceFile.FileName()
+		if configMap != nil {
+			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
+			if cfg == nil {
+				return nil
+			}
+			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(cfg, filePath, cfgDir, enforcePlugins, typeInfoFiles)
+		}
+		return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, filePath, currentDirectory, enforcePlugins, typeInfoFiles)
+	}
+
+	// Build per-program file filters combining:
+	//   - multi-config ownership deduplication (ESLint v10 aligned)
+	//   - config `ignores` exclusion (applies to rules and counts)
+	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
+
+	// fallback gap program (if any) is excluded from --type-check: its
+	// CompilerOptions are synthesized defaults, not the user's tsconfig,
+	// so semantic diagnostics there would be unreliable. This honors the
+	// commitment in website/docs/en/guide/type-checking.md ("Files Without
+	// tsconfig Coverage").
+	skipTypeCheck := buildTypeCheckSkipMask(len(programs), fallbackProgramIndex)
+
+	// In --type-check-only mode, skip the lint phase entirely by passing
+	// nil for GetRulesForFile. RunLinter's Phase 1 is gated on this being
+	// non-nil; Phase 2 (type-check) runs independently.
+	var rulesForFile linter.RuleHandler
+	if !typeCheckOnly {
+		rulesForFile = getRulesForFile
+	}
+
+	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+		Programs:              programs,
+		SingleThreaded:        singleThreaded,
+		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+		PerProgramFilter:      toFileFilters(fileFilters),
+		GetRulesForFile:       rulesForFile,
+		TypeInfoFiles:         typeInfoFiles,
+		TypeCheck:             typeCheck,
+		SkipTypeCheckPrograms: skipTypeCheck,
+		OnDiagnostic: func(d rule.RuleDiagnostic) {
+			diagnosticsChan <- d
+		},
+	})
+
+	close(diagnosticsChan)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error running linter: %v\n", err)
+		return 1
+	}
+
+	lintedfileCount := lintResult.LintedFileCount
+
+	wg.Wait()
+
+	// Emit per-file warnings for CLI-specified files that won't be linted.
+	// Distinguishes "not found in project" vs "ignored by pattern", aligned
+	// with ESLint v10's warning behavior. Skipped in --type-check-only mode:
+	// these are lint-phase concepts and would mislead users about Phase 2
+	// (which runs program-wide regardless of CLI scope and rslint ignores).
+	if !typeCheckOnly {
+		warnings := collectAllowFileWarnings(allowFiles, programs, configMap, rslintConfig, currentDirectory)
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, formatAllowFileWarning(w, comparePathOptions))
+		}
+	}
+	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
+	if shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
+		return 0
+	}
+
+	// Phase 2: Apply fixes if --fix flag is enabled.
+	// Uses multi-pass fixing: after applying fixes, rebuild programs and re-lint
+	// to catch cascading issues (e.g. ban-types fix triggers no-inferrable-types).
+	// After fixing, allDiags is replaced with remaining (unfixed) diagnostics.
+	const maxFixPasses = 10
+	if fix && len(allDiags) > 0 {
+		diagnosticsByFile := groupDiagsByFile(allDiags)
+		fixedCount += applyFixPass(diagnosticsByFile)
+
+		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
+		// Skip if nothing was fixed in the first pass (no need to re-lint).
+		for pass := 1; pass < maxFixPasses && fixedCount > 0; pass++ {
+			newPrograms, newFallbackIdx, err := createPrograms()
+			if err != nil || len(newPrograms) == 0 {
+				break
+			}
+
+			// Re-lint: collect remaining diagnostics.
+			// Rebuild file filters for the new programs (ownership + ignores).
+			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
+			fixSkipMask := buildTypeCheckSkipMask(len(newPrograms), newFallbackIdx)
+			var passDiags []rule.RuleDiagnostic
+			passResult, _ := linter.RunLinter(linter.RunLinterOptions{
+				Programs:              newPrograms,
+				SingleThreaded:        singleThreaded,
+				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
+				PerProgramFilter:      toFileFilters(fixFileFilters),
+				GetRulesForFile:       getRulesForFile,
+				TypeInfoFiles:         typeInfoFiles,
+				TypeCheck:             typeCheck,
+				SkipTypeCheckPrograms: fixSkipMask,
+				OnDiagnostic: func(d rule.RuleDiagnostic) {
+					diagsMu.Lock()
+					passDiags = append(passDiags, d)
+					diagsMu.Unlock()
+				},
+			})
+			if passResult != nil {
+				for name := range passResult.ExecutedRules {
+					lintResult.ExecutedRules[name] = struct{}{}
+				}
+			}
+
+			// Replace allDiags with latest post-fix diagnostics.
+			allDiags = passDiags
+
+			passFixed := applyFixPass(groupDiagsByFile(passDiags))
+			if passFixed == 0 {
+				break // Stable — allDiags reflect final state
+			}
+			fixedCount += passFixed
+		}
+	}
+
+	// Phase 3: Print diagnostics and count errors/warnings.
+	// allDiags contains: original diagnostics (no fix), or remaining after fix.
+	errorsCount := 0
+	warningsCount := 0
+	typeErrorsCount := 0
+	{
+		w := bufio.NewWriterSize(os.Stdout, 4096*100)
+		for i, d := range allDiags {
 			switch d.Severity {
 			case rule.SeverityError:
 				errorsCount++
+				if typeCheck && strings.HasPrefix(d.RuleName, "TypeScript(") {
+					typeErrorsCount++
+				}
 			case rule.SeverityWarning:
 				warningsCount++
 			}
 
-			// Store diagnostics by file for fixing
-			if fix {
-				fileName := d.SourceFile.FileName()
-				diagnosticsByFile[fileName] = append(diagnosticsByFile[fileName], d)
-			}
-
-			if errorsCount+warningsCount == 1 {
+			if i == 0 {
 				w.WriteByte('\n')
 			}
 			// Only print Error message when quiet is true
@@ -651,62 +1263,10 @@ func runCMD() int {
 				w.Flush()
 			}
 		}
-	}()
-
-	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
-	lintedfileCount, err := linter.RunLinter(
-		programs,
-		singleThreaded,
-		nil,
-		utils.ExcludePaths,
-
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory, enforcePlugins)
-			return activeRules
-		},
-		func(d rule.RuleDiagnostic) {
-			diagnosticsChan <- d
-		},
-	)
-
-	close(diagnosticsChan)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error running linter: %v\n", err)
-		return 1
+		w.Flush()
 	}
 
-	wg.Wait()
-
-	// Apply fixes if --fix flag is enabled
-	if fix && len(diagnosticsByFile) > 0 {
-		for fileName, fileDiagnostics := range diagnosticsByFile {
-			// Only apply fixes for diagnostics that have fixes
-			diagnosticsWithFixes := make([]rule.RuleDiagnostic, 0)
-			for _, d := range fileDiagnostics {
-				if len(d.Fixes()) > 0 {
-					diagnosticsWithFixes = append(diagnosticsWithFixes, d)
-				}
-			}
-
-			if len(diagnosticsWithFixes) > 0 {
-				// Read the original file content
-				originalContent := diagnosticsWithFixes[0].SourceFile.Text()
-
-				// Apply fixes
-				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
-
-				if wasFixed {
-					// Write the fixed content back to the file
-					err := os.WriteFile(fileName, []byte(fixedContent), 0644)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
-					} else {
-						fixedCount += len(diagnosticsWithFixes) - len(unapplied)
-					}
-				}
-			}
-		}
-	}
+	lintErrorsCount := errorsCount - typeErrorsCount
 
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string
@@ -723,40 +1283,78 @@ func runCMD() int {
 		warningsColorFunc = colors.WarnText
 	}
 
-	errorsText := "errors"
-	if errorsCount == 1 {
-		errorsText = "error"
-	}
-
-	warningsText := "warnings"
-	if warningsCount == 1 {
-		warningsText = "warning"
-	}
-
-	filesText := "files"
-	if lintedfileCount == 1 {
-		filesText = "file"
-	}
+	warningsText := pluralize(warningsCount, "warning", "warnings")
+	filesText := pluralize(int(lintedfileCount), "file", "files")
+	rulesCount := len(lintResult.ExecutedRules)
+	rulesText := pluralize(rulesCount, "rule", "rules")
 	threadsCount := 1
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
 	if format == "default" {
-		if fix && fixedCount > 0 {
-			fixText := "issues"
-			if fixedCount == 1 {
-				fixText = "issue"
+		// Build the errors summary part.
+		// When type-check is enabled and there are type errors, split the display.
+		var errorsSummary string
+		switch {
+		case typeCheckOnly:
+			// Lint phase was skipped; only type errors are possible.
+			errorsSummary = fmt.Sprintf("%s %s",
+				errorsColorFunc("%d", typeErrorsCount),
+				pluralize(typeErrorsCount, "type error", "type errors"),
+			)
+		case typeCheck:
+			errorsSummary = fmt.Sprintf("%s %s, %s %s",
+				errorsColorFunc("%d", lintErrorsCount),
+				pluralize(lintErrorsCount, "lint error", "lint errors"),
+				errorsColorFunc("%d", typeErrorsCount),
+				pluralize(typeErrorsCount, "type error", "type errors"),
+			)
+		default:
+			errorsSummary = fmt.Sprintf("%s %s",
+				errorsColorFunc("%d", errorsCount),
+				pluralize(errorsCount, "error", "errors"),
+			)
+		}
+
+		if typeCheckOnly {
+			// type-check-only: omit lint-file/rule/warning columns since no
+			// lint ran. Report the type-checked file count derived from
+			// non-skipped programs' root files (tsconfig include/files);
+			// transitive .d.ts imports are excluded for user readability.
+			seen := make(map[string]struct{})
+			for i, prog := range programs {
+				if i < len(skipTypeCheck) && skipTypeCheck[i] {
+					continue
+				}
+				for _, fn := range prog.CommandLine().FileNames() {
+					seen[fn] = struct{}{}
+				}
 			}
+			typeCheckedFileCount := len(seen)
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
-				errorsColorFunc("%d", errorsCount),
-				errorsText,
+				"Found %s %s(type-checked %s %s in %s using %s threads)%s\n",
+				errorsSummary,
+				colors.DimText(""),
+				colors.BoldText("%d", typeCheckedFileCount),
+				pluralize(typeCheckedFileCount, "file", "files"),
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""),
+			)
+		} else if fix && fixedCount > 0 {
+			fixText := pluralize(fixedCount, "issue", "issues")
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s and %s %s %s(linted %s %s with %s %s in %s using %s threads, fixed %s %s)%s\n",
+				errorsSummary,
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
 				colors.BoldText("%d", lintedfileCount),
 				filesText,
+				colors.BoldText("%d", rulesCount),
+				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
 				colors.SuccessText("%d", fixedCount),
@@ -766,14 +1364,15 @@ func runCMD() int {
 		} else {
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
-				errorsColorFunc("%d", errorsCount),
-				errorsText,
+				"Found %s and %s %s %s(linted %s %s with %s %s in %s using %s threads)%s\n",
+				errorsSummary,
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
 				colors.BoldText("%d", lintedfileCount),
 				filesText,
+				colors.BoldText("%d", rulesCount),
+				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
 				color.New().SprintFunc()(""), // Reset

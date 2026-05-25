@@ -153,7 +153,7 @@ export const TypeInfoView: React.FC<TypeInfoViewProps> = ({ info }) => {
 
 // Helper to get title for top-level display
 export const getTypeTitle = (info: TypeInfo) => {
-  return `Type[${info.flagNames?.map(n => n.replace('checker.', '')).join(' | ') || 'Unknown'}]`;
+  return `Type[${info.flagNames?.map((n) => n.replace('checker.', '')).join(' | ') || 'Unknown'}]`;
 };
 
 // Helper to get preview for top-level display

@@ -7,6 +7,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+// Invalid-case columns point at the `=` token (upstream reports
+// `loc: equalToken.loc.start`), not at the surrounding whitespace span.
 func TestJsxEqualsSpacingRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &JsxEqualsSpacingRule, []rule_tester.ValidTestCase{
 		{
@@ -61,7 +63,7 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "noSpaceBefore",
 					Line:      1,
-					Column:    17,
+					Column:    18,
 				},
 			},
 			Output: []string{`var x = <div foo="bar" />`},
@@ -74,7 +76,7 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "noSpaceAfter",
 					Line:      1,
-					Column:    18,
+					Column:    17,
 				},
 			},
 			Output: []string{`var x = <div foo="bar" />`},
@@ -93,7 +95,7 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "needSpaceAfter",
 					Line:      1,
-					Column:    18,
+					Column:    17,
 				},
 			},
 			Output: []string{`var x = <div foo = "bar" />`},
@@ -106,12 +108,12 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "noSpaceBefore",
 					Line:      1,
-					Column:    17,
+					Column:    18,
 				},
 				{
 					MessageId: "noSpaceAfter",
 					Line:      1,
-					Column:    19,
+					Column:    18,
 				},
 			},
 			Output: []string{`var x = <div foo={bar} />`},
@@ -124,17 +126,17 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "noSpaceAfter",
 					Line:      1,
-					Column:    18,
+					Column:    17,
 				},
 				{
 					MessageId: "noSpaceBefore",
 					Line:      1,
-					Column:    28,
+					Column:    29,
 				},
 				{
 					MessageId: "noSpaceAfter",
 					Line:      1,
-					Column:    30,
+					Column:    29,
 				},
 			},
 			Output: []string{`var x = <div foo={bar} baz={qux} />`},
@@ -148,7 +150,7 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "needSpaceAfter",
 					Line:      1,
-					Column:    19,
+					Column:    18,
 				},
 			},
 			Output: []string{`var x = <div foo = {bar} />`},
@@ -181,12 +183,12 @@ func TestJsxEqualsSpacingRule(t *testing.T) {
 				{
 					MessageId: "needSpaceAfter",
 					Line:      1,
-					Column:    18,
+					Column:    17,
 				},
 				{
 					MessageId: "needSpaceAfter",
 					Line:      1,
-					Column:    29,
+					Column:    28,
 				},
 			},
 			Output: []string{`var x = <div foo = {bar} baz = {qux} />`},

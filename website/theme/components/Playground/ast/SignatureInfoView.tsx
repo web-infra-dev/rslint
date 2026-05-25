@@ -119,7 +119,7 @@ export const SignatureInfoView: React.FC<SignatureInfoViewProps> = ({
 
 // Helper to get title for top-level display
 export const getSignatureTitle = (info: SignatureInfo) => {
-  return `Signature[${info.flagNames?.map(n => n.replace('checker.', '')).join(' | ') || ''}]`;
+  return `Signature[${info.flagNames?.map((n) => n.replace('checker.', '')).join(' | ') || ''}]`;
 };
 
 // Helper to get preview for top-level display

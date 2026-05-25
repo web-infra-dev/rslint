@@ -2103,5 +2103,45 @@ const f = (gotcha: ObjectWithCallback = { callback: () => {} }): void => {};
       ],
       options: [{ allowTypedFunctionExpressions: false }],
     },
+    // Decorators on class members must be excluded from the reported
+    // function-head range (matches typescript-eslint's getFunctionHeadLoc).
+    {
+      code: `
+declare function LifecycleHook(): any;
+class HookLifeCycle {
+  @LifecycleHook()
+  async didLoad() {
+    return;
+  }
+}
+      `,
+      errors: [
+        {
+          column: 3,
+          endColumn: 16,
+          endLine: 5,
+          line: 5,
+          messageId: 'missingReturnType',
+        },
+      ],
+    },
+    {
+      code: `
+declare function Bound(): any;
+class Foo {
+  @Bound()
+  foo = () => 1;
+}
+      `,
+      errors: [
+        {
+          column: 3,
+          endColumn: 9,
+          endLine: 5,
+          line: 5,
+          messageId: 'missingReturnType',
+        },
+      ],
+    },
   ],
 });

@@ -258,8 +258,9 @@ func checkIdentifierWrite(node *ast.Node, ctx *rule.RuleContext, constSymbols ma
 }
 
 // NoConstAssignRule disallows reassigning const variables
-var NoConstAssignRule = rule.CreateRule(rule.Rule{
-	Name: "no-const-assign",
+var NoConstAssignRule = rule.Rule{
+	Name:             "no-const-assign",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Track const declarations by their symbol
 		constSymbols := make(map[*ast.Symbol]bool)
@@ -330,7 +331,7 @@ var NoConstAssignRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}
 
 // collectSymbols recursively collects symbols for all identifiers from a binding pattern
 func collectSymbols(bindingName *ast.Node, ctx *rule.RuleContext, constSymbols map[*ast.Symbol]bool) {

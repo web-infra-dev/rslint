@@ -1,0 +1,1498 @@
+// Rstest Snapshot v1
+
+exports[`no-unneeded-ternary > invalid 1`] = `
+{
+  "code": "var a = x === 2 ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 2`] = `
+{
+  "code": "var a = x >= 2 ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 3`] = `
+{
+  "code": "var a = x ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 4`] = `
+{
+  "code": "var a = x === 1 ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 5`] = `
+{
+  "code": "var a = x != 1 ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 6`] = `
+{
+  "code": "var a = foo() ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 7`] = `
+{
+  "code": "var a = !foo() ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 8`] = `
+{
+  "code": "var a = foo + bar ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 9`] = `
+{
+  "code": "var a = x instanceof foo ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 10`] = `
+{
+  "code": "var a = foo ? false : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 11`] = `
+{
+  "code": "var a = foo() ? false : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 12`] = `
+{
+  "code": "var a = x instanceof foo ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 13`] = `
+{
+  "code": "var a = !foo ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 14`] = `
+{
+  "code": "var result = value ? value : canSet ? 'unset' : 'can not set'",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 15`] = `
+{
+  "code": "foo ? foo : (bar ? baz : qux)",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 16`] = `
+{
+  "code": "function* fn() { foo ? foo : yield bar }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 17`] = `
+{
+  "code": "var a = foo ? foo : 'No';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 18`] = `
+{
+  "code": "var a = ((foo)) ? (((((foo))))) : ((((((((((((((bar))))))))))))));",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 19`] = `
+{
+  "code": "var a = b ? b : c => c;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 20`] = `
+{
+  "code": "var a = b ? b : c = 0;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 21`] = `
+{
+  "code": "var a = b ? b : (c => c);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 22`] = `
+{
+  "code": "var a = b ? b : (c = 0);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 23`] = `
+{
+  "code": "var a = b ? b : (c) => (c);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 24`] = `
+{
+  "code": "var a = b ? b : c, d;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 25`] = `
+{
+  "code": "var a = b ? b : (c, d);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 26`] = `
+{
+  "code": "f(x ? x : 1);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 27`] = `
+{
+  "code": "x ? x : 1;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 28`] = `
+{
+  "code": "var a = foo ? foo : bar;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 29`] = `
+{
+  "code": "var a = foo ? foo : a ?? b;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 30`] = `
+{
+  "code": "foo as any ? false : true",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 31`] = `
+{
+  "code": "foo ? foo : bar as any",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 32`] = `
+{
+  "code": "var a = typeof x === 'string' ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 33`] = `
+{
+  "code": "var a = typeof x ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 34`] = `
+{
+  "code": "var a = typeof x === 'string' ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 35`] = `
+{
+  "code": "var a = delete obj.x ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 36`] = `
+{
+  "code": "var a = void x ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 37`] = `
+{
+  "code": "async function f() { return await x ? true : false; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 38`] = `
+{
+  "code": "var a = ++x ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 39`] = `
+{
+  "code": "var a = x++ ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 40`] = `
+{
+  "code": "var a = (foo + bar) ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 41`] = `
+{
+  "code": "var a = (typeof x === 'string') ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 42`] = `
+{
+  "code": "var a = x===1?false:true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 43`] = `
+{
+  "code": "var a = x  ===   1 ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 44`] = `
+{
+  "code": "var a = 中 === 国 ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 45`] = `
+{
+  "code": "var a = x satisfies number ? false : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 46`] = `
+{
+  "code": "foo ? foo : bar satisfies number",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 47`] = `
+{
+  "code": "foo ? foo : (foo ? foo : c)",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 48`] = `
+{
+  "code": "var a = Boolean(x) ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 49`] = `
+{
+  "code": "var a = x === 1 ? true : true;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 50`] = `
+{
+  "code": "b ? b : c ? d : e;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 51`] = `
+{
+  "code": "b ? b : function() { return 1; };",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 52`] = `
+{
+  "code": "b ? b : class { static foo() {} };",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of conditional expression for default assignment.",
+      "messageId": "unnecessaryConditionalAssignment",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 53`] = `
+{
+  "code": "var a = new Foo() ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 54`] = `
+{
+  "code": "var a = \`abc\` ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 55`] = `
+{
+  "code": "var a = obj["foo"] ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 56`] = `
+{
+  "code": "var a = obj.foo ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unneeded-ternary > invalid 57`] = `
+{
+  "code": "var a = foo?.bar ? true : false;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary use of boolean literals in conditional expression.",
+      "messageId": "unnecessaryConditionalExpression",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unneeded-ternary",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,3888 @@
+// Rstest Snapshot v1
+
+exports[`strict-boolean-expressions > invalid 1`] = `
+{
+  "code": "
+if (true && 1 + 1) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 2`] = `
+{
+  "code": "while (false || 'a' + 'b') {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 3`] = `
+{
+  "code": "(x: object) => (true || false || x ? true : false);",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 4`] = `
+{
+  "code": "if (('' && {}) || (0 && void 0)) { }",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 5`] = `
+{
+  "code": "
+        declare const array: string[];
+        array.some(x => x);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in array predicate return type. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 6`] = `
+{
+  "code": "
+declare const foo: true & { __BRAND: 'Foo' };
+if (('' && foo) || (0 && void 0)) { }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 7`] = `
+{
+  "code": "
+declare const foo: false & { __BRAND: 'Foo' };
+if (('' && {}) || (foo && void 0)) { }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 8`] = `
+{
+  "code": "'asd' && 123 && [] && null;",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 9`] = `
+{
+  "code": "'asd' || 123 || [] || null;",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 10`] = `
+{
+  "code": "let x = (1 && 'a' && null) || 0 || '' || {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 11`] = `
+{
+  "code": "return (1 || 'a' || null) && 0 && '' && {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 12`] = `
+{
+  "code": "console.log((1 && []) || ('a' && {}));",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 13`] = `
+{
+  "code": "if ((1 && []) || ('a' && {})) void 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 14`] = `
+{
+  "code": "let x = null || 0 || 'a' || [] ? {} : undefined;",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 15`] = `
+{
+  "code": "return !(null || 0 || 'a' || []);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 16`] = `
+{
+  "code": "null || {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 17`] = `
+{
+  "code": "undefined && [];",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 18`] = `
+{
+  "code": "
+declare const x: null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 19`] = `
+{
+  "code": "(x: undefined) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 20`] = `
+{
+  "code": "<T extends null | undefined>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 21`] = `
+{
+  "code": "<T extends null>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 22`] = `
+{
+  "code": "<T extends undefined>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 23`] = `
+{
+  "code": "[] || 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 24`] = `
+{
+  "code": "({}) && 'a';",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 25`] = `
+{
+  "code": "
+declare const x: symbol;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 26`] = `
+{
+  "code": "(x: () => void) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 27`] = `
+{
+  "code": "<T extends object>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 28`] = `
+{
+  "code": "<T extends Object | Function>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 29`] = `
+{
+  "code": "<T extends { a: number }>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 30`] = `
+{
+  "code": "<T extends () => void>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 31`] = `
+{
+  "code": "while ('') {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 32`] = `
+{
+  "code": "for (; 'foo'; ) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 33`] = `
+{
+  "code": "
+declare const x: string;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 34`] = `
+{
+  "code": "(x: string) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 35`] = `
+{
+  "code": "<T extends string>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in conditional. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 36`] = `
+{
+  "code": "while (0n) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 37`] = `
+{
+  "code": "for (; 123; ) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 38`] = `
+{
+  "code": "
+declare const x: number;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 39`] = `
+{
+  "code": "(x: bigint) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 40`] = `
+{
+  "code": "<T extends number>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 41`] = `
+{
+  "code": "![]['length']; // doesn't count as array.length when computed",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 42`] = `
+{
+  "code": "
+declare const a: any[] & { notLength: number };
+if (a.notLength) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 43`] = `
+{
+  "code": "
+if (![].length) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 44`] = `
+{
+  "code": "
+(a: number[]) => a.length && '...';
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 45`] = `
+{
+  "code": "
+<T extends unknown[]>(...a: T) => a.length || 'empty';
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in conditional. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 46`] = `
+{
+  "code": "
+declare const x: string | number;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected value in conditional. A boolean expression is required.",
+      "messageId": "conditionErrorOther",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 47`] = `
+{
+  "code": "(x: bigint | string) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected value in conditional. A boolean expression is required.",
+      "messageId": "conditionErrorOther",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 48`] = `
+{
+  "code": "<T extends number | bigint | string>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected value in conditional. A boolean expression is required.",
+      "messageId": "conditionErrorOther",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 49`] = `
+{
+  "code": "
+declare const x: boolean | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 50`] = `
+{
+  "code": "(x?: boolean) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 51`] = `
+{
+  "code": "<T extends boolean | null | undefined>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in conditional. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 52`] = `
+{
+  "code": "
+declare const x: object | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 53`] = `
+{
+  "code": "(x?: { a: number }) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 54`] = `
+{
+  "code": "<T extends {} | null | undefined>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 55`] = `
+{
+  "code": "
+declare const x: string | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 56`] = `
+{
+  "code": "(x?: string) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 57`] = `
+{
+  "code": "<T extends string | null | undefined>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 58`] = `
+{
+  "code": "
+function foo(x: '' | 'bar' | null) {
+  if (!x) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 59`] = `
+{
+  "code": "
+declare const x: number | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableNumber",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 60`] = `
+{
+  "code": "(x?: number) => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableNumber",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 61`] = `
+{
+  "code": "<T extends number | null | undefined>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableNumber",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 62`] = `
+{
+  "code": "
+function foo(x: 0 | 1 | null) {
+  if (!x) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable number value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableNumber",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 63`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = 0,
+          That = 1,
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 64`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = 0,
+          That = 1,
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (!theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 65`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This,
+          That,
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (!theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 66`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = '',
+          That = 'a',
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (!theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 67`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = '',
+          That = 0,
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (!theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 68`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = 'one',
+          That = 'two',
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (!theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 69`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = 1,
+          That = 2,
+        }
+        const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+        if (!theEnum) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 70`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = 0,
+          That = 'one',
+        }
+        (value?: ExampleEnum) => (value ? 1 : 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 6,
+        },
+        "start": {
+          "column": 35,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 71`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = '',
+          That = 1,
+        }
+        (value?: ExampleEnum) => (!value ? 1 : 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 6,
+        },
+        "start": {
+          "column": 36,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 72`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = 'this',
+          That = 1,
+        }
+        (value?: ExampleEnum) => (!value ? 1 : 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 6,
+        },
+        "start": {
+          "column": 36,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 73`] = `
+{
+  "code": "
+        enum ExampleEnum {
+          This = '',
+          That = 0,
+        }
+        (value?: ExampleEnum) => (!value ? 1 : 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in conditional. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 6,
+        },
+        "start": {
+          "column": 36,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 74`] = `
+{
+  "code": "
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any value in conditional. An explicit comparison or type conversion is required.",
+      "messageId": "conditionErrorAny",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 75`] = `
+{
+  "code": "x => !x;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any value in conditional. An explicit comparison or type conversion is required.",
+      "messageId": "conditionErrorAny",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 76`] = `
+{
+  "code": "<T extends any>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected any value in conditional. An explicit comparison or type conversion is required.",
+      "messageId": "conditionErrorAny",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 77`] = `
+{
+  "code": "<T,>(x: T) => (x ? 1 : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected any value in conditional. An explicit comparison or type conversion is required.",
+      "messageId": "conditionErrorAny",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 78`] = `
+{
+  "code": "
+declare const x: string[] | null;
+if (x) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "messageId": "noStrictNullCheck",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected object value in conditional. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 79`] = `
+{
+  "code": "
+        declare const obj: { x: number } | null;
+        !obj ? 1 : 0
+        !obj
+        obj || 0
+        obj && 1 || 0
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+    {
+      "message": "Unexpected nullable object value in conditional. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 80`] = `
+{
+  "code": "
+declare function assert(x: unknown): asserts x;
+declare const nullableString: string | null;
+assert(nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 81`] = `
+{
+  "code": "
+declare function assert(a: number, b: unknown): asserts b;
+declare const nullableString: string | null;
+assert(foo, nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 82`] = `
+{
+  "code": "
+declare function assert(a: number, b: unknown): asserts b;
+declare function assert(one: number, two: unknown): asserts two;
+declare const nullableString: string | null;
+assert(foo, nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 83`] = `
+{
+  "code": "
+declare function assert(this: object, a: number, b: unknown): asserts b;
+declare const nullableString: string | null;
+assert(foo, nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 84`] = `
+{
+  "code": "
+function assert(this: object, a: number, b: unknown): asserts b;
+function assert(a: bigint, b: unknown): asserts b;
+function assert(this: object, a: string, two: string): asserts two;
+function assert(
+  this: object,
+  a: string,
+  assertee: string,
+  c: bigint,
+  d: object,
+): asserts assertee;
+
+function assert(...args: any[]) {
+  throw new Error('lol');
+}
+
+declare const nullableString: string | null;
+assert(3 as any, nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 18,
+        },
+        "start": {
+          "column": 18,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 85`] = `
+{
+  "code": "
+function assert(this: object, a: number, b: unknown): asserts b;
+function assert(a: bigint, b: unknown): asserts b;
+function assert(this: object, a: string, two: string): asserts two;
+function assert(
+  this: object,
+  a: string,
+  assertee: string,
+  c: bigint,
+  d: object,
+): asserts assertee;
+function assert(a: any, two: unknown, ...rest: any[]): asserts two;
+
+function assert(...args: any[]) {
+  throw new Error('lol');
+}
+
+declare const nullableString: string | null;
+assert(3 as any, nullableString, 'more', 'args', 'afterwards');
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 19,
+        },
+        "start": {
+          "column": 18,
+          "line": 19,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 86`] = `
+{
+  "code": "
+declare function assert(a: boolean, b: unknown): asserts b;
+declare function assert({ a }: { a: boolean }, b: unknown): asserts b;
+declare const nullableString: string | null;
+declare const boo: boolean;
+assert(boo, nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 87`] = `
+{
+  "code": "
+function assert(one: unknown): asserts one;
+function assert(one: unknown, two: unknown): asserts two;
+function assert(...args: unknown[]) {
+  throw new Error('not implemented');
+}
+declare const nullableString: string | null;
+assert(nullableString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 8,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 88`] = `
+{
+  "code": "
+['one', 'two', ''].find(x => {
+  return x;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in array predicate return type. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 89`] = `
+{
+  "code": "
+['one', 'two', ''].find(x => {
+  return;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 90`] = `
+{
+  "code": "
+['one', 'two', ''].findLast(x => {
+  return undefined;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 29,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 91`] = `
+{
+  "code": "
+['one', 'two', ''].find(x => {
+  if (x) {
+    return Math.random() > 0.5;
+  }
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 25,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 92`] = `
+{
+  "code": "
+const predicate = (x: string) => {
+  if (x) {
+    return Math.random() > 0.5;
+  }
+};
+
+['one', 'two', ''].find(predicate);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 8,
+        },
+        "start": {
+          "column": 25,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 93`] = `
+{
+  "code": "
+[1, null].every(async x => {
+  return x != null;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Predicate function should not be 'async'; expected a boolean return type.",
+      "messageId": "predicateCannotBeAsync",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 94`] = `
+{
+  "code": "
+const predicate = async x => {
+  return x != null;
+};
+
+[1, null].every(predicate);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in array predicate return type. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 95`] = `
+{
+  "code": "
+[1, null].every((x): boolean | number => {
+  return x != null;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected value in conditional. A boolean expression is required.",
+      "messageId": "conditionErrorOther",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 96`] = `
+{
+  "code": "
+[1, null].every((x): boolean | undefined => {
+  return x != null;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 97`] = `
+{
+  "code": "
+[1, null].every((x, i) => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 98`] = `
+{
+  "code": "
+[() => {}, null].every((x: () => void) => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 99`] = `
+{
+  "code": "
+[() => {}, null].every(function (x: () => void) {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 100`] = `
+{
+  "code": "
+[() => {}, null].every(() => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullish value in conditional. The condition is always false.",
+      "messageId": "conditionErrorNullish",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 101`] = `
+{
+  "code": "
+declare function f(x: number): string;
+declare function f(x: string | null): boolean;
+
+[35].filter(f);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected value in conditional. A boolean expression is required.",
+      "messageId": "conditionErrorOther",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 102`] = `
+{
+  "code": "
+declare function f(x: number): string;
+declare function f(x: number | boolean): boolean;
+declare function f(x: string | null): boolean;
+
+[35].filter(f);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected value in conditional. A boolean expression is required.",
+      "messageId": "conditionErrorOther",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 103`] = `
+{
+  "code": "
+declare function foo<T>(x: number): T;
+[1, null].every(foo);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any value in array predicate return type. An explicit comparison or type conversion is required.",
+      "messageId": "conditionErrorAny",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 104`] = `
+{
+  "code": "
+function foo<T extends number>(x: number): T {}
+[1, null].every(foo);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 105`] = `
+{
+  "code": "
+declare const nullOrString: string | null;
+['one', null].filter(x => nullOrString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in array predicate return type. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 106`] = `
+{
+  "code": "
+declare const nullOrString: string | null;
+['one', null].filter(x => !nullOrString);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable string value in conditional. Please handle the nullish/empty cases explicitly.",
+      "messageId": "conditionErrorNullableString",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 107`] = `
+{
+  "code": "
+declare const anyValue: any;
+['one', null].filter(x => anyValue);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any value in array predicate return type. An explicit comparison or type conversion is required.",
+      "messageId": "conditionErrorAny",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 108`] = `
+{
+  "code": "
+declare const nullOrBoolean: boolean | null;
+[true, null].filter(x => nullOrBoolean);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable boolean value in array predicate return type. Please handle the nullish case explicitly.",
+      "messageId": "conditionErrorNullableBoolean",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 109`] = `
+{
+  "code": "
+enum ExampleEnum {
+  This = 0,
+  That = 1,
+}
+const theEnum = Math.random() < 0.3 ? ExampleEnum.This : null;
+[0, 1].filter(x => theEnum);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable enum value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableEnum",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 7,
+        },
+        "start": {
+          "column": 15,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 110`] = `
+{
+  "code": "
+declare const nullOrNumber: number | null;
+[0, null].filter(x => nullOrNumber);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable number value in array predicate return type. Please handle the nullish/zero/NaN cases explicitly.",
+      "messageId": "conditionErrorNullableNumber",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 111`] = `
+{
+  "code": "
+const objectValue: object = {};
+[{ a: 0 }, {}].filter(x => objectValue);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in array predicate return type. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 112`] = `
+{
+  "code": "
+const objectValue: object = {};
+[{ a: 0 }, {}].filter(x => {
+  return objectValue;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected object value in array predicate return type. The condition is always true.",
+      "messageId": "conditionErrorObject",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 113`] = `
+{
+  "code": "
+declare const nullOrObject: object | null;
+[{ a: 0 }, null].filter(x => nullOrObject);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected nullable object value in array predicate return type. An explicit null check is required.",
+      "messageId": "conditionErrorNullableObject",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 114`] = `
+{
+  "code": "
+const numbers: number[] = [1];
+[1, 2].filter(x => numbers.length);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 115`] = `
+{
+  "code": "
+const numberValue: number = 1;
+[1, 2].filter(x => numberValue);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected number value in array predicate return type. An explicit zero/NaN check is required.",
+      "messageId": "conditionErrorNumber",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`strict-boolean-expressions > invalid 116`] = `
+{
+  "code": "
+const stringValue: string = 'hoge';
+['hoge', 'foo'].filter(x => stringValue);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected string value in array predicate return type. An explicit empty string check is required.",
+      "messageId": "conditionErrorString",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/strict-boolean-expressions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

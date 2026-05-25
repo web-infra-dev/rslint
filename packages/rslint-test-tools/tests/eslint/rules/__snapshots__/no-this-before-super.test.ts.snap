@@ -1,0 +1,1689 @@
+// Rstest Snapshot v1
+
+exports[`no-this-before-super > invalid 1`] = `
+{
+  "code": "class A extends B { constructor() { this.c = 0; } }",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 2`] = `
+{
+  "code": "class A extends B { constructor() { this.c = 0; super(); } }",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 3`] = `
+{
+  "code": "class A extends B { constructor() { super.c(); super(); } }",
+  "diagnostics": [
+    {
+      "message": "'super' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 4`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this.a = 0, super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 5`] = `
+{
+  "code": "class A extends B {
+  constructor(a) {
+    a && super();
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 6`] = `
+{
+  "code": "class A extends B {
+  constructor(a = this.x) {
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 7`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const { a = this.b } = {};
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 8`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const x = \`\${this.a}\`;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 9`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this?.a;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 10`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    for (const x of this.items) {}
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 11`] = `
+{
+  "code": "class A extends B {
+  constructor(a = super.x) {
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'super' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 12`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this.a &&= 0;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 13`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this.a ||= 0;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 14`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this.a ??= 0;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 15`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const { a: { b = this.c } } = { a: {} };
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 16`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const [a = this.b] = [];
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 17`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    for (;this.check();) { break; }
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 18`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    new this.Foo();
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 19`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    delete this.foo;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 20`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const t = typeof this;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 21`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const arr = [...this.items];
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 22`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this.tag\`hello\`;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 23`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    void this.a;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 24`] = `
+{
+  "code": "class A extends B {
+  constructor(a) {
+    a ? super() : null;
+    this.x = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 25`] = `
+{
+  "code": "class A extends B {
+  constructor(a) {
+    if (a === 1) {
+      super();
+    } else if (a === 2) {
+      super();
+    }
+    this.x = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 26`] = `
+{
+  "code": "class A extends B {
+  constructor(a) {
+    for (;a;) { super(); break; }
+    this.x = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 27`] = `
+{
+  "code": "class A extends B {
+  constructor(x) {
+    switch(x) {}
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 28`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    for (const {a} of this.items) {}
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 29`] = `
+{
+  "code": "class A extends B {
+  constructor(a, b) {
+    a ? (b ? super() : null) : super();
+    this.c = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 30`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const obj = { [this.key]: 1 };
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 31`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    while(this.check()) { break; }
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 32`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    for (const k in this.obj) {}
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 33`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    for (this.i = 0;;) { break; }
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 34`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    try { } catch(e) { super(); }
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 35`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const x = this.a + 1 + super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 36`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    do { } while(this.a);
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 37`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    this.a ? super() : super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 38`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const arr = [this.a, super()];
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 39`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    try { super(); } finally { this.a = 0; }
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 32,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 40`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    try { this.a = 0; } finally { super(); }
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 41`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    for (let i = 0; i < 1; i++) {
+      for (let j = 0; j < 1; j++) {
+        super();
+      }
+    }
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 42`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    null || super();
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 43`] = `
+{
+  "code": "class A extends B {
+  constructor(a) {
+    if (a) { super(); }
+    if (!a) { super(); }
+    this.x = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 44`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const x = \`\${this.a} \${super()}\`;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 45`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    while(true) { this.a = 0; break; }
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 46`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    do { this.a = 0; } while(super());
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 47`] = `
+{
+  "code": "class A extends B {
+  constructor(c) {
+    const x = (c ? super() : 0) + this.a;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 35,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 48`] = `
+{
+  "code": "class A extends B {
+  constructor(x) {
+    switch(x) {
+      case 1: super(); break;
+      case 2: super(); break;
+    }
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 49`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    try { super(); } catch(e) { }
+    this.a = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 50`] = `
+{
+  "code": "class A extends B {
+  constructor(a, b) {
+    (a || b) && super();
+    this.x = 0;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 51`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    try { } catch(e) { super(); } finally { this.a = 0; }
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 3,
+        },
+        "start": {
+          "column": 45,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 52`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    try { super(); } catch(e) { this.a = 0; }
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 33,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 53`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    const obj = { ...this };
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 54`] = `
+{
+  "code": "class A extends B {
+  constructor() {
+    delete super.prop;
+    super();
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'super' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 55`] = `
+{
+  "code": "class A extends B {
+  constructor(cond) {
+    for (; cond; super()) { this.a = 0; break; }
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "noBeforeSuper",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

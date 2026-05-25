@@ -84,7 +84,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			return
 		}
 
-		typeRef := typeAnnotation.AsTypeReference()
+		typeRef := typeAnnotation.AsTypeReferenceNode()
 		if typeRef == nil {
 			return
 		}

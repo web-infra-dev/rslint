@@ -11,8 +11,9 @@ type ConsistentTypeExportsOptions struct {
 
 // ConsistentTypeExportsRule enforces consistent type exports
 var ConsistentTypeExportsRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-type-exports",
-	Run:  run,
+	Name:             "consistent-type-exports",
+	RequiresTypeInfo: true,
+	Run:              run,
 })
 
 func run(ctx rule.RuleContext, options any) rule.RuleListeners {

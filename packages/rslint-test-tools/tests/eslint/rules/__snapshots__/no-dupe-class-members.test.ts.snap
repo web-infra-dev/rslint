@@ -1,0 +1,1458 @@
+// Rstest Snapshot v1
+
+exports[`no-dupe-class-members > invalid 1`] = `
+{
+  "code": "class A { foo() {} foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 2`] = `
+{
+  "code": "!class A { foo() {} foo() {} };",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 3`] = `
+{
+  "code": "class A { 'foo'() {} 'foo'() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 4`] = `
+{
+  "code": "class A { 10() {} 1e1() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '10'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 5`] = `
+{
+  "code": "class A { ['foo']() {} ['foo']() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 6`] = `
+{
+  "code": "class A { static ['foo']() {} static foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 7`] = `
+{
+  "code": "class A { set 'foo'(value) {} set ['foo'](val) {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 8`] = `
+{
+  "code": "class A { ''() {} ['']() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name ''.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 9`] = `
+{
+  "code": "class A { [\`foo\`]() {} [\`foo\`]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 10`] = `
+{
+  "code": "class A { static get [\`foo\`]() {} static get ['foo']() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 11`] = `
+{
+  "code": "class A { foo() {} [\`foo\`]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 12`] = `
+{
+  "code": "class A { get [\`foo\`]() {} 'foo'() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 13`] = `
+{
+  "code": "class A { static 'foo'() {} static [\`foo\`]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 14`] = `
+{
+  "code": "class A { ['constructor']() {} ['constructor']() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'constructor'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 15`] = `
+{
+  "code": "class A { static [\`constructor\`]() {} static constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'constructor'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 16`] = `
+{
+  "code": "class A { static constructor() {} static 'constructor'() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'constructor'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 17`] = `
+{
+  "code": "class A { [123]() {} [123]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '123'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 18`] = `
+{
+  "code": "class A { [0x10]() {} 16() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '16'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 19`] = `
+{
+  "code": "class A { [100]() {} [1e2]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '100'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 20`] = `
+{
+  "code": "class A { [123.00]() {} [\`123\`]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '123'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 21`] = `
+{
+  "code": "class A { static '65'() {} static [0o101]() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '65'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 22`] = `
+{
+  "code": "class A { [123n]() {} 123() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '123'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 23`] = `
+{
+  "code": "class A { [null]() {} 'null'() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'null'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 24`] = `
+{
+  "code": "class A { foo() {} foo() {} foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 25`] = `
+{
+  "code": "class A { static foo() {} static foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 26`] = `
+{
+  "code": "class A { foo() {} get foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 27`] = `
+{
+  "code": "class A { set foo(value) {} foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 28`] = `
+{
+  "code": "class A { foo; foo; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 29`] = `
+{
+  "code": "class A { foo; foo = 42; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 30`] = `
+{
+  "code": "class A { foo; foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 31`] = `
+{
+  "code": "class A { foo(a: string): void; foo(a: any) {} foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 32`] = `
+{
+  "code": "class A { async foo() {} async foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 33`] = `
+{
+  "code": "class A { *foo() {} *foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 34`] = `
+{
+  "code": "class A { foo() {} async foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 35`] = `
+{
+  "code": "var x = class { foo() {} foo() {} };",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 36`] = `
+{
+  "code": "class Outer { bar() {} foo() { class Inner { baz() {} baz() {} } } }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'baz'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 37`] = `
+{
+  "code": "class Outer { foo() {} foo() {} bar() { class Inner { baz() {} baz() {} } } }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'baz'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 38`] = `
+{
+  "code": "class A { foo() {} bar() {} foo() {} bar() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'bar'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 39`] = `
+{
+  "code": "class A { foo = 1; get foo() {} set foo(v) {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 40`] = `
+{
+  "code": "class A { get foo() {} get foo() {} set foo(v) {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 41`] = `
+{
+  "code": "class A { foo() {} get foo() {} get foo() {} set foo(v) {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 42`] = `
+{
+  "code": "class Base { foo() {} } class Child extends Base { foo() {} foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 43`] = `
+{
+  "code": "class A { __proto__() {} __proto__() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name '__proto__'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 44`] = `
+{
+  "code": "class A { foo = () => {}; foo = () => {}; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 45`] = `
+{
+  "code": "class A { [key: string]: any; foo() {} foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 46`] = `
+{
+  "code": "class A { foo!: string; foo!: number; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 47`] = `
+{
+  "code": "class A { private foo() {} public foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 48`] = `
+{
+  "code": "class A { readonly foo: string; foo: number; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 49`] = `
+{
+  "code": "class A { foo?: string; foo: number; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 50`] = `
+{
+  "code": "class A { ['foo'] = 1; foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 51`] = `
+{
+  "code": "class A { declare foo: string; foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-class-members > invalid 52`] = `
+{
+  "code": "class A { foo() {} static foo() {} foo() {} static foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+    {
+      "message": "Duplicate name 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
