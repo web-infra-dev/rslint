@@ -30,7 +30,8 @@ func buildUnsafeReturnThisMessage(t string) rule.RuleMessage {
 }
 
 var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
-	Name: "no-unsafe-return",
+	Name:             "no-unsafe-return",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
 		// When noImplicitThis is not enabled (considering strict mode), object literal methods
@@ -42,10 +43,10 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			returnNode *ast.Node,
 			reportingNode *ast.Node,
 		) {
-			t := ctx.TypeChecker.GetTypeAtLocation(returnNode)
+			returnNodeType := ctx.TypeChecker.GetTypeAtLocation(returnNode)
 
 			anyType := utils.DiscriminateAnyType(
-				t,
+				returnNodeType,
 				ctx.TypeChecker,
 				ctx.Program,
 				returnNode,
@@ -55,8 +56,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// function has an explicit return type, so ensure it's a safe return
-			returnNodeType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, returnNode)
+			constrainedReturnNodeType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, returnNode)
 
 			// function expressions will not have their return type modified based on receiver typing
 			// so we have to use the contextual typing in these cases, i.e.
@@ -119,7 +119,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 				}
 
 				var typeString string
-				if utils.IsIntrinsicErrorType(returnNodeType) {
+				if utils.IsIntrinsicErrorType(constrainedReturnNodeType) {
 					typeString = "error"
 				} else if anyType == utils.DiscriminatedAnyTypeAny {
 					typeString = "`any`"
@@ -170,6 +170,7 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 			ast.KindArrowFunction: func(node *ast.Node) {
 				body := node.Body()
 				if !ast.IsBlock(body) {
+					body = ast.SkipParentheses(body)
 					checkReturn(body, body)
 				}
 			},

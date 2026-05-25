@@ -1,0 +1,265 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-constructor > invalid 1`] = `
+{
+  "code": "class A { constructor(){} }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 2`] = `
+{
+  "code": "class A { 'constructor'(){} }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 3`] = `
+{
+  "code": "class A extends B { constructor() { super(); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 4`] = `
+{
+  "code": "class A extends B { constructor(foo){ super(foo); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 5`] = `
+{
+  "code": "class A extends B { constructor(foo, bar){ super(foo, bar); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 6`] = `
+{
+  "code": "class A extends B { constructor(...args){ super(...args); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 7`] = `
+{
+  "code": "class A extends B.C { constructor() { super(...arguments); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 8`] = `
+{
+  "code": "class A extends B { constructor(a, b, ...c) { super(...arguments); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 9`] = `
+{
+  "code": "class A extends B { constructor(a, b, ...c) { super(a, b, ...c); } }",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-constructor > invalid 10`] = `
+{
+  "code": "
+class A {
+  public constructor() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Useless constructor.",
+      "messageId": "noUselessConstructor",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-useless-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

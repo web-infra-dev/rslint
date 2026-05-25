@@ -1278,7 +1278,7 @@ class Foo {
       "ruleName": "@typescript-eslint/member-ordering",
     },
     {
-      "message": "Member #I should be declared before all public instance method definitions.",
+      "message": "Member I should be declared before all public instance method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -1370,7 +1370,7 @@ class Foo {
       "ruleName": "@typescript-eslint/member-ordering",
     },
     {
-      "message": "Member #C should be declared before all constructor definitions.",
+      "message": "Member C should be declared before all constructor definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -1430,7 +1430,7 @@ class Foo {
       "ruleName": "@typescript-eslint/member-ordering",
     },
     {
-      "message": "Member #F should be declared before all constructor definitions.",
+      "message": "Member F should be declared before all constructor definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3854,7 +3854,7 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Member #imPrivate should be declared before all private method definitions.",
+      "message": "Member imPrivate should be declared before all private method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3995,7 +3995,7 @@ abstract class Foo {
       "ruleName": "@typescript-eslint/member-ordering",
     },
     {
-      "message": "Member #I should be declared before all field definitions.",
+      "message": "Member I should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -4010,7 +4010,7 @@ abstract class Foo {
       "ruleName": "@typescript-eslint/member-ordering",
     },
     {
-      "message": "Member #J should be declared before all field definitions.",
+      "message": "Member J should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {

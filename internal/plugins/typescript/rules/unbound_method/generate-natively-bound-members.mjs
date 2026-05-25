@@ -29,7 +29,7 @@ const SUPPORTED_GLOBALS = [
   'JSON',
   'Intl',
 ];
-const nativelyBoundMembers = SUPPORTED_GLOBALS.map(namespace => {
+const nativelyBoundMembers = SUPPORTED_GLOBALS.map((namespace) => {
   if (!(namespace in global)) {
     // node.js might not have namespaces like Intl depending on compilation options
     // https://nodejs.org/api/intl.html#intl_options_for_building_node_js
@@ -39,7 +39,7 @@ const nativelyBoundMembers = SUPPORTED_GLOBALS.map(namespace => {
   return [
     namespace,
     Object.getOwnPropertyNames(object).filter(
-      name => !name.startsWith('_') && typeof object[name] === 'function',
+      (name) => !name.startsWith('_') && typeof object[name] === 'function',
     ),
   ];
 });
@@ -53,7 +53,7 @@ var nativelyBoundMembers = map[string](map[string]struct{}){
 ${nativelyBoundMembers
   .map(([namespace, names]) => {
     const lines = names
-      .map(name => `\t\t${JSON.stringify(name)}: struct{}{},\n`)
+      .map((name) => `\t\t${JSON.stringify(name)}: struct{}{},\n`)
       .join('');
     return `\t${JSON.stringify(namespace)}: {\n${lines}\t},\n`;
   })

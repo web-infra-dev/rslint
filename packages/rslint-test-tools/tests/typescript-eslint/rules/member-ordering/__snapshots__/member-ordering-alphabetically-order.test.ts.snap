@@ -1,6 +1,6 @@
 // Rstest Snapshot v1
 
-exports[`member-ordering > invalid 1`] = `
+exports[`member-ordering - alphabetically-order > invalid 1`] = `
 {
   "code": "
 interface Foo {
@@ -49,7 +49,7 @@ interface Foo {
 }
 `;
 
-exports[`member-ordering > invalid 2`] = `
+exports[`member-ordering - alphabetically-order > invalid 2`] = `
 {
   "code": "
 interface Foo {
@@ -96,7 +96,7 @@ interface Foo {
 }
 `;
 
-exports[`member-ordering > invalid 3`] = `
+exports[`member-ordering - alphabetically-order > invalid 3`] = `
 {
   "code": "
 interface Foo {
@@ -143,7 +143,7 @@ interface Foo {
 }
 `;
 
-exports[`member-ordering > invalid 4`] = `
+exports[`member-ordering - alphabetically-order > invalid 4`] = `
 {
   "code": "
 type Foo = {
@@ -192,7 +192,7 @@ type Foo = {
 }
 `;
 
-exports[`member-ordering > invalid 5`] = `
+exports[`member-ordering - alphabetically-order > invalid 5`] = `
 {
   "code": "
 type Foo = {
@@ -239,7 +239,7 @@ type Foo = {
 }
 `;
 
-exports[`member-ordering > invalid 6`] = `
+exports[`member-ordering - alphabetically-order > invalid 6`] = `
 {
   "code": "
 type Foo = {
@@ -286,7 +286,7 @@ type Foo = {
 }
 `;
 
-exports[`member-ordering > invalid 7`] = `
+exports[`member-ordering - alphabetically-order > invalid 7`] = `
 {
   "code": "
 class Foo {
@@ -322,173 +322,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 8`] = `
-{
-  "code": "
-class Foo {
-  public static c: string;
-  public static b: string;
-  public static a: string;
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "Member b should be declared before member c.",
-      "messageId": "incorrectOrder",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 4,
-        },
-        "start": {
-          "column": 3,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/member-ordering",
-    },
-    {
-      "message": "Member a should be declared before member b.",
-      "messageId": "incorrectOrder",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 5,
-        },
-      },
-      "ruleName": "@typescript-eslint/member-ordering",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`member-ordering > invalid 9`] = `
-{
-  "code": "
-const foo = class Foo {
-  protected static b: string = '';
-  public static a: string;
-  private static c: string = '';
-  constructor() {}
-  public d: string = '';
-  protected e: string = '';
-  private f: string = '';
-};
-      ",
-  "diagnostics": [
-    {
-      "message": "Member a should be declared before member b.",
-      "messageId": "incorrectOrder",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 4,
-        },
-        "start": {
-          "column": 3,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/member-ordering",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`member-ordering > invalid 10`] = `
-{
-  "code": "
-const foo = class Foo {
-  public static c: string;
-  public static b: string;
-  public static a: string;
-};
-      ",
-  "diagnostics": [
-    {
-      "message": "Member b should be declared before member c.",
-      "messageId": "incorrectOrder",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 4,
-        },
-        "start": {
-          "column": 3,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/member-ordering",
-    },
-    {
-      "message": "Member a should be declared before member b.",
-      "messageId": "incorrectOrder",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 5,
-        },
-      },
-      "ruleName": "@typescript-eslint/member-ordering",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`member-ordering > invalid 11`] = `
-{
-  "code": "
-class Foo {
-  protected static b: string = '';
-  public static a: string;
-  private static c: string = '';
-  constructor() {}
-  public d: string = '';
-  protected e: string = '';
-  private f: string = '';
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "Member a should be declared before member b.",
-      "messageId": "incorrectOrder",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 4,
-        },
-        "start": {
-          "column": 3,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/member-ordering",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`member-ordering > invalid 12`] = `
+exports[`member-ordering - alphabetically-order > invalid 8`] = `
 {
   "code": "
 class Foo {
@@ -535,7 +369,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 13`] = `
+exports[`member-ordering - alphabetically-order > invalid 9`] = `
 {
   "code": "
 const foo = class Foo {
@@ -571,7 +405,7 @@ const foo = class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 14`] = `
+exports[`member-ordering - alphabetically-order > invalid 10`] = `
 {
   "code": "
 const foo = class Foo {
@@ -618,7 +452,173 @@ const foo = class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 15`] = `
+exports[`member-ordering - alphabetically-order > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  protected static b: string = '';
+  public static a: string;
+  private static c: string = '';
+  constructor() {}
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering - alphabetically-order > invalid 12`] = `
+{
+  "code": "
+class Foo {
+  public static c: string;
+  public static b: string;
+  public static a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering - alphabetically-order > invalid 13`] = `
+{
+  "code": "
+const foo = class Foo {
+  protected static b: string = '';
+  public static a: string;
+  private static c: string = '';
+  constructor() {}
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering - alphabetically-order > invalid 14`] = `
+{
+  "code": "
+const foo = class Foo {
+  public static c: string;
+  public static b: string;
+  public static a: string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering - alphabetically-order > invalid 15`] = `
 {
   "code": "
 interface Foo {
@@ -667,7 +667,7 @@ interface Foo {
 }
 `;
 
-exports[`member-ordering > invalid 16`] = `
+exports[`member-ordering - alphabetically-order > invalid 16`] = `
 {
   "code": "
 interface Foo {
@@ -714,7 +714,7 @@ interface Foo {
 }
 `;
 
-exports[`member-ordering > invalid 17`] = `
+exports[`member-ordering - alphabetically-order > invalid 17`] = `
 {
   "code": "
 type Foo = {
@@ -763,7 +763,7 @@ type Foo = {
 }
 `;
 
-exports[`member-ordering > invalid 18`] = `
+exports[`member-ordering - alphabetically-order > invalid 18`] = `
 {
   "code": "
 type Foo = {
@@ -810,7 +810,7 @@ type Foo = {
 }
 `;
 
-exports[`member-ordering > invalid 19`] = `
+exports[`member-ordering - alphabetically-order > invalid 19`] = `
 {
   "code": "
 class FooTestGetter {
@@ -852,7 +852,7 @@ class FooTestGetter {
 }
 `;
 
-exports[`member-ordering > invalid 20`] = `
+exports[`member-ordering - alphabetically-order > invalid 20`] = `
 {
   "code": "
 class Foo {
@@ -905,7 +905,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 21`] = `
+exports[`member-ordering - alphabetically-order > invalid 21`] = `
 {
   "code": "
 class FooTestGetter {
@@ -962,7 +962,7 @@ class FooTestGetter {
 }
 `;
 
-exports[`member-ordering > invalid 22`] = `
+exports[`member-ordering - alphabetically-order > invalid 22`] = `
 {
   "code": "
 const foo = class Foo {
@@ -1028,7 +1028,7 @@ const foo = class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 23`] = `
+exports[`member-ordering - alphabetically-order > invalid 23`] = `
 {
   "code": "
 class Foo {
@@ -1100,7 +1100,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 24`] = `
+exports[`member-ordering - alphabetically-order > invalid 24`] = `
 {
   "code": "
 class Foo {
@@ -1166,7 +1166,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 25`] = `
+exports[`member-ordering - alphabetically-order > invalid 25`] = `
 {
   "code": "
 const foo = class Foo {
@@ -1232,7 +1232,7 @@ const foo = class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 26`] = `
+exports[`member-ordering - alphabetically-order > invalid 26`] = `
 {
   "code": "
 interface Foo {
@@ -1319,7 +1319,7 @@ interface Foo {
 }
 `;
 
-exports[`member-ordering > invalid 27`] = `
+exports[`member-ordering - alphabetically-order > invalid 27`] = `
 {
   "code": "
 type Foo = {
@@ -1406,7 +1406,7 @@ type Foo = {
 }
 `;
 
-exports[`member-ordering > invalid 28`] = `
+exports[`member-ordering - alphabetically-order > invalid 28`] = `
 {
   "code": "
 class Foo {
@@ -1417,7 +1417,7 @@ class Foo {
       ",
   "diagnostics": [
     {
-      "message": "Member #b should be declared before member #c.",
+      "message": "Member b should be declared before member c.",
       "messageId": "incorrectOrder",
       "range": {
         "end": {
@@ -1432,7 +1432,7 @@ class Foo {
       "ruleName": "@typescript-eslint/member-ordering",
     },
     {
-      "message": "Member #a should be declared before member #b.",
+      "message": "Member a should be declared before member b.",
       "messageId": "incorrectOrder",
       "range": {
         "end": {
@@ -1453,7 +1453,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 29`] = `
+exports[`member-ordering - alphabetically-order > invalid 29`] = `
 {
   "code": "
 class Foo {
@@ -1520,7 +1520,7 @@ class Foo {
 }
 `;
 
-exports[`member-ordering > invalid 30`] = `
+exports[`member-ordering - alphabetically-order > invalid 30`] = `
 {
   "code": "
 class Foo {

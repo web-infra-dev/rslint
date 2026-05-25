@@ -96,9 +96,6 @@ func isNumber(node *ast.Node, value int) bool {
 	return false
 }
 
-func isNullLiteral(node *ast.Node) bool {
-	return node != nil && node.Kind == ast.KindNullKeyword
-}
 
 func isNegativeOp(op ast.Kind) bool {
 	return op == ast.KindExclamationEqualsToken || op == ast.KindExclamationEqualsEqualsToken
@@ -413,7 +410,8 @@ func needsParentheses(node *ast.Node) bool {
 }
 
 var PreferStringStartsEndsWithRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-string-starts-ends-with",
+	Name:             "prefer-string-starts-ends-with",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := defaultOpts
 
@@ -606,7 +604,7 @@ func (h *ruleHelper) checkMatch(left, right *ast.Node, op ast.Kind) {
 		return
 	}
 
-	if !isNullLiteral(right) {
+	if !utils.IsNullLiteral(right) {
 		return
 	}
 

@@ -83,20 +83,27 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 type RuleListeners map[ast.Kind](func(node *ast.Node))
 
 type Rule struct {
-	Name string
-	Run  func(ctx RuleContext, options any) RuleListeners
+	Name             string
+	RequiresTypeInfo bool
+	Run              func(ctx RuleContext, options any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
-		Name: "@typescript-eslint/" + r.Name,
-		Run:  r.Run,
+		Name:             "@typescript-eslint/" + r.Name,
+		RequiresTypeInfo: r.RequiresTypeInfo,
+		Run:              r.Run,
 	}
 }
 
 type RuleMessage struct {
 	Id          string
 	Description string
+	// Data exposes the placeholder values that were substituted into
+	// Description (e.g. ESLint's `report({ data: { type } })`). Downstream
+	// reporters / IDE clients can use this for structured access. Optional —
+	// rules that don't carry placeholders may leave it nil.
+	Data map[string]string
 }
 
 type RuleFix struct {
@@ -152,6 +159,10 @@ type RuleDiagnostic struct {
 	Suggestions *[]RuleSuggestion
 	SourceFile  *ast.SourceFile
 	Severity    DiagnosticSeverity
+	// PreFormatted indicates that Message.Description already contains
+	// structured formatting (e.g. indented continuation lines from tsc diagnostics).
+	// The renderer will use a simple 2-space indent instead of the │ border style.
+	PreFormatted bool
 }
 
 func (d RuleDiagnostic) Fixes() []RuleFix {
@@ -163,6 +174,7 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 
 type RuleContext struct {
 	SourceFile                 *ast.SourceFile
+	Settings                   map[string]interface{}
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager
@@ -172,6 +184,18 @@ type RuleContext struct {
 	ReportNode                 func(node *ast.Node, msg RuleMessage)
 	ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
 	ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
+	// ReportNodeWithFixesAndSuggestions emits a single diagnostic carrying
+	// BOTH an autofix and one or more suggestions. Used by rules that follow
+	// upstream's "promote first suggestion to fix while keeping the
+	// suggestion" pattern (e.g., ESLint's
+	// `enableDangerousAutofixThisMayCauseInfiniteLoops` in
+	// react-hooks/exhaustive-deps).
+	ReportNodeWithFixesAndSuggestions func(node *ast.Node, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
+	// ReportRangeWithFixesAndSuggestions is the range-keyed twin of
+	// ReportNodeWithFixesAndSuggestions. Same semantics, anchors the
+	// diagnostic at an explicit TextRange instead of a node's trimmed
+	// range.
+	ReportRangeWithFixesAndSuggestions func(textRange core.TextRange, msg RuleMessage, fixes []RuleFix, suggestions []RuleSuggestion)
 }
 
 func ReportNodeWithFixesOrSuggestions(ctx RuleContext, node *ast.Node, fix bool, msg RuleMessage, suggestionMsg RuleMessage, fixes ...RuleFix) {

@@ -65,7 +65,8 @@ func isBooleanType(t *checker.Type) bool {
 }
 
 var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
-	Name: "no-unnecessary-boolean-literal-compare",
+	Name:             "no-unnecessary-boolean-literal-compare",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoUnnecessaryBooleanLiteralCompareOptions)
 		if !ok {
@@ -209,12 +210,15 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 
 				fixes := make([]rule.RuleFix, 0, 6)
 
-				fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, mutatedNode, ctx.SourceFile.Text()[comparison.expression.Pos():comparison.expression.End()]))
+				innerExpression := ast.SkipParentheses(comparison.expression)
+				expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, innerExpression)
+				expressionText := ctx.SourceFile.Text()[expressionRange.Pos():expressionRange.End()]
+				fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, mutatedNode, expressionText))
 
 				if shouldNegate == isUnaryNegation {
 					fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, mutatedNode, "!"))
 
-					if !utils.IsStrongPrecedenceNode(comparison.expression) {
+					if !utils.IsStrongPrecedenceNode(innerExpression) {
 						fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, mutatedNode, "("), rule.RuleFixInsertAfter(mutatedNode, ")"))
 					}
 				}

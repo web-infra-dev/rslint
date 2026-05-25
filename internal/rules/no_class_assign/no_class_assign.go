@@ -3,6 +3,7 @@ package no_class_assign
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Message builder
@@ -246,137 +247,9 @@ func isNameShadowed(node *ast.Node, className string, classNode *ast.Node, ctx *
 		return symbol != classSymbol
 	}
 
-	// Fallback: check if the identifier is within a scope that shadows the class name
-	return isInShadowingScope(node, className, classNode)
-}
-
-// isInShadowingScope checks if a node is within a scope that shadows the class name
-func isInShadowingScope(node *ast.Node, className string, classNode *ast.Node) bool {
-	current := node.Parent
-	for current != nil && current != classNode {
-		switch current.Kind {
-		case ast.KindFunctionDeclaration,
-			ast.KindFunctionExpression,
-			ast.KindArrowFunction,
-			ast.KindMethodDeclaration,
-			ast.KindConstructor,
-			ast.KindGetAccessor,
-			ast.KindSetAccessor:
-			// Check if there's a parameter with the same name
-			if hasShadowingParameter(current, className) {
-				return true
-			}
-
-		case ast.KindBlock:
-			// Check if there's a variable declaration with the same name
-			if hasShadowingVariable(current, className) {
-				return true
-			}
-
-		case ast.KindCatchClause:
-			// Check if the catch variable has the same name
-			catchClause := current.AsCatchClause()
-			if catchClause != nil && catchClause.VariableDeclaration != nil {
-				varDecl := catchClause.VariableDeclaration.AsVariableDeclaration()
-				if varDecl != nil && varDecl.Name() != nil {
-					if getIdentifierName(varDecl.Name()) == className {
-						return true
-					}
-				}
-			}
-		}
-		current = current.Parent
-	}
-	return false
-}
-
-// hasShadowingParameter checks if a function has a parameter with the given name
-func hasShadowingParameter(node *ast.Node, name string) bool {
-	var params []*ast.Node
-
-	switch node.Kind {
-	case ast.KindFunctionDeclaration:
-		funcDecl := node.AsFunctionDeclaration()
-		if funcDecl != nil && funcDecl.Parameters != nil {
-			params = funcDecl.Parameters.Nodes
-		}
-	case ast.KindFunctionExpression:
-		funcExpr := node.AsFunctionExpression()
-		if funcExpr != nil && funcExpr.Parameters != nil {
-			params = funcExpr.Parameters.Nodes
-		}
-	case ast.KindArrowFunction:
-		arrowFunc := node.AsArrowFunction()
-		if arrowFunc != nil && arrowFunc.Parameters != nil {
-			params = arrowFunc.Parameters.Nodes
-		}
-	case ast.KindMethodDeclaration:
-		method := node.AsMethodDeclaration()
-		if method != nil && method.Parameters != nil {
-			params = method.Parameters.Nodes
-		}
-	case ast.KindConstructor:
-		constructor := node.AsConstructorDeclaration()
-		if constructor != nil && constructor.Parameters != nil {
-			params = constructor.Parameters.Nodes
-		}
-	case ast.KindGetAccessor:
-		getter := node.AsGetAccessorDeclaration()
-		if getter != nil && getter.Parameters != nil {
-			params = getter.Parameters.Nodes
-		}
-	case ast.KindSetAccessor:
-		setter := node.AsSetAccessorDeclaration()
-		if setter != nil && setter.Parameters != nil {
-			params = setter.Parameters.Nodes
-		}
-	}
-
-	for _, param := range params {
-		if param != nil && param.Kind == ast.KindParameter {
-			paramDecl := param.AsParameterDeclaration()
-			if paramDecl != nil && paramDecl.Name() != nil && getIdentifierName(paramDecl.Name()) == name {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// hasShadowingVariable checks if a block contains a variable declaration with the given name
-func hasShadowingVariable(node *ast.Node, name string) bool {
-	if node.Kind != ast.KindBlock {
-		return false
-	}
-
-	block := node.AsBlock()
-	if block == nil || block.Statements == nil {
-		return false
-	}
-
-	for _, stmt := range block.Statements.Nodes {
-		if stmt != nil && stmt.Kind == ast.KindVariableStatement {
-			varStmt := stmt.AsVariableStatement()
-			if varStmt != nil && varStmt.DeclarationList != nil {
-				declList := varStmt.DeclarationList.AsVariableDeclarationList()
-				if declList != nil && declList.Declarations != nil {
-					for _, decl := range declList.Declarations.Nodes {
-						if decl != nil && decl.Kind == ast.KindVariableDeclaration {
-							varDecl := decl.AsVariableDeclaration()
-							if varDecl != nil && varDecl.Name() != nil {
-								if getIdentifierName(varDecl.Name()) == name {
-									return true
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return false
+	// Fallback: check if the identifier is within a scope that shadows the
+	// class name. Walks only up to classNode (not to SourceFile).
+	return utils.IsNameShadowedBetween(node, classNode, className)
 }
 
 // checkClassReassignments finds all reassignments to the class name
@@ -455,7 +328,7 @@ func findEnclosingScope(node *ast.Node) *ast.Node {
 }
 
 // NoClassAssignRule disallows reassigning class declarations
-var NoClassAssignRule = rule.CreateRule(rule.Rule{
+var NoClassAssignRule = rule.Rule{
 	Name: "no-class-assign",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -484,4 +357,4 @@ var NoClassAssignRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

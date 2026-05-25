@@ -13,49 +13,113 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 		"tsconfig.json",
 		t,
 		&NoConstantBinaryExpressionRule,
-		// Valid cases - ported from ESLint
+		// ============================================
+		// Valid cases
+		// ============================================
 		[]rule_tester.ValidTestCase{
-			// Variable references
+			// --- Variable references (not constant) ---
 			{Code: `bar && foo`},
-			{Code: `true ? foo : bar`},
-			{Code: `new Foo() == true`},
+			{Code: `bar || foo`},
+			{Code: `bar ?? foo`},
 			{Code: `foo == true`},
 			{Code: `foo === true`},
+			{Code: `true ? foo : bar`},
 
-			// Template literals with expressions
-			{Code: "var a = `${bar}` && foo"},
-
-			// Assignment expressions
-			{Code: `(x += 1) && foo`},
-
-			// Delete operations
-			{Code: `delete bar.baz && foo`},
-
-			// Nullish coalescing edge cases
-			{Code: `foo ?? null ?? bar`},
-
-			// Shadowed built-in functions
-			{Code: `function Boolean(n) { return n; } Boolean(x) ?? foo`},
-			{Code: `function Boolean(n) { return n; } Boolean(x) && foo`},
-
-			// Valid comparisons
-			{Code: `x === null`},
-			{Code: `null === x`},
-			{Code: `x == null`},
-			{Code: `x == undefined`},
-
-			// Function return values (not constant)
+			// --- Function return values (not constant) ---
 			{Code: `foo() && bar`},
 			{Code: `foo() || bar`},
 			{Code: `foo() ?? bar`},
 
-			// Array/object access (not constant)
+			// --- Property access (not constant) ---
 			{Code: `foo[0] && bar`},
 			{Code: `foo.bar && baz`},
+
+			// --- Template literals with expressions (not constant in non-boolean) ---
+			{Code: "var a = `${bar}` && foo"},
+
+			// --- Compound assignment (not constant) ---
+			{Code: `(x += 1) && foo`},
+			{Code: `(x -= 1) || bar`},
+
+			// --- Delete operations (not constant) ---
+			{Code: `delete bar.baz && foo`},
+
+			// --- Nullish coalescing edge cases ---
+			{Code: `foo ?? null ?? bar`},
+
+			// --- Shadowed built-in functions ---
+			{Code: `function Boolean(n: any) { return n; } Boolean(x) ?? foo`},
+			{Code: `function Boolean(n: any) { return n; } Boolean(x) && foo`},
+			{Code: `var Boolean = (n: any) => n; Boolean(x) ?? foo`},
+
+			// --- Valid comparisons ---
+			{Code: `x === null`},
+			{Code: `null === x`},
+			{Code: `x == null`},
+			{Code: `x == undefined`},
+			{Code: `x !== null`},
+			{Code: `x != undefined`},
+
+			// --- Logical NOT of non-constant is not constant (#552) ---
+			{Code: `!foo && bar`},
+			{Code: `!foo || bar`},
+			{Code: `!module || !module[pluginName]`},
+			{Code: `!!foo && bar`},
+
+			// --- For ==, alwaysNew only applies when BOTH sides are always new ---
+			{Code: `x == /[a-z]/`},
+			{Code: `x == []`},
+
+			// --- new with user-defined constructors (not guaranteed always new) ---
+			{Code: `new Foo() == true`},
+
+			// --- PostfixUnary (not constant) ---
+			{Code: `x++ && bar`},
+			{Code: `x-- || bar`},
+
+			// --- PrefixUnary ++ / -- (not constant, modifies variable) ---
+			{Code: `++x && bar`},
+
+			// --- Boolean(variable) is not constant (result depends on variable) ---
+			{Code: `Boolean(foo) && bar`},
+
+			// --- delete is not constant in isConstant ---
+			{Code: `delete bar.baz && foo`},
+
+			// --- Unary +/- of variable is not constant ---
+			{Code: `+foo && bar`},
+			{Code: `-foo || bar`},
+
+			// --- Comma expression with variable last ---
+			{Code: `(1, x) && foo`},
+
+			// --- Logical assignment with non-identity rhs (not constant) ---
+			{Code: `(x ||= foo) && bar`},
+			{Code: `(x &&= foo) || bar`},
+
+			// --- Single-element array has variable loose boolean comparison ---
+			{Code: `[x] == true`},
+
+			// --- new user-defined constructor is not always new for === ---
+			{Code: `new Foo() === x`},
+
+			// --- delete returns boolean, comparison to boolean varies ---
+			{Code: `delete x.y === true`},
 		},
-		// Invalid cases - ported from ESLint
+		// ============================================
+		// Invalid cases
+		// ============================================
 		[]rule_tester.InvalidTestCase{
+			// ============================
 			// Constant short-circuit: &&
+			// ============================
+			// 2-char string is truthy (regression: quote stripping bug)
+			{
+				Code: `"ab" && foo`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
 			{
 				Code: `[] && greeting`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -116,8 +180,71 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
 				},
 			},
+			// Negation of constant
+			{
+				Code: `!true && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `!undefined && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `![] && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// void is always constant
+			{
+				Code: `void 0 && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// typeof in boolean position is always constant (non-empty string)
+			{
+				Code: `typeof foo && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// Constant binary expressions (e.g. 1+2) are constant
+			{
+				Code: `(1 + 2) && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// Assignment with constant right side
+			{
+				Code: `(x = true) && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// null is constant
+			{
+				Code: `null && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// Class expression is constant
+			{
+				Code: `(class {}) && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
 
+			// ============================
 			// Constant short-circuit: ||
+			// ============================
 			{
 				Code: `[] || greeting`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -142,8 +269,16 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
 				},
 			},
+			{
+				Code: `!true || bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
 
+			// ============================
 			// Constant short-circuit: ??
+			// ============================
 			{
 				Code: `({}) ?? foo`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -168,8 +303,49 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
 				},
 			},
+			// Comparison operators always produce non-nullish boolean
+			{
+				Code: `(x > 0) ?? fallback`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `(x === y) ?? fallback`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// Unary expressions always have constant nullishness
+			{
+				Code: `!foo ?? bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `typeof foo ?? bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			// String(), Number() always return non-nullish
+			{
+				Code: `String(x) ?? foo`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `Number(x) ?? foo`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
 
+			// ============================
 			// Constant binary operand: ==
+			// ============================
 			{
 				Code: `[] == true`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -212,8 +388,35 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
 				},
 			},
+			// String/numeric comparisons with booleans
+			{
+				Code: `"" == true`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `"hello" == false`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `0 == true`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `1 == false`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
 
+			// ============================
 			// Constant binary operand: !=
+			// ============================
 			{
 				Code: `({}) != true`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -227,7 +430,9 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 				},
 			},
 
+			// ============================
 			// Constant binary operand: ===
+			// ============================
 			{
 				Code: `true === true`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -264,8 +469,22 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
 				},
 			},
+			{
+				Code: `"" === true`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `42 === true`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
 
+			// ============================
 			// Constant binary operand: !==
+			// ============================
 			{
 				Code: `[] !== null`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -279,7 +498,9 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 				},
 			},
 
-			// Both always new
+			// ============================
+			// Both always new (== only)
+			// ============================
 			{
 				Code: `[a] == [a]`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -292,20 +513,22 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "bothAlwaysNew", Line: 1, Column: 1},
 				},
 			},
+
+			// ============================
+			// Always new (=== / !==)
+			// ============================
 			{
 				Code: `[] === []`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "bothAlwaysNew", Line: 1, Column: 1},
+					{MessageId: "alwaysNew", Line: 1, Column: 1},
 				},
 			},
 			{
 				Code: `({}) === ({})`,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "bothAlwaysNew", Line: 1, Column: 1},
+					{MessageId: "alwaysNew", Line: 1, Column: 1},
 				},
 			},
-
-			// Always new
 			{
 				Code: `x === {}`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -331,12 +554,6 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `x == /[a-z]/`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "alwaysNew", Line: 1, Column: 1},
-				},
-			},
-			{
 				Code: `({}) === x`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "alwaysNew", Line: 1, Column: 1},
@@ -349,63 +566,9 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 				},
 			},
 
-			// String literals with boolean comparison
-			{
-				Code: `"" == true`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
-				},
-			},
-			{
-				Code: `"hello" == false`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
-				},
-			},
-			{
-				Code: `"" === true`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
-				},
-			},
-
-			// Numeric literals with boolean comparison
-			{
-				Code: `0 == true`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
-				},
-			},
-			{
-				Code: `1 == false`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
-				},
-			},
-			{
-				Code: `42 === true`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
-				},
-			},
-
-			// Unary negation
-			{
-				Code: `!foo && bar`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
-				},
-			},
-			// TODO: These cases require scope analysis to detect if Boolean/String/Number
-			// are shadowed built-in functions or user-defined functions. Commenting out for now.
-			// {
-			// 	Code: `Boolean(foo) && bar`,
-			// 	Errors: []rule_tester.InvalidTestCaseError{
-			// 		{MessageId: "constantShortCircuit", Line: 1, Column: 1},
-			// 	},
-			// },
-
+			// ============================
 			// Boolean constructor calls
+			// ============================
 			{
 				Code: `Boolean(true) && foo`,
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -418,20 +581,134 @@ func TestNoConstantBinaryExpressionRule(t *testing.T) {
 					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
 				},
 			},
-			// TODO: These cases require scope analysis to detect if String/Number
-			// are shadowed built-in functions or user-defined functions. Commenting out for now.
-			// {
-			// 	Code: `String(x) ?? foo`,
-			// 	Errors: []rule_tester.InvalidTestCaseError{
-			// 		{MessageId: "constantShortCircuit", Line: 1, Column: 1},
-			// 	},
-			// },
-			// {
-			// 	Code: `Number(x) ?? foo`,
-			// 	Errors: []rule_tester.InvalidTestCaseError{
-			// 		{MessageId: "constantShortCircuit", Line: 1, Column: 1},
-			// 	},
-			// },
+
+			// ============================
+			// Parenthesized expressions
+			// ============================
+			{
+				Code: `(!true) && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `(null) ?? bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// typeof / void / delete edge cases
+			// ============================
+			// typeof is always a string, strict comparison with boolean is constant
+			{
+				Code: `typeof x === true`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+			// void 0 is undefined, comparing with undefined is constant
+			{
+				Code: `void 0 == undefined`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+			// void produces undefined (always nullish), constant for ??
+			{
+				Code: `void 0 ?? bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Logical assignment with identity rhs
+			// ============================
+			{
+				Code: `(x ||= 1) && foo`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `(x &&= 0) || bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Comma (sequence) expression
+			// ============================
+			{
+				Code: `(1, 2) && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Assignment with constant rhs
+			// ============================
+			{
+				Code: `(x = []) && bar`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Conditional expression in isAlwaysNew
+			// ============================
+			{
+				Code: `x === (true ? [] : {})`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysNew", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Boolean() always non-nullish for ??
+			// ============================
+			{
+				Code: `Boolean(x) ?? foo`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantShortCircuit", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Negation of constant in equality
+			// ============================
+			{
+				Code: `!true == 42`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Multi-element array in loose comparison
+			// ============================
+			{
+				Code: `[1, 2] == true`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "constantBinaryOperand", Line: 1, Column: 1},
+				},
+			},
+
+			// ============================
+			// Class expression is always new
+			// ============================
+			{
+				Code: `(class {}) === x`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "alwaysNew", Line: 1, Column: 1},
+				},
+			},
 		},
 	)
 }
+

@@ -5,6 +5,8 @@ package collections
 
 import "github.com/microsoft/typescript-go/internal/collections"
 
+type CopyOnWriteMap[K comparable, V any] = collections.CopyOnWriteMap[K,V]
+type CopyOnWriteSet[K comparable] = collections.CopyOnWriteSet[K]
 type MapEntry[K comparable, V any] = collections.MapEntry[K,V]
 type MultiMap[K, V comparable] = collections.MultiMap[K,V]
 type OrderedMap[K comparable, V any] = collections.OrderedMap[K,V]

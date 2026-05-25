@@ -1,0 +1,1201 @@
+// Rstest Snapshot v1
+
+exports[`no-new-func > invalid 1`] = `
+{
+  "code": "var a = new Function("b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 2`] = `
+{
+  "code": "new Function()",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 3`] = `
+{
+  "code": "var a = Function("b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 4`] = `
+{
+  "code": "(Function)("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 5`] = `
+{
+  "code": "((Function))("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 6`] = `
+{
+  "code": "new (Function)("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 7`] = `
+{
+  "code": "Function?.("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 8`] = `
+{
+  "code": "var a = Function.call(null, "b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 9`] = `
+{
+  "code": "var a = Function.apply(null, ["b", "c", "return b+c"]);",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 10`] = `
+{
+  "code": "var a = Function.bind(null, "b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 11`] = `
+{
+  "code": "var a = Function.bind(null, "b", "c", "return b+c")();",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 12`] = `
+{
+  "code": "var a = Function["call"](null, "b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 13`] = `
+{
+  "code": "var a = Function["apply"](null, ["b", "c", "return b+c"]);",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 14`] = `
+{
+  "code": "var a = Function["bind"](null, "b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 15`] = `
+{
+  "code": "var a = Function[\`call\`](null, "code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 16`] = `
+{
+  "code": "(Function?.call)(null, "b", "c", "return b+c");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 17`] = `
+{
+  "code": "Function?.call(null, "code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 18`] = `
+{
+  "code": "Function?.apply(null, ["code"])",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 19`] = `
+{
+  "code": "Function?.bind(null, "code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 20`] = `
+{
+  "code": "(Function).call(null, "code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 21`] = `
+{
+  "code": "(Function).apply(null, ["code"])",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 22`] = `
+{
+  "code": "(Function as any)("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 23`] = `
+{
+  "code": "(<any>Function)("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 24`] = `
+{
+  "code": "Function!("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 25`] = `
+{
+  "code": "(Function satisfies any)("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 26`] = `
+{
+  "code": "new (Function as any)("code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 27`] = `
+{
+  "code": "(Function as any).call(null, "code")",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 28`] = `
+{
+  "code": "new (Function("code"))",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 29`] = `
+{
+  "code": "function f() { return new Function("code"); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 30`] = `
+{
+  "code": "var f = () => new Function("code");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 31`] = `
+{
+  "code": "if (true) { var x = new Function("code"); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 32`] = `
+{
+  "code": "class C { m() { return new Function("code"); } }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 33`] = `
+{
+  "code": "class C { constructor() { this.x = new Function("code"); } }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 34`] = `
+{
+  "code": "function outer() { function inner() { return new Function("code"); } }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 35`] = `
+{
+  "code": "var a = new Function("a"); var b = Function("b");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 36`] = `
+{
+  "code": "var x = true ? new Function("a") : Function("b");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 37`] = `
+{
+  "code": "var x = foo || new Function("code");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 38`] = `
+{
+  "code": "var x = foo ?? new Function("code");",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 39`] = `
+{
+  "code": "const fn = () => { class Function {} }; new Function('', '')",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 40`] = `
+{
+  "code": "var fn = function () { function Function() {} }; Function('', '')",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 41`] = `
+{
+  "code": "function f() { { let Function = class {}; } var x = new Function("code"); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 42`] = `
+{
+  "code": "function f() { var x = new Function("code"); (function() { var Function = 1; })(); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 43`] = `
+{
+  "code": "function f() { var fn = (Function) => Function; var x = new Function("code"); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 44`] = `
+{
+  "code": "function f() { try {} catch (Function) {} var x = new Function("code"); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-func > invalid 45`] = `
+{
+  "code": "function f() { for (let Function of []) {} var x = new Function("code"); }",
+  "diagnostics": [
+    {
+      "message": "The Function constructor is eval.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

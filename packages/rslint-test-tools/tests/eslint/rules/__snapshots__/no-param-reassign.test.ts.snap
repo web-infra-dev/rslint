@@ -1,0 +1,911 @@
+// Rstest Snapshot v1
+
+exports[`no-param-reassign > invalid 1`] = `
+{
+  "code": "function foo(bar) { bar = 13; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 2`] = `
+{
+  "code": "function foo(bar) { bar += 13; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 3`] = `
+{
+  "code": "function foo(bar) { (function() { bar = 13; })(); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 4`] = `
+{
+  "code": "function foo(bar) { ++bar; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 5`] = `
+{
+  "code": "function foo(bar) { bar++; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 6`] = `
+{
+  "code": "function foo(bar) { --bar; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 7`] = `
+{
+  "code": "function foo(bar) { bar--; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 8`] = `
+{
+  "code": "function foo({bar}) { bar = 13; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 9`] = `
+{
+  "code": "function foo([, {bar}]) { bar = 13; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 10`] = `
+{
+  "code": "function foo(bar) { ({bar} = {}); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 11`] = `
+{
+  "code": "function foo(bar) { ({x: [, bar = 0]} = {}); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 12`] = `
+{
+  "code": "function foo(bar) { for (bar in baz); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 13`] = `
+{
+  "code": "function foo(bar) { for (bar of baz); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 14`] = `
+{
+  "code": "function foo(bar) { bar.a = 0; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 15`] = `
+{
+  "code": "function foo(bar) { bar.get(0).a = 0; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 16`] = `
+{
+  "code": "function foo(bar) { delete bar.a; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 17`] = `
+{
+  "code": "function foo(bar) { ++bar.a; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 18`] = `
+{
+  "code": "function foo(bar) { for (bar.a in {}); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 19`] = `
+{
+  "code": "function foo(bar) { for (bar.a of []); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 20`] = `
+{
+  "code": "function foo(bar) { (bar ? bar : [])[0] = 1; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 21`] = `
+{
+  "code": "function foo(bar) { [bar.a] = []; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 22`] = `
+{
+  "code": "function foo(a) { ({a} = obj); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'a'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 23`] = `
+{
+  "code": "function foo(a) { ([...a] = obj); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'a'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 24`] = `
+{
+  "code": "function foo(a) { ({...a} = obj); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'a'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 25`] = `
+{
+  "code": "function foo(a) { ([...a.b] = obj); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'a'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 26`] = `
+{
+  "code": "function foo(a) { ({...a.b} = obj); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'a'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 27`] = `
+{
+  "code": "function foo(a) { for ([a.b] of []); }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'a'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 28`] = `
+{
+  "code": "function foo(a) { a &&= b; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'a'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 29`] = `
+{
+  "code": "function foo(a) { a ||= b; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'a'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 30`] = `
+{
+  "code": "function foo(a) { a ??= b; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to function parameter 'a'.",
+      "messageId": "assignmentToFunctionParam",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 31`] = `
+{
+  "code": "function foo(a) { a.b &&= c; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'a'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 32`] = `
+{
+  "code": "function foo(a) { a.b.c ||= d; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'a'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 33`] = `
+{
+  "code": "function foo(a) { a[b] ??= c; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'a'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 34`] = `
+{
+  "code": "function foo(bar) { [bar.a] = []; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-param-reassign > invalid 35`] = `
+{
+  "code": "function foo(bar) { [bar.a] = []; }",
+  "diagnostics": [
+    {
+      "message": "Assignment to property of function parameter 'bar'.",
+      "messageId": "assignmentToFunctionParamProp",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-param-reassign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

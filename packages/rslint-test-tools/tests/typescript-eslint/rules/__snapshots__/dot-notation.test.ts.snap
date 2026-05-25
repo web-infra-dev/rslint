@@ -424,8 +424,8 @@ foo
           "line": 3,
         },
         "start": {
-          "column": 1,
-          "line": 2,
+          "column": 4,
+          "line": 3,
         },
       },
       "ruleName": "@typescript-eslint/dot-notation",
@@ -535,7 +535,7 @@ exports[`dot-notation > invalid 18`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 19,
           "line": 1,
         },
       },
@@ -616,7 +616,7 @@ exports[`dot-notation > invalid 21`] = `
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 5,
           "line": 1,
         },
       },
@@ -796,6 +796,442 @@ type Foo = {
 
 function f<T extends Foo>(x: T) {
   x.extraKey;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 26`] = `
+{
+  "code": "
+type NumMap = { [k: number]: number };
+declare const m: NumMap;
+m['foo'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type NumMap = { [k: number]: number };
+declare const m: NumMap;
+m.foo;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 27`] = `
+{
+  "code": "
+interface WithIdx { bar: number; [k: string]: number }
+declare const m: WithIdx;
+m['bar'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface WithIdx { bar: number; [k: string]: number }
+declare const m: WithIdx;
+m.bar;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 28`] = `
+{
+  "code": "a['\\u0062'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.b;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 29`] = `
+{
+  "code": "a.null;",
+  "diagnostics": [
+    {
+      "message": "Property is a keyword - use bracket notation.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a["null"];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 30`] = `
+{
+  "code": "a.true;",
+  "diagnostics": [
+    {
+      "message": "Property is a keyword - use bracket notation.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a["true"];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 31`] = `
+{
+  "code": "a.false;",
+  "diagnostics": [
+    {
+      "message": "Property is a keyword - use bracket notation.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a["false"];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 32`] = `
+{
+  "code": "a['foo'] = 1;",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.foo = 1;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 33`] = `
+{
+  "code": "a['foo'] += 1;",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.foo += 1;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 34`] = `
+{
+  "code": "a['foo']++;",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.foo++;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 35`] = `
+{
+  "code": "
+declare const x: any;
+x['foo'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const x: any;
+x.foo;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 36`] = `
+{
+  "code": "
+class X {
+  a = 1;
+  foo() { return this['a']; }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class X {
+  a = 1;
+  foo() { return this.a; }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 37`] = `
+{
+  "code": "
+class B { foo = 1; }
+class X extends B {
+  bar() { return super['foo']; }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 24,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class B { foo = 1; }
+class X extends B {
+  bar() { return super.foo; }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 38`] = `
+{
+  "code": "
+declare const p: { foo: string };
+const el = <div>{p['foo']}</div>;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const p: { foo: string };
+const el = <div>{p.foo}</div>;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 39`] = `
+{
+  "code": "
+namespace N {
+  declare const m: { foo: number };
+  m['foo'];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace N {
+  declare const m: { foo: number };
+  m.foo;
 }
       ",
   "ruleCount": 1,

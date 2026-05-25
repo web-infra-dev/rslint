@@ -1,0 +1,339 @@
+// Rstest Snapshot v1
+
+exports[`no-empty-character-class > invalid 1`] = `
+{
+  "code": "var foo = /^abc[]/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 2`] = `
+{
+  "code": "var foo = /foo[]bar/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 3`] = `
+{
+  "code": "var foo = /[]]/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 4`] = `
+{
+  "code": "var foo = /\\[[]/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 5`] = `
+{
+  "code": "var foo = /\\[\\[\\]a-z[]/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 6`] = `
+{
+  "code": "var foo = /[]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 7`] = `
+{
+  "code": "var foo = /[[]]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 8`] = `
+{
+  "code": "var foo = /[[a][]]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 9`] = `
+{
+  "code": "var foo = /[a[[b[]c]]d]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 10`] = `
+{
+  "code": "var foo = /[a--[]]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 11`] = `
+{
+  "code": "var foo = /[[]--b]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 12`] = `
+{
+  "code": "var foo = /[a&&[]]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 13`] = `
+{
+  "code": "var foo = /[[]&&b]/v;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

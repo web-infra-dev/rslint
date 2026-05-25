@@ -146,7 +146,7 @@ var supportedGlobalTypes = []string{
 func checkMethod(valueDeclaration *ast.Node, ignoreStatic bool) ( /* dangerous */ bool /* firstParamIsThis */, bool) {
 	params := valueDeclaration.Parameters()
 
-	firstParamIsThis := len(params) > 0 && ast.IsParameter(params[0]) && ast.IsIdentifier(params[0].Name()) && params[0].Name().Text() == "this"
+	firstParamIsThis := len(params) > 0 && ast.IsParameterDeclaration(params[0]) && ast.IsIdentifier(params[0].Name()) && params[0].Name().Text() == "this"
 
 	thisArgIsVoid := firstParamIsThis && params[0].Type().Kind == ast.KindVoidKeyword
 
@@ -192,7 +192,8 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 }
 
 var UnboundMethodRule = rule.CreateRule(rule.Rule{
-	Name: "unbound-method",
+	Name:             "unbound-method",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(UnboundMethodOptions)
 		if !ok {
@@ -312,7 +313,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 
 				var initNode *ast.Node
 
-				parentIsAssignmentPatternLike := ast.IsBindingElement(node.Parent) || ast.IsParameter(node.Parent)
+				parentIsAssignmentPatternLike := ast.IsBindingElement(node.Parent) || ast.IsParameterDeclaration(node.Parent)
 				if ast.IsVariableDeclaration(node.Parent) || parentIsAssignmentPatternLike {
 					initNode = node.Parent.Initializer()
 				}

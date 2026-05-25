@@ -1,0 +1,3280 @@
+// Rstest Snapshot v1
+
+exports[`no-misused-promises > invalid 1`] = `
+{
+  "code": "
+if (Promise.resolve()) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 2`] = `
+{
+  "code": "
+if (Promise.resolve()) {
+} else if (Promise.resolve()) {
+} else {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 3`] = `
+{
+  "code": "for (let i; Promise.resolve(); i++) {}",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 4`] = `
+{
+  "code": "do {} while (Promise.resolve());",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 5`] = `
+{
+  "code": "while (Promise.resolve()) {}",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 6`] = `
+{
+  "code": "Promise.resolve() ? 123 : 456;",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 7`] = `
+{
+  "code": "
+if (!Promise.resolve()) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 8`] = `
+{
+  "code": "Promise.resolve() || false;",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 9`] = `
+{
+  "code": "
+[Promise.resolve(), Promise.reject()].forEach(async val => {
+  await val;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 47,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 10`] = `
+{
+  "code": "
+new Promise(async (resolve, reject) => {
+  await Promise.resolve();
+  resolve();
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 11`] = `
+{
+  "code": "
+const fnWithCallback = (arg: string, cb: (err: any, res: string) => void) => {
+  cb(null, arg);
+};
+
+fnWithCallback('val', async (err, res) => {
+  await res;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 8,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 12`] = `
+{
+  "code": "
+const fnWithCallback = (arg: string, cb: (err: any, res: string) => void) => {
+  cb(null, arg);
+};
+
+fnWithCallback('val', (err, res) => Promise.resolve(res));
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 13`] = `
+{
+  "code": "
+const fnWithCallback = (arg: string, cb: (err: any, res: string) => void) => {
+  cb(null, arg);
+};
+
+fnWithCallback('val', (err, res) => {
+  if (err) {
+    return 'abc';
+  } else {
+    return Promise.resolve(res);
+  }
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 12,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 14`] = `
+{
+  "code": "
+const fnWithCallback:
+  | ((arg: string, cb: (err: any, res: string) => void) => void)
+  | null = (arg, cb) => {
+  cb(null, arg);
+};
+
+fnWithCallback?.('val', (err, res) => Promise.resolve(res));
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 8,
+        },
+        "start": {
+          "column": 25,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 15`] = `
+{
+  "code": "
+const fnWithCallback:
+  | ((arg: string, cb: (err: any, res: string) => void) => void)
+  | null = (arg, cb) => {
+  cb(null, arg);
+};
+
+fnWithCallback('val', (err, res) => {
+  if (err) {
+    return 'abc';
+  } else {
+    return Promise.resolve(res);
+  }
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 14,
+        },
+        "start": {
+          "column": 23,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 16`] = `
+{
+  "code": "
+function test(bool: boolean, p: Promise<void>) {
+  if (bool || p) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 17`] = `
+{
+  "code": "
+function test(bool: boolean, p: Promise<void>) {
+  if (bool && p) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 18`] = `
+{
+  "code": "
+function test(a: any, p: Promise<void>) {
+  if (a ?? p) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 19`] = `
+{
+  "code": "
+function test(p: Promise<void> | undefined) {
+  if (p ?? Promise.reject()) {
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected non-Promise value in a boolean conditional.",
+      "messageId": "conditional",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 20`] = `
+{
+  "code": "
+let f: () => void;
+f = async () => {
+  return 3;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to variable where a void return was expected.",
+      "messageId": "voidReturnVariable",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 21`] = `
+{
+  "code": "
+let f: () => void;
+f = async () => {
+  return 3;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to variable where a void return was expected.",
+      "messageId": "voidReturnVariable",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 22`] = `
+{
+  "code": "
+const f: () => void = async () => {
+  return 0;
+};
+const g = async () => 1,
+  h: () => void = async () => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to variable where a void return was expected.",
+      "messageId": "voidReturnVariable",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning function provided to variable where a void return was expected.",
+      "messageId": "voidReturnVariable",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 19,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 23`] = `
+{
+  "code": "
+const obj: {
+  f?: () => void;
+} = {};
+obj.f = async () => {
+  return 0;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to variable where a void return was expected.",
+      "messageId": "voidReturnVariable",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 24`] = `
+{
+  "code": "
+type O = { f: () => void };
+const obj: O = {
+  f: async () => 'foo',
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 25`] = `
+{
+  "code": "
+type O = { f: () => void };
+const obj: O = {
+  f: async () => 'foo',
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 26`] = `
+{
+  "code": "
+type O = { f: () => void };
+const f = async () => 0;
+const obj: O = {
+  f,
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 27`] = `
+{
+  "code": "
+type O = { f: () => void };
+const obj: O = {
+  async f() {
+    return 0;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 28`] = `
+{
+  "code": "
+type O = { f: () => void; g: () => void; h: () => void };
+function f(): O {
+  const h = async () => 0;
+  return {
+    async f() {
+      return 123;
+    },
+    g: async () => 0,
+    h,
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 9,
+        },
+        "start": {
+          "column": 5,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 10,
+        },
+        "start": {
+          "column": 5,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 29`] = `
+{
+  "code": "
+function f(): () => void {
+  return async () => 0;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to return value where a void return was expected.",
+      "messageId": "voidReturnReturnValue",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 30`] = `
+{
+  "code": "
+function f(): () => void {
+  return async () => 0;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to return value where a void return was expected.",
+      "messageId": "voidReturnReturnValue",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 31`] = `
+{
+  "code": "
+type O = {
+  func: () => void;
+};
+const Component = (obj: O) => null;
+<Component func={async () => 0} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to attribute where a void return was expected.",
+      "messageId": "voidReturnAttribute",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 32`] = `
+{
+  "code": "
+type O = {
+  func: () => void;
+};
+const Component = (obj: O) => null;
+<Component func={async () => 0} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to attribute where a void return was expected.",
+      "messageId": "voidReturnAttribute",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 33`] = `
+{
+  "code": "
+type O = {
+  func: () => void;
+};
+const g = async () => 'foo';
+const Component = (obj: O) => null;
+<Component func={g} />;
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to attribute where a void return was expected.",
+      "messageId": "voidReturnAttribute",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 34`] = `
+{
+  "code": "
+interface ItLike {
+  (name: string, callback: () => number): void;
+  (name: string, callback: () => void): void;
+}
+
+declare const it: ItLike;
+
+it('', async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 9,
+        },
+        "start": {
+          "column": 8,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 35`] = `
+{
+  "code": "
+interface ItLike {
+  (name: string, callback: () => number): void;
+}
+interface ItLike {
+  (name: string, callback: () => void): void;
+}
+
+declare const it: ItLike;
+
+it('', async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 11,
+        },
+        "start": {
+          "column": 8,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 36`] = `
+{
+  "code": "
+interface ItLike {
+  (name: string, callback: () => void): void;
+}
+interface ItLike {
+  (name: string, callback: () => number): void;
+}
+
+declare const it: ItLike;
+
+it('', async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 11,
+        },
+        "start": {
+          "column": 8,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 37`] = `
+{
+  "code": "
+console.log({ ...Promise.resolve({ key: 42 }) });
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be spread in an object.",
+      "messageId": "spread",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 38`] = `
+{
+  "code": "
+const getData = () => Promise.resolve({ key: 42 });
+
+console.log({
+  someData: 42,
+  ...getData(),
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be spread in an object.",
+      "messageId": "spread",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 6,
+        },
+        "start": {
+          "column": 6,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 39`] = `
+{
+  "code": "
+declare const condition: boolean;
+
+console.log({ ...(condition && Promise.resolve({ key: 42 })) });
+console.log({ ...(condition || Promise.resolve({ key: 42 })) });
+console.log({ ...(condition ? {} : Promise.resolve({ key: 42 })) });
+console.log({ ...(condition ? Promise.resolve({ key: 42 }) : {}) });
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be spread in an object.",
+      "messageId": "spread",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Expected a non-Promise value to be spread in an object.",
+      "messageId": "spread",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Expected a non-Promise value to be spread in an object.",
+      "messageId": "spread",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 6,
+        },
+        "start": {
+          "column": 18,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Expected a non-Promise value to be spread in an object.",
+      "messageId": "spread",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 7,
+        },
+        "start": {
+          "column": 18,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 40`] = `
+{
+  "code": "
+function restPromises(first: Boolean, ...callbacks: Array<() => void>): void {}
+
+restPromises(
+  true,
+  () => Promise.resolve(true),
+  () => Promise.resolve(null),
+  () => true,
+  () => Promise.resolve('Hello'),
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 41`] = `
+{
+  "code": "
+type MyUnion = (() => void) | boolean;
+
+function restUnion(first: string, ...callbacks: Array<MyUnion>): void {}
+restUnion('Testing', false, () => Promise.resolve(true));
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 5,
+        },
+        "start": {
+          "column": 29,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 42`] = `
+{
+  "code": "
+function restTupleOne(first: string, ...callbacks: [() => void]): void {}
+restTupleOne('My string', () => Promise.resolve(1));
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 43`] = `
+{
+  "code": "
+function restTupleTwo(
+  first: boolean,
+  ...callbacks: [undefined, () => void, undefined]
+): void {}
+
+restTupleTwo(true, undefined, () => Promise.resolve(true), undefined);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 7,
+        },
+        "start": {
+          "column": 31,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 44`] = `
+{
+  "code": "
+function restTupleFour(
+  first: number,
+  ...callbacks: [() => void, boolean, () => void, () => void]
+): void;
+
+restTupleFour(
+  1,
+  () => Promise.resolve(true),
+  false,
+  () => {},
+  () => Promise.resolve(1),
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 45`] = `
+{
+  "code": "
+class TakesVoidCb {
+  constructor(first: string, ...args: Array<() => void>);
+}
+
+new TakesVoidCb;
+new TakesVoidCb();
+new TakesVoidCb(
+  'Testing',
+  () => {},
+  () => Promise.resolve(true),
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 46`] = `
+{
+  "code": "
+function restTuple(...args: []): void;
+function restTuple(...args: [boolean, () => void]): void;
+function restTuple(..._args: any[]): void {}
+
+restTuple();
+restTuple(true, () => Promise.resolve(1));
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 47`] = `
+{
+  "code": "
+type ReturnsRecord = () => Record<string, () => void>;
+
+const test: ReturnsRecord = () => {
+  return { asynchronous: async () => {} };
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 48`] = `
+{
+  "code": "
+let value: Record<string, () => void>;
+value.asynchronous = async () => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to variable where a void return was expected.",
+      "messageId": "voidReturnVariable",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 49`] = `
+{
+  "code": "
+type ReturnsRecord = () => Record<string, () => void>;
+
+async function asynchronous() {}
+
+const test: ReturnsRecord = () => {
+  return { asynchronous };
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 50`] = `
+{
+  "code": "
+declare function foo(cb: undefined | (() => void));
+declare const bar: undefined | (() => Promise<void>);
+foo(bar);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 51`] = `
+{
+  "code": "
+declare function foo(cb: string & (() => void));
+declare const bar: string & (() => Promise<void>);
+foo(bar);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 52`] = `
+{
+  "code": "
+function consume(..._callbacks: Array<() => void>): void {}
+let cbs: Array<() => Promise<boolean>> = [
+  () => Promise.resolve(true),
+  () => Promise.resolve(true),
+];
+consume(...cbs);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 53`] = `
+{
+  "code": "
+function consume(..._callbacks: Array<() => void>): void {}
+let cbs = [() => Promise.resolve(true), () => Promise.resolve(true)] as const;
+consume(...cbs);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 54`] = `
+{
+  "code": "
+function consume(..._callbacks: Array<() => void>): void {}
+let cbs = [() => Promise.resolve(true), () => Promise.resolve(true)];
+consume(...cbs);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 55`] = `
+{
+  "code": "
+class MyClass {
+  setThing(): void {
+    return;
+  }
+}
+
+class MySubclassExtendsMyClass extends MyClass {
+  async setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 56`] = `
+{
+  "code": "
+class MyClass {
+  setThing(): void {
+    return;
+  }
+}
+
+abstract class MyAbstractClassExtendsMyClass extends MyClass {
+  abstract setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 57`] = `
+{
+  "code": "
+class MyClass {
+  setThing(): void {
+    return;
+  }
+}
+
+interface MyInterfaceExtendsMyClass extends MyClass {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 58`] = `
+{
+  "code": "
+abstract class MyAbstractClass {
+  abstract setThing(): void;
+}
+
+class MySubclassExtendsMyAbstractClass extends MyAbstractClass {
+  async setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyAbstractClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 59`] = `
+{
+  "code": "
+abstract class MyAbstractClass {
+  abstract setThing(): void;
+}
+
+abstract class MyAbstractSubclassExtendsMyAbstractClass extends MyAbstractClass {
+  abstract setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyAbstractClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 60`] = `
+{
+  "code": "
+abstract class MyAbstractClass {
+  abstract setThing(): void;
+}
+
+interface MyInterfaceExtendsMyAbstractClass extends MyAbstractClass {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyAbstractClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 61`] = `
+{
+  "code": "
+interface MyInterface {
+  setThing(): void;
+}
+
+class MyInterfaceSubclass implements MyInterface {
+  async setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 62`] = `
+{
+  "code": "
+interface MyInterface {
+  setThing(): void;
+}
+
+abstract class MyAbstractClassImplementsMyInterface implements MyInterface {
+  abstract setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 63`] = `
+{
+  "code": "
+class MyClass {
+  accessor setThing = (): void => {
+    return;
+  };
+}
+
+class MySubclassExtendsMyClass extends MyClass {
+  accessor setThing = async (): Promise<void> => {
+    await Promise.resolve();
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 64`] = `
+{
+  "code": "
+abstract class MyClass {
+  abstract accessor setThing: () => void;
+}
+
+abstract class MySubclassExtendsMyClass extends MyClass {
+  abstract accessor setThing: () => Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 65`] = `
+{
+  "code": "
+interface MyInterface {
+  setThing(): void;
+}
+
+interface MySubInterface extends MyInterface {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 66`] = `
+{
+  "code": "
+type MyTypeIntersection = { setThing(): void } & { thing: number };
+
+class MyClassImplementsMyTypeIntersection implements MyTypeIntersection {
+  thing = 1;
+  async setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyTypeIntersection'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 67`] = `
+{
+  "code": "
+type MyGenericType<IsAsync extends boolean = true> = IsAsync extends true
+  ? { setThing(): Promise<void> }
+  : { setThing(): void };
+
+interface MyAsyncInterface extends MyGenericType<false> {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type '{ setThing(): void; }'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 68`] = `
+{
+  "code": "
+interface MyInterface {
+  setThing(): void;
+}
+
+interface MyOtherInterface {
+  setThing(): void;
+}
+
+interface MyThirdInterface extends MyInterface, MyOtherInterface {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyOtherInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 69`] = `
+{
+  "code": "
+class MyClass {
+  setThing(): void {
+    return;
+  }
+}
+
+class MyOtherClass {
+  setThing(): void {
+    return;
+  }
+}
+
+interface MyInterface extends MyClass, MyOtherClass {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyOtherClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 70`] = `
+{
+  "code": "
+interface MyAsyncInterface {
+  setThing(): Promise<void>;
+}
+
+interface MySyncInterface {
+  setThing(): void;
+}
+
+class MyClass {
+  setThing(): void {
+    return;
+  }
+}
+
+class MySubclass extends MyClass implements MyAsyncInterface, MySyncInterface {
+  async setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClass'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 19,
+        },
+        "start": {
+          "column": 3,
+          "line": 17,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MySyncInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 19,
+        },
+        "start": {
+          "column": 3,
+          "line": 17,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 71`] = `
+{
+  "code": "
+interface MyInterface {
+  setThing(): void;
+}
+
+const MyClassExpressionExtendsMyClass = class implements MyInterface {
+  setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 72`] = `
+{
+  "code": "
+const MyClassExpression = class {
+  setThing(): void {
+    return;
+  }
+};
+
+class MyClassExtendsMyClassExpression extends MyClassExpression {
+  async setThing(): Promise<void> {
+    await Promise.resolve();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyClassExpression'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 73`] = `
+{
+  "code": "
+const MyClassExpression = class {
+  setThing(): void {
+    return;
+  }
+};
+type MyClassExpressionType = typeof MyClassExpression;
+
+interface MyInterfaceExtendsMyClassExpression extends MyClassExpressionType {
+  setThing(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'typeof MyClassExpression'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 74`] = `
+{
+  "code": "
+interface MySyncInterface {
+  (): void;
+  (arg: string): void;
+  new (): void;
+  [key: string]: () => void;
+  [key: number]: () => void;
+  myMethod(): void;
+}
+interface MyAsyncInterface extends MySyncInterface {
+  (): Promise<void>;
+  (arg: string): Promise<void>;
+  new (): Promise<void>;
+  [key: string]: () => Promise<void>;
+  [key: number]: () => Promise<void>;
+  myMethod(): Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MySyncInterface'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 16,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 75`] = `
+{
+  "code": "
+interface MyCall {
+  (): void;
+  (arg: string): void;
+}
+
+interface MyIndex {
+  [key: string]: () => void;
+  [key: number]: () => void;
+}
+
+interface MyConstruct {
+  new (): void;
+  new (arg: string): void;
+}
+
+interface MyMethods {
+  doSyncThing(): void;
+  doOtherSyncThing(): void;
+  syncMethodProperty: () => void;
+}
+interface MyInterface extends MyCall, MyIndex, MyConstruct, MyMethods {
+  (): void;
+  (arg: string): Promise<void>;
+  new (): void;
+  new (arg: string): void;
+  [key: string]: () => Promise<void>;
+  [key: number]: () => void;
+  doSyncThing(): Promise<void>;
+  doAsyncThing(): Promise<void>;
+  syncMethodProperty: () => Promise<void>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyMethods'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 29,
+        },
+        "start": {
+          "column": 3,
+          "line": 29,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise-returning method provided where a void return was expected by extended/implemented type 'MyMethods'.",
+      "messageId": "voidReturnInheritedMethod",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 31,
+        },
+        "start": {
+          "column": 3,
+          "line": 31,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 76`] = `
+{
+  "code": "
+declare function isTruthy(value: unknown): Promise<boolean>;
+[0, 1, 2].filter(isTruthy);
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be returned.",
+      "messageId": "predicate",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 77`] = `
+{
+  "code": "
+const array: number[] = [];
+array.every(() => Promise.resolve(true));
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be returned.",
+      "messageId": "predicate",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 78`] = `
+{
+  "code": "
+const array: (string[] & { foo: 'bar' }) | (number[] & { bar: 'foo' }) = [];
+array.every(() => Promise.resolve(true));
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be returned.",
+      "messageId": "predicate",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 79`] = `
+{
+  "code": "
+const tuple: [number, number, number] = [1, 2, 3];
+tuple.find(() => Promise.resolve(false));
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a non-Promise value to be returned.",
+      "messageId": "predicate",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 80`] = `
+{
+  "code": "
+type ReturnsVoid = () => void;
+declare const useCallback: <T extends (...args: unknown[]) => unknown>(
+  fn: T,
+) => T;
+declare const useCallbackReturningVoid: typeof useCallback<ReturnsVoid>;
+useCallbackReturningVoid(async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 7,
+        },
+        "start": {
+          "column": 26,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 81`] = `
+{
+  "code": "
+type ReturnsVoid = () => void;
+declare const useCallback: <T extends (...args: unknown[]) => unknown>(
+  fn: T,
+) => T;
+useCallback<ReturnsVoid>(async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 6,
+        },
+        "start": {
+          "column": 26,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 82`] = `
+{
+  "code": "
+interface Foo<T> {
+  (callback: () => T): void;
+  (callback: () => number): void;
+}
+declare const foo: Foo<void>;
+
+foo(async () => {});
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 83`] = `
+{
+  "code": "
+declare function tupleFn<T extends (...args: unknown[]) => unknown>(
+  ...fns: [T, string, T]
+): void;
+tupleFn<() => void>(
+  async () => {},
+  'foo',
+  async () => {},
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 84`] = `
+{
+  "code": "
+declare function arrayFn<T extends (...args: unknown[]) => unknown>(
+  ...fns: (T | string)[]
+): void;
+arrayFn<() => void>(
+  async () => {},
+  'foo',
+  async () => {},
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+    {
+      "message": "Promise returned in function argument where a void return was expected.",
+      "messageId": "voidReturnArgument",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 85`] = `
+{
+  "code": "
+type HasVoidMethod = {
+  f(): void;
+};
+
+const o: HasVoidMethod = {
+  async f() {
+    return 3;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 86`] = `
+{
+  "code": "
+type HasVoidMethod = {
+  f(): void;
+};
+
+const o: HasVoidMethod = {
+  async f(): Promise<number> {
+    return 3;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 87`] = `
+{
+  "code": "
+type HasVoidMethod = {
+  f(): void;
+};
+const obj: HasVoidMethod = {
+  f() {
+    return Promise.resolve('foo');
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 88`] = `
+{
+  "code": "
+type HasVoidMethod = {
+  f(): void;
+};
+const obj: HasVoidMethod = {
+  f(): Promise<void> {
+    throw new Error();
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 6,
+        },
+        "start": {
+          "column": 8,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 89`] = `
+{
+  "code": "
+type O = { f: () => void };
+const asyncFunction = async () => 'foo';
+const obj: O = {
+  f: asyncFunction,
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 90`] = `
+{
+  "code": "
+type O = { f: () => void };
+const obj: O = {
+  f: async (): Promise<string> => 'foo',
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-promises > invalid 91`] = `
+{
+  "code": "
+type A = { f: () => void } | undefined;
+const a: A = {
+  async f() {},
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Promise-returning function provided to property where a void return was expected.",
+      "messageId": "voidReturnProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

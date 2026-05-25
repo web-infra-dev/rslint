@@ -2,7 +2,9 @@ import { PackageManagerTabs } from '@rspress/core/theme';
 
 # Getting Started
 
-Rslint is a high-performance JavaScript and TypeScript linter written in Go.
+Rslint is a high-performance, ESLint-compatible linter for JavaScript and TypeScript.
+
+Powered by [typescript-go](https://github.com/microsoft/typescript-go), it delivers a faster drop-in experience with type-aware rules and optional type checking in the same run.
 
 ## Installation
 
@@ -28,6 +30,9 @@ npx rslint .
 
 # Lint with auto-fix
 npx rslint --fix .
+
+# Lint with TypeScript type checking (replaces tsc --noEmit)
+npx rslint --type-check .
 ```
 
 ### Configuration Preview
@@ -51,21 +56,4 @@ For full configuration options, see the [Configuration](/config/) page.
 
 ## Editor Integration
 
-### VS Code
-
-Install the official extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rslint). It provides:
-
-- Real-time diagnostics as you type
-- Code actions for auto-fixable rules
-- Multi-workspace support
-
-The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
-
-#### Settings
-
-| Setting                | Default    | Description                                                 |
-| ---------------------- | ---------- | ----------------------------------------------------------- |
-| `rslint.enable`        | `true`     | Enable or disable the linter                                |
-| `rslint.binPath`       | `built-in` | Binary source: `built-in`, `local` (workspace), or `custom` |
-| `rslint.customBinPath` | —          | Path to a custom rslint binary (when `binPath` is `custom`) |
-| `rslint.trace.server`  | `off`      | LSP trace level: `off`, `messages`, or `verbose`            |
+Install the official [VSCode Extension](/guide/vscode-extension) for real-time diagnostics, code actions, and auto-fix on save.

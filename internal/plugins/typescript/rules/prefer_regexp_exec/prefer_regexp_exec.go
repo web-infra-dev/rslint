@@ -6,6 +6,7 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -66,36 +67,6 @@ func isNodeParenthesized(node *ast.Node) bool {
 	return parent != nil && parent.Expression == node
 }
 
-func isWeakPrecedenceParent(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindPostfixUnaryExpression,
-		ast.KindPrefixUnaryExpression,
-		ast.KindBinaryExpression,
-		ast.KindConditionalExpression,
-		ast.KindAwaitExpression:
-		return true
-	}
-	if ast.IsPropertyAccessExpression(parent) {
-		return parent.AsPropertyAccessExpression().Expression == node
-	}
-	if ast.IsElementAccessExpression(parent) {
-		return parent.AsElementAccessExpression().Expression == node
-	}
-	if ast.IsCallExpression(parent) || ast.IsNewExpression(parent) {
-		return parent.Expression() == node
-	}
-	if ast.IsTaggedTemplateExpression(parent) {
-		return parent.AsTaggedTemplateExpression().Tag == node
-	}
-	return false
-}
 
 func getWrappedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	if sourceFile == nil || node == nil {
@@ -378,14 +349,15 @@ func buildPreferRegExpExecReplacement(ctx rule.RuleContext, callNode *ast.Node, 
 			return "", false
 		}
 	}
-	if isWeakPrecedenceParent(callNode) && !isNodeParenthesized(callNode) {
+	if typescriptutil.IsWeakPrecedenceParent(callNode) && !isNodeParenthesized(callNode) {
 		replacement = "(" + replacement + ")"
 	}
 	return replacement, true
 }
 
 var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-regexp-exec",
+	Name:             "prefer-regexp-exec",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

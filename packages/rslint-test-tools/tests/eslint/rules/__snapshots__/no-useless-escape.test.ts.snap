@@ -1,0 +1,1685 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-escape > invalid 1`] = `
+{
+  "code": "var foo = /\\#/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 2`] = `
+{
+  "code": "var foo = /\\;/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\;.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 3`] = `
+{
+  "code": "var foo = "\\'";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\'.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 4`] = `
+{
+  "code": "var foo = "\\#/";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 5`] = `
+{
+  "code": "var foo = "\\a";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\a.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 6`] = `
+{
+  "code": "var foo = "\\B";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\B.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 7`] = `
+{
+  "code": "var foo = "\\@";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 8`] = `
+{
+  "code": "var foo = "foo \\a bar";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\a.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 9`] = `
+{
+  "code": "var foo = '\\"';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\".",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 10`] = `
+{
+  "code": "var foo = '\\#';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 11`] = `
+{
+  "code": "var foo = '\\$';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\$.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 12`] = `
+{
+  "code": "var foo = '\\p';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\p.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 13`] = `
+{
+  "code": "var foo = '\\p\\a\\@';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\p.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\a.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 14`] = `
+{
+  "code": "var foo = '\\\`';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\\`.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 15`] = `
+{
+  "code": "var foo = \`\\"\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\".",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 16`] = `
+{
+  "code": "var foo = \`\\'\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\'.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 17`] = `
+{
+  "code": "var foo = \`\\#\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 18`] = `
+{
+  "code": "var foo = '\\\`foo\\\`';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\\`.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\\`.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 19`] = `
+{
+  "code": "var foo = \`\\#\${foo}\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 20`] = `
+{
+  "code": "var foo = \`\\$\\{{\${foo}\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\$.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 21`] = `
+{
+  "code": "var foo = \`\\$a\${foo}\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\$.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 22`] = `
+{
+  "code": "var foo = \`a\\{{\${foo}\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\{.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 23`] = `
+{
+  "code": "var foo = /[ab\\-]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\-.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 24`] = `
+{
+  "code": "var foo = /[\\-ab]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\-.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 25`] = `
+{
+  "code": "var foo = /[ab\\?]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\?.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 26`] = `
+{
+  "code": "var foo = /[ab\\.]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 27`] = `
+{
+  "code": "var foo = /\\-/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\-.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 28`] = `
+{
+  "code": "var foo = /[\\-]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\-.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 29`] = `
+{
+  "code": "var foo = /[\\B]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\B.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 30`] = `
+{
+  "code": "var foo = /[a\\^]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\^.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 31`] = `
+{
+  "code": "/[^\\^]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\^.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 32`] = `
+{
+  "code": ""use\\ strict";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\ .",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 33`] = `
+{
+  "code": "/[\\$]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\$.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 34`] = `
+{
+  "code": "/[\\&\\&]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\&.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 35`] = `
+{
+  "code": "/[\\p{ASCII}--\\.]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 36`] = `
+{
+  "code": "/[\\.--\\.--\\.]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 37`] = `
+{
+  "code": "/[[\\.&]--[\\.&]]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 38`] = `
+{
+  "code": "var foo = /\\#\\@/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 39`] = `
+{
+  "code": "var foo = /[a\\@b]/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 40`] = `
+{
+  "code": "var foo = \`\\#\${a}\\@\${b}\\!\`;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\!.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 41`] = `
+{
+  "code": "var foo = ("\\#")!;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 42`] = `
+{
+  "code": "var foo = "\\@" as string;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 43`] = `
+{
+  "code": "var foo = "\\@" satisfies string;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 44`] = `
+{
+  "code": "import foo from "./a\\#";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 45`] = `
+{
+  "code": "enum E { A = "\\#" }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 46`] = `
+{
+  "code": "type T = "\\#";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 47`] = `
+{
+  "code": "const obj = { ["\\#"]: 1 };",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 48`] = `
+{
+  "code": "function f() { "use\\ strict"; return 1; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\ .",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 49`] = `
+{
+  "code": "/[\\.&&[a&&[b]]]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 50`] = `
+{
+  "code": "/[a&&[b&&[\\.]]]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 51`] = `
+{
+  "code": "/[^a\\^]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\^.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 52`] = `
+{
+  "code": "var foo = "\\é";",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\é.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 53`] = `
+{
+  "code": "var foo = /\\d\\@\\w\\#\\s/;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 54`] = `
+{
+  "code": "var foo = '👍\\#';",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 55`] = `
+{
+  "code": "if (true) { "ba\\z"; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\z.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 56`] = `
+{
+  "code": "{ "ba\\z"; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\z.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 57`] = `
+{
+  "code": "class C { static { "use\\ strict"; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\ .",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 58`] = `
+{
+  "code": "/[\\q{a\\.b}]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\..",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-escape > invalid 59`] = `
+{
+  "code": "/[\\q{\\@a|\\#b}]/v;",
+  "diagnostics": [
+    {
+      "message": "Unnecessary escape character: \\@.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+    {
+      "message": "Unnecessary escape character: \\#.",
+      "messageId": "unnecessaryEscape",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-escape",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

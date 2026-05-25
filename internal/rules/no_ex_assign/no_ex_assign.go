@@ -21,7 +21,11 @@ func collectCatchBindingNamesAndSymbols(node *ast.Node, ctx rule.RuleContext) ([
 		return nil, nil
 	}
 	if ast.IsIdentifier(node) {
-		return []string{node.Text()}, []*ast.Symbol{ctx.TypeChecker.GetSymbolAtLocation(node)}
+		var sym *ast.Symbol
+		if ctx.TypeChecker != nil {
+			sym = ctx.TypeChecker.GetSymbolAtLocation(node)
+		}
+		return []string{node.Text()}, []*ast.Symbol{sym}
 	}
 	if ast.IsBindingPattern(node) {
 		var names []string
@@ -36,7 +40,11 @@ func collectCatchBindingNamesAndSymbols(node *ast.Node, ctx rule.RuleContext) ([
 			}
 			utils.CollectBindingNames(be.Name(), func(ident *ast.Node, name string) {
 				names = append(names, name)
-				symbols = append(symbols, ctx.TypeChecker.GetSymbolAtLocation(ident))
+				var sym *ast.Symbol
+				if ctx.TypeChecker != nil {
+					sym = ctx.TypeChecker.GetSymbolAtLocation(ident)
+				}
+				symbols = append(symbols, sym)
 			})
 		}
 		return names, symbols
@@ -194,30 +202,12 @@ func isWriteReference(node *ast.Node) bool {
 	return false
 }
 
-func getReferenceSymbol(node *ast.Node, ctx rule.RuleContext) *ast.Symbol {
-	if node == nil || ctx.TypeChecker == nil {
-		return nil
-	}
-
-	parent := node.Parent
-	if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-		shorthand := parent.AsShorthandPropertyAssignment()
-		if shorthand != nil && shorthand.Name() == node {
-			if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
-				return symbol
-			}
-		}
-	}
-
-	return ctx.TypeChecker.GetSymbolAtLocation(node)
-}
-
 func isNameShadowed(node *ast.Node, symbols []*ast.Symbol, ctx rule.RuleContext) bool {
 	if node == nil || ctx.TypeChecker == nil || len(symbols) == 0 {
 		return false
 	}
 
-	symbol := getReferenceSymbol(node, ctx)
+	symbol := utils.GetReferenceSymbol(node, ctx.TypeChecker)
 	if symbol == nil {
 		return false
 	}
@@ -273,7 +263,8 @@ func checkReassignments(block *ast.Node, names []string, symbols []*ast.Symbol, 
 }
 
 var NoExAssignRule = rule.Rule{
-	Name: "no-ex-assign",
+	Name:             "no-ex-assign",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCatchClause: func(node *ast.Node) {

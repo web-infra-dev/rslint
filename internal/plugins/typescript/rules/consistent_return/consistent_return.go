@@ -13,8 +13,9 @@ type ConsistentReturnOptions struct {
 
 // ConsistentReturnRule enforces consistent return statements
 var ConsistentReturnRule = rule.CreateRule(rule.Rule{
-	Name: "consistent-return",
-	Run:  run,
+	Name:             "consistent-return",
+	RequiresTypeInfo: true,
+	Run:              run,
 })
 
 // functionInfo tracks information about a function's return statements

@@ -6,7 +6,10 @@ inputs:
     description: Go version range to set up.
     required: true
   cache-name:
-    description: Name of scoped cache for this set up.
+    description: >
+      Name of scoped cache for this set up. On self-hosted Windows runners it
+      also derives the GOCACHE / TEMP subdirectory path under the runner work
+      disk, so it must not contain path separators (`\` or `/`).
     default: 'cache'
 
 runs:
@@ -19,20 +22,6 @@ runs:
         go-version: ${{ inputs.go-version }}
         cache: false
 
-    # Clean up before cache restore to free disk space
-    - name: Pre-cache cleanup (Windows)
-      shell: pwsh
-      if: runner.os == 'Windows'
-      run: |
-        Write-Host "Disk space before cleanup:"
-        Get-PSDrive C | Select-Object Used,Free | Format-Table
-
-        # Clean temp directory
-        Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-
-        Write-Host "Disk space after cleanup:"
-        Get-PSDrive C | Select-Object Used,Free | Format-Table
-
     - name: Go cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       if: runner.environment == 'github-hosted'
@@ -40,7 +29,8 @@ runs:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
-        # Only cache dependencies, not build cache (saves disk space on Windows)
+        # Only cache module downloads, not build cache (GOCACHE is too large
+        # and fills up disk on self-hosted runners)
         path: |
           ~/go/pkg/mod
 
@@ -51,9 +41,18 @@ runs:
         key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
-        # Only cache dependencies, not build cache (saves disk space on Windows)
+        # Only cache module downloads, not build cache (GOCACHE is too large
+        # and fills up disk on self-hosted runners)
         path: |
           ~/go/pkg/mod
+
+    # Clean GOCACHE on self-hosted runners to prevent disk space issues.
+    # Build cache is not persisted via cache action, so it grows indefinitely
+    # on persistent runners and must be cleaned each run.
+    - name: Clean Go build cache
+      shell: bash
+      if: runner.environment == 'self-hosted'
+      run: go clean -cache
 
     # Clean up after cache restore - remove toolchain to save space
     - name: Clean Go module cache dir (Linux)
@@ -69,3 +68,23 @@ runs:
         if (Test-Path $toolchainPath) {
           Get-ChildItem -Path $toolchainPath -Filter "toolchain*" -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         }
+
+    # Relocate GOCACHE / TEMP / GOTMPDIR off the small system drive on
+    # self-hosted Windows runners. Required when compiling Go projects whose
+    # build cache and $WORK temp directory would exceed the system drive's
+    # free space (e.g. anything that pulls in the typescript-go shim). Paths
+    # are derived from `cache-name` to keep concurrent jobs on the same runner
+    # isolated.
+    - name: Relocate Go cache & temp (self-hosted Windows)
+      if: runner.environment == 'self-hosted' && runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $base = 'C:\Users\ContainerAdministrator\runner\_work'
+        $goCache = Join-Path $base "go\${{ inputs.cache-name }}"
+        $temp    = Join-Path $base "temp\${{ inputs.cache-name }}"
+        New-Item -ItemType Directory -Force -Path $goCache, $temp | Out-Null
+
+        "GOCACHE=$goCache" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+        "TEMP=$temp"       | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+        "TMP=$temp"        | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+        "GOTMPDIR=$temp"   | Out-File -Append -Encoding utf8 $env:GITHUB_ENV

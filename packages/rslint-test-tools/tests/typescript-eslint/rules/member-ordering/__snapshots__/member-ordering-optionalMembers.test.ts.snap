@@ -1,6 +1,6 @@
 // Rstest Snapshot v1
 
-exports[`member-ordering > invalid 1`] = `
+exports[`member-ordering - required > invalid 1`] = `
 {
   "code": "
 interface X {
@@ -32,7 +32,7 @@ interface X {
 }
 `;
 
-exports[`member-ordering > invalid 2`] = `
+exports[`member-ordering - required > invalid 2`] = `
 {
   "code": "
 interface X {
@@ -64,7 +64,7 @@ interface X {
 }
 `;
 
-exports[`member-ordering > invalid 3`] = `
+exports[`member-ordering - required > invalid 3`] = `
 {
   "code": "
 class X {
@@ -96,7 +96,7 @@ class X {
 }
 `;
 
-exports[`member-ordering > invalid 4`] = `
+exports[`member-ordering - required > invalid 4`] = `
 {
   "code": "
 class X {
@@ -127,7 +127,7 @@ class X {
 }
 `;
 
-exports[`member-ordering > invalid 5`] = `
+exports[`member-ordering - required > invalid 5`] = `
 {
   "code": "
 interface X {
@@ -159,7 +159,7 @@ interface X {
 }
 `;
 
-exports[`member-ordering > invalid 6`] = `
+exports[`member-ordering - required > invalid 6`] = `
 {
   "code": "
 interface X {
@@ -191,7 +191,7 @@ interface X {
 }
 `;
 
-exports[`member-ordering > invalid 7`] = `
+exports[`member-ordering - required > invalid 7`] = `
 {
   "code": "
 class Test {
@@ -227,7 +227,7 @@ class Test {
 }
 `;
 
-exports[`member-ordering > invalid 8`] = `
+exports[`member-ordering - required > invalid 8`] = `
 {
   "code": "
 class Test {

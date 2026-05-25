@@ -940,3 +940,668 @@ exports[`no-unnecessary-boolean-literal-compare > invalid 27`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 28`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean === true) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 29`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean === false) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 30`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean !== true) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+      "messageId": "negated",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 31`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean == true) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 32`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean == false) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 33`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean != true) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+      "messageId": "negated",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 34`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (varBoolean != false) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+      "messageId": "negated",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 35`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (true == varBoolean) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 36`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (true === varBoolean) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 37`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (false === varBoolean) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 38`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (false == varBoolean) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 39`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (true != varBoolean) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+      "messageId": "negated",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 40`] = `
+{
+  "code": "
+        declare const varBoolean: boolean;
+        if (false != varBoolean) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of negating it.",
+      "messageId": "negated",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 41`] = `
+{
+  "code": "
+        declare const varFalse: false;
+        if (varFalse === false) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a boolean value to a boolean instead of using it directly.",
+      "messageId": "direct",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varFalse: false;
+        if (!varFalse) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 42`] = `
+{
+  "code": "
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === true) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a nullable boolean value to true instead of using it directly.",
+      "messageId": "comparingNullableToTrueDirect",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 43`] = `
+{
+  "code": "
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === false) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+      "messageId": "comparingNullableToFalse",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 44`] = `
+{
+  "code": "
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (true === varBooleanOrUndefined) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a nullable boolean value to true instead of using it directly.",
+      "messageId": "comparingNullableToTrueDirect",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (varBooleanOrUndefined) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 45`] = `
+{
+  "code": "
+        declare const varBooleanOrNull: boolean | null;
+        if (false === varBooleanOrNull) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+      "messageId": "comparingNullableToFalse",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-boolean-literal-compare > invalid 46`] = `
+{
+  "code": "
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull !== false)) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "This expression unnecessarily compares a nullable boolean value to false instead of using the ?? operator to provide a default.",
+      "messageId": "comparingNullableToFalse",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-boolean-literal-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      ",
+  "ruleCount": 1,
+}
+`;

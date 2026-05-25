@@ -677,7 +677,7 @@ func switchHasSuper(switchStmt *ast.Node) bool {
 }
 
 // ConstructorSuperRule enforces proper super() calls in constructors
-var ConstructorSuperRule = rule.CreateRule(rule.Rule{
+var ConstructorSuperRule = rule.Rule{
 	Name: "constructor-super",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -749,4 +749,4 @@ var ConstructorSuperRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

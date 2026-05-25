@@ -1,0 +1,602 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 1`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo: string) {
+    this.foo = foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 2`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo?: string) {
+    this.foo = foo!;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 3`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo?: string) {
+    this.foo = foo as any;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 4`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo = '') {
+    this.foo = foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo = '') {
+    this.foo = foo;
+    this.foo += 'foo';
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo: string) {
+    this.foo ||= foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo: string) {
+    this.foo ??= foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 8`] = `
+{
+  "code": "
+class Foo {
+  constructor(public foo: string) {
+    this.foo &&= foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 9`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    this['foo'] = foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 10`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    function bar() {
+      this.foo = foo;
+    }
+    this.foo = foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    this.bar = () => {
+      this.foo = foo;
+    };
+    this.foo = foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 5,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 12`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    class Bar {
+      constructor(private foo: string) {
+        this.foo = foo;
+      }
+    }
+    this.foo = foo;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 9,
+        },
+        "start": {
+          "column": 5,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 13`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    this.foo = foo;
+  }
+  bar = () => {
+    this.foo = 'foo';
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 14`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    this.foo = foo;
+  }
+  init = foo => {
+    this.foo = foo;
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 15`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    this.foo = foo;
+  }
+  init = class Bar {
+    constructor(private foo: string) {
+      this.foo = foo;
+    }
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 8,
+        },
+        "start": {
+          "column": 7,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 16`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    {
+      this.foo = foo;
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-parameter-property-assignment > invalid 17`] = `
+{
+  "code": "
+class Foo {
+  constructor(private foo: string) {
+    (() => {
+      this.foo = foo;
+    })();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "This assignment is unnecessary since it is already assigned by a parameter property.",
+      "messageId": "unnecessaryAssign",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-parameter-property-assignment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

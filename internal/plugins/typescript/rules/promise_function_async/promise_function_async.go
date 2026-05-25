@@ -25,7 +25,8 @@ type PromiseFunctionAsyncOptions struct {
 }
 
 var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
-	Name: "promise-function-async",
+	Name:             "promise-function-async",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(PromiseFunctionAsyncOptions)
 		if !ok {

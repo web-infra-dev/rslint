@@ -12,7 +12,7 @@ import type {
  * Main RslintService class that automatically uses the appropriate implementation
  */
 export class RSLintService {
-  private service: RslintServiceBackend;
+  private readonly service: RslintServiceBackend;
 
   constructor(service: RslintServiceBackend) {
     this.service = service;
@@ -98,7 +98,7 @@ export class RSLintService {
    * Close the service
    */
   async close(): Promise<void> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.service.sendMessage('exit', {}).finally(() => {
         this.service.terminate();
         resolve();

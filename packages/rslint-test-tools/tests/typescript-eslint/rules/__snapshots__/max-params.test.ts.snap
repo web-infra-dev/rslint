@@ -1,0 +1,723 @@
+// Rstest Snapshot v1
+
+exports[`max-params > invalid 1`] = `
+{
+  "code": "function foo(a, b, c, d) {}",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 2`] = `
+{
+  "code": "const foo = function (a, b, c, d) {};",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 3`] = `
+{
+  "code": "const foo = (a, b, c, d) => {};",
+  "diagnostics": [
+    {
+      "message": "Arrow function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 4`] = `
+{
+  "code": "const foo = a => {};",
+  "diagnostics": [
+    {
+      "message": "Arrow function 'foo' has too many parameters (1). Maximum allowed is 0.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  method(this: void, a, b, c, d) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Method 'method' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  method(this: void, a) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Method 'method' has too many parameters (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  method(this: Foo, a, b, c) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Method 'method' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 8`] = `
+{
+  "code": "
+declare function makeDate(m: number, d: number, y: number): Date;
+      ",
+  "diagnostics": [
+    {
+      "message": "Function 'makeDate' has too many parameters (3). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 9`] = `
+{
+  "code": "
+type sum = (a: number, b: number) => number;
+      ",
+  "diagnostics": [
+    {
+      "message": "Function 'sum' has too many parameters (2). Maximum allowed is 1.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 10`] = `
+{
+  "code": "var obj = { foo: function (a, b, c, d) {} };",
+  "diagnostics": [
+    {
+      "message": "Method 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 11`] = `
+{
+  "code": "var obj = { foo: async function (a, b, c, d) {} };",
+  "diagnostics": [
+    {
+      "message": "Async method 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 12`] = `
+{
+  "code": "var obj = { foo: (a, b, c, d) => {} };",
+  "diagnostics": [
+    {
+      "message": "Arrow function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 13`] = `
+{
+  "code": "class C { foo = function (a, b, c, d) {}; }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 14`] = `
+{
+  "code": "
+declare class Foo {
+  method(a, b, c, d): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Method 'method' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 15`] = `
+{
+  "code": "
+declare class Foo {
+  static method(a, b, c, d): void;
+  constructor(a, b, c, d);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Static method 'method' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+    {
+      "message": "Constructor has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 16`] = `
+{
+  "code": "type F = (a: number, b: number, c: number, d: number) => void;",
+  "diagnostics": [
+    {
+      "message": "Function 'F' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 17`] = `
+{
+  "code": "interface I { foo: (a, b, c, d) => void }",
+  "diagnostics": [
+    {
+      "message": "Function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 18`] = `
+{
+  "code": "class C { static async *#m(a, b, c, d) {} }",
+  "diagnostics": [
+    {
+      "message": "Static private async generator method '#m' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 19`] = `
+{
+  "code": "class C { constructor(public a: number, private b: string, readonly c: boolean, d: any) {} }",
+  "diagnostics": [
+    {
+      "message": "Constructor has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 20`] = `
+{
+  "code": "
+class Foo {
+  m(a, b): void;
+  m(a, b, c, d): void;
+  m(...args: any[]): any {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Method 'm' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 21`] = `
+{
+  "code": "function f(this: void, a, b, c, ...rest) {}",
+  "diagnostics": [
+    {
+      "message": "Function 'f' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 22`] = `
+{
+  "code": "class C { #foo = (a, b, c, d) => {}; }",
+  "diagnostics": [
+    {
+      "message": "Private arrow function '#foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 23`] = `
+{
+  "code": "class C { static foo = (a, b, c, d) => {}; }",
+  "diagnostics": [
+    {
+      "message": "Static arrow function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 24`] = `
+{
+  "code": "class C { static #foo = (a, b, c, d) => {}; }",
+  "diagnostics": [
+    {
+      "message": "Static private arrow function '#foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 25`] = `
+{
+  "code": "class C { #foo = function (a, b, c, d) {}; }",
+  "diagnostics": [
+    {
+      "message": "Private function '#foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`max-params > invalid 26`] = `
+{
+  "code": "class C { static #foo = async function (a, b, c, d) {}; }",
+  "diagnostics": [
+    {
+      "message": "Static private async function '#foo' has too many parameters (4). Maximum allowed is 3.",
+      "messageId": "exceed",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/max-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

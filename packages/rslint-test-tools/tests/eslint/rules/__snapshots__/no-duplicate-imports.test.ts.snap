@@ -1,0 +1,1137 @@
+// Rstest Snapshot v1
+
+exports[`no-duplicate-imports > invalid 1`] = `
+{
+  "code": "import "fs";
+import "fs"",
+  "diagnostics": [
+    {
+      "message": "'fs' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 2`] = `
+{
+  "code": "import { merge } from "lodash-es";
+import { find } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 3`] = `
+{
+  "code": "import { merge } from "lodash-es";
+import _ from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 4`] = `
+{
+  "code": "import os from "os";
+import { something } from "os";
+import * as foobar from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'os' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 5`] = `
+{
+  "code": "import * as modns from "lodash-es";
+import { merge } from "lodash-es";
+import { baz } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 6`] = `
+{
+  "code": "export { os } from "os";
+export { something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 7`] = `
+{
+  "code": "import os from "os";
+export { os as foobar } from "os";
+export { something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 8`] = `
+{
+  "code": "import os from "os";
+export { something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 9`] = `
+{
+  "code": "import os from "os";
+export * as os from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 10`] = `
+{
+  "code": "export * as os from "os";
+import os from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' import is duplicated as export.",
+      "messageId": "importAs",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 11`] = `
+{
+  "code": "import * as modns from "mod";
+export * as  modns from "mod";",
+  "diagnostics": [
+    {
+      "message": "'mod' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 12`] = `
+{
+  "code": "export * from "os";
+export * from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 13`] = `
+{
+  "code": "import "os";
+export * from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 14`] = `
+{
+  "code": "import { type Merge } from "lodash-es";
+import { type Find } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 15`] = `
+{
+  "code": "import { type Merge } from "lodash-es";
+import type { Find } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 16`] = `
+{
+  "code": "import type { Merge } from "lodash-es";
+import type { Find } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 17`] = `
+{
+  "code": "import type Os from "os";
+import type { Something } from "os";
+import type * as Foobar from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 18`] = `
+{
+  "code": "import type * as Modns from "lodash-es";
+import type { Merge } from "lodash-es";
+import type { Baz } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 19`] = `
+{
+  "code": "import { type Foo } from "module";
+export type { Bar } from "module";",
+  "diagnostics": [
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 20`] = `
+{
+  "code": "export { os } from "os";
+export type { Something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 21`] = `
+{
+  "code": "export type { Os } from "os";
+export type { Something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 22`] = `
+{
+  "code": "import type { Os } from "os";
+export type { Os as Foobar } from "os";
+export type { Something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 23`] = `
+{
+  "code": "import type { Os } from "os";
+export type { Something } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 24`] = `
+{
+  "code": "import type Os from "os";
+export type * as Os from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 25`] = `
+{
+  "code": "import type * as Modns from "mod";
+export type * as Modns from "mod";",
+  "diagnostics": [
+    {
+      "message": "'mod' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 26`] = `
+{
+  "code": "export type * from "os";
+export type * from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 27`] = `
+{
+  "code": "import "os";
+export type { Os } from "os";",
+  "diagnostics": [
+    {
+      "message": "'os' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 28`] = `
+{
+  "code": "import { someValue } from 'module';
+import { anotherValue } from 'module';",
+  "diagnostics": [
+    {
+      "message": "'module' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 29`] = `
+{
+  "code": "import type { Merge } from "lodash-es";
+import type { Find } from "lodash-es";",
+  "diagnostics": [
+    {
+      "message": "'lodash-es' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 30`] = `
+{
+  "code": "import { someValue, type Foo } from 'module';
+import type { SomeType } from 'module';
+import type { AnotherType } from 'module';",
+  "diagnostics": [
+    {
+      "message": "'module' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 31`] = `
+{
+  "code": "import { type Foo } from 'module';
+import { type Bar } from 'module';",
+  "diagnostics": [
+    {
+      "message": "'module' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 32`] = `
+{
+  "code": "export type { Foo } from "module";
+export type { Bar } from "module";",
+  "diagnostics": [
+    {
+      "message": "'module' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 33`] = `
+{
+  "code": "import { type Foo } from "module";
+export { type Bar } from "module";
+export { type Baz } from "module";",
+  "diagnostics": [
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 34`] = `
+{
+  "code": "import { type Foo } from "module";
+export { type Bar } from "module";
+export { regular } from "module";",
+  "diagnostics": [
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-imports > invalid 35`] = `
+{
+  "code": "import { type Foo } from "module";
+import { regular } from "module";
+export { type Bar } from "module";
+export { regular as other } from "module";",
+  "diagnostics": [
+    {
+      "message": "'module' import is duplicated.",
+      "messageId": "import",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated.",
+      "messageId": "export",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+    {
+      "message": "'module' export is duplicated as import.",
+      "messageId": "exportAs",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-imports",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

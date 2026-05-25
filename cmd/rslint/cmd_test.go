@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -409,6 +410,53 @@ func TestPrintDiagnosticEdgeCases(t *testing.T) {
 			t.Errorf("4-line codebox should show all lines.\nOutput:\n%s", output)
 		}
 	})
+
+	t.Run("source contains invalid UTF-8 bytes", func(t *testing.T) {
+		// Regression: the codebox renderer iterated `for _, char := range
+		// codeboxText` and advanced a manual byte counter by
+		// `utf8.RuneLen(char)`. Go's range yields utf8.RuneError (U+FFFD)
+		// for each invalid UTF-8 byte but only advances 1 byte — yet
+		// utf8.RuneLen(RuneError) is 3 (the encoded length of U+FFFD).
+		// The manual counter fell out of sync and downstream sliced the
+		// source text past its length, panicking with
+		// `slice bounds out of range [:17] with length 7`.
+		//
+		// Source: `//` + 5 invalid UTF-8 first bytes (0xFF 0xFE 0xFD
+		// 0xFC 0xFB) — mirrors a real swc-loader fixture in rspack that
+		// triggered this in production.
+		source := "//\xff\xfe\xfd\xfc\xfb"
+		d, opts := createTestDiagnostic(t, source, len(source), len(source))
+		output := renderDiagnostic(t, d, opts)
+
+		// The render must complete without panic and produce a non-empty
+		// codebox containing the leading `//`.
+		if !strings.Contains(output, "//") {
+			t.Errorf("Should render the `//` prefix without panicking.\nOutput:\n%s", output)
+		}
+		if !strings.Contains(output, "╰") {
+			t.Errorf("Should have closing border.\nOutput:\n%s", output)
+		}
+	})
+
+	t.Run("codebox contains only whitespace", func(t *testing.T) {
+		// Regression: indentSize was initialized to math.MaxInt and only
+		// updated inside `if !lineIndentCalculated && !unicode.IsSpace`.
+		// When every codebox line was whitespace-only (e.g. a 1-byte
+		// `"\n"` source), indentSize stayed MaxInt, and
+		// `lineMap[line] + indentSize` overflowed int — wrapping to a
+		// large negative number that then sliced out of bounds.
+		//
+		// Source: single LF — the simplest shape that produces a
+		// whitespace-only codebox. The diagnostic covers the LF itself
+		// (mirrors what eol-last 'never' emits on a 1-byte file).
+		source := "\n"
+		d, opts := createTestDiagnostic(t, source, 0, 1)
+		output := renderDiagnostic(t, d, opts)
+
+		if !strings.Contains(output, "╰") {
+			t.Errorf("Should have closing border.\nOutput:\n%s", output)
+		}
+	})
 }
 
 // TestSyntaxErrorFormat tests that syntax errors produce clean, readable messages
@@ -581,5 +629,296 @@ func TestReportSyntacticErrorsNonSyntactic(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Fatal("Should not write anything for non-SyntacticError")
+	}
+}
+
+// ======== groupDiagsByFile tests ========
+
+func TestGroupDiagsByFile_Empty(t *testing.T) {
+	result := groupDiagsByFile(nil)
+	if len(result) != 0 {
+		t.Errorf("expected empty map for nil input, got %d entries", len(result))
+	}
+
+	result = groupDiagsByFile([]rule.RuleDiagnostic{})
+	if len(result) != 0 {
+		t.Errorf("expected empty map for empty input, got %d entries", len(result))
+	}
+}
+
+func TestGroupDiagsByFile_SingleFile(t *testing.T) {
+	source := "const x = 1;\nconst y = 2;\n"
+	d1, _ := createTestDiagnostic(t, source, 0, 5)
+	// Create a second diagnostic from the SAME source file
+	d2 := d1
+	d2.Range = core.NewTextRange(13, 18)
+	d2.Message = rule.RuleMessage{Id: "test2", Description: "Second diagnostic"}
+
+	result := groupDiagsByFile([]rule.RuleDiagnostic{d1, d2})
+
+	if len(result) != 1 {
+		t.Fatalf("expected 1 file group, got %d", len(result))
+	}
+
+	for _, diags := range result {
+		if len(diags) != 2 {
+			t.Errorf("expected 2 diagnostics in group, got %d", len(diags))
+		}
+	}
+}
+
+func TestGroupDiagsByFile_MultipleFiles(t *testing.T) {
+	// Create diagnostics from two different temp directories (different files)
+	sourceA := "const a = 1;"
+	sourceB := "const b = 2;"
+	dA, _ := createTestDiagnostic(t, sourceA, 0, 5)
+	dB, _ := createTestDiagnostic(t, sourceB, 0, 5)
+
+	result := groupDiagsByFile([]rule.RuleDiagnostic{dA, dB})
+
+	// Each diagnostic comes from a different temp dir → different file names
+	if len(result) != 2 {
+		t.Fatalf("expected 2 file groups, got %d", len(result))
+	}
+
+	for _, diags := range result {
+		if len(diags) != 1 {
+			t.Errorf("expected 1 diagnostic per file, got %d", len(diags))
+		}
+	}
+}
+
+// ======== resolveStartTime tests ========
+
+func TestResolveStartTime_Zero(t *testing.T) {
+	before := time.Now()
+	result := resolveStartTime(0)
+	after := time.Now()
+
+	if result.Before(before) || result.After(after) {
+		t.Errorf("expected time.Now() when startTimeMs is 0, got %v", result)
+	}
+}
+
+func TestResolveStartTime_Positive(t *testing.T) {
+	ms := int64(1711800000000) // a fixed epoch millis
+	result := resolveStartTime(ms)
+	expected := time.UnixMilli(ms)
+
+	if !result.Equal(expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
+func TestResolveStartTime_Negative(t *testing.T) {
+	before := time.Now()
+	result := resolveStartTime(-1)
+	after := time.Now()
+
+	if result.Before(before) || result.After(after) {
+		t.Errorf("expected time.Now() when startTimeMs is negative, got %v", result)
+	}
+}
+
+// --- validateTypeCheckOnlyFlags ---
+//
+// These tests pin down the CLI compatibility policy for --type-check-only:
+// it implies --type-check, but is rejected with exit code 2 when combined
+// with --fix or --rule (both rely on the lint phase that this mode disables).
+
+func TestValidateTypeCheckOnlyFlags_OffIsNoop(t *testing.T) {
+	// typeCheckOnly=false → policy doesn't apply, every other combination ok.
+	cases := []struct {
+		fix       bool
+		ruleFlags []string
+	}{
+		{false, nil},
+		{true, nil},
+		{false, []string{"no-console: error"}},
+		{true, []string{"no-console: error"}},
+	}
+	for _, c := range cases {
+		code, msg := validateTypeCheckOnlyFlags(false, c.fix, c.ruleFlags)
+		if code != 0 || msg != "" {
+			t.Errorf("typeCheckOnly=false should never reject (fix=%v rules=%v), got (%d, %q)", c.fix, c.ruleFlags, code, msg)
+		}
+	}
+}
+
+func TestValidateTypeCheckOnlyFlags_AloneIsOK(t *testing.T) {
+	code, msg := validateTypeCheckOnlyFlags(true, false, nil)
+	if code != 0 || msg != "" {
+		t.Errorf("typeCheckOnly alone should be accepted, got (%d, %q)", code, msg)
+	}
+}
+
+func TestValidateTypeCheckOnlyFlags_RejectsFix(t *testing.T) {
+	code, msg := validateTypeCheckOnlyFlags(true, true, nil)
+	if code != 2 {
+		t.Errorf("expected exit code 2 for --type-check-only + --fix, got %d", code)
+	}
+	if !strings.Contains(msg, "--fix") || !strings.Contains(msg, "--type-check-only") {
+		t.Errorf("expected message to mention both flags, got %q", msg)
+	}
+}
+
+func TestValidateTypeCheckOnlyFlags_RejectsRule(t *testing.T) {
+	code, msg := validateTypeCheckOnlyFlags(true, false, []string{"no-console: error"})
+	if code != 2 {
+		t.Errorf("expected exit code 2 for --type-check-only + --rule, got %d", code)
+	}
+	if !strings.Contains(msg, "--rule") || !strings.Contains(msg, "--type-check-only") {
+		t.Errorf("expected message to mention both flags, got %q", msg)
+	}
+}
+
+// TestValidateTypeCheckOnlyFlags_FixTakesPriority documents the diagnostic
+// preference when both incompatible flags are present: the error message
+// names --fix (not --rule) because --fix is checked first. This isn't a
+// correctness property, just a stability guarantee for users with scripts
+// scraping stderr.
+func TestValidateTypeCheckOnlyFlags_FixTakesPriority(t *testing.T) {
+	code, msg := validateTypeCheckOnlyFlags(true, true, []string{"no-console: error"})
+	if code != 2 {
+		t.Errorf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(msg, "--fix") {
+		t.Errorf("expected --fix to take priority in the error message, got %q", msg)
+	}
+}
+
+// --- shouldShortCircuitOutput ---
+//
+// Locks two regressions:
+//   1. `--type-check-only <dir>` returning exit 0 with no diagnostics
+//      because Phase 1's LintedFileCount was always 0, tripping a
+//      short-circuit meant for "user pointed at a nonexistent file"
+//      (lint mode).
+//   2. `--type-check <non-program-file.ts>` silently dropping Phase 2
+//      diagnostics: lintedFileCount==0 (scope filtered out everything in
+//      Phase 1) but Phase 2 ran program-wide and produced TS errors that
+//      the short-circuit would have swallowed.
+//
+// Either type-check mode must never take the short-circuit.
+
+func TestShouldShortCircuitOutput_NotInTypeCheckOnly(t *testing.T) {
+	// All combinations of scope/lintedFileCount must NOT short-circuit
+	// when type-check-only is on, because Phase 2 may have output.
+	cases := []struct {
+		scopeRestricted bool
+		lintedFileCount int32
+	}{
+		{false, 0},
+		{false, 5},
+		{true, 0},
+		{true, 5},
+	}
+	for _, c := range cases {
+		// typeCheckOnly=true with typeCheck=false is non-canonical (main()
+		// sets typeCheck=true when typeCheckOnly is on), but the guard must
+		// still hold on its own to avoid coupling.
+		if shouldShortCircuitOutput(true, false, c.scopeRestricted, c.lintedFileCount) {
+			t.Errorf("type-check-only mode must never short-circuit (scope=%v lintedFiles=%d)", c.scopeRestricted, c.lintedFileCount)
+		}
+	}
+}
+
+func TestShouldShortCircuitOutput_NotInTypeCheckMode(t *testing.T) {
+	// --type-check (without --type-check-only): Phase 2 runs program-wide
+	// regardless of Scope, so even lintedFileCount==0 + scopeRestricted is
+	// not enough to drop diagnostics. Locks review-111 Issue 1.
+	cases := []struct {
+		scopeRestricted bool
+		lintedFileCount int32
+	}{
+		{false, 0},
+		{false, 5},
+		{true, 0}, // <-- the previously-buggy case
+		{true, 5},
+	}
+	for _, c := range cases {
+		if shouldShortCircuitOutput(false, true, c.scopeRestricted, c.lintedFileCount) {
+			t.Errorf("--type-check mode must never short-circuit (scope=%v lintedFiles=%d)", c.scopeRestricted, c.lintedFileCount)
+		}
+	}
+}
+
+func TestShouldShortCircuitOutput_LintModeShortCircuitsWhenEmpty(t *testing.T) {
+	if !shouldShortCircuitOutput(false, false, true, 0) {
+		t.Error("lint mode with scope restriction and zero linted files should short-circuit")
+	}
+}
+
+func TestShouldShortCircuitOutput_LintModeKeepsRunningOtherwise(t *testing.T) {
+	cases := []struct {
+		name            string
+		scopeRestricted bool
+		lintedFileCount int32
+	}{
+		{"no scope, no files", false, 0},
+		{"no scope, files present", false, 5},
+		{"scope, files present", true, 5},
+	}
+	for _, c := range cases {
+		if shouldShortCircuitOutput(false, false, c.scopeRestricted, c.lintedFileCount) {
+			t.Errorf("%s: lint mode must not short-circuit", c.name)
+		}
+	}
+}
+
+// --- allowFileWarning ---
+//
+// collectAllowFileWarnings is the structured form of "this CLI file won't
+// be linted" diagnostics. formatAllowFileWarning is the message renderer.
+// We test them separately so the policy (when to emit) and the wording
+// (what the message looks like) are pinned independently.
+
+func TestFormatAllowFileWarning_NotInProgram(t *testing.T) {
+	opts := tspath.ComparePathsOptions{CurrentDirectory: "/work", UseCaseSensitiveFileNames: true}
+	msg := formatAllowFileWarning(allowFileWarning{Path: "/work/missing.ts", Kind: allowFileNotInProgram}, opts)
+	if !strings.Contains(msg, "missing.ts") {
+		t.Errorf("message should contain file name, got %q", msg)
+	}
+	if !strings.Contains(msg, "was not found in the project") {
+		t.Errorf("message should explain 'not in project', got %q", msg)
+	}
+	if !strings.Contains(msg, "skipping") {
+		t.Errorf("message should say 'skipping' (lint-side semantics), got %q", msg)
+	}
+	if strings.HasSuffix(msg, "\n") {
+		t.Errorf("message should NOT include trailing newline (caller adds it via Fprintln), got %q", msg)
+	}
+}
+
+func TestFormatAllowFileWarning_Ignored(t *testing.T) {
+	opts := tspath.ComparePathsOptions{CurrentDirectory: "/work", UseCaseSensitiveFileNames: true}
+	msg := formatAllowFileWarning(allowFileWarning{Path: "/work/src/x.ts", Kind: allowFileIgnored}, opts)
+	if !strings.Contains(msg, "src/x.ts") {
+		t.Errorf("message should contain relative path, got %q", msg)
+	}
+	if !strings.Contains(msg, "ignored because of a matching ignore pattern") {
+		t.Errorf("message should reference the ignore pattern, got %q", msg)
+	}
+}
+
+func TestFormatAllowFileWarning_UnknownKindIsEmpty(t *testing.T) {
+	// Defensive: future Kind enum additions shouldn't crash callers if
+	// formatter isn't updated. Empty string is the agreed sentinel.
+	msg := formatAllowFileWarning(allowFileWarning{Path: "/x.ts", Kind: allowFileWarningKind(99)}, tspath.ComparePathsOptions{})
+	if msg != "" {
+		t.Errorf("unknown kind should produce empty message, got %q", msg)
+	}
+}
+
+func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
+	// No allowFiles → no work, no warnings. Important so callers can rely
+	// on a non-nil result implying actual user-specified files.
+	got := collectAllowFileWarnings(nil, nil, nil, nil, "/work")
+	if got != nil {
+		t.Errorf("empty allowFiles should produce nil, got %+v", got)
+	}
+	got = collectAllowFileWarnings([]string{}, nil, nil, nil, "/work")
+	if got != nil {
+		t.Errorf("empty allowFiles (non-nil slice) should still produce nil, got %+v", got)
 	}
 }
