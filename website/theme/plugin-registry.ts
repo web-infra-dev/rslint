@@ -3,6 +3,15 @@
  * (no @rslint/core import), so it can be loaded both at build time by Node
  * scripts and at runtime by browser UI components.
  */
+export interface PluginPresetMeta {
+  /**
+   * Dot-path to the preset config object, e.g. `reactPlugin.configs.recommended`.
+   */
+  name: string;
+  /** Human-readable preset description, shown in the docs preset table. */
+  description: string;
+}
+
 export interface PluginMeta {
   /**
    * Rule key prefix users write in their rslint config (e.g. `import` for
@@ -21,13 +30,8 @@ export interface PluginMeta {
   group: string;
   /** Named export from `@rslint/core` (e.g. `importPlugin`). */
   importName: string;
-  /**
-   * Dot-path to the preset config object, e.g. `reactPlugin.configs.recommended`.
-   * `null` if the plugin ships no preset.
-   */
-  presetName: string | null;
-  /** Human-readable preset description, shown in the docs preset table. */
-  description: string;
+  /** Presets shipped by this plugin. Empty when the plugin has no preset. */
+  presets: PluginPresetMeta[];
 }
 
 /**
@@ -42,64 +46,105 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     prefix: '',
     group: 'eslint',
     importName: 'js',
-    presetName: 'js.configs.recommended',
-    description: 'JavaScript recommended rules',
+    presets: [
+      {
+        name: 'js.configs.recommended',
+        description: 'JavaScript recommended rules',
+      },
+    ],
   },
   {
     prefix: '@typescript-eslint',
     group: '@typescript-eslint',
     importName: 'ts',
-    presetName: 'ts.configs.recommended',
-    description: 'TypeScript recommended rules (includes ESLint core rules)',
+    presets: [
+      {
+        name: 'ts.configs.recommended',
+        description:
+          'TypeScript recommended rules (includes ESLint core rules)',
+      },
+    ],
   },
   {
     prefix: 'react',
     group: 'react',
     importName: 'reactPlugin',
-    presetName: 'reactPlugin.configs.recommended',
-    description: 'React rules',
+    presets: [
+      {
+        name: 'reactPlugin.configs.recommended',
+        description: 'React rules',
+      },
+    ],
   },
   {
     prefix: 'react-hooks',
     group: 'eslint-plugin-react-hooks',
     importName: 'reactHooksPlugin',
-    presetName: 'reactHooksPlugin.configs.recommended',
-    description: 'React Hooks rules',
+    presets: [
+      {
+        name: 'reactHooksPlugin.configs.recommended',
+        description: 'React Hooks rules',
+      },
+    ],
   },
   {
     prefix: 'import',
     group: 'eslint-plugin-import',
     importName: 'importPlugin',
-    presetName: 'importPlugin.configs.recommended',
-    description: 'Import/export rules',
+    presets: [
+      {
+        name: 'importPlugin.configs.recommended',
+        description: 'Import/export rules',
+      },
+    ],
   },
   {
     prefix: 'promise',
     group: 'eslint-plugin-promise',
     importName: 'promisePlugin',
-    presetName: 'promisePlugin.configs.recommended',
-    description: 'Promise rules',
+    presets: [
+      {
+        name: 'promisePlugin.configs.recommended',
+        description: 'Promise rules',
+      },
+    ],
   },
   {
     prefix: 'jest',
     group: 'eslint-plugin-jest',
     importName: 'jestPlugin',
-    presetName: 'jestPlugin.configs.recommended',
-    description: 'Jest rules',
+    presets: [
+      {
+        name: 'jestPlugin.configs.recommended',
+        description: 'Jest rules',
+      },
+      {
+        name: 'jestPlugin.configs.style',
+        description: 'Jest style rules',
+      },
+    ],
   },
   {
     prefix: 'unicorn',
     group: 'eslint-plugin-unicorn',
     importName: 'unicornPlugin',
-    presetName: 'unicornPlugin.configs.recommended',
-    description: 'Unicorn rules',
+    presets: [
+      {
+        name: 'unicornPlugin.configs.recommended',
+        description: 'Unicorn rules',
+      },
+    ],
   },
   {
     prefix: 'jsx-a11y',
     group: 'eslint-plugin-jsx-a11y',
     importName: 'jsxA11yPlugin',
-    presetName: 'jsxA11yPlugin.configs.recommended',
-    description: 'JSX a11y rules',
+    presets: [
+      {
+        name: 'jsxA11yPlugin.configs.recommended',
+        description: 'JSX a11y rules',
+      },
+    ],
   },
   {
     prefix: '@stylistic',
@@ -109,6 +154,18 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     description: 'Stylistic / formatting rules',
   },
 ];
+
+/** One row per preset, with the parent plugin fields attached. */
+export type PluginPresetEntry = PluginMeta & PluginPresetMeta;
+
+/** Expand each plugin into one entry per preset (for preset tables, manifest, etc.). */
+export function expandPluginPresets(
+  registry: PluginMeta[] = PLUGIN_REGISTRY,
+): PluginPresetEntry[] {
+  return registry.flatMap((plugin) =>
+    plugin.presets.map((preset) => ({ ...plugin, ...preset })),
+  );
+}
 
 /**
  * Convert a manifest plugin group (the value of `PLUGIN_NAME` in

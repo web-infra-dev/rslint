@@ -4,7 +4,7 @@ import { recommended as reactRecommended } from './react.js';
 import { recommended as reactHooksRecommended } from './react-hooks.js';
 import { recommended as importRecommended } from './import.js';
 import { recommended as promiseRecommended } from './promise.js';
-import { recommended as jestRecommended } from './jest.js';
+import { recommended as jestRecommended, style as jestStyle } from './jest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
 import { recommended as stylisticRecommended } from './stylistic.js';
@@ -34,7 +34,7 @@ export const promisePlugin = {
 };
 
 export const jestPlugin = {
-  configs: { recommended: jestRecommended },
+  configs: { recommended: jestRecommended, style: jestStyle },
 };
 
 export const unicornPlugin = {
