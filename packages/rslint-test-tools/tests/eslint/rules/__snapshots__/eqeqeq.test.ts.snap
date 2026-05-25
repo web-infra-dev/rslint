@@ -1,0 +1,822 @@
+// Rstest Snapshot v1
+
+exports[`eqeqeq > invalid 1`] = `
+{
+  "code": "a == b",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 2`] = `
+{
+  "code": "a != b",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 3`] = `
+{
+  "code": "typeof a == "number"",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 4`] = `
+{
+  "code": ""string" != typeof a",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 5`] = `
+{
+  "code": "true == true",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 6`] = `
+{
+  "code": "2 == 3",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 7`] = `
+{
+  "code": "'hello' != 'world'",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 8`] = `
+{
+  "code": "a == null",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 9`] = `
+{
+  "code": "null != a",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 10`] = `
+{
+  "code": "a == b",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 11`] = `
+{
+  "code": "a != b",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 12`] = `
+{
+  "code": "true == 1",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 13`] = `
+{
+  "code": "0 != "1"",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 14`] = `
+{
+  "code": "typeof a == "number"",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 15`] = `
+{
+  "code": ""hello" != "world"",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 16`] = `
+{
+  "code": "2 == 3",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 17`] = `
+{
+  "code": "true == true",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 18`] = `
+{
+  "code": "true == null",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 19`] = `
+{
+  "code": "true != null",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 20`] = `
+{
+  "code": "null == null",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 21`] = `
+{
+  "code": "null != null",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 22`] = `
+{
+  "code": "a === null",
+  "diagnostics": [
+    {
+      "message": "Expected '==' and instead saw '==='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 23`] = `
+{
+  "code": "null !== a",
+  "diagnostics": [
+    {
+      "message": "Expected '!=' and instead saw '!=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 24`] = `
+{
+  "code": "null === null",
+  "diagnostics": [
+    {
+      "message": "Expected '==' and instead saw '==='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 25`] = `
+{
+  "code": "null !== null",
+  "diagnostics": [
+    {
+      "message": "Expected '!=' and instead saw '!=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 26`] = `
+{
+  "code": "a == b",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 27`] = `
+{
+  "code": "a == b",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 28`] = `
+{
+  "code": "(a) == b",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 29`] = `
+{
+  "code": "a == (b)",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 30`] = `
+{
+  "code": "(a) == (b)",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 31`] = `
+{
+  "code": "(a == b) == (c)",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

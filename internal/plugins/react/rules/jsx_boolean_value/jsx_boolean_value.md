@@ -1,4 +1,4 @@
-# react/jsx-boolean-value
+# jsx-boolean-value
 
 ## Rule Details
 

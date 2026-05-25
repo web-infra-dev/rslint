@@ -1,0 +1,313 @@
+// Rstest Snapshot v1
+
+exports[`no-extra-boolean-cast > invalid 1`] = `
+{
+  "code": "if (!!foo) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 2`] = `
+{
+  "code": "if (Boolean(foo)) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant Boolean call.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 3`] = `
+{
+  "code": "while (!!foo) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 4`] = `
+{
+  "code": "Boolean(!!foo)",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 5`] = `
+{
+  "code": "new Boolean(!!foo)",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 6`] = `
+{
+  "code": "if ((!!foo)) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 7`] = `
+{
+  "code": "if (x || !!y) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 8`] = `
+{
+  "code": "while (x && Boolean(y)) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant Boolean call.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 9`] = `
+{
+  "code": "if (x ?? !!y) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 10`] = `
+{
+  "code": "if (cond ? Boolean(a) : b) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant Boolean call.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 11`] = `
+{
+  "code": "if (cond ? a : !!b) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 12`] = `
+{
+  "code": "if ((a, b, Boolean(c))) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant Boolean call.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

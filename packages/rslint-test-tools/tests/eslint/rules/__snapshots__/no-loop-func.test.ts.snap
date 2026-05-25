@@ -1,0 +1,2016 @@
+// Rstest Snapshot v1
+
+exports[`no-loop-func > invalid 1`] = `
+{
+  "code": "for (var i=0; i<l; i++) { (function() { i; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 2`] = `
+{
+  "code": "for (var i=0; i<l; i++) { for (var j=0; j<m; j++) { (function() { i+j; }) } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i', 'j'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 3`] = `
+{
+  "code": "for (var i in {}) { (function() { i; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 4`] = `
+{
+  "code": "for (var i of {}) { (function() { i; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 5`] = `
+{
+  "code": "for (var i=0; i < l; i++) { (() => { i; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 6`] = `
+{
+  "code": "for (var i=0; i < l; i++) { var a = function() { i; } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 7`] = `
+{
+  "code": "for (var i=0; i < l; i++) { function a() { i; }; a(); }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 8`] = `
+{
+  "code": "let a; for (let i=0; i<l; i++) { a = 1; (function() { a; });}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 9`] = `
+{
+  "code": "let a; for (let i in {}) { (function() { a; }); a = 1; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 10`] = `
+{
+  "code": "let a; for (let i of {}) { (function() { a; }); } a = 1;",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 11`] = `
+{
+  "code": "let a; for (let i=0; i<l; i++) { (function() { (function() { a; }); }); a = 1; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 12`] = `
+{
+  "code": "let a; for (let i in {}) { a = 1; function foo() { (function() { a; }); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 13`] = `
+{
+  "code": "let a; for (let i of {}) { (() => { (function() { a; }); }); } a = 1;",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 14`] = `
+{
+  "code": "for (var i = 0; i < 10; ++i) { for (let x in xs.filter(x => x != i)) {  } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 15`] = `
+{
+  "code": "for (let x of xs) { let a; for (let y of ys) { a = 1; (function() { a; }); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 16`] = `
+{
+  "code": "for (var x of xs) { for (let y of ys) { (function() { x; }); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'x'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 17`] = `
+{
+  "code": "for (var x of xs) { (function() { x; }); }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'x'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 18`] = `
+{
+  "code": "var a; for (let x of xs) { a = 1; (function() { a; }); }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 19`] = `
+{
+  "code": "var a; for (let x of xs) { (function() { a; }); a = 1; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 20`] = `
+{
+  "code": "let a; function foo() { a = 10; } for (let x of xs) { (function() { a; }); } foo();",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 21`] = `
+{
+  "code": "let a; function foo() { a = 10; for (let x of xs) { (function() { a; }); } } foo();",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 22`] = `
+{
+  "code": "let a; for (var i=0; i<l; i++) { (function* (){i;})() }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 23`] = `
+{
+  "code": "let a; for (var i=0; i<l; i++) { (async function (){i;})() }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 24`] = `
+{
+  "code": "let current = getStart();
+const arr = [];
+while (current) {
+    (function f() {
+        current;
+        arr.push(f);
+    })();
+
+    current = current.upper;
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'current'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 7,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 25`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i++) {
+    (function fun () {
+        if (arr.includes(fun)) return i;
+        else arr.push(fun);
+    })();
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 7,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 26`] = `
+{
+  "code": "let current = getStart();
+const arr = [];
+while (current) {
+    const p = (async () => {
+        await someDelay();
+        current;
+    })();
+
+    arr.push(p);
+    current = current.upper;
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'current'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 7,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 27`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i++) {
+    arr.push((f => f)(
+        () => i
+    ));
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 28`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i++) {
+    arr.push((() => {
+        return () => i;
+    })());
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 29`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i++) {
+    arr.push((() => {
+        return () => { return i };
+    })());
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 30`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i++) {
+    arr.push((() => {
+        return () => {
+            return () => i
+        };
+    })());
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 31`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i++) {
+    arr.push((() => {
+        return () =>
+            (() => i)();
+    })());
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 32`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i ++) {
+    (() => {
+        arr.push((async () => {
+            await 1;
+            return i;
+        })());
+    })();
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 8,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 33`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i ++) {
+    (() => {
+        (function f() {
+            if (!arr.includes(f)) {
+                arr.push(f);
+            }
+            return i;
+        })();
+    })();
+
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 10,
+        },
+        "start": {
+          "column": 10,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 34`] = `
+{
+  "code": "var arr1 = [], arr2 = [];
+
+for (var [i, j] of ["a", "b", "c"].entries()) {
+    (() => {
+        arr1.push((() => i)());
+        arr2.push(() => j);
+    })();
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'j'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 19,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 35`] = `
+{
+  "code": "var arr = [];
+
+for (var i = 0; i < 5; i ++) {
+    ((f) => {
+        arr.push(f);
+    })(() => {
+        return (() => i)();
+    });
+
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 8,
+        },
+        "start": {
+          "column": 8,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 36`] = `
+{
+  "code": "for (var i = 0; i < 5; i++) {
+    (async () => {
+        () => i;
+    })();
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 37`] = `
+{
+  "code": "for (var i = 0; i < 10; i++) {
+    items.push({
+        id: i,
+        name: "Item " + i
+    });
+
+    const process = function (callback){
+        callback({ id: i, name: "Item " + i });
+    };
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 9,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 38`] = `
+{
+  "code": "for (var i = 0; i < 10; i++) {
+  function foo() {
+    console.log(i);
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 39`] = `
+{
+  "code": "for (var i = 0; i < 10; i++) {
+  const handler = (event: Event) => {
+    console.log(i);
+  };
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 40`] = `
+{
+  "code": "interface Item {
+  id: number;
+  name: string;
+}
+
+const items: Item[] = [];
+for (var i = 0; i < 10; i++) {
+  items.push({
+    id: i,
+    name: "Item " + i
+  });
+
+  const process = function(callback: (item: Item) => void): void {
+    callback({ id: i, name: "Item " + i });
+  };
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 15,
+        },
+        "start": {
+          "column": 19,
+          "line": 13,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 41`] = `
+{
+  "code": "type Processor<T> = (item: T) => void;
+
+for (var i = 0; i < 10; i++) {
+  const processor: Processor<number> = (item) => {
+    return item + i;
+  };
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 6,
+        },
+        "start": {
+          "column": 40,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 42`] = `
+{
+  "code": "for (var i = 0; i < 10; i++) {
+  const process = (item: UnconfiguredGlobalType) => {
+    console.log(i, item.value);
+  };
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 43`] = `
+{
+  "code": "for (var {a} of arr) { (function() { a; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 44`] = `
+{
+  "code": "for (var [[a]] of arr) { (function() { a; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 45`] = `
+{
+  "code": "for (var {a = 10} of arr) { (function() { a; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 46`] = `
+{
+  "code": "var a; for (var i = 0; i < l; i++) { [a] = [i]; (function() { a; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 47`] = `
+{
+  "code": "var a; for (var i = 0; i < l; i++) { ({a} = {a: i}); (function() { a; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 48`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { async function f() { i; } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 49`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { function foo() { function bar() { i; } bar(); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 50`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { const o = { m() { return i; } }; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 51`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { class C { m() { return i; } } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 52`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { class C { get x() { return i; } } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 53`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { class C { set x(v) { this.a = i + v; } } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 54`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { class C { constructor() { this.a = i; } } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 55`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { const o = { async m() { return i; } }; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 56`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { const o = { *m() { yield i; } }; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 57`] = `
+{
+  "code": "for (var i = 0; i < l; i++) {
+    class C {
+        static {
+            var f = function() { i; };
+        }
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 58`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { (function(x = i) { x; }); }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 59`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { var o = { [i]: function() { return i; } }; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 60`] = `
+{
+  "code": "var Foo; for (var i = 0; i < l; i++) { Foo = i; const C = class { m() { return Foo; } }; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'Foo'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 86,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 61`] = `
+{
+  "code": "async function f(xs) { for await (var x of xs) { (function() { x; }) } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'x'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 68,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 62`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { function outer() { (function() { i; }); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 63`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { function foo() { return i; } foo(); }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 64`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { function foo() { return i; } foo = null; var g = function() { foo; }; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'foo'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 99,
+          "line": 1,
+        },
+        "start": {
+          "column": 80,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 65`] = `
+{
+  "code": "var a, b; for (var i = 0; i < l; i++) { a = i; b = i; (function() { a + b; }) }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a', 'b'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 66`] = `
+{
+  "code": "for (var i = 0; i < 3; i++) {
+    (() => {
+        for (var j = 0; j < 3; j++) {
+            (function() { i + j; });
+        }
+    })();
+}",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i', 'j'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 67`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { try { throw 0; } catch (e) { (function() { e; }); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'e'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 68`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { switch (x) { case 1: (function() { i; }); break; } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 69`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { const f = cond ? (() => i) : null; }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 70`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { class C { f = () => i; } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-loop-func > invalid 71`] = `
+{
+  "code": "for (var i = 0; i < l; i++) { function m(x = () => i) { return x(); } }",
+  "diagnostics": [
+    {
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "messageId": "unsafeRefs",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-loop-func",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

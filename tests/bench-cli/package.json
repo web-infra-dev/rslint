@@ -1,0 +1,18 @@
+{
+  "name": "rslint-bench-cli",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "init:vscode": "bash ./scripts/init.sh",
+    "build:bench": "pnpm --filter @rslint/core run build:js && tsgo -p tsconfig.build.json --incremental false",
+    "bench:cli": "pnpm run init:vscode && pnpm run build:bench && node dist/cli.bench.js",
+    "bench": "pnpm run bench:cli"
+  },
+  "devDependencies": {
+    "@codspeed/tinybench-plugin": "5.2.0",
+    "@rslint/core": "workspace:*",
+    "@types/node": "24.0.14",
+    "tinybench": "6.0.0"
+  }
+}

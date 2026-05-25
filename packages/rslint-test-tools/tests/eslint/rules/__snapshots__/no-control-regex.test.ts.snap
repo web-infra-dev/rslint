@@ -1,0 +1,859 @@
+// Rstest Snapshot v1
+
+exports[`no-control-regex > invalid 1`] = `
+{
+  "code": "var regex = /\\x1f/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 2`] = `
+{
+  "code": "var regex = /\\x00/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x00.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 3`] = `
+{
+  "code": "var regex = /\\\\\\x1f\\\\x1e/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 4`] = `
+{
+  "code": "var regex = /\\\\\\x1fFOO\\\\x00/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 5`] = `
+{
+  "code": "var regex = /FOO\\\\\\x1fFOO\\\\x1f/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 6`] = `
+{
+  "code": "/\\u000C/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x0c.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 7`] = `
+{
+  "code": "/\\u{C}/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x0c.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 8`] = `
+{
+  "code": "/\\u{1F}/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 9`] = `
+{
+  "code": "/\\u{1F}/gui",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 10`] = `
+{
+  "code": "/\\u{1111}*\\x1F/u",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 11`] = `
+{
+  "code": "/[\\u{1F}--B]/v",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 12`] = `
+{
+  "code": "var regex = /(?<a>\\x1f)/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 13`] = `
+{
+  "code": "var regex = /(?<\\u{1d49c}>.)\\x1f/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 14`] = `
+{
+  "code": "var regex = new RegExp('\\x1f\\x1e')",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f, \\x1e.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 15`] = `
+{
+  "code": "var regex = new RegExp('\\x1fFOO\\x00')",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f, \\x00.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 16`] = `
+{
+  "code": "var regex = new RegExp('FOO\\x1fFOO\\x1f')",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f, \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 17`] = `
+{
+  "code": "var regex = RegExp('\\x1f')",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 18`] = `
+{
+  "code": "new RegExp("\\\\u001F", flags)",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 19`] = `
+{
+  "code": "new RegExp("\\\\u{1111}*\\\\x1F", "u")",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 20`] = `
+{
+  "code": "new RegExp("\\\\u{1F}", "u")",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 21`] = `
+{
+  "code": "new RegExp("\\\\u{1F}", "gui")",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 22`] = `
+{
+  "code": "new RegExp("[\\\\q{\\\\u{1F}}]", "v")",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 23`] = `
+{
+  "code": "(RegExp)('\\x1f')",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 24`] = `
+{
+  "code": "((RegExp))('\\x1f')",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 25`] = `
+{
+  "code": "foo(/\\x1f/)",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 26`] = `
+{
+  "code": "[/\\x1f/]",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 27`] = `
+{
+  "code": "({ re: /\\x1f/ })",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 28`] = `
+{
+  "code": "const fn = () => /\\x1f/;",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 29`] = `
+{
+  "code": "RegExp(RegExp('\\x1f'))",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 30`] = `
+{
+  "code": "class C { m() { /\\x1f/; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 31`] = `
+{
+  "code": "function f(x = /\\x1f/) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 32`] = `
+{
+  "code": "/[\\x00-\\x1f]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x00, \\x1f.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-control-regex > invalid 33`] = `
+{
+  "code": "/\\x11/; RegExp("foo", "uv");",
+  "diagnostics": [
+    {
+      "message": "Unexpected control character(s) in regular expression: \\x11.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-control-regex",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

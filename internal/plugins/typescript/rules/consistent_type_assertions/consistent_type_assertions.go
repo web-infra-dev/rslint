@@ -73,7 +73,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		}
 
 		if typeNode != nil && typeNode.Kind == ast.KindTypeReference {
-			typeRef := typeNode.AsTypeReference()
+			typeRef := typeNode.AsTypeReferenceNode()
 			if typeRef != nil && typeRef.TypeName != nil {
 				typeName := typeRef.TypeName
 				if typeName.Kind == ast.KindIdentifier {
@@ -152,6 +152,18 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			return true
 		case ast.KindParameter:
 			return true
+		case ast.KindBindingElement:
+			// Default value in a destructuring pattern, e.g. `function f({ x = {} as Foo }) {}`.
+			// The equivalent of ESTree AssignmentPattern.
+			return true
+		case ast.KindJsxExpression:
+			// JSX attribute value, e.g. `<Foo style={{} as Bar} />`.
+			return true
+		case ast.KindParenthesizedExpression:
+			// ESTree has no explicit parenthesis node, so upstream treats
+			// `foo(({} as Foo))` as having CallExpression as the parent.
+			// TypeScript's AST preserves the parens, so recurse through them.
+			return isAsParameter(parent)
 		case ast.KindPropertyAssignment:
 			// Check if it's a default value in a parameter
 			propAssignment := parent.AsPropertyAssignment()

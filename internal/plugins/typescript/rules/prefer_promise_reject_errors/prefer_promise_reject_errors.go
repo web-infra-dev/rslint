@@ -21,7 +21,8 @@ type PreferPromiseRejectErrorsOptions struct {
 }
 
 var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-promise-reject-errors",
+	Name:             "prefer-promise-reject-errors",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(PreferPromiseRejectErrorsOptions)
 		if !ok {
@@ -84,7 +85,7 @@ var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 					}
 					param := symbol.ValueDeclaration
 
-					if param == nil || !ast.IsParameter(param) {
+					if param == nil || !ast.IsParameterDeclaration(param) {
 						return
 					}
 

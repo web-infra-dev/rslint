@@ -1,0 +1,1265 @@
+// Rstest Snapshot v1
+
+exports[`no-self-assign > invalid 1`] = `
+{
+  "code": "a = a",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 2`] = `
+{
+  "code": "[a] = [a]",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 3`] = `
+{
+  "code": "[a, b] = [a, b]",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 4`] = `
+{
+  "code": "[a, b] = [a, c]",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 5`] = `
+{
+  "code": "[a, b] = [, b]",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 6`] = `
+{
+  "code": "[a, ...b] = [a, ...b]",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 7`] = `
+{
+  "code": "[[a], {b}] = [[a], {b}]",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 8`] = `
+{
+  "code": "({a} = {a})",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 9`] = `
+{
+  "code": "({a: b} = {a: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 10`] = `
+{
+  "code": "({'a': b} = {'a': b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 11`] = `
+{
+  "code": "({a: b} = {'a': b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 12`] = `
+{
+  "code": "({'a': b} = {a: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 13`] = `
+{
+  "code": "({1: b} = {1: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 14`] = `
+{
+  "code": "({1: b} = {'1': b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 15`] = `
+{
+  "code": "({'1': b} = {1: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 16`] = `
+{
+  "code": "({['a']: b} = {a: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 17`] = `
+{
+  "code": "({'a': b} = {[\`a\`]: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 18`] = `
+{
+  "code": "({1: b} = {[1]: b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 19`] = `
+{
+  "code": "({a, b} = {a, b})",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 20`] = `
+{
+  "code": "({a, b} = {b, a})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 21`] = `
+{
+  "code": "({a, b} = {c, a})",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 22`] = `
+{
+  "code": "({a: {b}, c: [d]} = {a: {b}, c: [d]})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+    {
+      "message": "'d' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 23`] = `
+{
+  "code": "({a, b} = {a, ...x, b})",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 24`] = `
+{
+  "code": "a.b = a.b",
+  "diagnostics": [
+    {
+      "message": "'a.b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 25`] = `
+{
+  "code": "a.b.c = a.b.c",
+  "diagnostics": [
+    {
+      "message": "'a.b.c' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 26`] = `
+{
+  "code": "a[b] = a[b]",
+  "diagnostics": [
+    {
+      "message": "'a[b]' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 27`] = `
+{
+  "code": "a['b'] = a['b']",
+  "diagnostics": [
+    {
+      "message": "'a['b']' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 28`] = `
+{
+  "code": "a.b = a.b",
+  "diagnostics": [
+    {
+      "message": "'a.b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 29`] = `
+{
+  "code": "a.b.c = a.b.c",
+  "diagnostics": [
+    {
+      "message": "'a.b.c' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 30`] = `
+{
+  "code": "a[b] = a[b]",
+  "diagnostics": [
+    {
+      "message": "'a[b]' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 31`] = `
+{
+  "code": "a['b'] = a['b']",
+  "diagnostics": [
+    {
+      "message": "'a['b']' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 32`] = `
+{
+  "code": "this.x = this.x",
+  "diagnostics": [
+    {
+      "message": "'this.x' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 33`] = `
+{
+  "code": "a[1] = a[1]",
+  "diagnostics": [
+    {
+      "message": "'a[1]' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 34`] = `
+{
+  "code": "a[0] = a[0]",
+  "diagnostics": [
+    {
+      "message": "'a[0]' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 35`] = `
+{
+  "code": "a.b = a['b']",
+  "diagnostics": [
+    {
+      "message": "'a['b']' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 36`] = `
+{
+  "code": "a['b'] = a.b",
+  "diagnostics": [
+    {
+      "message": "'a.b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 37`] = `
+{
+  "code": "a[0] = a['0']",
+  "diagnostics": [
+    {
+      "message": "'a['0']' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 38`] = `
+{
+  "code": "a[
+    'b'
+] = a[
+    'b'
+]",
+  "diagnostics": [
+    {
+      "message": "'a['b']' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 39`] = `
+{
+  "code": "a['/(?<zero>0)/'] = a[/(?<zero>0)/]",
+  "diagnostics": [
+    {
+      "message": "'a[/(?<zero>0)/]' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 40`] = `
+{
+  "code": "(a?.b).c = (a?.b).c",
+  "diagnostics": [
+    {
+      "message": "'(a?.b).c' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 41`] = `
+{
+  "code": "a.b = a?.b",
+  "diagnostics": [
+    {
+      "message": "'a?.b' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 42`] = `
+{
+  "code": "a[0] = a?.[0]",
+  "diagnostics": [
+    {
+      "message": "'a?.[0]' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 43`] = `
+{
+  "code": "a &&= a",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 44`] = `
+{
+  "code": "a ||= a",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 45`] = `
+{
+  "code": "a ??= a",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

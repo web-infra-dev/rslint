@@ -161,7 +161,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 				return
 			}
 
-			typeRef := node.AsTypeReference()
+			typeRef := node.AsTypeReferenceNode()
 			if typeRef == nil {
 				return
 			}
@@ -244,7 +244,7 @@ func canConvertMappedTypeToRecord(mappedType *ast.MappedTypeNode) bool {
 		return false
 	}
 
-	typeParam := mappedType.TypeParameter.AsTypeParameter()
+	typeParam := mappedType.TypeParameter.AsTypeParameterDeclaration()
 	if typeParam == nil {
 		return false
 	}
@@ -306,7 +306,7 @@ func checkTypeReference(targetName string, typeNode *ast.Node) bool {
 
 	switch typeNode.Kind {
 	case ast.KindTypeReference:
-		typeRef := typeNode.AsTypeReference()
+		typeRef := typeNode.AsTypeReferenceNode()
 		if typeRef != nil && typeRef.TypeName != nil {
 			if typeRef.TypeName.Kind == ast.KindIdentifier {
 				ident := typeRef.TypeName.AsIdentifier()

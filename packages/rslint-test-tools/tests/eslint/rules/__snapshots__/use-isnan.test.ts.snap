@@ -1,0 +1,2464 @@
+// Rstest Snapshot v1
+
+exports[`use-isnan > invalid 1`] = `
+{
+  "code": "123 == NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 2`] = `
+{
+  "code": "123 === NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 3`] = `
+{
+  "code": "NaN === "abc";",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 4`] = `
+{
+  "code": "NaN == "abc";",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 5`] = `
+{
+  "code": "123 != NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 6`] = `
+{
+  "code": "123 !== NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 7`] = `
+{
+  "code": "NaN < "abc";",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 8`] = `
+{
+  "code": ""abc" < NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 9`] = `
+{
+  "code": "NaN > "abc";",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 10`] = `
+{
+  "code": ""abc" >= NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 11`] = `
+{
+  "code": "NaN <= "abc";",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 12`] = `
+{
+  "code": "123 === Number.NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 13`] = `
+{
+  "code": "Number.NaN === "abc";",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 14`] = `
+{
+  "code": "x === Number['NaN'];",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 15`] = `
+{
+  "code": "x !== Number['NaN'];",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 16`] = `
+{
+  "code": "x === Number?.NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 17`] = `
+{
+  "code": "x === Number?.['NaN'];",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 18`] = `
+{
+  "code": "x === Number[\`NaN\`];",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 19`] = `
+{
+  "code": "x = (foo, NaN) === 1;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 20`] = `
+{
+  "code": "x = 1 === (foo, NaN);",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 21`] = `
+{
+  "code": "x = (a, b, NaN) === 1;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 22`] = `
+{
+  "code": "x = (a, Number.NaN) === 1;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 23`] = `
+{
+  "code": "x = (a, Number['NaN']) === 1;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 24`] = `
+{
+  "code": "x = (1, 2) === NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 25`] = `
+{
+  "code": "x === (doStuff(), NaN);",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 26`] = `
+{
+  "code": "x === (a, (NaN));",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 27`] = `
+{
+  "code": "x === (a, ((NaN)));",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 28`] = `
+{
+  "code": "x === (a, (Number.NaN));",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 29`] = `
+{
+  "code": "x === (NaN);",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 30`] = `
+{
+  "code": "x === ((NaN));",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 31`] = `
+{
+  "code": "((x)) === ((NaN));",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 32`] = `
+{
+  "code": "x === ((a, NaN));",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 33`] = `
+{
+  "code": "NaN === NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 34`] = `
+{
+  "code": "NaN == Number.NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 35`] = `
+{
+  "code": "switch(NaN) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 36`] = `
+{
+  "code": "switch(Number.NaN) { case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 37`] = `
+{
+  "code": "switch(Number['NaN']) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 38`] = `
+{
+  "code": "switch(Number?.NaN) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 39`] = `
+{
+  "code": "switch((a, NaN)) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 40`] = `
+{
+  "code": "switch((a, b, NaN)) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 41`] = `
+{
+  "code": "switch((NaN)) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 42`] = `
+{
+  "code": "switch(((NaN))) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 43`] = `
+{
+  "code": "switch((doStuff(), NaN)) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 44`] = `
+{
+  "code": "switch((doStuff(), Number.NaN)) {}",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 45`] = `
+{
+  "code": "switch(foo) { case NaN: break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 46`] = `
+{
+  "code": "switch(foo) { case Number.NaN: break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 47`] = `
+{
+  "code": "switch(foo) { case Number['NaN']: break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 48`] = `
+{
+  "code": "switch(foo) { case Number?.NaN: break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 49`] = `
+{
+  "code": "switch(foo) { case (NaN): break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 50`] = `
+{
+  "code": "switch(foo) { case ((NaN)): break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 51`] = `
+{
+  "code": "switch(foo) { case (a, NaN): break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 52`] = `
+{
+  "code": "switch(foo) { case (a, Number.NaN): break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 53`] = `
+{
+  "code": "switch(foo) { case NaN: case Number.NaN: break; }",
+  "diagnostics": [
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 54`] = `
+{
+  "code": "switch(NaN) { case NaN: break; }",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 55`] = `
+{
+  "code": "switch(Number.NaN) { case Number.NaN: break; }",
+  "diagnostics": [
+    {
+      "message": "'switch(NaN)' can never match a case clause. Use Number.isNaN instead of the switch.",
+      "messageId": "switchNaN",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+    {
+      "message": "'case NaN' can never match. Use Number.isNaN before the switch.",
+      "messageId": "caseNaN",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 56`] = `
+{
+  "code": "foo.indexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 57`] = `
+{
+  "code": "foo.lastIndexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'lastIndexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 58`] = `
+{
+  "code": "foo['indexOf'](NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 59`] = `
+{
+  "code": "foo['lastIndexOf'](NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'lastIndexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 60`] = `
+{
+  "code": "foo[\`indexOf\`](NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 61`] = `
+{
+  "code": "foo?.indexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 62`] = `
+{
+  "code": "foo?.lastIndexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'lastIndexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 63`] = `
+{
+  "code": "foo.indexOf?.(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 64`] = `
+{
+  "code": "foo?.indexOf?.(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 65`] = `
+{
+  "code": "(foo?.indexOf)(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 66`] = `
+{
+  "code": "((foo.indexOf))(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 67`] = `
+{
+  "code": "foo().indexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 68`] = `
+{
+  "code": "foo.bar.indexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 69`] = `
+{
+  "code": "foo.bar.baz.lastIndexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'lastIndexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 70`] = `
+{
+  "code": "(a || b).indexOf(NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 71`] = `
+{
+  "code": "foo.indexOf(Number.NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 72`] = `
+{
+  "code": "foo.indexOf(Number['NaN'])",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 73`] = `
+{
+  "code": "foo.indexOf(Number?.NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 74`] = `
+{
+  "code": "foo.indexOf((a, NaN))",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 75`] = `
+{
+  "code": "foo.indexOf((a, Number.NaN))",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 76`] = `
+{
+  "code": "foo.indexOf((NaN))",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 77`] = `
+{
+  "code": "foo.indexOf(NaN, 1)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 78`] = `
+{
+  "code": "foo.indexOf(NaN, b)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 79`] = `
+{
+  "code": "foo.lastIndexOf(NaN, NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'lastIndexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 80`] = `
+{
+  "code": "foo.indexOf(Number.NaN, 1)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'indexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 81`] = `
+{
+  "code": "foo.lastIndexOf(Number.NaN)",
+  "diagnostics": [
+    {
+      "message": "Array prototype method 'lastIndexOf' cannot find NaN.",
+      "messageId": "indexOfNaN",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 82`] = `
+{
+  "code": "if (NaN === x) {}",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 83`] = `
+{
+  "code": "while (x !== NaN) {}",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 84`] = `
+{
+  "code": "for (; NaN < x;) {}",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 85`] = `
+{
+  "code": "var t = x === NaN ? 'yes' : 'no';",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 86`] = `
+{
+  "code": "var u = [NaN === 1];",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 87`] = `
+{
+  "code": "var v = { key: NaN === 1 };",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 88`] = `
+{
+  "code": "function f() { return NaN === x; }",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 89`] = `
+{
+  "code": "var g = () => NaN === x;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 90`] = `
+{
+  "code": "var h = function() { return x === NaN; };",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 91`] = `
+{
+  "code": "console.log(NaN === 1);",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 92`] = `
+{
+  "code": "void (NaN === x);",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 93`] = `
+{
+  "code": "!(NaN === x);",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

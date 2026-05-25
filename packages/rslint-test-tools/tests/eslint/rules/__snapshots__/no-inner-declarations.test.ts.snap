@@ -1,0 +1,755 @@
+// Rstest Snapshot v1
+
+exports[`no-inner-declarations > invalid 1`] = `
+{
+  "code": "if (foo) function f(){}",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 2`] = `
+{
+  "code": "function bar() { if (foo) function f(){}; }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 3`] = `
+{
+  "code": "while (test) { function doSomething() { } }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 4`] = `
+{
+  "code": "do { function foo() {} } while (test)",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 5`] = `
+{
+  "code": "function doSomething() { do { function somethingElse() { } } while (test); }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 6`] = `
+{
+  "code": "(function() { if (test) { function doSomething() { } } }());",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 7`] = `
+{
+  "code": "function foo() { { function bar() { } } }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 8`] = `
+{
+  "code": "export {}; if (foo) function f(){}",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 9`] = `
+{
+  "code": "export {}; function bar() { if (foo) function f(){}; }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 10`] = `
+{
+  "code": "export {}; while (test) { function doSomething() { } }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 11`] = `
+{
+  "code": "export {}; do { function foo() {} } while (test)",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 12`] = `
+{
+  "code": "export {}; function doSomething() { do { function somethingElse() { } } while (test); }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 13`] = `
+{
+  "code": "export {}; (function() { if (test) { function doSomething() { } } }());",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 14`] = `
+{
+  "code": "if (foo) { var a; }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 15`] = `
+{
+  "code": "if (foo) var a;",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 16`] = `
+{
+  "code": "function bar() { if (foo) var a; }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 17`] = `
+{
+  "code": "if (foo) { var fn = function(){} }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 18`] = `
+{
+  "code": "while (test) { var foo; }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 19`] = `
+{
+  "code": "function doSomething() { if (test) { var foo = 42; } }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 20`] = `
+{
+  "code": "(function() { if (test) { var foo; } }());",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 21`] = `
+{
+  "code": "const doSomething = () => { if (test) { var foo = 42; } }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 22`] = `
+{
+  "code": "class C { method() { if(test) { var foo; } } }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 23`] = `
+{
+  "code": "class C { static { if (test) { var foo; } } }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to class static block body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 24`] = `
+{
+  "code": "class C { static { if (test) { function foo() {} } } }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to class static block body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 25`] = `
+{
+  "code": "class C { static { if (test) { if (anotherTest) { var foo; } } } }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to class static block body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 26`] = `
+{
+  "code": "if (foo) { var bar = 1; }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 27`] = `
+{
+  "code": "export {}; if (test) { function doSomething() { } }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 28`] = `
+{
+  "code": "export {}; function foo() { { function bar() { } } }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 29`] = `
+{
+  "code": "namespace Foo { if (test) { var x = 1; } }",
+  "diagnostics": [
+    {
+      "message": "Move variable declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

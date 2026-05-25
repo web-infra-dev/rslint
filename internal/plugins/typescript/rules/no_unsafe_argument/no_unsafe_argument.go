@@ -151,7 +151,8 @@ func (s *functionSignature) getNextParameterType() *checker.Type {
 }
 
 var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
-	Name: "no-unsafe-argument",
+	Name:             "no-unsafe-argument",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		describeType := func(t *checker.Type) string {
 			if utils.IsIntrinsicErrorType(t) {

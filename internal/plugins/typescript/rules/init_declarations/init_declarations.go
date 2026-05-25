@@ -8,188 +8,210 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-type Options struct {
-	Mode              string
-	IgnoreForLoopInit bool
-}
-
-func normalizeMode(mode string) string {
-	switch mode {
-	case "always", "never":
-		return mode
-	}
-	return "always"
-}
-
-func parseOptions(options any) Options {
-	opts := Options{
-		Mode:              "always",
-		IgnoreForLoopInit: false,
-	}
-
-	if options == nil {
-		return opts
-	}
-
-	switch optionValue := options.(type) {
-	case string:
-		if optionValue != "" {
-			opts.Mode = optionValue
-		}
-	case []interface{}:
-		if len(optionValue) > 0 {
-			if mode, ok := optionValue[0].(string); ok && mode != "" {
-				opts.Mode = mode
-			}
-		}
-		if len(optionValue) > 1 {
-			if optsMap, ok := optionValue[1].(map[string]interface{}); ok {
-				if ignore, ok := optsMap["ignoreForLoopInit"].(bool); ok {
-					opts.IgnoreForLoopInit = ignore
-				}
-			}
-		}
-	case map[string]interface{}:
-		if mode, ok := optionValue["mode"].(string); ok && mode != "" {
-			opts.Mode = mode
-		}
-		if ignore, ok := optionValue["ignoreForLoopInit"].(bool); ok {
-			opts.IgnoreForLoopInit = ignore
-		}
-	}
-
-	opts.Mode = normalizeMode(opts.Mode)
-	return opts
-}
-
-func buildInitializedMessage(name string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "initialized",
-		Description: fmt.Sprintf("Variable '%s' should be initialized on declaration.", name),
-	}
-}
-
-func buildNotInitializedMessage(name string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "notInitialized",
-		Description: fmt.Sprintf("Variable '%s' should not be initialized on declaration.", name),
-	}
-}
-
-func getDeclarationNameText(sourceFile *ast.SourceFile, name *ast.Node) string {
-	if name == nil || sourceFile == nil || name.Kind != ast.KindIdentifier {
-		return ""
-	}
-	if id := name.AsIdentifier(); id != nil {
-		return id.Text
-	}
-	return ""
-}
-
-func isConstDeclaration(varDecl *ast.VariableDeclaration) bool {
-	if varDecl == nil || varDecl.Parent == nil {
-		return false
-	}
-	if varDecl.Parent.Kind != ast.KindVariableDeclarationList {
-		return false
-	}
-	declList := varDecl.Parent.AsVariableDeclarationList()
-	if declList == nil {
-		return false
-	}
-	return declList.Flags&ast.NodeFlagsConst != 0
-}
-
-func getForLoopKind(varDecl *ast.VariableDeclaration) (ast.Kind, bool) {
-	if varDecl == nil || varDecl.Parent == nil || varDecl.Parent.Kind != ast.KindVariableDeclarationList {
-		return ast.KindUnknown, false
-	}
-	declList := varDecl.Parent.AsVariableDeclarationList()
-	if declList == nil || declList.Parent == nil {
-		return ast.KindUnknown, false
-	}
-	switch declList.Parent.Kind {
-	case ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
-		return declList.Parent.Kind, true
-	default:
-		return ast.KindUnknown, false
-	}
-}
-
-func isInDeclaredContext(node *ast.Node) bool {
-	for current := node; current != nil; current = current.Parent {
-		switch current.Kind {
-		case ast.KindVariableStatement:
-			stmt := current.AsVariableStatement()
-			if stmt != nil && utils.IncludesModifier(stmt, ast.KindDeclareKeyword) {
-				return true
-			}
-		case ast.KindModuleDeclaration:
-			moduleDecl := current.AsModuleDeclaration()
-			if moduleDecl != nil && utils.IncludesModifier(moduleDecl, ast.KindDeclareKeyword) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
+// InitDeclarationsRule mirrors @typescript-eslint/init-declarations, which wraps
+// the ESLint core init-declarations rule and additionally:
+//   - Skips `declare const|let|var` declarations.
+//   - Skips bindings inside an ancestor `declare namespace { ... }` (or any
+//     other ambient `ModuleDeclaration` — `declare module 'm'`,
+//     `declare global`).
+//   - When reporting on a declarator whose `Initializer == nil`, narrows the
+//     diagnostic range to just the identifier (excluding the type annotation),
+//     matching typescript-eslint's `getReportLoc`.
+//
+// https://typescript-eslint.io/rules/init-declarations
+// Upstream wrapper: packages/eslint-plugin/src/rules/init-declarations.ts
+// Upstream base rule: eslint/lib/rules/init-declarations.js
 var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 	Name: "init-declarations",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
-			ast.KindVariableDeclaration: func(node *ast.Node) {
-				varDecl := node.AsVariableDeclaration()
-				if varDecl == nil {
-					return
-				}
-
-				nameNode := varDecl.Name()
-				if nameNode == nil {
-					return
-				}
-				// Align with ESLint base behavior: only identifier declarators are reported.
-				if !ast.IsIdentifier(nameNode) {
-					return
-				}
-
-				if opts.Mode == "always" && isInDeclaredContext(node) {
-					return
-				}
-
-				if opts.Mode == "never" && isConstDeclaration(varDecl) {
-					return
-				}
-
-				_, isForLoopInit := getForLoopKind(varDecl)
-				if opts.Mode == "never" && isForLoopInit && opts.IgnoreForLoopInit {
-					return
-				}
-
-				nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-				nameText := getDeclarationNameText(ctx.SourceFile, nameNode)
-
-				hasInitializer := varDecl.Initializer != nil
-				isInitialized := hasInitializer || isForLoopInit
-
-				switch opts.Mode {
-				case "always":
-					if !isInitialized {
-						ctx.ReportRange(nameRange, buildInitializedMessage(nameText))
-					}
-				case "never":
-					if isInitialized {
-						reportRange := nameRange
-						if hasInitializer {
-							reportRange = reportRange.WithEnd(varDecl.Initializer.End())
-						}
-						ctx.ReportRange(reportRange, buildNotInitializedMessage(nameText))
-					}
-				}
+			// Listen on VariableDeclarationList rather than VariableStatement:
+			// for-loop initializers (`for (var i = 0; ...)`) are direct children
+			// of ForStatement / ForInStatement / ForOfStatement and have no
+			// enclosing VariableStatement.
+			ast.KindVariableDeclarationList: func(node *ast.Node) {
+				checkVariableDeclarationList(ctx, node, opts)
 			},
 		}
 	},
 })
+
+type initDeclarationsOptions struct {
+	mode              string // "always" or "never"
+	ignoreForLoopInit bool
+}
+
+// parseOptions accepts every shape config.go can hand a rule that uses ESLint's
+// `["mode", { ...sub-options }]` schema:
+//   - nil → defaults
+//   - "always" / "never" (string, from `['<level>', '<mode>']` — single-element
+//     option arrays are unwrapped by config.go)
+//   - []interface{}{"<mode>", map[string]interface{}{...}} (multi-element form,
+//     not unwrapped)
+//   - map[string]interface{}{...} (defensive — the CLI single-option fallback
+//     when only the sub-option object is supplied)
+func parseOptions(raw any) initDeclarationsOptions {
+	opts := initDeclarationsOptions{mode: "always"}
+
+	if raw == nil {
+		return opts
+	}
+
+	var modeStr string
+	var subOpts map[string]interface{}
+
+	switch v := raw.(type) {
+	case string:
+		modeStr = v
+	case []interface{}:
+		if len(v) > 0 {
+			modeStr, _ = v[0].(string)
+		}
+		if len(v) > 1 {
+			subOpts, _ = v[1].(map[string]interface{})
+		}
+	case map[string]interface{}:
+		subOpts = v
+	}
+
+	if modeStr == "always" || modeStr == "never" {
+		opts.mode = modeStr
+	}
+	if subOpts != nil {
+		if b, ok := subOpts["ignoreForLoopInit"].(bool); ok {
+			opts.ignoreForLoopInit = b
+		}
+	}
+
+	return opts
+}
+
+func checkVariableDeclarationList(ctx rule.RuleContext, node *ast.Node, opts initDeclarationsOptions) {
+	declList := node.AsVariableDeclarationList()
+	if declList == nil || declList.Declarations == nil {
+		return
+	}
+
+	parent := node.Parent
+	if parent == nil {
+		return
+	}
+
+	// Skip `declare const|let|var ...;` (the modifier lives on the wrapping
+	// VariableStatement, not the DeclarationList).
+	if parent.Kind == ast.KindVariableStatement &&
+		ast.HasSyntacticModifier(parent, ast.ModifierFlagsAmbient) {
+		return
+	}
+
+	// Skip declarations contained in any ambient ModuleDeclaration ancestor
+	// (`declare namespace`, `declare module 'm'`, `declare global`). Upstream
+	// tracks this via TSModuleDeclaration enter/exit state; the ancestor walk
+	// is equivalent because `declare` propagates downward through nested
+	// non-declare namespaces in TS scoping.
+	if hasAmbientModuleAncestor(node) {
+		return
+	}
+
+	// CONSTANT_BINDINGS in upstream = {const, using, await using}. They require
+	// an initializer at parse time, so "never" mode must never report them as
+	// `notInitialized`. utils.GetVarDeclListKind centralizes the
+	// `await using = NodeFlagsConst|NodeFlagsUsing` encoding so we don't have
+	// to repeat it here.
+	kind := utils.GetVarDeclListKind(node)
+	isConstantBinding := kind == "const" || kind == "using" || kind == "await using"
+
+	inForLoop := isForLoopParent(parent)
+
+	for _, decl := range declList.Declarations.Nodes {
+		varDecl := decl.AsVariableDeclaration()
+		if varDecl == nil {
+			continue
+		}
+
+		nameNode := varDecl.Name()
+		// Upstream only reports for `id.type === "Identifier"`; destructuring
+		// patterns (`{a} = ...`, `[a] = ...`) are silently skipped.
+		if nameNode == nil || nameNode.Kind != ast.KindIdentifier {
+			continue
+		}
+		idName := nameNode.AsIdentifier().Text
+
+		hasExplicitInit := varDecl.Initializer != nil
+		// Mirror ESLint's `isInitialized`: for-loop bindings are considered
+		// initialized regardless of `Initializer` — `for (var i;;)` should not
+		// trip "always", and `for (var x in arr)` should still trip "never".
+		initialized := hasExplicitInit || inForLoop
+
+		var messageId string
+		switch {
+		case opts.mode == "always" && !initialized:
+			messageId = "initialized"
+		case opts.mode == "never" && initialized && !isConstantBinding:
+			if opts.ignoreForLoopInit && inForLoop {
+				continue
+			}
+			messageId = "notInitialized"
+		}
+		if messageId == "" {
+			continue
+		}
+
+		msg := buildMessage(messageId, idName)
+
+		// Mirror typescript-eslint's `getReportLoc`: when the declarator has no
+		// explicit init, narrow the report to the identifier so the diagnostic
+		// doesn't underline a trailing type annotation. This covers BOTH paths
+		// that produce a no-init report:
+		//   - "always" + !initialized → "initialized"
+		//   - "never" + in-for-loop + Initializer==nil → "notInitialized"
+		//     (e.g. `for (var x: T;;)` or `for (var x in arr)`)
+		if !hasExplicitInit {
+			ctx.ReportNode(nameNode, msg)
+		} else {
+			// Declarator has an init expression — report the full declarator
+			// (id + type + init) to match upstream's diagnostic ranges.
+			ctx.ReportNode(decl, msg)
+		}
+	}
+}
+
+func buildMessage(messageId, idName string) rule.RuleMessage {
+	var desc string
+	if messageId == "initialized" {
+		desc = fmt.Sprintf("Variable '%s' should be initialized on declaration.", idName)
+	} else {
+		desc = fmt.Sprintf("Variable '%s' should not be initialized on declaration.", idName)
+	}
+	return rule.RuleMessage{
+		Id:          messageId,
+		Description: desc,
+		Data:        map[string]string{"idName": idName},
+	}
+}
+
+// isForLoopParent reports whether the VariableDeclarationList's parent is a
+// for-loop statement. A VariableDeclarationList can only sit in the
+// initializer / left slot of these three kinds, so reaching this state already
+// implies the declaration list IS the loop binding.
+func isForLoopParent(parent *ast.Node) bool {
+	switch parent.Kind {
+	case ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
+		return true
+	}
+	return false
+}
+
+// hasAmbientModuleAncestor walks ancestor ModuleDeclarations looking for one
+// with a `declare` modifier. Equivalent to upstream's stateful
+// TSModuleDeclaration enter/exit tracking — `declare` propagates downward
+// through nested non-declare namespaces in TS scoping, so an ancestor walk
+// matches the same set of bindings.
+func hasAmbientModuleAncestor(node *ast.Node) bool {
+	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
+		return n.Kind == ast.KindModuleDeclaration &&
+			ast.HasSyntacticModifier(n, ast.ModifierFlagsAmbient)
+	}) != nil
+}

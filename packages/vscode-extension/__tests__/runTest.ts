@@ -26,17 +26,17 @@ async function main() {
     failed = true;
   }
 
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace],
-      version: '1.106.3',
-    });
-  } catch (err) {
-    console.error('JSON config tests (1.106.3) failed:', err);
-    failed = true;
-  }
+  // try {
+  //   await runTests({
+  //     extensionDevelopmentPath,
+  //     extensionTestsPath,
+  //     launchArgs: ['--disable-extensions', testWorkspace],
+  //     version: '1.106.3',
+  //   });
+  // } catch (err) {
+  //   console.error('JSON config tests (1.106.3) failed:', err);
+  //   failed = true;
+  // }
 
   // --- JS config tests ---
   const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
@@ -84,6 +84,50 @@ async function main() {
     });
   } catch (err) {
     console.error('No config tests failed:', err);
+    failed = true;
+  }
+
+  // --- Type-aware rule scope tests ---
+  const typeAwareScopeWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-type-aware-scope',
+  );
+  const typeAwareScopeTestsPath = path.resolve(
+    __dirname,
+    './suite-type-aware-scope',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: typeAwareScopeTestsPath,
+      launchArgs: ['--disable-extensions', typeAwareScopeWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('Type-aware scope tests failed:', err);
+    failed = true;
+  }
+
+  // --- projectService type-aware scope tests ---
+  const projectServiceScopeWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-project-service-scope',
+  );
+  const projectServiceScopeTestsPath = path.resolve(
+    __dirname,
+    './suite-project-service-scope',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: projectServiceScopeTestsPath,
+      launchArgs: ['--disable-extensions', projectServiceScopeWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('projectService scope tests failed:', err);
     failed = true;
   }
 

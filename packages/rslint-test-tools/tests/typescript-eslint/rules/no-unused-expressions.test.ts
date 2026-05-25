@@ -2,13 +2,7 @@ import { RuleTester } from '@typescript-eslint/rule-tester';
 
 
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      ecmaVersion: 6,
-    },
-  },
-});
+const ruleTester = new RuleTester();
 
 ruleTester.run('no-unused-expressions', {
   valid: [
@@ -72,6 +66,83 @@ ruleTester.run('no-unused-expressions', {
       code: "foo ? import('./foo') : import('./bar');",
       options: [{ allowTernary: true }],
     },
+
+    // Side-effect expressions: assignments, update, delete, void, yield, await
+    'a = b',
+    'new a',
+    'i++',
+    'i--',
+    '--i',
+    '++i',
+    'a += 1',
+    'a &&= b',
+    'a ||= b',
+    'a ??= b',
+    'delete foo.bar',
+    'void new C',
+    'function* foo(){ yield 0; }',
+    'function* foo(){ yield; }',
+    'async function foo() { await 5; }',
+
+    // TS assertions wrapping calls (inner expression has side effects)
+    'foo() as any;',
+    'foo()!;',
+    '<any>foo();',
+    'foo() satisfies string;',
+
+    // TS non-null assertion wrapping call in short-circuit
+    { code: 'foo && foo()!;', options: [{ allowShortCircuit: true }] },
+
+    // Instantiation expression wrapping call (has side effects)
+    'declare function getSet(): Set<unknown>; getSet()<string>();',
+
+    // Combined allowShortCircuit + allowTernary
+    {
+      code: 'a ? b && c() : d()',
+      options: [{ allowShortCircuit: true, allowTernary: true }],
+    },
+    {
+      code: 'a ?? b()',
+      options: [{ allowShortCircuit: true }],
+    },
+    {
+      code: 'a || b()',
+      options: [{ allowShortCircuit: true }],
+    },
+
+    // Directives: multiple, different strings, arrow body
+    '"use strict"; "use asm"; f();',
+    'var foo = () => {"use strict"; return true; }',
+
+    // String in variable declaration is not a directive (but also not a standalone expression)
+    'function foo() { var foo = "use strict"; return true; }',
+
+    // Deep nesting: TS wrappers + options combined
+    {
+      code: `
+declare const foo: Function | undefined;
+<any>(foo && foo()!)
+      `,
+      options: [{ allowShortCircuit: true }],
+    },
+    {
+      code: '(Foo && Foo())<string, number>;',
+      options: [{ allowShortCircuit: true }],
+    },
+    {
+      code: 'a ? (b && c()) : (d || e())',
+      options: [{ allowShortCircuit: true, allowTernary: true }],
+    },
+
+    // Chained optional calls
+    'a?.()?.b();',
+
+    // satisfies is NOT unwrapped (defaults to not disallowed)
+    'declare const x: string; x satisfies string;',
+    'foo() satisfies string;',
+
+    // Class static block: leading string treated as directive
+    "class C { static { 'use strict'; } }",
   ],
   invalid: [
     {
@@ -389,6 +460,164 @@ foo!;
           messageId: 'unusedExpression',
         },
       ],
+    },
+
+    // Literals: boolean, null, bigint, regex
+    {
+      code: 'true;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: 'false;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: 'null;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: '1n;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: '/regex/;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Unary without side effects: -, ~, typeof
+    {
+      code: '-a;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: '~a;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: 'typeof foo;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // this / super as standalone
+    {
+      code: 'function foo() { this; }',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Nested parenthesized expressions
+    {
+      code: '((a));',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Arithmetic / comparison / bitwise binary expressions
+    {
+      code: 'a + b;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: 'a === b;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: 'a & b;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // NOTE: satisfies is NOT unwrapped (matches @typescript-eslint behavior).
+    // `foo satisfies T;` is NOT flagged — see valid cases.
+
+    // Nested TS assertions wrapping non-call
+    {
+      code: 'declare const foo: any; (foo as any)!;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: 'declare const foo: any; (foo as any) as number;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Comma expression (both sides are calls, but comma itself is disallowed)
+    {
+      code: 'f(), g();',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Ternary: one branch valid, one invalid
+    {
+      code: 'a ? b() || (c = d) : e',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Class static block: leading strings are directives, non-leading flagged
+    {
+      code: "class C { static { const x = 1; 'foo'; 'bar'; } }",
+      errors: [
+        { messageId: 'unusedExpression' },
+        { messageId: 'unusedExpression' },
+      ],
+    },
+
+    // allowShortCircuit: right side must be valid
+    {
+      code: 'a && (b ?? c);',
+      options: [{ allowShortCircuit: true }],
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // allowTernary: both branches must be valid
+    {
+      code: 'a ? b() : c;',
+      options: [{ allowTernary: true }],
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Element access (no side effects)
+    {
+      code: "a['b'];",
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Template literal with interpolation
+    {
+      code: '`hello ${world}`;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+
+    // Deep nesting invalid: instantiation > short-circuit > identifier (no call)
+    {
+      code: '(Foo && Foo)<string, number>;',
+      options: [{ allowShortCircuit: true }],
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    // Deeply nested ternary + short-circuit: one branch invalid
+    {
+      code: 'a ? (b && c()) : (d || e)',
+      options: [{ allowShortCircuit: true, allowTernary: true }],
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    // Chained optional member access after call (result is member access)
+    {
+      code: 'a?.()?.b;',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    // Arrow/function/class expression as statement
+    {
+      code: '(() => {});',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: '(function() {});',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    {
+      code: '(class {});',
+      errors: [{ messageId: 'unusedExpression' }],
+    },
+    // Object literal as statement
+    {
+      code: '({a: 1});',
+      errors: [{ messageId: 'unusedExpression' }],
     },
   ],
 });

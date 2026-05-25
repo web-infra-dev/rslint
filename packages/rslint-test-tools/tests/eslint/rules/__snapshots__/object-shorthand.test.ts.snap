@@ -1,0 +1,692 @@
+// Rstest Snapshot v1
+
+exports[`object-shorthand > invalid 1`] = `
+{
+  "code": "var x = {x: x}",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 2`] = `
+{
+  "code": "var x = {'x': x}",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 3`] = `
+{
+  "code": "var x = {y: y, x: x}",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 4`] = `
+{
+  "code": "var x = {y: function() {}}",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 5`] = `
+{
+  "code": "var x = {y: function*() {}}",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 6`] = `
+{
+  "code": "doSomething({x: x})",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 7`] = `
+{
+  "code": "doSomething({y: function() {}})",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 8`] = `
+{
+  "code": "doSomething({[y]: function() {}})",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 9`] = `
+{
+  "code": "var x = {y() {}}",
+  "diagnostics": [
+    {
+      "message": "Expected longform method syntax.",
+      "messageId": "expectedMethodLongform",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 10`] = `
+{
+  "code": "var x = {*y() {}}",
+  "diagnostics": [
+    {
+      "message": "Expected longform method syntax.",
+      "messageId": "expectedMethodLongform",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 11`] = `
+{
+  "code": "var x = {y}",
+  "diagnostics": [
+    {
+      "message": "Expected longform property syntax.",
+      "messageId": "expectedPropertyLongform",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 12`] = `
+{
+  "code": "var x = {x: x}",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 13`] = `
+{
+  "code": "var x = {y: function() {}}",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 14`] = `
+{
+  "code": "var x = {a: function(){}}",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 15`] = `
+{
+  "code": "var x = {'a'(){}}",
+  "diagnostics": [
+    {
+      "message": "Expected longform method syntax for string literal keys.",
+      "messageId": "expectedLiteralMethodLongform",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 16`] = `
+{
+  "code": "var x = {a: a, b}",
+  "diagnostics": [
+    {
+      "message": "Unexpected mix of shorthand and non-shorthand properties.",
+      "messageId": "unexpectedMix",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 17`] = `
+{
+  "code": "var x = {a: a, b: b}",
+  "diagnostics": [
+    {
+      "message": "Expected shorthand for all properties.",
+      "messageId": "expectedAllPropertiesShorthanded",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 18`] = `
+{
+  "code": "var x = {a, z: function z(){}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected mix of shorthand and non-shorthand properties.",
+      "messageId": "unexpectedMix",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 19`] = `
+{
+  "code": "({ x: () => { return; } })",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 20`] = `
+{
+  "code": "({ x: foo => { return; } })",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 21`] = `
+{
+  "code": "({ x: (foo = 1) => { return; } })",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 22`] = `
+{
+  "code": "var x = {a: (a)}",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 23`] = `
+{
+  "code": "var x = {a: (((a)))}",
+  "diagnostics": [
+    {
+      "message": "Expected property shorthand.",
+      "messageId": "expectedPropertyShorthand",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 24`] = `
+{
+  "code": "var x = {a: (function(){ return 1 })}",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 25`] = `
+{
+  "code": "({ a: (() => { return 1 }) })",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object-shorthand > invalid 26`] = `
+{
+  "code": "({ x: () => { arguments } })",
+  "diagnostics": [
+    {
+      "message": "Expected method shorthand.",
+      "messageId": "expectedMethodShorthand",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "object-shorthand",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

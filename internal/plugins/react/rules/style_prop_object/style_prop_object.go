@@ -39,6 +39,12 @@ var StylePropObjectRule = rule.Rule{
 		// to resolve variable.defs[0].node.init and checks isNonNullaryLiteral.
 		// We use TypeChecker symbol resolution which is more accurate (handles cross-file, type info).
 		checkIdentifier := func(expr *ast.Node, reportNode *ast.Node) {
+			// TypeChecker is nil for gap files (files in the program but not
+			// in typeInfoFiles). Without it we cannot resolve the identifier
+			// to its declaration — skip the check instead of panicking.
+			if ctx.TypeChecker == nil {
+				return
+			}
 			decl := utils.GetDeclaration(ctx.TypeChecker, expr)
 			if decl == nil {
 				return
@@ -108,14 +114,12 @@ var StylePropObjectRule = rule.Rule{
 				}
 			},
 
-			// Handle React.createElement('div', { style: ... })
-			// NOTE: Only hardcodes "React.createElement". ESLint also supports:
-			// - Custom pragma via settings.react.pragma or @jsx comment (e.g. Preact.h)
-			// - Destructured createElement (e.g. import { createElement } from 'react')
-			// These are not supported here as rslint does not have pragma configuration infrastructure.
+			// Handle <pragma>.createElement('div', { style: ... })
+			// NOTE: Destructured createElement (e.g. import { createElement } from 'react')
+			// and @jsx comment pragmas are not supported.
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()
-				if !reactutil.IsCreateElementCall(call.Expression) {
+				if !reactutil.IsCreateElementCall(call.Expression, reactutil.GetReactPragma(ctx.Settings)) {
 					return
 				}
 				args := call.Arguments
@@ -169,7 +173,15 @@ var StylePropObjectRule = rule.Rule{
 						if nameNode == nil || nameNode.Kind != ast.KindIdentifier || nameNode.AsIdentifier().Text != "style" {
 							continue
 						}
-						// For shorthand { style }, resolve the value symbol to the variable declaration
+						// For shorthand { style }, resolve the value symbol to the variable declaration.
+						// TypeChecker is nil on gap files (files not in typeInfoFiles);
+						// skip the check instead of panicking. utils.GetDeclaration
+						// already nil-guards, but GetShorthandAssignmentValueSymbol
+						// is a direct checker method with no wrapper, so the guard
+						// lives here.
+						if ctx.TypeChecker == nil {
+							return
+						}
 						valueSymbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(prop)
 						if valueSymbol != nil && len(valueSymbol.Declarations) > 0 {
 							decl := valueSymbol.Declarations[0]

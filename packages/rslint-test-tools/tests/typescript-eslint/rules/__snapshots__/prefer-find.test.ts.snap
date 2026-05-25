@@ -1,0 +1,842 @@
+// Rstest Snapshot v1
+
+exports[`prefer-find > invalid 1`] = `
+{
+  "code": "
+declare const arr: string[];
+arr.filter(item => item === 'aha')[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 2`] = `
+{
+  "code": "
+declare const arr: Array<string>;
+const zero = 0;
+arr.filter(item => item === 'aha')[zero];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 3`] = `
+{
+  "code": "
+declare const arr: Array<string>;
+const zero = 0n;
+arr.filter(item => item === 'aha')[zero];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 4`] = `
+{
+  "code": "
+declare const arr: Array<string>;
+const zero = -0n;
+arr.filter(item => item === 'aha')[zero];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 5`] = `
+{
+  "code": "
+declare const arr: readonly string[];
+arr.filter(item => item === 'aha').at(0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 6`] = `
+{
+  "code": "
+declare const arr: ReadonlyArray<string>;
+(undefined, arr.filter(item => item === 'aha')).at(0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 7`] = `
+{
+  "code": "
+declare const arr: string[];
+const zero = 0;
+arr.filter(item => item === 'aha').at(zero);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 8`] = `
+{
+  "code": "
+declare const arr: string[];
+arr.filter(item => item === 'aha')['0'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 9`] = `
+{
+  "code": "const two = [1, 2, 3].filter(item => item === 2)[0];",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 10`] = `
+{
+  "code": "const fltr = "filter"; (([] as unknown[]))[fltr] ((item) => { return item === 2 }  ) [ 0  ] ;",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 92,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 11`] = `
+{
+  "code": "(([] as unknown[]))?.["filter"] ((item) => { return item === 2 }  ) [ 0  ] ;",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 12`] = `
+{
+  "code": "
+declare const nullableArray: unknown[] | undefined | null;
+nullableArray?.filter(item => true)[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 13`] = `
+{
+  "code": "([]?.filter(f))[0];",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 14`] = `
+{
+  "code": "
+declare const objectWithArrayProperty: { arr: unknown[] };
+declare function cond(x: unknown): boolean;
+console.log((1, 2, objectWithArrayProperty?.arr['filter'](cond)).at(0));
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 15`] = `
+{
+  "code": "
+[1, 2, 3].filter(x => x > 0).at(NaN);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 16`] = `
+{
+  "code": "
+const idxToLookUp = -0.12635678;
+[1, 2, 3].filter(x => x > 0).at(idxToLookUp);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 17`] = `
+{
+  "code": "
+[1, 2, 3].filter(x => x > 0)[\`at\`](0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 18`] = `
+{
+  "code": "
+declare const arr: string[];
+declare const cond: Parameters<Array<string>['filter']>[0];
+const a = { arr };
+a?.arr
+  .filter(cond) /* what a bad spot for a comment. Let's make sure
+  there's some yucky symbols too. [ . ?. <>   ' ' \\'] */
+  .at('0');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 19`] = `
+{
+  "code": "
+const imNotActuallyAnArray = [
+  [1, 2, 3],
+  [2, 3, 4],
+] as const;
+const butIAm = [4, 5, 6];
+butIAm.push(
+  // line comment!
+  ...imNotActuallyAnArray[/* comment */ 'filter' /* another comment */](
+    x => x[1] > 0,
+  ) /**/[\`0\`]!,
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 11,
+        },
+        "start": {
+          "column": 6,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 20`] = `
+{
+  "code": "
+function actingOnArray<T extends string[]>(values: T) {
+  return values.filter(filter => filter === 'filter')[
+    /* filter */ -0.0 /* filter */
+  ];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 21`] = `
+{
+  "code": "
+const nestedSequenceAbomination =
+  (1,
+  2,
+  (1,
+  2,
+  3,
+  (1, 2, 3, 4),
+  (1, 2, 3, 4, 5, [1, 2, 3, 4, 5, 6].filter(x => x % 2 == 0)))['0']);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 68,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 22`] = `
+{
+  "code": "
+declare const arr: { a: 1 }[] & { b: 2 }[];
+arr.filter(f, thisArg)[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 23`] = `
+{
+  "code": "
+declare const arr: { a: 1 }[] & ({ b: 2 }[] | { c: 3 }[]);
+arr.filter(f, thisArg)[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 24`] = `
+{
+  "code": "
+(Math.random() < 0.5
+  ? [1, 2, 3].filter(x => false)
+  : [1, 2, 3].filter(x => true))[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 25`] = `
+{
+  "code": "
+Math.random() < 0.5
+  ? [1, 2, 3].find(x => true)
+  : [1, 2, 3].filter(x => true)[0];
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 26`] = `
+{
+  "code": "
+declare const f: (arg0: unknown, arg1: number, arg2: Array<unknown>) => boolean,
+  g: (arg0: unknown) => boolean;
+const nestedTernaries = (
+  Math.random() < 0.5
+    ? Math.random() < 0.5
+      ? [1, 2, 3].filter(f)
+      : []?.filter(x => 'shrug')
+    : [2, 3, 4]['filter'](g)
+).at(0.2);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 10,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 27`] = `
+{
+  "code": "
+declare const f: (arg0: unknown) => boolean, g: (arg0: unknown) => boolean;
+const nestedTernariesWithSequenceExpression = (
+  Math.random() < 0.5
+    ? ('sequence',
+      'expression',
+      Math.random() < 0.5 ? [1, 2, 3].filter(f) : []?.filter(x => 'shrug'))
+    : [2, 3, 4]['filter'](g)
+).at(0.2);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 9,
+        },
+        "start": {
+          "column": 47,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-find > invalid 28`] = `
+{
+  "code": "
+declare const spreadArgs: [(x: unknown) => boolean];
+[1, 2, 3].filter(...spreadArgs).at(0);
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer .find(...) instead of .filter(...)[0].",
+      "messageId": "preferFind",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-find",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

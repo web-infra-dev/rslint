@@ -115,7 +115,7 @@ func getConditionalTypeName(node *ast.Node) string {
 }
 
 // NoCondAssignRule disallows assignment operators in conditional expressions
-var NoCondAssignRule = rule.CreateRule(rule.Rule{
+var NoCondAssignRule = rule.Rule{
 	Name: "no-cond-assign",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Parse options - default is "except-parens"
@@ -226,7 +226,7 @@ var NoCondAssignRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}
 
 // containsNode checks if a root node contains a target node in its subtree
 func containsNode(root, target *ast.Node) bool {

@@ -1,0 +1,1596 @@
+// Rstest Snapshot v1
+
+exports[`no-return-assign > invalid 1`] = `
+{
+  "code": "function x() { return result = a * b; };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 2`] = `
+{
+  "code": "function x() { return (result) = (a * b); };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 3`] = `
+{
+  "code": "function x() { return result = a * b; };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 4`] = `
+{
+  "code": "function x() { return (result) = (a * b); };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 5`] = `
+{
+  "code": "() => { return result = a * b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 6`] = `
+{
+  "code": "() => result = a * b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 7`] = `
+{
+  "code": "function x() { return result = a * b; };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 8`] = `
+{
+  "code": "function x() { return (result = a * b); };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 9`] = `
+{
+  "code": "function x() { return result || (result = a * b); };",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 10`] = `
+{
+  "code": "function foo(){
+                return a = b
+            }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 11`] = `
+{
+  "code": "function doSomething() {
+                return foo = bar && foo > 0;
+            }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 12`] = `
+{
+  "code": "function doSomething() {
+                return foo = function(){
+                    return (bar = bar1)
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 13`] = `
+{
+  "code": "function doSomething() {
+                return foo = () => a
+            }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 14`] = `
+{
+  "code": "function doSomething() {
+                return () => a = () => b
+            }",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 15`] = `
+{
+  "code": "function foo(a){
+                return function bar(b){
+                    return a = b
+                }
+            }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 16`] = `
+{
+  "code": "const foo = (a) => (b) => a = b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 17`] = `
+{
+  "code": "function x() { return a -= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 18`] = `
+{
+  "code": "function x() { return a *= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 19`] = `
+{
+  "code": "function x() { return a /= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 20`] = `
+{
+  "code": "function x() { return a %= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 21`] = `
+{
+  "code": "function x() { return a **= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 22`] = `
+{
+  "code": "function x() { return a <<= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 23`] = `
+{
+  "code": "function x() { return a >>= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 24`] = `
+{
+  "code": "function x() { return a >>>= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 25`] = `
+{
+  "code": "function x() { return a &= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 26`] = `
+{
+  "code": "function x() { return a |= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 27`] = `
+{
+  "code": "function x() { return a ^= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 28`] = `
+{
+  "code": "function x() { return a &&= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 29`] = `
+{
+  "code": "function x() { return a ||= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 30`] = `
+{
+  "code": "function x() { return a ??= b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 31`] = `
+{
+  "code": "() => a += b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 32`] = `
+{
+  "code": "() => a ??= b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 33`] = `
+{
+  "code": "(a, b) => a = b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 34`] = `
+{
+  "code": "async function f() { return a = b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 35`] = `
+{
+  "code": "function* g() { return a = b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 36`] = `
+{
+  "code": "async function* ag() { return a = b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 37`] = `
+{
+  "code": "class C { m() { return a = b; } }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 38`] = `
+{
+  "code": "class C { get x() { return a = b; } }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 39`] = `
+{
+  "code": "class C { set x(v) { return a = b; } }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 40`] = `
+{
+  "code": "({ m() { return a = b; } })",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 41`] = `
+{
+  "code": "async () => a = b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 42`] = `
+{
+  "code": "function x() { return a = b, c; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 43`] = `
+{
+  "code": "function x() { return a ? b = c : d; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 44`] = `
+{
+  "code": "function x() { return { x: a = b }; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 45`] = `
+{
+  "code": "function x() { return [a = b]; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 46`] = `
+{
+  "code": "function x() { return a = b && c; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 47`] = `
+{
+  "code": "function x() { return !(a = b); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 48`] = `
+{
+  "code": "function x() { return typeof (a = b); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 49`] = `
+{
+  "code": "function x() { return ((a = b)); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 50`] = `
+{
+  "code": "() => ((a = b))",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 51`] = `
+{
+  "code": "function x() { return c || (a = b); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 52`] = `
+{
+  "code": "function x() { return a + (b = c); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 53`] = `
+{
+  "code": "function f(): number { return a = b; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 54`] = `
+{
+  "code": "const f = (): number => a = b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 55`] = `
+{
+  "code": "function f(): number { return a = b as number; }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 56`] = `
+{
+  "code": "function f() { return (function g() { return a = b; })(); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 57`] = `
+{
+  "code": "function f() { return a = (b = c); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 58`] = `
+{
+  "code": "function f() { return a = (b = c); }",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 59`] = `
+{
+  "code": "function x() {
+  return a
+    = b;
+}",
+  "diagnostics": [
+    {
+      "message": "Return statement should not contain assignment.",
+      "messageId": "returnAssignment",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-return-assign > invalid 60`] = `
+{
+  "code": "() =>
+  a = b",
+  "diagnostics": [
+    {
+      "message": "Arrow function should not return assignment.",
+      "messageId": "arrowAssignment",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-return-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

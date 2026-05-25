@@ -14,14 +14,15 @@ func buildUseThisTypeMessage() rule.RuleMessage {
 }
 
 var PreferReturnThisTypeRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-return-this-type",
+	Name:             "prefer-return-this-type",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		var tryGetNameInTypeNode func(name string, node *ast.Node) *ast.Node
 		tryGetNameInTypeNode = func(name string, node *ast.Node) *ast.Node {
 			node = ast.SkipParentheses(node)
 
 			if ast.IsTypeReferenceNode(node) {
-				n := node.AsTypeReference().TypeName
+				n := node.AsTypeReferenceNode().TypeName
 				if ast.IsIdentifier(n) && n.AsIdentifier().Text == name {
 					return node
 				}

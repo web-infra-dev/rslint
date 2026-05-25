@@ -1,0 +1,560 @@
+// Rstest Snapshot v1
+
+exports[`accessor-pairs > invalid 1`] = `
+{
+  "code": "var o = { set a(value) {} };",
+  "diagnostics": [
+    {
+      "message": "Getter is not present for setter 'a'.",
+      "messageId": "missingGetterInObjectLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 2`] = `
+{
+  "code": "var o = { get a() {} };",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for getter 'a'.",
+      "messageId": "missingSetterInObjectLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 3`] = `
+{
+  "code": "var o = { get a() {}, set b(foo) {} };",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for getter 'a'.",
+      "messageId": "missingSetterInObjectLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+    {
+      "message": "Getter is not present for setter 'b'.",
+      "messageId": "missingGetterInObjectLiteral",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 4`] = `
+{
+  "code": "var o = { get [a]() {}, set [b](foo) {} };",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for getter.",
+      "messageId": "missingSetterInObjectLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+    {
+      "message": "Getter is not present for setter.",
+      "messageId": "missingGetterInObjectLiteral",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 5`] = `
+{
+  "code": "var o = {d: 1};
+ Object.defineProperty(o, 'c', 
+{set: function(value) {
+ val = value; 
+} 
+});",
+  "diagnostics": [
+    {
+      "message": "Getter is not present in property descriptor.",
+      "messageId": "missingGetterInPropertyDescriptor",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 6`] = `
+{
+  "code": "Reflect.defineProperty(obj, 'foo', {set: function(value) {}});",
+  "diagnostics": [
+    {
+      "message": "Getter is not present in property descriptor.",
+      "messageId": "missingGetterInPropertyDescriptor",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 7`] = `
+{
+  "code": "Object.defineProperties(obj, {foo: {set: function(value) {}}});",
+  "diagnostics": [
+    {
+      "message": "Getter is not present in property descriptor.",
+      "messageId": "missingGetterInPropertyDescriptor",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 8`] = `
+{
+  "code": "Object.create(null, {foo: {set: function(value) {}}});",
+  "diagnostics": [
+    {
+      "message": "Getter is not present in property descriptor.",
+      "messageId": "missingGetterInPropertyDescriptor",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 9`] = `
+{
+  "code": "Object?.defineProperty(obj, 'foo', {set: function(value) {}});",
+  "diagnostics": [
+    {
+      "message": "Getter is not present in property descriptor.",
+      "messageId": "missingGetterInPropertyDescriptor",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 10`] = `
+{
+  "code": "(Object?.defineProperty)(obj, 'foo', {set: function(value) {}});",
+  "diagnostics": [
+    {
+      "message": "Getter is not present in property descriptor.",
+      "messageId": "missingGetterInPropertyDescriptor",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 11`] = `
+{
+  "code": "class A { set a(foo) {} }",
+  "diagnostics": [
+    {
+      "message": "Getter is not present for class setter 'a'.",
+      "messageId": "missingGetterInClass",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 12`] = `
+{
+  "code": "class A { get a() {} }",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for class getter 'a'.",
+      "messageId": "missingSetterInClass",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 13`] = `
+{
+  "code": "class A { static set a(foo) {} }",
+  "diagnostics": [
+    {
+      "message": "Getter is not present for class static setter 'a'.",
+      "messageId": "missingGetterInClass",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 14`] = `
+{
+  "code": "class A { get a() {} set b(foo) {} }",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for class getter 'a'.",
+      "messageId": "missingSetterInClass",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+    {
+      "message": "Getter is not present for class setter 'b'.",
+      "messageId": "missingGetterInClass",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 15`] = `
+{
+  "code": "class A { get a() {} static set a(foo) {} }",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for class getter 'a'.",
+      "messageId": "missingSetterInClass",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+    {
+      "message": "Getter is not present for class static setter 'a'.",
+      "messageId": "missingGetterInClass",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 16`] = `
+{
+  "code": "class A { set #a(foo) {} }",
+  "diagnostics": [
+    {
+      "message": "Getter is not present for class private setter #a.",
+      "messageId": "missingGetterInClass",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 17`] = `
+{
+  "code": "interface I { set prop(value: any): any }",
+  "diagnostics": [
+    {
+      "message": "Getter is not present for type setter 'prop'.",
+      "messageId": "missingGetterInType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 18`] = `
+{
+  "code": "type T = { set prop(value: any): any }",
+  "diagnostics": [
+    {
+      "message": "Getter is not present for type setter 'prop'.",
+      "messageId": "missingGetterInType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`accessor-pairs > invalid 19`] = `
+{
+  "code": "type T = { get prop(): any }",
+  "diagnostics": [
+    {
+      "message": "Setter is not present for type getter 'prop'.",
+      "messageId": "missingSetterInType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "accessor-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

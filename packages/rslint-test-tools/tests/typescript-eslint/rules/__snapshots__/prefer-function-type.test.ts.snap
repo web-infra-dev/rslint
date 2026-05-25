@@ -1,0 +1,614 @@
+// Rstest Snapshot v1
+
+exports[`prefer-function-type > invalid 1`] = `
+{
+  "code": "
+interface Foo {
+  (): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = () => string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 2`] = `
+{
+  "code": "
+export default interface Foo {
+  /** comment */
+  (): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 3`] = `
+{
+  "code": "
+interface Foo {
+  // comment
+  (): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+// comment
+type Foo = () => string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 4`] = `
+{
+  "code": "
+export interface Foo {
+  /** comment */
+  (): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+/** comment */
+export type Foo = () => string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 5`] = `
+{
+  "code": "
+export interface Foo {
+  // comment
+  (): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+// comment
+export type Foo = () => string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 6`] = `
+{
+  "code": "
+function foo(bar: { /* comment */ (s: string): number } | undefined): number {
+  return bar('hello');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 2,
+        },
+        "start": {
+          "column": 35,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar: /* comment */ ((s: string) => number) | undefined): number {
+  return bar('hello');
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 7`] = `
+{
+  "code": "
+type Foo = {
+  (): string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = () => string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 8`] = `
+{
+  "code": "
+function foo(bar: { (s: string): number }): number {
+  return bar('hello');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar: (s: string) => number): number {
+  return bar('hello');
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 9`] = `
+{
+  "code": "
+function foo(bar: { (s: string): number } | undefined): number {
+  return bar('hello');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar: ((s: string) => number) | undefined): number {
+  return bar('hello');
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 10`] = `
+{
+  "code": "
+interface Foo extends Function {
+  (): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = () => void;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 11`] = `
+{
+  "code": "
+interface Foo<T> {
+  (bar: T): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<T> = (bar: T) => string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 12`] = `
+{
+  "code": "
+interface Foo<T> {
+  (this: T): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<T> = (this: T) => void;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 13`] = `
+{
+  "code": "
+type Foo<T> = { (this: string): T };
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo<T> = (this: string) => T;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 14`] = `
+{
+  "code": "
+interface Foo {
+  (arg: this): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`this\` refers to the function type 'Foo', did you intend to use a generic \`this\` parameter like \`<Self>(this: Self, ...) => Self\` instead?",
+      "messageId": "unexpectedThisOnFunctionOnlyInterface",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 15`] = `
+{
+  "code": "
+interface Foo {
+  (arg: number): this | undefined;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`this\` refers to the function type 'Foo', did you intend to use a generic \`this\` parameter like \`<Self>(this: Self, ...) => Self\` instead?",
+      "messageId": "unexpectedThisOnFunctionOnlyInterface",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 16`] = `
+{
+  "code": "
+// isn't actually valid ts but want to not give message saying it refers to Foo.
+interface Foo {
+  (): {
+    a: {
+      nested: this;
+    };
+    between: this;
+    b: {
+      nested: string;
+    };
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Interface only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+// isn't actually valid ts but want to not give message saying it refers to Foo.
+type Foo = () => {
+    a: {
+      nested: this;
+    };
+    between: this;
+    b: {
+      nested: string;
+    };
+  };
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 17`] = `
+{
+  "code": "
+type X = {} | { (): void; }
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type X = {} | (() => void)
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-function-type > invalid 18`] = `
+{
+  "code": "
+type X = {} & { (): void; };
+      ",
+  "diagnostics": [
+    {
+      "message": "Type literal only has a call signature, you should use a function type instead.",
+      "messageId": "functionTypeOverCallableType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-function-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type X = {} & (() => void);
+      ",
+  "ruleCount": 1,
+}
+`;

@@ -11,7 +11,18 @@ import {
 
 export { defineConfig } from './define-config.js';
 export type { RslintConfigEntry } from './define-config.js';
-export { ts, js, reactPlugin, importPlugin } from './configs/index.js';
+export {
+  ts,
+  js,
+  reactPlugin,
+  reactHooksPlugin,
+  importPlugin,
+  promisePlugin,
+  jestPlugin,
+  unicornPlugin,
+  jsxA11yPlugin,
+  stylisticPlugin,
+} from './configs/index.js';
 
 // Export the main RSLintService class for direct usage
 export { RSLintService } from './service.js';
