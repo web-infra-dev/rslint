@@ -1,0 +1,28 @@
+/* Hero row — custom hero (left) beside the lint demo (right). It lives INSIDE
+   the shared doc-ui `containerStyle` section (the same wrapper Rstack/ToolStack
+   uses, applied in pages/index.tsx), so the horizontal gutters and 1296px
+   max-width — and how they respond to window size — are identical to Rstack's,
+   keeping the two stacked sections edge-aligned at every breakpoint. The
+   container's vertical padding also restores the hero height (~96px top/bottom
+   + the ~460px demo ≈ the old single-hero block). This element only owns the
+   inner two-column grid. */
+.heroRow {
+  width: 100%;
+  max-width: 1296px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 590px;
+  align-items: center;
+  gap: 48px;
+}
+
+/* Stack only on tablet/narrow widths. Above this the columns stay side-by-side
+   (1024–1280 is a touch tight because doc-ui's gutter eats width, but it keeps
+   common laptop widths side-by-side). Hero.module.scss re-centers at the same
+   breakpoint. */
+@media (max-width: 1024px) {
+  .heroRow {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 40px;
+  }
+}
