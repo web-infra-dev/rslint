@@ -418,9 +418,26 @@ func needToEscapeForJSX(raw string, parentIsAttribute bool) bool {
 	return false
 }
 
-var JsxCurlyBracePresenceRule = rule.Rule{
-	Name: "react/jsx-curly-brace-presence",
-	Run: func(ctx rule.RuleContext, raw any) rule.RuleListeners {
+// JsxCurlyBracePresenceRule is the eslint-plugin-react variant
+// (react/jsx-curly-brace-presence).
+var JsxCurlyBracePresenceRule = BuildRule("react/jsx-curly-brace-presence", false)
+
+// BuildRule constructs jsx-curly-brace-presence under the given registration
+// name. stylisticQuotes selects the @stylistic/eslint-plugin variant of the
+// unnecessary-curly check: when true, an attribute string literal whose value
+// contains a quote character is left untouched — matching @stylistic's
+// `isJSX(parent) || !containsQuoteCharacters(value)` guard. When false the
+// eslint-plugin-react behavior applies: always report, and the fix preserves
+// the original quoting when the inner text holds a double quote.
+func BuildRule(name string, stylisticQuotes bool) rule.Rule {
+	return rule.Rule{
+		Name: name,
+		Run:  makeRun(stylisticQuotes),
+	}
+}
+
+func makeRun(stylisticQuotes bool) func(rule.RuleContext, any) rule.RuleListeners {
+	return func(ctx rule.RuleContext, raw any) rule.RuleListeners {
 		opts := parseOptions(raw)
 		text := ctx.SourceFile.Text()
 
@@ -470,7 +487,11 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 				case ast.KindStringLiteral:
 					rawWithQuotes := stringLiteralRawText(text, expr)
 					inner := trimQuotes(rawWithQuotes)
-					if strings.Contains(inner, `"`) {
+					// In @stylistic the quote gate (lintUnnecessaryCurly) blocks
+					// quote-bearing attribute values from reaching this fix, so
+					// `inner` never holds a `"`; only eslint-plugin-react takes the
+					// raw-preserving branch below.
+					if !stylisticQuotes && strings.Contains(inner, `"`) {
 						replacement = rawWithQuotes
 					} else {
 						replacement = `"` + inner + `"`
@@ -655,6 +676,14 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 				if needToEscapeForJSX(rawWithQuotes, parentIsAttribute) {
 					return
 				}
+				// @stylistic variant: keep the braces when an attribute string
+				// value contains a quote character. @stylistic gates Case A on
+				// `isJSX(parent) || !containsQuoteCharacters(value)`, so a
+				// quote-bearing prop value stays wrapped; eslint-plugin-react
+				// reports here regardless (its guard is tautologically true).
+				if stylisticQuotes && parentIsAttribute && containsQuoteChars(value) {
+					return
+				}
 				reportUnnecessaryCurlyOnExpr(jsxExpr)
 				return
 			}
@@ -753,5 +782,5 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 				}
 			},
 		}
-	},
+	}
 }
