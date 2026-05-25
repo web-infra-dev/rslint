@@ -466,6 +466,7 @@ export default defineConfig({
     './tests/eslint-plugin-stylistic/rules/jsx-closing-bracket-location.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-curly-brace-presence.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-curly-newline.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
