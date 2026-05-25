@@ -344,8 +344,8 @@ importers:
         specifier: ^2.0.11
         version: 2.0.11(@rspress/core@2.0.11(@rspack/core@2.0.2(@swc/helpers@0.5.21))(@types/mdast@4.0.4)(@types/react@19.2.14)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2))
       '@rstack-dev/doc-ui':
-        specifier: 1.13.3
-        version: 1.13.3
+        specifier: 1.14.2
+        version: 1.14.2(@rspress/core@2.0.11(@rspack/core@2.0.2(@swc/helpers@0.5.21))(@types/mdast@4.0.4)(@types/react@19.2.14)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2))
       '@tailwindcss/postcss':
         specifier: ^4.3.0
         version: 4.3.0
@@ -1884,8 +1884,13 @@ packages:
   '@rspress/shared@2.0.11':
     resolution: {integrity: sha512-7l5Pso4s597utJyisVEnd7n/40h053nfE8DwGQMeS8RLGtSwVgxFwNHsSrvQEGtFlLrg2aWWSITqnAVO1wfTew==}
 
-  '@rstack-dev/doc-ui@1.13.3':
-    resolution: {integrity: sha512-g9T8mG1I5ch3CHnzktl/PPFwJmxgRBLUi8NC6pGDwp3JQfKzaylDNK2LcPM4kjLP60+9fv2gFDSrLHE6jFu8uQ==}
+  '@rstack-dev/doc-ui@1.14.2':
+    resolution: {integrity: sha512-bnQY2rHLKvqOfEp/fGjEmMM9WTVsLEL9BwaQXN7jnX9zfA1AWx9ic2lBbOEBtuQ3/cg5uTB3pKNukXQTtytKwA==}
+    peerDependencies:
+      '@rspress/core': '>=2.0.0'
+    peerDependenciesMeta:
+      '@rspress/core':
+        optional: true
 
   '@rstest/core@0.9.2':
     resolution: {integrity: sha512-W56FguRjmeDH0PiGzWv/E6ChJ1vjAgKCix8SDiBabVmCR1mPJh/ASGeDRXh6NEPtUS1OuOyX9Q2baOLY3sdA8g==}
@@ -2981,6 +2986,7 @@ packages:
 
   esbuild-plugin-polyfill-node@0.3.0:
     resolution: {integrity: sha512-SHG6CKUfWfYyYXGpW143NEZtcVVn8S/WHcEOxk62LuDXnY4Zpmc+WmxJKN6GMTgTClXJXhEM5KQlxKY6YjbucQ==}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
     peerDependencies:
       esbuild: '*'
 
@@ -6778,7 +6784,9 @@ snapshots:
       - '@module-federation/runtime-tools'
       - core-js
 
-  '@rstack-dev/doc-ui@1.13.3': {}
+  '@rstack-dev/doc-ui@1.14.2(@rspress/core@2.0.11(@rspack/core@2.0.2(@swc/helpers@0.5.21))(@types/mdast@4.0.4)(@types/react@19.2.14)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2))':
+    optionalDependencies:
+      '@rspress/core': 2.0.11(@rspack/core@2.0.2(@swc/helpers@0.5.21))(@types/mdast@4.0.4)(@types/react@19.2.14)(core-js@3.47.0)(micromark-util-types@2.0.2)(micromark@4.0.2)
 
   '@rstest/core@0.9.2(core-js@3.47.0)':
     dependencies:
