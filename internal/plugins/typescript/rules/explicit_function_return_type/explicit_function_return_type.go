@@ -2,21 +2,67 @@ package explicit_function_return_type
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/typescriptutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-type ExplicitFunctionReturnTypeOptions struct {
-	AllowConciseArrowFunctionExpressionsStartingWithVoid bool
-	AllowDirectConstAssertionInArrowFunctions            bool
-	AllowedNames                                         []string
-	AllowExpressions                                     bool
-	AllowFunctionsWithoutTypeParameters                  bool
-	AllowHigherOrderFunctions                            bool
-	AllowIIFEs                                           bool
-	AllowTypedFunctionExpressions                        bool
+type options struct {
+	allowConciseArrowFunctionExpressionsStartingWithVoid bool
+	allowDirectConstAssertionInArrowFunctions            bool
+	allowedNames                                         []string
+	allowExpressions                                     bool
+	allowFunctionsWithoutTypeParameters                  bool
+	allowHigherOrderFunctions                            bool
+	allowIIFEs                                           bool
+	allowTypedFunctionExpressions                        bool
+}
+
+func parseOptions(rawOpts any) options {
+	opts := options{
+		allowConciseArrowFunctionExpressionsStartingWithVoid: false,
+		allowDirectConstAssertionInArrowFunctions:            true,
+		allowedNames:                        nil,
+		allowExpressions:                    false,
+		allowFunctionsWithoutTypeParameters: false,
+		allowHigherOrderFunctions:           true,
+		allowIIFEs:                          false,
+		allowTypedFunctionExpressions:       true,
+	}
+
+	optsMap := utils.GetOptionsMap(rawOpts)
+	if optsMap == nil {
+		return opts
+	}
+	if v, ok := optsMap["allowConciseArrowFunctionExpressionsStartingWithVoid"].(bool); ok {
+		opts.allowConciseArrowFunctionExpressionsStartingWithVoid = v
+	}
+	if v, ok := optsMap["allowDirectConstAssertionInArrowFunctions"].(bool); ok {
+		opts.allowDirectConstAssertionInArrowFunctions = v
+	}
+	if v, ok := optsMap["allowedNames"].([]interface{}); ok {
+		for _, name := range v {
+			if s, ok := name.(string); ok {
+				opts.allowedNames = append(opts.allowedNames, s)
+			}
+		}
+	}
+	if v, ok := optsMap["allowExpressions"].(bool); ok {
+		opts.allowExpressions = v
+	}
+	if v, ok := optsMap["allowFunctionsWithoutTypeParameters"].(bool); ok {
+		opts.allowFunctionsWithoutTypeParameters = v
+	}
+	if v, ok := optsMap["allowHigherOrderFunctions"].(bool); ok {
+		opts.allowHigherOrderFunctions = v
+	}
+	if v, ok := optsMap["allowIIFEs"].(bool); ok {
+		opts.allowIIFEs = v
+	}
+	if v, ok := optsMap["allowTypedFunctionExpressions"].(bool); ok {
+		opts.allowTypedFunctionExpressions = v
+	}
+	return opts
 }
 
 type functionInfo struct {
@@ -24,661 +70,289 @@ type functionInfo struct {
 	returns []*ast.Node
 }
 
-func buildMissingReturnTypeMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "missingReturnType",
-		Description: "Missing return type on function.",
-	}
-}
+var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
+	Name: "explicit-function-return-type",
+	Run:  run,
+})
 
-func parseOptions(options any) ExplicitFunctionReturnTypeOptions {
-	opts := ExplicitFunctionReturnTypeOptions{
-		AllowConciseArrowFunctionExpressionsStartingWithVoid: false,
-		AllowDirectConstAssertionInArrowFunctions:            true,
-		AllowedNames:                        []string{},
-		AllowExpressions:                    false,
-		AllowFunctionsWithoutTypeParameters: false,
-		AllowHigherOrderFunctions:           true,
-		AllowIIFEs:                          false,
-		AllowTypedFunctionExpressions:       true,
+func run(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	opts := parseOptions(rawOptions)
+	functionStack := make([]*functionInfo, 0)
+
+	enterFunction := func(node *ast.Node) {
+		functionStack = append(functionStack, &functionInfo{node: node})
 	}
 
-	if options == nil {
-		return opts
+	popFunctionInfo := func() *functionInfo {
+		if len(functionStack) == 0 {
+			return nil
+		}
+		info := functionStack[len(functionStack)-1]
+		functionStack = functionStack[:len(functionStack)-1]
+		return info
 	}
 
-	var optsMap map[string]interface{}
-	if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = options.(map[string]interface{})
+	report := func(node *ast.Node) {
+		loc := utils.GetFunctionHeadLoc(ctx.SourceFile, node)
+		ctx.ReportRange(loc, rule.RuleMessage{
+			Id:          "missingReturnType",
+			Description: "Missing return type on function.",
+		})
 	}
 
-	if optsMap == nil {
-		return opts
+	// checkFunctionReturnType checks the common validity conditions:
+	// - allowHigherOrderFunctions + doesImmediatelyReturnFunctionExpression
+	// - has explicit return type
+	// - is constructor or setter
+	// Returns true if the function is valid (no error should be reported).
+	checkFunctionReturnType := func(info *functionInfo) bool {
+		node := info.node
+		// Skip bodyless functions: declare functions, abstract methods, overload signatures.
+		// ESLint models these as TSDeclareFunction / TSAbstractMethodDefinition which are
+		// separate node types not visited by the rule. In tsgo they share the same Kind.
+		if node.Body() == nil {
+			return true
+		}
+		if opts.allowHigherOrderFunctions && typescriptutil.DoesImmediatelyReturnFunctionExpression(node, info.returns) {
+			return true
+		}
+		if node.Type() != nil {
+			return true
+		}
+		if node.Kind == ast.KindConstructor || node.Kind == ast.KindSetAccessor {
+			return true
+		}
+		return false
 	}
 
-	if v, ok := optsMap["allowConciseArrowFunctionExpressionsStartingWithVoid"].(bool); ok {
-		opts.AllowConciseArrowFunctionExpressionsStartingWithVoid = v
+	isAllowedFunction := func(node *ast.Node) bool {
+		if opts.allowFunctionsWithoutTypeParameters && node.TypeParameters() == nil {
+			return true
+		}
+		if opts.allowIIFEs && isIIFE(node) {
+			return true
+		}
+		if len(opts.allowedNames) == 0 {
+			return false
+		}
+		return isNameAllowed(ctx.SourceFile, node, opts.allowedNames)
 	}
-	if v, ok := optsMap["allowDirectConstAssertionInArrowFunctions"].(bool); ok {
-		opts.AllowDirectConstAssertionInArrowFunctions = v
-	}
-	if v, ok := optsMap["allowedNames"].([]interface{}); ok {
-		opts.AllowedNames = make([]string, 0, len(v))
-		for _, name := range v {
-			if str, ok := name.(string); ok {
-				opts.AllowedNames = append(opts.AllowedNames, str)
+
+	// exitFunctionExpression handles ArrowFunction and FunctionExpression exit
+	exitFunctionExpression := func(node *ast.Node) {
+		info := popFunctionInfo()
+		if info == nil {
+			return
+		}
+
+		// allowConciseArrowFunctionExpressionsStartingWithVoid
+		if opts.allowConciseArrowFunctionExpressionsStartingWithVoid &&
+			node.Kind == ast.KindArrowFunction {
+			af := node.AsArrowFunction()
+			if af.Body != nil && af.Body.Kind != ast.KindBlock {
+				if ast.SkipParentheses(af.Body).Kind == ast.KindVoidExpression {
+					return
+				}
 			}
 		}
-	}
-	if v, ok := optsMap["allowExpressions"].(bool); ok {
-		opts.AllowExpressions = v
-	}
-	if v, ok := optsMap["allowFunctionsWithoutTypeParameters"].(bool); ok {
-		opts.AllowFunctionsWithoutTypeParameters = v
-	}
-	if v, ok := optsMap["allowHigherOrderFunctions"].(bool); ok {
-		opts.AllowHigherOrderFunctions = v
-	}
-	if v, ok := optsMap["allowIIFEs"].(bool); ok {
-		opts.AllowIIFEs = v
-	}
-	if v, ok := optsMap["allowTypedFunctionExpressions"].(bool); ok {
-		opts.AllowTypedFunctionExpressions = v
-	}
 
-	return opts
-}
+		if isAllowedFunction(node) {
+			return
+		}
 
-func getParentSkippingParens(node *ast.Node) *ast.Node {
-	parent := node.Parent
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-	return parent
-}
+		if opts.allowTypedFunctionExpressions &&
+			(typescriptutil.IsValidFunctionExpressionReturnType(
+				node,
+				opts.allowTypedFunctionExpressions,
+				opts.allowExpressions,
+				opts.allowDirectConstAssertionInArrowFunctions,
+			) || typescriptutil.AncestorHasReturnType(node)) {
+			return
+		}
 
-func hasTypeParameters(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	typeParams := node.TypeParameters()
-	return len(typeParams) > 0
-}
-
-func getSimpleIdentifierName(name *ast.Node) string {
-	if name == nil {
-		return ""
-	}
-	if name.Kind == ast.KindComputedPropertyName {
-		return ""
-	}
-	if ast.IsIdentifier(name) {
-		identifier := name.AsIdentifier()
-		if identifier != nil {
-			return identifier.Text
+		if !checkFunctionReturnType(info) {
+			report(node)
 		}
 	}
-	return ""
+
+	// exitFunctionDeclaration handles FunctionDeclaration exit
+	exitFunctionDeclaration := func(node *ast.Node) {
+		info := popFunctionInfo()
+		if info == nil {
+			return
+		}
+		if isAllowedFunction(node) {
+			return
+		}
+		if opts.allowTypedFunctionExpressions && node.Type() != nil {
+			return
+		}
+		if !checkFunctionReturnType(info) {
+			report(node)
+		}
+	}
+
+	// exitMethodOrAccessor handles MethodDeclaration and GetAccessor exit
+	exitMethodOrAccessor := func(node *ast.Node) {
+		info := popFunctionInfo()
+		if info == nil {
+			return
+		}
+		if isAllowedFunction(node) {
+			return
+		}
+
+		// In ESLint, object methods/getters are Property > FunctionExpression, so they go
+		// through exitFunctionExpression. In tsgo they are MethodDeclaration/GetAccessor
+		// directly inside ObjectLiteralExpression. Apply the same expression-path checks.
+		if node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
+			if opts.allowTypedFunctionExpressions &&
+				(isObjectMethodTyped(node, opts) || typescriptutil.AncestorHasReturnType(node) || opts.allowExpressions) {
+				return
+			}
+		}
+
+		if !checkFunctionReturnType(info) {
+			report(node)
+		}
+	}
+
+	// Constructors and setters never need return types — just pop the stack.
+	exitConstructorOrSetter := func(_ *ast.Node) {
+		popFunctionInfo()
+	}
+
+	return rule.RuleListeners{
+		// Enter listeners - push to stack
+		ast.KindFunctionDeclaration: enterFunction,
+		ast.KindFunctionExpression:  enterFunction,
+		ast.KindArrowFunction:       enterFunction,
+		ast.KindMethodDeclaration:   enterFunction,
+		ast.KindGetAccessor:         enterFunction,
+		ast.KindConstructor:         enterFunction,
+		ast.KindSetAccessor:         enterFunction,
+
+		// Exit listeners
+		rule.ListenerOnExit(ast.KindFunctionDeclaration): exitFunctionDeclaration,
+		rule.ListenerOnExit(ast.KindFunctionExpression):  exitFunctionExpression,
+		rule.ListenerOnExit(ast.KindArrowFunction):       exitFunctionExpression,
+		rule.ListenerOnExit(ast.KindMethodDeclaration):   exitMethodOrAccessor,
+		rule.ListenerOnExit(ast.KindGetAccessor):         exitMethodOrAccessor,
+		rule.ListenerOnExit(ast.KindConstructor):         exitConstructorOrSetter,
+		rule.ListenerOnExit(ast.KindSetAccessor):         exitConstructorOrSetter,
+
+		// Return statement listener
+		ast.KindReturnStatement: func(node *ast.Node) {
+			if len(functionStack) > 0 {
+				info := functionStack[len(functionStack)-1]
+				info.returns = append(info.returns, node)
+			}
+		},
+	}
 }
 
-func getFunctionName(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-
-	if name := getSimpleIdentifierName(node.Name()); name != "" {
-		return name
-	}
-
-	parent := getParentSkippingParens(node)
-	if parent == nil {
-		return ""
-	}
-
-	switch parent.Kind {
-	case ast.KindVariableDeclaration:
-		return getSimpleIdentifierName(parent.Name())
-	case ast.KindPropertyDeclaration:
-		return getSimpleIdentifierName(parent.Name())
-	case ast.KindPropertyAssignment:
-		return getSimpleIdentifierName(parent.Name())
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		return getSimpleIdentifierName(parent.Name())
-	}
-
-	return ""
-}
-
+// isIIFE checks if a function node is the callee of an immediately invoked call expression.
 func isIIFE(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
 	parent := node.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		callParent := parent.Parent
-		if ast.IsCallExpression(callParent) && callParent.Expression() == parent {
-			return true
-		}
 		parent = parent.Parent
 	}
-
-	if ast.IsCallExpression(parent) {
-		return parent.Expression() == node
-	}
-
-	return false
-}
-
-func isAllowedFunction(node *ast.Node, opts ExplicitFunctionReturnTypeOptions, allowedNames map[string]struct{}) bool {
-	if opts.AllowFunctionsWithoutTypeParameters && !hasTypeParameters(node) {
-		return true
-	}
-
-	if opts.AllowIIFEs && isIIFE(node) {
-		return true
-	}
-
-	if len(allowedNames) == 0 {
-		return false
-	}
-
-	if name := getFunctionName(node); name != "" {
-		if _, ok := allowedNames[name]; ok {
-			return true
-		}
-	}
-
-	return false
-}
-
-func isDefaultParameterWithTypeAnnotation(parent *ast.Node) bool {
-	if parent == nil || parent.Kind != ast.KindParameter {
-		return false
-	}
-	return parent.Type() != nil
-}
-
-func isVariableDeclarationWithTypeAnnotation(parent *ast.Node) bool {
-	if parent == nil || parent.Kind != ast.KindVariableDeclaration {
-		return false
-	}
-	return parent.Type() != nil
-}
-
-func isPropertyDeclarationWithTypeAnnotation(parent *ast.Node) bool {
-	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
-		return false
-	}
-	return parent.Type() != nil
-}
-
-func isFunctionArgument(parent *ast.Node, callee *ast.Node) bool {
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return false
 	}
-	if callee != nil && ast.SkipParentheses(parent.Expression()) == callee {
-		return false
-	}
-	return true
+	callee := ast.SkipParentheses(parent.AsCallExpression().Expression)
+	return callee == node
 }
 
-func isTypedJSX(parent *ast.Node) bool {
-	if parent == nil {
+// isObjectMethodTyped checks if an object method is in a typed context.
+// This handles the tsgo-specific case where object method shorthand (e.g., { foo() {} })
+// is a MethodDeclaration inside ObjectLiteralExpression.
+//
+// NOTE: IsConstructorArgument is intentionally NOT checked here. In ESLint,
+// isConstructorArgument is only for direct function arguments to new expressions
+// (e.g., `new Foo(() => {})`), not for methods inside objects passed to new expressions
+// (e.g., `new Proxy(obj, { get() {} })`).
+func isObjectMethodTyped(node *ast.Node, opts options) bool {
+	if !opts.allowTypedFunctionExpressions {
 		return false
 	}
-	return ast.IsJsxExpression(parent) || ast.IsJsxSpreadAttribute(parent)
-}
-
-func isTypedParent(parent *ast.Node, callee *ast.Node) bool {
-	if parent == nil {
-		return false
-	}
-
-	if parent.Kind == ast.KindAsExpression || parent.Kind == ast.KindTypeAssertionExpression {
-		return true
-	}
-
-	if isVariableDeclarationWithTypeAnnotation(parent) {
-		return true
-	}
-
-	if isDefaultParameterWithTypeAnnotation(parent) {
-		return true
-	}
-
-	if isPropertyDeclarationWithTypeAnnotation(parent) {
-		return true
-	}
-
-	if isFunctionArgument(parent, callee) {
-		return true
-	}
-
-	return isTypedJSX(parent)
-}
-
-func isConstructorArgument(parent *ast.Node) bool {
-	return parent != nil && parent.Kind == ast.KindNewExpression
-}
-
-func isPropertyOfObjectWithType(property *ast.Node) bool {
-	if property == nil {
-		return false
-	}
-
-	if property.Kind != ast.KindPropertyAssignment &&
-		property.Kind != ast.KindMethodDeclaration &&
-		property.Kind != ast.KindGetAccessor &&
-		property.Kind != ast.KindSetAccessor {
-		return false
-	}
-
-	objectExpr := property.Parent
+	objectExpr := node.Parent
 	if objectExpr == nil || objectExpr.Kind != ast.KindObjectLiteralExpression {
 		return false
 	}
-
-	parent := getParentSkippingParens(objectExpr)
-	return isTypedParent(parent, nil) || isPropertyOfObjectWithType(parent)
-}
-
-func isTypedFunctionExpression(node *ast.Node, opts ExplicitFunctionReturnTypeOptions) bool {
-	if !opts.AllowTypedFunctionExpressions {
+	parent := typescriptutil.GetEffectiveParent(objectExpr)
+	if parent == nil {
 		return false
 	}
-
-	parent := getParentSkippingParens(node)
-	if parent != nil && isTypedParent(parent, node) {
-		return true
-	}
-
-	if isPropertyOfObjectWithType(parent) {
-		return true
-	}
-
-	if (node.Kind == ast.KindMethodDeclaration ||
-		node.Kind == ast.KindGetAccessor ||
-		node.Kind == ast.KindSetAccessor) &&
-		node.Parent != nil && node.Parent.Kind == ast.KindObjectLiteralExpression {
-		return isPropertyOfObjectWithType(node)
-	}
-
-	return isConstructorArgument(parent)
+	return typescriptutil.IsTypedParent(parent, node) ||
+		typescriptutil.IsPropertyOfObjectWithType(parent, node)
 }
 
-func isConstAssertion(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	var typeNode *ast.Node
-	switch node.Kind {
-	case ast.KindAsExpression:
-		typeNode = node.AsAsExpression().Type
-	case ast.KindTypeAssertionExpression:
-		typeNode = node.AsTypeAssertion().Type
-	default:
-		return false
-	}
-
-	if typeNode == nil || typeNode.Kind != ast.KindTypeReference {
-		return false
-	}
-
-	typeRef := typeNode.AsTypeReference()
-	if typeRef == nil || typeRef.TypeName == nil || !ast.IsIdentifier(typeRef.TypeName) {
-		return false
-	}
-
-	return typeRef.TypeName.AsIdentifier().Text == "const"
-}
-
-func isValidFunctionExpressionReturnType(node *ast.Node, opts ExplicitFunctionReturnTypeOptions) bool {
-	if isTypedFunctionExpression(node, opts) {
-		return true
-	}
-
-	parent := getParentSkippingParens(node)
-	if opts.AllowExpressions && parent != nil {
-		isClassParent := parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression
-		isClassMember := isClassParent && (node.Kind == ast.KindMethodDeclaration ||
-			node.Kind == ast.KindGetAccessor ||
-			node.Kind == ast.KindSetAccessor ||
-			node.Kind == ast.KindConstructor)
-		isDisallowedParent := parent.Kind == ast.KindVariableDeclaration ||
-			parent.Kind == ast.KindPropertyDeclaration ||
-			parent.Kind == ast.KindExportAssignment ||
-			isClassMember
-		if !isDisallowedParent {
-			return true
-		}
-	}
-
-	if !opts.AllowDirectConstAssertionInArrowFunctions || node.Kind != ast.KindArrowFunction {
-		return false
-	}
-
-	body := ast.SkipParentheses(node.Body())
-	for body != nil && body.Kind == ast.KindSatisfiesExpression {
-		body = body.AsSatisfiesExpression().Expression
-		body = ast.SkipParentheses(body)
-	}
-
-	return isConstAssertion(body)
-}
-
-func doesImmediatelyReturnFunctionExpression(info *functionInfo) bool {
-	if info == nil || info.node == nil {
-		return false
-	}
-
-	if info.node.Kind == ast.KindArrowFunction {
-		body := ast.SkipParentheses(info.node.Body())
-		if ast.IsArrowFunction(body) || ast.IsFunctionExpression(body) {
-			return true
-		}
-	}
-
-	if len(info.returns) == 0 {
-		return false
-	}
-
-	for _, ret := range info.returns {
-		argument := ret.Expression()
-		if argument == nil {
-			return false
-		}
-		argument = ast.SkipParentheses(argument)
-		if !ast.IsArrowFunction(argument) && !ast.IsFunctionExpression(argument) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func isSetter(node *ast.Node) bool {
-	return node != nil && node.Kind == ast.KindSetAccessor
-}
-
-func isConstructor(node *ast.Node) bool {
-	return node != nil && node.Kind == ast.KindConstructor
-}
-
-func checkFunctionReturnType(ctx rule.RuleContext, info *functionInfo, opts ExplicitFunctionReturnTypeOptions) {
-	if info == nil || info.node == nil {
-		return
-	}
-
-	if opts.AllowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(info) {
-		return
-	}
-
-	if info.node.Type() != nil {
-		return
-	}
-
-	if isConstructor(info.node) || isSetter(info.node) {
-		return
-	}
-
-	ctx.ReportRange(getFunctionHeadRange(ctx.SourceFile, info.node), buildMissingReturnTypeMessage())
-}
-
-func getStartAfterDecorators(sourceFile *ast.SourceFile, node *ast.Node) int {
-	start := node.Pos()
-	modifiers := node.Modifiers()
-	if modifiers != nil {
-		for _, modifier := range modifiers.Nodes {
-			if modifier.Kind == ast.KindDecorator && modifier.End() > start {
-				start = modifier.End()
-			}
-		}
-	}
-
-	return getTokenStart(sourceFile, start)
-}
-
-func getTokenStart(sourceFile *ast.SourceFile, pos int) int {
-	s := scanner.GetScannerForSourceFile(sourceFile, pos)
-	if s.TokenStart() < pos {
-		s.Scan()
-	}
-	return s.TokenStart()
-}
-
-func getFunctionDeclarationStart(sourceFile *ast.SourceFile, node *ast.Node) int {
-	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-	for s.TokenStart() < node.End() {
-		if s.Token() == ast.KindAsyncKeyword || s.Token() == ast.KindFunctionKeyword {
-			return s.TokenStart()
-		}
-		s.Scan()
-	}
-	return getTokenStart(sourceFile, node.Pos())
-}
-
-func getOpeningParenPos(sourceFile *ast.SourceFile, node *ast.Node) int {
-	if node == nil {
-		return 0
-	}
-
-	if node.Kind == ast.KindArrowFunction && utils.IsParenlessArrowFunction(node) {
-		arrow := node.AsArrowFunction()
-		if arrow != nil && arrow.Parameters != nil && len(arrow.Parameters.Nodes) > 0 {
-			param := arrow.Parameters.Nodes[0]
-			tokenRange := scanner.GetRangeOfTokenAtPosition(sourceFile, param.Pos())
-			return tokenRange.Pos()
-		}
-	}
-
-	scanStart := node.Pos()
-	if name := node.Name(); name != nil {
-		scanStart = name.End()
-	} else {
-		scanStart = getTokenStart(sourceFile, scanStart)
-	}
-
-	s := scanner.GetScannerForSourceFile(sourceFile, scanStart)
-	for s.TokenStart() < node.End() {
-		if s.Token() == ast.KindOpenParenToken {
-			return s.TokenStart()
-		}
-		s.Scan()
-	}
-
-	return scanStart
-}
-
-func getArrowTokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	body := node.Body()
-	if body == nil {
-		return utils.TrimNodeTextRange(sourceFile, node)
-	}
-
-	endPos := body.Pos()
-	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-	arrowRange := core.NewTextRange(node.Pos(), node.Pos())
-	for s.TokenStart() < endPos {
-		if s.Token() == ast.KindEqualsGreaterThanToken {
-			arrowRange = s.TokenRange()
-		}
-		s.Scan()
-	}
-
-	return arrowRange
-}
-
-func getFunctionHeadRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
-	parent := getParentSkippingParens(node)
-
-	if parent != nil && (parent.Kind == ast.KindMethodDeclaration || parent.Kind == ast.KindPropertyDeclaration) {
-		start := getStartAfterDecorators(sourceFile, parent)
-		end := getOpeningParenPos(sourceFile, node)
-		return core.NewTextRange(start, end)
-	}
-
-	if parent != nil && parent.Kind == ast.KindPropertyAssignment {
-		start := getTokenStart(sourceFile, parent.Pos())
-		end := getOpeningParenPos(sourceFile, node)
-		return core.NewTextRange(start, end)
-	}
+// isNameAllowed checks if a function's name is in the allowed names list.
+func isNameAllowed(sourceFile *ast.SourceFile, node *ast.Node, allowedNames []string) bool {
+	var funcName string
 
 	switch node.Kind {
-	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		start := getStartAfterDecorators(sourceFile, node)
-		end := getOpeningParenPos(sourceFile, node)
-		return core.NewTextRange(start, end)
-	case ast.KindArrowFunction:
-		return getArrowTokenRange(sourceFile, node)
-	default:
-		start := getTokenStart(sourceFile, node.Pos())
-		if node.Kind == ast.KindFunctionDeclaration {
-			start = getFunctionDeclarationStart(sourceFile, node)
+	case ast.KindArrowFunction, ast.KindFunctionExpression:
+		// Check if the function expression has a name
+		if node.Kind == ast.KindFunctionExpression {
+			fe := node.AsFunctionExpression()
+			if fe.Name() != nil && fe.Name().Kind == ast.KindIdentifier {
+				funcName = fe.Name().AsIdentifier().Text
+			}
 		}
-		end := getOpeningParenPos(sourceFile, node)
-		return core.NewTextRange(start, end)
-	}
-}
-
-var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
-	Name: "explicit-function-return-type",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
-		allowedNames := make(map[string]struct{}, len(opts.AllowedNames))
-		for _, name := range opts.AllowedNames {
-			allowedNames[name] = struct{}{}
-		}
-
-		functionInfoStack := make([]*functionInfo, 0, 4)
-
-		enterFunction := func(node *ast.Node) {
-			functionInfoStack = append(functionInfoStack, &functionInfo{
-				node:    node,
-				returns: []*ast.Node{},
-			})
-		}
-
-		popFunctionInfo := func() *functionInfo {
-			if len(functionInfoStack) == 0 {
-				return nil
+		if funcName == "" {
+			parent := node.Parent
+			if parent == nil {
+				return false
 			}
-			info := functionInfoStack[len(functionInfoStack)-1]
-			functionInfoStack = functionInfoStack[:len(functionInfoStack)-1]
-			return info
-		}
-
-		exitFunctionExpression := func(node *ast.Node) {
-			info := popFunctionInfo()
-			if info == nil {
-				return
-			}
-
-			if opts.AllowConciseArrowFunctionExpressionsStartingWithVoid &&
-				node.Kind == ast.KindArrowFunction &&
-				node.Body() != nil &&
-				ast.IsVoidExpression(node.Body()) {
-				return
-			}
-
-			if isAllowedFunction(node, opts, allowedNames) {
-				return
-			}
-
-			if opts.AllowTypedFunctionExpressions &&
-				(isValidFunctionExpressionReturnType(node, opts) || ancestorHasReturnType(node)) {
-				return
-			}
-
-			checkFunctionReturnType(ctx, info, opts)
-		}
-
-		exitFunctionDeclaration := func(node *ast.Node) {
-			info := popFunctionInfo()
-			if info == nil {
-				return
-			}
-
-			if isAllowedFunction(node, opts, allowedNames) {
-				return
-			}
-
-			if opts.AllowTypedFunctionExpressions && node.Type() != nil {
-				return
-			}
-
-			checkFunctionReturnType(ctx, info, opts)
-		}
-
-		return rule.RuleListeners{
-			ast.KindArrowFunction:       enterFunction,
-			ast.KindFunctionExpression:  enterFunction,
-			ast.KindFunctionDeclaration: enterFunction,
-			ast.KindMethodDeclaration:   enterFunction,
-			ast.KindGetAccessor:         enterFunction,
-			ast.KindSetAccessor:         enterFunction,
-			ast.KindConstructor:         enterFunction,
-			ast.KindReturnStatement: func(node *ast.Node) {
-				if len(functionInfoStack) == 0 {
-					return
+			switch parent.Kind {
+			case ast.KindVariableDeclaration:
+				decl := parent.AsVariableDeclaration()
+				if decl.Name() != nil && decl.Name().Kind == ast.KindIdentifier {
+					funcName = decl.Name().AsIdentifier().Text
 				}
-				functionInfoStack[len(functionInfoStack)-1].returns = append(functionInfoStack[len(functionInfoStack)-1].returns, node)
-			},
-			rule.ListenerOnExit(ast.KindArrowFunction):       exitFunctionExpression,
-			rule.ListenerOnExit(ast.KindFunctionExpression):  exitFunctionExpression,
-			rule.ListenerOnExit(ast.KindMethodDeclaration):   exitFunctionExpression,
-			rule.ListenerOnExit(ast.KindGetAccessor):         exitFunctionExpression,
-			rule.ListenerOnExit(ast.KindSetAccessor):         exitFunctionExpression,
-			rule.ListenerOnExit(ast.KindConstructor):         exitFunctionExpression,
-			rule.ListenerOnExit(ast.KindFunctionDeclaration): exitFunctionDeclaration,
-		}
-	},
-})
-
-func ancestorHasReturnType(node *ast.Node) bool {
-	ancestor := getParentSkippingParens(node)
-	if ancestor == nil {
-		return false
-	}
-
-	if ancestor.Kind == ast.KindPropertyAssignment {
-		property := ancestor.AsPropertyAssignment()
-		if property == nil || property.Initializer == nil {
-			return false
-		}
-		ancestor = property.Initializer
-	}
-
-	isReturnStatement := ancestor.Kind == ast.KindReturnStatement
-	isArrowExpressionBody := ancestor.Kind == ast.KindArrowFunction && ancestor.Body() != nil && ancestor.Body().Kind != ast.KindBlock
-	if !isReturnStatement && !isArrowExpressionBody {
-		return false
-	}
-
-	for ancestor != nil {
-		if ancestor.Kind == ast.KindParenthesizedExpression {
-			ancestor = ancestor.Parent
-			continue
-		}
-
-		switch ancestor.Kind {
-		case ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindFunctionDeclaration, ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-			if ancestor.Type() != nil {
-				return true
+			case ast.KindMethodDeclaration:
+				md := parent.AsMethodDeclaration()
+				if md.Name() != nil && md.Name().Kind == ast.KindIdentifier {
+					funcName = md.Name().AsIdentifier().Text
+				}
+			case ast.KindPropertyDeclaration:
+				pd := parent.AsPropertyDeclaration()
+				if pd.Name() != nil && pd.Name().Kind == ast.KindIdentifier {
+					funcName = pd.Name().AsIdentifier().Text
+				}
+			case ast.KindPropertyAssignment:
+				pa := parent.AsPropertyAssignment()
+				if pa.Name() != nil && pa.Name().Kind == ast.KindIdentifier {
+					funcName = pa.Name().AsIdentifier().Text
+				}
 			}
-		case ast.KindVariableDeclaration:
-			return ancestor.Type() != nil
-		case ast.KindPropertyDeclaration:
-			return ancestor.Type() != nil
-		case ast.KindExpressionStatement:
-			return false
 		}
-
-		ancestor = ancestor.Parent
+	case ast.KindFunctionDeclaration:
+		fd := node.AsFunctionDeclaration()
+		if fd.Name() != nil && fd.Name().Kind == ast.KindIdentifier {
+			funcName = fd.Name().AsIdentifier().Text
+		}
+	case ast.KindMethodDeclaration:
+		md := node.AsMethodDeclaration()
+		if md.Name() != nil && md.Name().Kind == ast.KindIdentifier {
+			funcName = md.Name().AsIdentifier().Text
+		}
+	case ast.KindGetAccessor:
+		ga := node.AsGetAccessorDeclaration()
+		if ga.Name() != nil && ga.Name().Kind == ast.KindIdentifier {
+			funcName = ga.Name().AsIdentifier().Text
+		}
 	}
 
+	if funcName == "" {
+		return false
+	}
+	for _, name := range allowedNames {
+		if name == funcName {
+			return true
+		}
+	}
 	return false
 }

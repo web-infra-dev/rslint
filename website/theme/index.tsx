@@ -1,4 +1,4 @@
-import { Layout as BaseLayout } from '@rspress/core/theme';
+import { Layout as BaseLayout } from '@rspress/core/theme-original';
 import { NavIcon } from '@rstack-dev/doc-ui/nav-icon';
 import { HomeLayout } from './pages';
 import './index.scss';
@@ -8,5 +8,4 @@ const Layout = () => {
 };
 
 export { Layout, HomeLayout };
-
-export * from '@rspress/core/theme';
+export * from '@rspress/core/theme-original';

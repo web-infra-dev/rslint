@@ -33,7 +33,6 @@ func GetNodeFlagNames(flags ast.NodeFlags) []string {
 		ast.NodeFlagsThisNodeHasError:                "ast.NodeFlagsThisNodeHasError",
 		ast.NodeFlagsJavaScriptFile:                  "ast.NodeFlagsJavaScriptFile",
 		ast.NodeFlagsThisNodeOrAnySubNodesHasError:   "ast.NodeFlagsThisNodeOrAnySubNodesHasError",
-		ast.NodeFlagsHasAggregatedChildData:          "ast.NodeFlagsHasAggregatedChildData",
 		ast.NodeFlagsPossiblyContainsDynamicImport:   "ast.NodeFlagsPossiblyContainsDynamicImport",
 		ast.NodeFlagsPossiblyContainsImportMeta:      "ast.NodeFlagsPossiblyContainsImportMeta",
 		ast.NodeFlagsHasJSDoc:                        "ast.NodeFlagsHasJSDoc",

@@ -1,0 +1,1996 @@
+// Rstest Snapshot v1
+
+exports[`no-eval > invalid 1`] = `
+{
+  "code": "eval(foo)",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 2`] = `
+{
+  "code": "eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 3`] = `
+{
+  "code": "function foo(eval) { eval('foo') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 4`] = `
+{
+  "code": "function foo() { function bar() { eval('x') } }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 5`] = `
+{
+  "code": "var fn = () => eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 6`] = `
+{
+  "code": "(function() { eval('foo') })()",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 7`] = `
+{
+  "code": "async function foo() { eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 8`] = `
+{
+  "code": "function* gen() { eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 9`] = `
+{
+  "code": "class A { foo() { eval('bar') } }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 10`] = `
+{
+  "code": "class A { field = eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 11`] = `
+{
+  "code": "class A { static { eval('bar') } }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 12`] = `
+{
+  "code": "function foo(x = eval('bar')) {}",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 13`] = `
+{
+  "code": "eval(foo)",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 14`] = `
+{
+  "code": "eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 15`] = `
+{
+  "code": "function foo(eval) { eval('foo') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 16`] = `
+{
+  "code": "(0, eval)('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 17`] = `
+{
+  "code": "globalThis.eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 18`] = `
+{
+  "code": "globalThis.globalThis.eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 19`] = `
+{
+  "code": "globalThis.globalThis['eval']('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 20`] = `
+{
+  "code": "(0, globalThis.eval)('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 21`] = `
+{
+  "code": "(0, globalThis['eval'])('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 22`] = `
+{
+  "code": "var EVAL = eval; EVAL('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 23`] = `
+{
+  "code": "(function(exe){ exe('foo') })(eval);",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 24`] = `
+{
+  "code": "var EVAL = globalThis.eval; EVAL('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 25`] = `
+{
+  "code": "var arr = [eval]",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 26`] = `
+{
+  "code": "var fn = eval || function() {}",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 27`] = `
+{
+  "code": "var fn = true ? eval : null",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 28`] = `
+{
+  "code": "var obj = { eval }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 29`] = `
+{
+  "code": "var arr = [...eval]",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 30`] = `
+{
+  "code": "var s = \`\${eval}\`",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 31`] = `
+{
+  "code": "var obj = { [eval]: 42 }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 32`] = `
+{
+  "code": "eval\`template\`",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 33`] = `
+{
+  "code": "typeof eval",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 34`] = `
+{
+  "code": "eval = function() {}",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 35`] = `
+{
+  "code": "for (eval in obj) {}",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 36`] = `
+{
+  "code": "export { eval }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 37`] = `
+{
+  "code": "export { eval as foo }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 38`] = `
+{
+  "code": "export default eval",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 39`] = `
+{
+  "code": "eval['foo']",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 40`] = `
+{
+  "code": "eval.foo",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 41`] = `
+{
+  "code": "var obj = { key: eval }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 42`] = `
+{
+  "code": "new eval()",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 43`] = `
+{
+  "code": "this.eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 44`] = `
+{
+  "code": "'use strict'; this.eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 45`] = `
+{
+  "code": "this['eval']('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 46`] = `
+{
+  "code": "this[\`eval\`]('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 47`] = `
+{
+  "code": "function foo() { this.eval('foo') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 48`] = `
+{
+  "code": "function foo() { ('use strict'); this.eval; }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 49`] = `
+{
+  "code": "async function foo() { this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 50`] = `
+{
+  "code": "function* gen() { this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 51`] = `
+{
+  "code": "var foo = function() { this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 52`] = `
+{
+  "code": "var Foo = function foo() { this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 53`] = `
+{
+  "code": "(function() { this.eval('foo') }).call(null)",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 54`] = `
+{
+  "code": "(function() { this.eval('foo') }).call(undefined)",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 55`] = `
+{
+  "code": "(function() { this.eval('foo') }).call()",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 56`] = `
+{
+  "code": "function foo() { return function() { this.eval('bar') } }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 57`] = `
+{
+  "code": "arr.forEach(function() { this.eval('foo') })",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 58`] = `
+{
+  "code": "arr.flatMap(function(x) { return this.eval(x) })",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 59`] = `
+{
+  "code": "arr.forEach(function() { this.eval('foo') }, null)",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 60`] = `
+{
+  "code": "arr.reduce(function(a, b) { return this.eval(a) ? a : b }, '0')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 61`] = `
+{
+  "code": "() => { this.eval('foo'); }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 62`] = `
+{
+  "code": "() => { 'use strict'; this.eval('foo'); }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 63`] = `
+{
+  "code": "'use strict'; () => { this.eval('foo'); }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 64`] = `
+{
+  "code": "() => { 'use strict'; () => { this.eval('foo'); } }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 65`] = `
+{
+  "code": "function foo() { () => this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 66`] = `
+{
+  "code": "function foo() { () => () => this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 67`] = `
+{
+  "code": "var obj = { foo: () => this.eval('bar') }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 68`] = `
+{
+  "code": "var EVAL = this.eval; EVAL('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 69`] = `
+{
+  "code": "'use strict'; var EVAL = this.eval; EVAL('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 70`] = `
+{
+  "code": "globalThis?.eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 71`] = `
+{
+  "code": "this?.eval('foo')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 72`] = `
+{
+  "code": "class C { [this.eval('foo')] = 0 }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 73`] = `
+{
+  "code": "'use strict'; class C { [this.eval('foo')] = 0 }",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 74`] = `
+{
+  "code": "eval('foo'); globalThis.eval('bar')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-eval > invalid 75`] = `
+{
+  "code": "eval('a'); eval('b'); eval('c')",
+  "diagnostics": [
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+    {
+      "message": "\`eval\` can be harmful.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-eval",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

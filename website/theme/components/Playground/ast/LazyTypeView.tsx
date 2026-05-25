@@ -64,7 +64,7 @@ export const LazyTypeView: React.FC<LazyTypeViewProps> = ({
   }, [expanded, context, pos, shallow.fileName, isAlreadyFull, hasValidPos]);
 
   // Title: Type flags (e.g., "Type[Object]", "Type[String]")
-  const title = `Type[${shallow.flagNames?.map(n => n.replace('checker.', '')).join(' | ') || 'Unknown'}]`;
+  const title = `Type[${shallow.flagNames?.map((n) => n.replace('checker.', '')).join(' | ') || 'Unknown'}]`;
 
   return (
     <ControlledCollapsibleItem

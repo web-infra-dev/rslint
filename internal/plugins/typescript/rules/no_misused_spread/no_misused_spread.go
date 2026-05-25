@@ -151,7 +151,8 @@ func isClassDeclaration(t *checker.Type) bool {
 }
 
 var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
-	Name: "no-misused-spread",
+	Name:             "no-misused-spread",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoMisusedSpreadOptions)
 		if !ok {

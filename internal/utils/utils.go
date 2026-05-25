@@ -3,7 +3,9 @@ package utils
 import (
 	"iter"
 	"slices"
+	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -13,6 +15,52 @@ import (
 
 func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
+}
+
+// GetVarKeywordRange returns the range of the kind keyword (`var`/`let`/`const`/
+// `using` or `await` for `await using`) inside a VariableStatement or
+// VariableDeclarationList. For VariableStatement it skips the modifier list
+// (e.g. `export`/`declare`) so the returned range starts at the actual kind
+// keyword. Used by rules that synthesize fixes around the kind keyword
+// (one-var, no-var, prefer-const, etc.).
+func GetVarKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
+	pos := TrimNodeTextRange(sourceFile, node).Pos()
+	if node.Kind == ast.KindVariableStatement {
+		if mods := node.Modifiers(); mods != nil && len(mods.Nodes) > 0 {
+			pos = mods.End()
+		}
+	}
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, pos)
+}
+
+// GetVarDeclListKind returns the kind keyword for a VariableDeclarationList:
+// "var", "let", "const", "using", "await using", or "" if the node is not a
+// VariableDeclarationList. Uses tsgo's IsVar* helpers (which apply
+// GetCombinedNodeFlags and correctly handle the `NodeFlagsConst|NodeFlagsUsing`
+// encoding of `await using`). Centralizes what was duplicated across no-var,
+// prefer-const, no-loop-func, and one-var.
+func GetVarDeclListKind(node *ast.Node) string {
+	if node == nil || node.Kind != ast.KindVariableDeclarationList {
+		return ""
+	}
+	switch {
+	case ast.IsVarAwaitUsing(node):
+		return "await using"
+	case ast.IsVarUsing(node):
+		return "using"
+	case ast.IsVarConst(node):
+		return "const"
+	case ast.IsVarLet(node):
+		return "let"
+	default:
+		return "var"
+	}
+}
+
+// TrimmedNodeText returns the source text for node over the same span as TrimNodeTextRange.
+func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	r := TrimNodeTextRange(sourceFile, node)
+	return sourceFile.Text()[r.Pos():r.End()]
 }
 
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
@@ -154,6 +202,48 @@ func Flatten[T any](array [][]T) []T {
 	return result
 }
 
+// IsConstructorName reports whether `name` follows the ESLint constructor
+// naming convention: the first character that is not `_`, `$`, or an ASCII
+// digit is uppercase. Names consisting only of `_`, `$` and ASCII digits
+// (e.g. `_`, `$$`, `_8`) are not treated as constructors.
+//
+// Matches the `isConstructor` helper used by ESLint's `new-cap` and
+// `object-shorthand` rules, including Unicode identifier characters
+// (e.g. `Π`). ESLint's regex `/[^_$0-9]/u` pairs an ASCII-only digit range
+// with a Unicode-aware `toUpperCase()` check — we mirror that: the digit
+// prefix is strictly ASCII while the case test is `unicode.IsUpper`.
+func IsConstructorName(name string) bool {
+	for _, r := range name {
+		if r == '_' || r == '$' || (r >= '0' && r <= '9') {
+			continue
+		}
+		// First non-prefix rune: constructor iff uppercase.
+		return unicode.IsUpper(r)
+	}
+	return false
+}
+
+// IsStringLiteralOrTemplate reports whether node is a string literal or a
+// template literal (with or without substitutions). Matches the semantics of
+// ESLint's `astUtils.isStringLiteral`, which treats `Literal{string}` and
+// `TemplateLiteral` as equivalent. The shim's `ast.IsStringLiteralLike` only
+// covers `StringLiteral` and `NoSubstitutionTemplateLiteral`, so we also
+// include `TemplateExpression` (templates with `${}`).
+func IsStringLiteralOrTemplate(node *ast.Node) bool {
+	return node != nil && (ast.IsStringLiteralLike(node) || node.Kind == ast.KindTemplateExpression)
+}
+
+// IsPlusBinaryExpression reports whether node is a `+` binary expression.
+// Covers both string concatenation and numeric addition — callers that only
+// care about concatenation must additionally inspect the operands.
+func IsPlusBinaryExpression(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	bin := node.AsBinaryExpression()
+	return bin != nil && bin.OperatorToken != nil && bin.OperatorToken.Kind == ast.KindPlusToken
+}
+
 func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
 	modifiers := node.Modifiers()
 	if modifiers == nil {
@@ -184,8 +274,64 @@ func IsStrWhiteSpace(r rune) bool {
 	return unicode.Is(unicode.Zs, r)
 }
 
-// ExcludePaths contains paths that should be excluded from linting
+// IsECMABlankLine reports whether s contains only ECMAScript WhiteSpace /
+// LineTerminator runes — matching JavaScript's `"".trim() === ""` check used
+// by rules like max-lines / max-lines-per-function for `skipBlankLines`.
+// Go's strings.TrimSpace diverges on U+FEFF (BOM) and U+0085 (NEL), so we
+// can't use it directly.
+func IsECMABlankLine(s string) bool {
+	for _, r := range s {
+		if !IsStrWhiteSpace(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// LineContentEnd returns the byte position just past the last character of the
+// line whose successor starts at nextLineStart — i.e. nextLineStart with its
+// immediately-preceding ECMA line terminator (LF, CR, CRLF, LS, PS) stripped.
+// Useful when slicing a single line out of source text without its terminator,
+// matching the behavior of ESLint's SourceCode.lines entries.
+func LineContentEnd(text string, nextLineStart int) int {
+	if nextLineStart >= 2 && text[nextLineStart-2] == '\r' && text[nextLineStart-1] == '\n' {
+		return nextLineStart - 2
+	}
+	if nextLineStart >= 1 {
+		c := text[nextLineStart-1]
+		if c == '\r' || c == '\n' {
+			return nextLineStart - 1
+		}
+		// U+2028 / U+2029 encode as 0xE2 0x80 0xA8 / 0xA9.
+		if nextLineStart >= 3 &&
+			text[nextLineStart-3] == 0xE2 &&
+			text[nextLineStart-2] == 0x80 &&
+			(text[nextLineStart-1] == 0xA8 || text[nextLineStart-1] == 0xA9) {
+			return nextLineStart - 3
+		}
+	}
+	return nextLineStart
+}
+
+// ExcludePaths contains path substrings that should be excluded from linting.
+// Used by RunLinterInProgram to skip files during program source file iteration.
 var ExcludePaths = []string{"/node_modules/", "bundled:"}
+
+// DefaultExcludeDirNames contains directory names that are always excluded
+// from file scanning. This is the single source of truth for default directory
+// exclusions, used by DiscoverGapFiles and the no-tsconfig fallback.
+// Aligned with JS-side SCAN_EXCLUDE_DIRS: new Set(['node_modules', '.git']).
+var DefaultExcludeDirNames = []string{"node_modules", ".git"}
+
+// DefaultIgnoreDirGlobs returns glob patterns derived from DefaultExcludeDirNames,
+// suitable for use with ignore pattern matching (e.g., DiscoverGapFiles).
+func DefaultIgnoreDirGlobs() []string {
+	globs := make([]string, len(DefaultExcludeDirNames))
+	for i, name := range DefaultExcludeDirNames {
+		globs[i] = name + "/**"
+	}
+	return globs
+}
 
 func Must[T any](v T, err error) T {
 	if err != nil {
@@ -196,6 +342,19 @@ func Must[T any](v T, err error) T {
 
 // GetOptionsMap extracts a map[string]interface{} from rule options.
 // It handles both array format [{ option: value }] and direct object format { option: value }.
+// ExtractRegexPatternAndFlags splits a RegularExpressionLiteral's text (e.g. "/pattern/gi")
+// into the pattern and flags portions. Returns ("", "") for malformed input.
+func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
+	if len(text) < 2 || text[0] != '/' {
+		return "", ""
+	}
+	lastSlash := strings.LastIndex(text[1:], "/")
+	if lastSlash == -1 {
+		return text[1:], ""
+	}
+	return text[1 : lastSlash+1], text[lastSlash+2:]
+}
+
 func GetOptionsMap(opts any) map[string]interface{} {
 	if opts == nil {
 		return nil
@@ -209,4 +368,154 @@ func GetOptionsMap(opts any) map[string]interface{} {
 	}
 
 	return optsMap
+}
+
+// CoerceInt converts a JSON-decoded numeric value to int. JSON numbers come in
+// as float64 from `encoding/json`, but rule_tester / test fixtures may pass
+// raw int / int32 / int64 / float32, so accept all of them. Returns
+// (value, true) on success, (0, false) for non-numeric inputs (including nil).
+func CoerceInt(v any) (int, bool) {
+	switch n := v.(type) {
+	case int:
+		return n, true
+	case int32:
+		return int(n), true
+	case int64:
+		return int(n), true
+	case float64:
+		return int(n), true
+	case float32:
+		return int(n), true
+	}
+	return 0, false
+}
+
+// GetOptionsString extracts a string option from the weakly-typed options parameter.
+// It handles both direct string format ("value") and array format (["value"]).
+func GetOptionsString(opts any) string {
+	if opts == nil {
+		return ""
+	}
+	if s, ok := opts.(string); ok {
+		return s
+	}
+	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
+		if s, ok := arr[0].(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+// ToStringSlice converts a weakly-typed JSON array ([]interface{}) to []string,
+// extracting only the string elements. Returns nil if the input is nil, not an array,
+// or contains no strings. Useful for parsing rule options from JSON config.
+func ToStringSlice(val interface{}) []string {
+	if val == nil {
+		return nil
+	}
+	arr, ok := val.([]interface{})
+	if !ok {
+		return nil
+	}
+	result := make([]string, 0, len(arr))
+	for _, item := range arr {
+		if s, ok := item.(string); ok {
+			result = append(result, s)
+		}
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+// NeedsLeadingSpaceForReplacement reports whether inserting `replacement`
+// at `insertPos` in `src` would merge with the preceding character into a
+// single identifier token. Callers use this when synthesizing a fix whose
+// text starts with an identifier (e.g. `Boolean(foo)`, `Number(foo)`,
+// `String(foo)`) to decide whether a leading space is required.
+//
+// Mirrors the identifier/keyword case of ESLint's `canTokensBeAdjacent`:
+// `typeof+foo` replaced with `Number(foo)` would otherwise become
+// `typeofNumber(foo)` (a single identifier). Multi-byte identifier chars
+// are handled via `scanner.IsIdentifierPart` / `scanner.IsIdentifierStart`.
+func NeedsLeadingSpaceForReplacement(src string, insertPos int, replacement string) bool {
+	if insertPos <= 0 || insertPos > len(src) || replacement == "" {
+		return false
+	}
+	firstRune, _ := utf8.DecodeRuneInString(replacement)
+	if firstRune == utf8.RuneError || !scanner.IsIdentifierStart(firstRune) {
+		return false
+	}
+	prevRune, _ := utf8.DecodeLastRuneInString(src[:insertPos])
+	if prevRune == utf8.RuneError {
+		return false
+	}
+	return scanner.IsIdentifierPart(prevRune)
+}
+
+// NaturalCompare compares two strings using natural sort order,
+// where embedded numeric segments are compared by their numeric value
+// (e.g., "a2" < "a10" instead of "a10" < "a2").
+// Returns -1 if a < b, 0 if a == b, 1 if a > b.
+func NaturalCompare(a, b string) int {
+	ra := []rune(a)
+	rb := []rune(b)
+	ai, bi := 0, 0
+	for ai < len(ra) && bi < len(rb) {
+		ca, cb := ra[ai], rb[bi]
+
+		if unicode.IsDigit(ca) && unicode.IsDigit(cb) {
+			na, nextA := extractRuneDigits(ra, ai)
+			nb, nextB := extractRuneDigits(rb, bi)
+			naTrimmed := strings.TrimLeft(na, "0")
+			nbTrimmed := strings.TrimLeft(nb, "0")
+			if naTrimmed == "" {
+				naTrimmed = "0"
+			}
+			if nbTrimmed == "" {
+				nbTrimmed = "0"
+			}
+			if len(naTrimmed) != len(nbTrimmed) {
+				if len(naTrimmed) < len(nbTrimmed) {
+					return -1
+				}
+				return 1
+			}
+			if naTrimmed < nbTrimmed {
+				return -1
+			}
+			if naTrimmed > nbTrimmed {
+				return 1
+			}
+			ai = nextA
+			bi = nextB
+		} else {
+			if ca < cb {
+				return -1
+			}
+			if ca > cb {
+				return 1
+			}
+			ai++
+			bi++
+		}
+	}
+
+	if ai < len(ra) {
+		return 1
+	}
+	if bi < len(rb) {
+		return -1
+	}
+	return 0
+}
+
+func extractRuneDigits(runes []rune, start int) (string, int) {
+	end := start
+	for end < len(runes) && unicode.IsDigit(runes[end]) {
+		end++
+	}
+	return string(runes[start:end]), end
 }

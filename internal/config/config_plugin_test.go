@@ -48,23 +48,6 @@ func TestRulePluginPrefix(t *testing.T) {
 	}
 }
 
-func TestGetPluginRules(t *testing.T) {
-	RegisterAllRules()
-
-	tsRules := GetPluginRules("@typescript-eslint")
-	if len(tsRules) == 0 {
-		t.Error("Expected at least one TS rule")
-	}
-
-	// Verify we only get TS-ESLint rules, not core or import rules.
-	// GetPluginRules filters by registry key prefix, so the returned count
-	// should be less than all rules.
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if len(tsRules) >= len(allRules) {
-		t.Errorf("Expected fewer plugin rules than total rules, got %d vs %d", len(tsRules), len(allRules))
-	}
-}
-
 func TestGetCoreRules(t *testing.T) {
 	RegisterAllRules()
 
@@ -81,16 +64,16 @@ func TestGetCoreRules(t *testing.T) {
 	}
 }
 
-func TestGetPluginRules_Disjoint(t *testing.T) {
+func TestRules_Disjoint(t *testing.T) {
 	RegisterAllRules()
 
-	tsRules := GetPluginRules("@typescript-eslint")
-	coreRules := GetCoreRules()
-	importRules := GetPluginRules("import")
-	reactRules := GetPluginRules("react")
+	// Sum across core + every known plugin's GetAllRules, so this test does not
+	// need to be edited each time a new plugin is added.
+	total := len(GetCoreRules())
+	for _, plugin := range KnownPlugins {
+		total += len(plugin.getAllRules())
+	}
 
-	// Together they should cover all registered rules
-	total := len(tsRules) + len(coreRules) + len(importRules) + len(reactRules)
 	allRules := GlobalRuleRegistry.GetAllRules()
 	if total != len(allRules) {
 		t.Errorf("Expected total %d to equal all rules %d", total, len(allRules))
@@ -131,19 +114,6 @@ func TestKnownPlugins_GetAllRulesMatchRulePrefix(t *testing.T) {
 	}
 }
 
-func TestKnownPlugins_GetAllRulesConsistentWithGetPluginRules(t *testing.T) {
-	RegisterAllRules()
-
-	for _, plugin := range KnownPlugins {
-		fromGetAll := plugin.getAllRules()
-		fromRegistry := GetPluginRules(plugin.RulePrefix)
-		if len(fromGetAll) != len(fromRegistry) {
-			t.Errorf("Plugin %q: getAllRules() returned %d rules but GetPluginRules returned %d",
-				plugin.RulePrefix, len(fromGetAll), len(fromRegistry))
-		}
-	}
-}
-
 func TestGetConfigForFile_MergesPlugins(t *testing.T) {
 	config := RslintConfig{
 		{
@@ -159,6 +129,7 @@ func TestGetConfigForFile_MergesPlugins(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.tsx", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// Both plugins should be merged
@@ -181,6 +152,7 @@ func TestGetConfigForFile_NormalizesEslintPluginPrefix(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// "eslint-plugin-import" should be normalized to "import"
@@ -207,6 +179,7 @@ func TestGetConfigForFile_PluginsOnlyFromMatchingEntries(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config for .ts file")
+		return
 	}
 	if _, ok := merged.Plugins["@typescript-eslint"]; !ok {
 		t.Error("Expected @typescript-eslint plugin for .ts file")
@@ -219,6 +192,7 @@ func TestGetConfigForFile_PluginsOnlyFromMatchingEntries(t *testing.T) {
 	merged = config.GetConfigForFile("src/app.jsx", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config for .jsx file")
+		return
 	}
 	if _, ok := merged.Plugins["react"]; !ok {
 		t.Error("Expected react plugin for .jsx file")
@@ -244,6 +218,7 @@ func TestGetConfigForFile_MultiplePluginsInSameEntry(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.tsx", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	if _, ok := merged.Plugins["@typescript-eslint"]; !ok {
@@ -268,6 +243,7 @@ func TestGetConfigForFile_DuplicatePluginInSameEntry(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	if _, ok := merged.Plugins["@typescript-eslint"]; !ok {
@@ -294,6 +270,7 @@ func TestGetConfigForFile_SamePluginDifferentNamesAcrossEntries(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// Both normalize to "import", so should be deduplicated to 1
@@ -320,6 +297,7 @@ func TestGetConfigForFile_PluginsEntry_WithAndWithoutPlugins(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// Plugins from entry1 should be present
@@ -346,6 +324,7 @@ func TestGetConfigForFile_SamePluginAcrossEntries(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	if _, ok := merged.Plugins["@typescript-eslint"]; !ok {
@@ -378,6 +357,7 @@ func TestGetConfigForFile_OverlappingPluginsAcrossEntries(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.tsx", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// Union: @typescript-eslint + react + import
@@ -408,6 +388,7 @@ func TestGetConfigForFile_AllEntriesNoPlugins(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	if len(merged.Plugins) != 0 {
@@ -430,6 +411,7 @@ func TestGetConfigForFile_EmptyPluginsArray(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// Only entry1's plugin should be present; empty array contributes nothing
@@ -460,6 +442,7 @@ func TestGetConfigForFile_ThreeEntries_MixedPlugins(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.tsx", "")
 	if merged == nil {
 		t.Fatal("Expected non-nil config")
+		return
 	}
 
 	// Union of entry1 + entry3 plugins; entry2 contributes none

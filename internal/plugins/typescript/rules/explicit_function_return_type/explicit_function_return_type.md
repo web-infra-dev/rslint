@@ -4,18 +4,24 @@
 
 Require explicit return types on functions and class methods.
 
+Functions in TypeScript often don't need to be given an explicit return type annotation. Leaving off the return type is less code to read or write and allows the compiler to infer it from the contents of the function. However, explicit return types do make it visually more clear what type is returned by a function and can speed up TypeScript type checking performance in large codebases.
+
 Examples of **incorrect** code for this rule:
 
 ```typescript
-function foo() {
+function test() {
   return;
 }
 
-const bar = () => 'value';
+var fn = function () {
+  return 1;
+};
+
+var arrowFn = () => 'test';
 
 class Test {
   method() {
-    return 1;
+    return;
   }
 }
 ```
@@ -23,39 +29,22 @@ class Test {
 Examples of **correct** code for this rule:
 
 ```typescript
-function foo(): void {
+function test(): void {
   return;
 }
 
-const bar = (): string => 'value';
+var fn = function (): number {
+  return 1;
+};
+
+var arrowFn = (): string => 'test';
 
 class Test {
-  method(): number {
-    return 1;
+  method(): void {
+    return;
   }
 }
 ```
-
-## Options
-
-This rule accepts an options object with the following fields (defaults shown):
-
-- `allowConciseArrowFunctionExpressionsStartingWithVoid`: `false`
-  - Allows `() => void expr` style arrows without explicit return types.
-- `allowDirectConstAssertionInArrowFunctions`: `true`
-  - Allows direct `as const` assertions in arrow bodies without explicit return types.
-- `allowedNames`: `[]`
-  - Function names that are exempt from this rule.
-- `allowExpressions`: `false`
-  - Allows function expressions in expression positions without explicit return types.
-- `allowFunctionsWithoutTypeParameters`: `false`
-  - Skips functions that have no type parameters.
-- `allowHigherOrderFunctions`: `true`
-  - Allows functions that immediately return another function expression.
-- `allowIIFEs`: `false`
-  - Allows immediately-invoked function expressions.
-- `allowTypedFunctionExpressions`: `true`
-  - Allows function expressions that are already typed by context (e.g. assignments, parameters).
 
 ## Original Documentation
 

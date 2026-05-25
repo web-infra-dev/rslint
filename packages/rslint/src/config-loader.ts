@@ -1,21 +1,13 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-export const JS_CONFIG_FILES = [
-  'rslint.config.js',
-  'rslint.config.mjs',
-  'rslint.config.ts',
-  'rslint.config.mts',
-];
-
-export function findJSConfig(cwd: string): string | null {
-  for (const name of JS_CONFIG_FILES) {
-    const p = path.join(cwd, name);
-    if (fs.existsSync(p)) return p;
-  }
-  return null;
-}
+// Re-export utilities that external consumers may depend on
+export {
+  JS_CONFIG_FILES,
+  findJSConfig,
+  findJSConfigUp,
+  findJSConfigsInDir,
+} from './utils/config-discovery.js';
 
 /**
  * Load a JS/TS config file.

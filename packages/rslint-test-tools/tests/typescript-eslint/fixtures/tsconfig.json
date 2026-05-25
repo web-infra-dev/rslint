@@ -17,6 +17,7 @@
   "include": [
     "virtual.tsx",
     "virtual.ts",
+    "decl.d.ts",
     "file.ts",
     "consistent-type-exports.ts",
     "deprecated.ts",

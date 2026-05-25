@@ -5499,3 +5499,244 @@ await (<Promise<number>>{});
 		},
 	})
 }
+
+// TestNoFloatingPromisesOptionParsing exercises the JSON options fallback path
+// that the CLI and JS configs actually hit. The main TestNoFloatingPromisesRule
+// passes NoFloatingPromisesOptions structs directly, which short-circuits the
+// type assertion and never exercises the JSON round-trip. This test covers the
+// shapes config.go and the JS rule tester produce:
+//   - nil (no options element)
+//   - bare map (single-option entry, unwrapped by config.go:414)
+//   - array-wrapped map (multi-element, or rule_tester with len>1)
+//   - empty array
+//   - multi-element array (only arr[0] is consumed)
+//   - malformed values (silently ignored, defaults retained)
+func TestNoFloatingPromisesOptionParsing(t *testing.T) {
+	// A thenable that matches the `.then(onFulfilled, onRejected)` shape.
+	// Triggers only when checkThenables=true; used to prove the option landed.
+	thenableCode := `
+interface MyThenable {
+  then(onFulfilled: () => void, onRejected: () => void): MyThenable;
+}
+declare function createMyThenable(): MyThenable;
+createMyThenable();
+`
+	// A plain Promise that's void-ignored. Triggers only when ignoreVoid=false.
+	voidPromiseCode := `
+async function test() {
+  void Promise.resolve('value');
+}
+`
+	// A plain unhandled Promise — always triggers regardless of options.
+	plainPromiseCode := `
+async function test() {
+  Promise.resolve('value');
+}
+`
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoFloatingPromisesRule,
+		[]rule_tester.ValidTestCase{
+			// nil options: defaults (checkThenables=false) — thenable is NOT reported.
+			{Code: thenableCode},
+			// Bare map without checkThenables — defaults retained — thenable NOT reported.
+			{Code: thenableCode, Options: map[string]interface{}{}},
+			// Array-wrapped map with checkThenables explicitly false.
+			{
+				Code:    thenableCode,
+				Options: []interface{}{map[string]interface{}{"checkThenables": false}},
+			},
+			// Empty array: treated as no options → defaults retained.
+			{Code: thenableCode, Options: []interface{}{}},
+			// Default ignoreVoid=true: void Promise is NOT reported.
+			{Code: voidPromiseCode},
+			// Bare map with ignoreVoid=true (explicit default).
+			{Code: voidPromiseCode, Options: map[string]interface{}{"ignoreVoid": true}},
+			// Malformed: wrong type for checkThenables (string instead of bool).
+			// json.Unmarshal fails on the field; we keep the default (false).
+			{Code: thenableCode, Options: map[string]interface{}{"checkThenables": "yes"}},
+			// Completely unknown keys are ignored without tripping defaults.
+			{Code: thenableCode, Options: map[string]interface{}{"bogusKey": 42}},
+			// Multi-element array: only arr[0] is consumed. arr[0] turns checkThenables off,
+			// so thenable is NOT reported even though arr[1] would have turned it on.
+			{
+				Code: thenableCode,
+				Options: []interface{}{
+					map[string]interface{}{"checkThenables": false},
+					map[string]interface{}{"checkThenables": true},
+				},
+			},
+			// Nested allowForKnownSafePromises shape (array of TypeOrValueSpecifier maps)
+			// round-trips through JSON and suppresses the otherwise-floating thenable.
+			{
+				Code: `
+interface SafePromise<T> extends Promise<T> {
+  brand: 'safe';
+}
+declare const createSafePromise: () => SafePromise<string>;
+createSafePromise();
+`,
+				Options: map[string]interface{}{
+					"checkThenables": true,
+					"allowForKnownSafePromises": []interface{}{
+						map[string]interface{}{"from": "file", "name": "SafePromise"},
+					},
+				},
+			},
+			// Inline string-array option (allowForKnownSafePromisesInline) via JSON path.
+			{
+				Code: `
+interface SafePromise<T> extends Promise<T> {
+  brand: 'safe';
+}
+declare const createSafePromise: () => SafePromise<string>;
+createSafePromise();
+`,
+				Options: map[string]interface{}{
+					"allowForKnownSafePromisesInline": []interface{}{"SafePromise"},
+				},
+			},
+			// Combined options (multiple flags set at once) via JSON path.
+			// ignoreVoid=true + checkThenables=true + ignoreIIFE=true — the async IIFE
+			// is suppressed but a bare thenable still isn't (wait — thenable IS reported).
+			// To keep this Valid, the code contains an ignored async IIFE only.
+			{
+				Code: `
+(async () => {
+  await Promise.resolve();
+})();
+`,
+				Options: map[string]interface{}{
+					"ignoreVoid":     true,
+					"checkThenables": true,
+					"ignoreIIFE":     true,
+				},
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Bare map (config.go shape): checkThenables=true reaches the Go rule.
+			{
+				Code:    thenableCode,
+				Options: map[string]interface{}{"checkThenables": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Line:      6,
+						MessageId: "floatingVoid",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "floatingFixVoid", Output: `
+interface MyThenable {
+  then(onFulfilled: () => void, onRejected: () => void): MyThenable;
+}
+declare function createMyThenable(): MyThenable;
+void createMyThenable();
+`},
+							{MessageId: "floatingFixAwait", Output: `
+interface MyThenable {
+  then(onFulfilled: () => void, onRejected: () => void): MyThenable;
+}
+declare function createMyThenable(): MyThenable;
+await createMyThenable();
+`},
+						},
+					},
+				},
+			},
+			// Array-wrapped map (rule_tester multi-element / explicit array shape).
+			{
+				Code:    thenableCode,
+				Options: []interface{}{map[string]interface{}{"checkThenables": true}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Line:      6,
+						MessageId: "floatingVoid",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "floatingFixVoid", Output: `
+interface MyThenable {
+  then(onFulfilled: () => void, onRejected: () => void): MyThenable;
+}
+declare function createMyThenable(): MyThenable;
+void createMyThenable();
+`},
+							{MessageId: "floatingFixAwait", Output: `
+interface MyThenable {
+  then(onFulfilled: () => void, onRejected: () => void): MyThenable;
+}
+declare function createMyThenable(): MyThenable;
+await createMyThenable();
+`},
+						},
+					},
+				},
+			},
+			// ignoreVoid=false via bare map — void-wrapped Promise now reports.
+			// With ignoreVoid=false the rule descends into `void <expr>` and reports
+			// `floating` (non-void form) with only the await suggestion.
+			{
+				Code:    voidPromiseCode,
+				Options: map[string]interface{}{"ignoreVoid": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Line:      3,
+						MessageId: "floating",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "floatingFixAwait", Output: `
+async function test() {
+  await Promise.resolve('value');
+}
+`},
+						},
+					},
+				},
+			},
+			// ignoreIIFE=false via array-wrapped map — async IIFE now reports.
+			{
+				Code: `
+(async () => {
+  await Promise.resolve();
+})();
+`,
+				Options: []interface{}{map[string]interface{}{"ignoreIIFE": false}},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Line:      2,
+						MessageId: "floatingVoid",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "floatingFixVoid", Output: `
+void (async () => {
+  await Promise.resolve();
+})();
+`},
+							{MessageId: "floatingFixAwait", Output: `
+await (async () => {
+  await Promise.resolve();
+})();
+`},
+						},
+					},
+				},
+			},
+			// Sanity: with nil options, a plain unhandled Promise still reports
+			// (proves the nil branch doesn't accidentally disable the rule).
+			{
+				Code: plainPromiseCode,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Line:      3,
+						MessageId: "floatingVoid",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "floatingFixVoid", Output: `
+async function test() {
+  void Promise.resolve('value');
+}
+`},
+							{MessageId: "floatingFixAwait", Output: `
+async function test() {
+  await Promise.resolve('value');
+}
+`},
+						},
+					},
+				},
+			},
+		},
+	)
+}

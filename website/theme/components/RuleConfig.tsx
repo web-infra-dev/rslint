@@ -1,29 +1,18 @@
 import React from 'react';
 import { CodeBlockRuntime } from '@rspress/core/theme';
+import { PLUGIN_REGISTRY } from '../plugin-registry';
 
-/**
- * Mapping from plugin group to the import name and preset used in rslint config.
- * Core eslint rules use `js`, everything else maps to its plugin export.
- */
-const GROUP_CONFIG: Record<string, { importName: string; preset: string }> = {
-  eslint: { importName: 'js', preset: 'js.configs.recommended' },
-  '@typescript-eslint': { importName: 'ts', preset: 'ts.configs.recommended' },
-  'eslint-plugin-import': {
-    importName: 'importPlugin',
-    preset: 'importPlugin.configs.recommended',
-  },
-  react: {
-    importName: 'reactPlugin',
-    preset: 'reactPlugin.configs.recommended',
-  },
-};
+const GROUP_CONFIG: Record<string, { importName: string; preset: string }> =
+  Object.fromEntries(
+    PLUGIN_REGISTRY.filter((p) => p.presets.length > 0).map((p) => [
+      p.group,
+      { importName: p.importName, preset: p.presets[0]!.name },
+    ]),
+  );
 
 /**
  * Displays a complete rslint configuration snippet that users can copy
  * for a specific rule. Includes the correct import, preset, and rule override.
- *
- * Registered as a global MDX component via the rule-manifest plugin,
- * so rule pages can use <RuleConfig name="..." group="..." /> without importing.
  */
 export const RuleConfig: React.FC<{ name: string; group: string }> = ({
   name,
@@ -31,8 +20,6 @@ export const RuleConfig: React.FC<{ name: string; group: string }> = ({
 }) => {
   const config = GROUP_CONFIG[group];
 
-  // Known group: show full config with import and preset
-  // Unknown group: show minimal config with just the rule override
   const code = config
     ? `import { defineConfig, ${config.importName} } from '@rslint/core';
 

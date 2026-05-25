@@ -5,7 +5,7 @@ import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 
 const ruleTester = new RuleTester();
 
-ruleTester.run('no-shadow TS tests', {
+ruleTester.run('no-shadow', {
   invalid: [
     {
       code: `
@@ -94,6 +94,8 @@ const x = 1;
       options: [{ ignoreTypeValueShadow: false }],
     },
     {
+      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
+      skip: true,
       code: `
 type Foo = 1;
       `,
@@ -136,6 +138,8 @@ type Fn = (test: string) => typeof test;
       options: [{ ignoreFunctionTypeParameterNameValueShadow: false }],
     },
     {
+      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
+      skip: true,
       code: `
 type Fn = (Foo: string) => typeof Foo;
       `,
@@ -822,6 +826,8 @@ type A = 1;
     },
 
     {
+      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
+      skip: true,
       code: `
 function foo<T extends (...args: any[]) => any>(fn: T, args: any[]) {}
       `,
@@ -848,6 +854,8 @@ function foo<T extends (...args: any[]) => any>(fn: T, args: any[]) {}
       ],
     },
     {
+      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
+      skip: true,
       code: `
 declare const has = (environment: 'dev' | 'prod' | 'test') => boolean;
       `,
@@ -867,6 +875,8 @@ declare const has = (environment: 'dev' | 'prod' | 'test') => boolean;
       options: [{ builtinGlobals: true }],
     },
     {
+      // SKIP: depends on ESLint `languageOptions.globals` which rslint does not model.
+      skip: true,
       code: `
 declare const has: (environment: 'dev' | 'prod' | 'test') => boolean;
 const fn = (has: string) => {};

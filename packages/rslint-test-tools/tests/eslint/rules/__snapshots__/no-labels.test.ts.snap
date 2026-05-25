@@ -1,0 +1,2303 @@
+// Rstest Snapshot v1
+
+exports[`no-labels > invalid 1`] = `
+{
+  "code": "label: while(true) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 2`] = `
+{
+  "code": "A: do {} while (true);",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 3`] = `
+{
+  "code": "A: for (;;) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 4`] = `
+{
+  "code": "A: for (var x in obj) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 5`] = `
+{
+  "code": "A: for (var x of arr) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 6`] = `
+{
+  "code": "A: switch (a) { case 0: break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 7`] = `
+{
+  "code": "A: {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 8`] = `
+{
+  "code": "A: if (true) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 9`] = `
+{
+  "code": "A: var foo = 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 10`] = `
+{
+  "code": "A: foo();",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 11`] = `
+{
+  "code": "label: while (true) { break label; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 12`] = `
+{
+  "code": "label: while (true) { continue label; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in continue statement.",
+      "messageId": "unexpectedLabelInContinue",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 13`] = `
+{
+  "code": "A: while (true) { break A; continue A; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in continue statement.",
+      "messageId": "unexpectedLabelInContinue",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 14`] = `
+{
+  "code": "A: break A;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 15`] = `
+{
+  "code": "A: { if (foo()) { break A; } bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 16`] = `
+{
+  "code": "A: if (a) { if (foo()) { break A; } bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 17`] = `
+{
+  "code": "A: switch (a) { case 0: break A; default: break; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 18`] = `
+{
+  "code": "A: switch (a) { case 0: B: { break A; } default: break; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 19`] = `
+{
+  "code": "A: while (true) { B: for (;;) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 20`] = `
+{
+  "code": "A: while (true) { B: { continue A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in continue statement.",
+      "messageId": "unexpectedLabelInContinue",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 21`] = `
+{
+  "code": "A: { B: { C: while (true) { break A; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 22`] = `
+{
+  "code": "A: B: while (true) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 23`] = `
+{
+  "code": "A: B: while (true) { break A; break B; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 24`] = `
+{
+  "code": "A: B: while (true) { break B; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 25`] = `
+{
+  "code": "A: B: while (true) { break A; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 26`] = `
+{
+  "code": "A: B: C: while (true) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 27`] = `
+{
+  "code": "A: B: switch (a) { case 0: break B; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 28`] = `
+{
+  "code": "A: { A: while (true) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 29`] = `
+{
+  "code": "A: { A: while (true) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 30`] = `
+{
+  "code": "A: var foo = 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 31`] = `
+{
+  "code": "A: break A;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 32`] = `
+{
+  "code": "A: { if (foo()) { break A; } bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 33`] = `
+{
+  "code": "A: if (a) { if (foo()) { break A; } bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 34`] = `
+{
+  "code": "A: switch (a) { case 0: break A; default: break; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 35`] = `
+{
+  "code": "A: var foo = 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 36`] = `
+{
+  "code": "A: break A;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 37`] = `
+{
+  "code": "A: { if (foo()) { break A; } bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 38`] = `
+{
+  "code": "A: if (a) { if (foo()) { break A; } bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 39`] = `
+{
+  "code": "A: while (a) { break A; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 40`] = `
+{
+  "code": "A: do { if (b) { break A; } } while (a);",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 41`] = `
+{
+  "code": "A: for (var a in obj) { for (;;) { switch (a) { case 0: break A; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 42`] = `
+{
+  "code": "A: { break A; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 43`] = `
+{
+  "code": "A: if (true) { break A; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 44`] = `
+{
+  "code": "A: var foo = 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 45`] = `
+{
+  "code": "A: while (true) { B: { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 46`] = `
+{
+  "code": "A: while (true) { B: { continue A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 47`] = `
+{
+  "code": "A: switch (a) { case 0: B: { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 48`] = `
+{
+  "code": "A:
+  while (true) {
+    break A;
+  }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 49`] = `
+{
+  "code": "A: while (true) {} B: for (;;) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 50`] = `
+{
+  "code": "A: { break A; } B: while (true) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 51`] = `
+{
+  "code": "A: { break A; } B: while (true) { break B; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 52`] = `
+{
+  "code": "A: while (true) { B: while (true) { break A; break B; continue A; continue B; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 82,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in continue statement.",
+      "messageId": "unexpectedLabelInContinue",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in continue statement.",
+      "messageId": "unexpectedLabelInContinue",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 53`] = `
+{
+  "code": "function f() { A: while (true) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 54`] = `
+{
+  "code": "var f = () => { A: while (true) { break A; } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 55`] = `
+{
+  "code": "class C { method() { A: while (true) { break A; } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+    {
+      "message": "Unexpected label in break statement.",
+      "messageId": "unexpectedLabelInBreak",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 56`] = `
+{
+  "code": "A: function f() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 57`] = `
+{
+  "code": "A: class C {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 58`] = `
+{
+  "code": "A: ;",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-labels > invalid 59`] = `
+{
+  "code": "A: try {} catch (e) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected labeled statement.",
+      "messageId": "unexpectedLabel",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,33 @@
+name: Benchmark Go
+
+on:
+  workflow_call:
+
+jobs:
+  benchmark-go:
+    name: Run Go benchmarks
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GOMAXPROCS: 8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version: '1.26.0'
+          cache: false
+
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@d872884a306dd4853acf0f584f4b706cf0cc72a2
+        with:
+          mode: walltime
+          run: go test -bench=. -benchtime=5s ./tests/bench-go/
+          go-runner-version: 1.1.0

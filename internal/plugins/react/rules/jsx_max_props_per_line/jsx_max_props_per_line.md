@@ -1,4 +1,4 @@
-# react/jsx-max-props-per-line
+# jsx-max-props-per-line
 
 ## Rule Details
 

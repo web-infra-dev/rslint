@@ -1,0 +1,1037 @@
+// Rstest Snapshot v1
+
+exports[`no-unused-vars > invalid 1`] = `
+{
+  "code": "
+function foox() {
+  return foox();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'foox' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 2`] = `
+{
+  "code": "
+(function () {
+  function foox() {
+    if (true) {
+      return foox();
+    }
+  }
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "'foox' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 3`] = `
+{
+  "code": "var a = 10;",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 4`] = `
+{
+  "code": "
+function f() {
+  var a = 1;
+  return function () {
+    f((a *= 2));
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'f' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 5`] = `
+{
+  "code": "
+function f() {
+  var a = 1;
+  return function () {
+    f(++a);
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'f' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 6`] = `
+{
+  "code": "
+function foo(first, second) {
+  doStuff(function () {
+    console.log(second);
+  });
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 7`] = `
+{
+  "code": "var a = 10;",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 8`] = `
+{
+  "code": "
+var a = 10;
+a = 20;
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 9`] = `
+{
+  "code": "
+var a = 10;
+(function () {
+  var a = 1;
+  alert(a);
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 10`] = `
+{
+  "code": "
+var a = 10,
+  b = 0,
+  c = null;
+alert(a + b);
+      ",
+  "diagnostics": [
+    {
+      "message": "'c' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 11`] = `
+{
+  "code": "
+var a = 10,
+  b = 0,
+  c = null;
+setTimeout(function () {
+  var b = 2;
+  alert(a + b + c);
+}, 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 12`] = `
+{
+  "code": "
+var a = 10,
+  b = 0,
+  c = null;
+setTimeout(function () {
+  var b = 2;
+  var c = 2;
+  alert(a + b + c);
+}, 0);
+      ",
+  "diagnostics": [
+    {
+      "message": "'b' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
+      "message": "'c' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 13`] = `
+{
+  "code": "
+function f() {
+  var a = [];
+  return a.map(function () {});
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'f' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 14`] = `
+{
+  "code": "
+function f() {
+  var a = [];
+  return a.map(function g() {});
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'f' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 15`] = `
+{
+  "code": "
+function foo() {
+  function foo(x) {
+    return x;
+  }
+  return function () {
+    return foo;
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 16`] = `
+{
+  "code": "
+function f() {
+  var x;
+  function a() {
+    x = 42;
+  }
+  function b() {
+    alert(x);
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'f' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
+      "message": "'a' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
+      "message": "'b' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 17`] = `
+{
+  "code": "
+function f(a) {}
+f();
+      ",
+  "diagnostics": [
+    {
+      "message": "'a' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 18`] = `
+{
+  "code": "
+function a(x, y, z) {
+  return y;
+}
+a();
+      ",
+  "diagnostics": [
+    {
+      "message": "'z' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 19`] = `
+{
+  "code": "var min = Math.min;",
+  "diagnostics": [
+    {
+      "message": "'min' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 20`] = `
+{
+  "code": "var min = { min: 1 };",
+  "diagnostics": [
+    {
+      "message": "'min' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 21`] = `
+{
+  "code": "
+Foo.bar = function (baz) {
+  return 1;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "'baz' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 22`] = `
+{
+  "code": "var min = { min: 1 };",
+  "diagnostics": [
+    {
+      "message": "'min' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 23`] = `
+{
+  "code": "
+function gg(baz, bar) {
+  return baz;
+}
+gg();
+      ",
+  "diagnostics": [
+    {
+      "message": "'bar' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 24`] = `
+{
+  "code": "
+(function (foo, baz, bar) {
+  return baz;
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "'bar' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 25`] = `
+{
+  "code": "
+(function (foo, baz, bar) {
+  return baz;
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "'foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
+      "message": "'bar' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 26`] = `
+{
+  "code": "
+(function z(foo) {
+  var bar = 33;
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "'foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
+      "message": "'bar' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 27`] = `
+{
+  "code": "
+(function z(foo) {
+  z();
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "'foo' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 28`] = `
+{
+  "code": "
+function f() {
+  var a = 1;
+  return function () {
+    f((a = 2));
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'f' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+    {
+      "message": "'a' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 8,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 29`] = `
+{
+  "code": "import x from 'y';",
+  "diagnostics": [
+    {
+      "message": "'x' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 30`] = `
+{
+  "code": "
+export function fn2({ x, y }) {
+  console.log(x);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'y' is assigned a value but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 26,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-vars > invalid 31`] = `
+{
+  "code": "
+export function fn2(x, y) {
+  console.log(x);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "'y' is defined but never used.",
+      "messageId": "unusedVar",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unused-vars",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

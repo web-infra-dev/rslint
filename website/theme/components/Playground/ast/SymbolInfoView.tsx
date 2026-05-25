@@ -77,6 +77,7 @@ export const getSymbolTitle = (info: SymbolInfo) => {
 // Helper to get preview for top-level display
 export const getSymbolPreview = (info: SymbolInfo) => {
   return (
-    info.flagNames?.map(n => n.replace('ast.SymbolFlags', '')).join(' | ') || ''
+    info.flagNames?.map((n) => n.replace('ast.SymbolFlags', '')).join(' | ') ||
+    ''
   );
 };

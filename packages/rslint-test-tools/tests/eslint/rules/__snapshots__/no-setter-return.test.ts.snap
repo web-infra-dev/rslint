@@ -1,0 +1,1020 @@
+// Rstest Snapshot v1
+
+exports[`no-setter-return > invalid 1`] = `
+{
+  "code": "({ set a(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 2`] = `
+{
+  "code": "class A { set a(val) { return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 3`] = `
+{
+  "code": "class A { static set a(val) { return 1; } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 4`] = `
+{
+  "code": "(class { set a(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 5`] = `
+{
+  "code": "class A { set a(val) { return undefined; } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 6`] = `
+{
+  "code": "({ set a(val) { if (foo) { return 1; }; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 7`] = `
+{
+  "code": "({ set a(val) { return 1; }, set b(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 8`] = `
+{
+  "code": "({ set a(val) { if(val) { return 1; } else { return 2 }; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 9`] = `
+{
+  "code": "({ set a(val) { if(val) { return 1; } else { return; }; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 10`] = `
+{
+  "code": "(class { set a(val) { while (foo){ if (bar) break; else return 1; } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 11`] = `
+{
+  "code": "(class { static set a(val) { if (val > 0) { (this as any)._val = val; return val; } return false; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 82,
+          "line": 1,
+        },
+        "start": {
+          "column": 71,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 98,
+          "line": 1,
+        },
+        "start": {
+          "column": 85,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 12`] = `
+{
+  "code": "class A { set a(val) { switch(val) { case 1: return x; case 2: return; default: return z } } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 89,
+          "line": 1,
+        },
+        "start": {
+          "column": 81,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 13`] = `
+{
+  "code": "(class { set a(val) { function b(){ return 1; } return 2; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 14`] = `
+{
+  "code": "({ set a(val) { function b(){ return; } return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 15`] = `
+{
+  "code": "Object.defineProperty(foo, 'bar', { set(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 16`] = `
+{
+  "code": "Reflect.defineProperty(foo, 'bar', { set(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 17`] = `
+{
+  "code": "Object.defineProperties(foo, { baz: { set(val) { return 1; } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 18`] = `
+{
+  "code": "Object.create(null, { baz: { set(val) { return 1; } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 19`] = `
+{
+  "code": "Object.defineProperty(foo, 'bar', { set: (val: any) => val })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 20`] = `
+{
+  "code": "Object.create(null, { baz: { set(val) { return (this as any)._val; return; return undefined; } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 93,
+          "line": 1,
+        },
+        "start": {
+          "column": 76,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 21`] = `
+{
+  "code": "Object.create({}, { baz: { set(val) { return 1; } }, bar: { set: (val: any) => 1 } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 80,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 22`] = `
+{
+  "code": "Object['defineProperty'](foo, 'bar', { set: function bar(val: any) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 79,
+          "line": 1,
+        },
+        "start": {
+          "column": 70,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 23`] = `
+{
+  "code": "Object[\`defineProperties\`](foo, { baz: { ['set'](val) { return 1; } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 24`] = `
+{
+  "code": "Object?.defineProperty(foo, 'bar', { set(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 25`] = `
+{
+  "code": "(Object?.defineProperty)(foo, 'bar', { set(val) { return 1; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 26`] = `
+{
+  "code": "({ set a(val) { return { set b(v) { return 1; } }; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 27`] = `
+{
+  "code": "({ set a(val) { if (x) { if (y) { if (z) { return 1; } } } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 28`] = `
+{
+  "code": "class A { set a(val) { try { return 1; } catch(e) { return 2; } finally { } } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 29`] = `
+{
+  "code": "class A { set a(val) { return val as any; } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 30`] = `
+{
+  "code": "class A { set a(val) { return val!; } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 31`] = `
+{
+  "code": "Object.defineProperty(foo, 'bar', { set: (val: any) => val > 0 ? val : -val })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 32`] = `
+{
+  "code": "Object.defineProperty(foo, 'a', { set(val) { Object.defineProperty(bar, 'b', { set(v) { return 1; } }); return 2; } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 98,
+          "line": 1,
+        },
+        "start": {
+          "column": 89,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 114,
+          "line": 1,
+        },
+        "start": {
+          "column": 105,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 33`] = `
+{
+  "code": "({ set a(val) { return [1,2,3].map(function(x: any) { return x * 2; }); } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 34`] = `
+{
+  "code": "({ set a(val) { for (var i = 0; i < 10; i++) { return i; } } })",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "returnsValue",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

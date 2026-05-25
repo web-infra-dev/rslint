@@ -1,0 +1,494 @@
+// Rstest Snapshot v1
+
+exports[`no-irregular-whitespace > invalid 1`] = `
+{
+  "code": "var any  = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 2`] = `
+{
+  "code": "var any   = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 3`] = `
+{
+  "code": "var any ﻿ = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 4`] = `
+{
+  "code": "var any 　 = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 5`] = `
+{
+  "code": "var any   = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 6`] = `
+{
+  "code": "var any   = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 1,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 7`] = `
+{
+  "code": "var any 　 = 'thing', other 　 = 'thing';
+var third 　 = 'thing';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 8`] = `
+{
+  "code": "// ",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 9`] = `
+{
+  "code": "/*   */",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 10`] = `
+{
+  "code": "var any = /　/, other = //;",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 11`] = `
+{
+  "code": "var any = '　', other = '';",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 12`] = `
+{
+  "code": "var any = \`　\`, other = \`\`;",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 13`] = `
+{
+  "code": "\`something \${　 10} another thing\`",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 14`] = `
+{
+  "code": "　
+\`　template\`",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 15`] = `
+{
+  "code": "var foo =  bar;",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-irregular-whitespace > invalid 16`] = `
+{
+  "code": "",
+  "diagnostics": [
+    {
+      "message": "Irregular whitespace not allowed.",
+      "messageId": "noIrregularWhitespace",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-irregular-whitespace",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

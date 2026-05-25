@@ -1,0 +1,15 @@
+export default [
+  {
+    files: [],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ['./tsconfig.files.json', './tsconfig.virtual.json'],
+      },
+    },
+    rules: {
+      'react-hooks/exhaustive-deps': 'warn',
+    },
+    plugins: ['react-hooks'],
+  },
+];

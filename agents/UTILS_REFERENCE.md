@@ -58,6 +58,15 @@ heritageClauses := utils.GetHeritageClauses(classNode) // *ast.NodeList
 
 // Check if a node has a specific modifier (e.g., async, static, public)
 isAsync := utils.IncludesModifier(funcNode, ast.KindAsyncKeyword)
+
+// Whether a node could plausibly evaluate to an Error object — mirrors
+// ESLint's astUtils.couldBeError. Unwraps parens + TS assertions internally.
+// Used by no-throw-literal, prefer-promise-reject-errors, etc.
+mayBeError := utils.CouldBeError(node)
+
+// Whether a node, after unwrapping parens + TS assertions, is the literal
+// identifier `undefined`. Lexical check only — does not detect `void 0`.
+isUndef := utils.IsUndefinedIdentifier(node)
 ```
 
 ### Collection Operations (Generic)
@@ -78,6 +87,14 @@ optsMap := utils.GetOptionsMap(options)
 if optsMap != nil {
     // Parse options from optsMap...
 }
+```
+
+### String Comparison
+
+```go
+// Natural sort comparison: embedded numbers compared numerically (e.g., "a2" < "a10")
+// Returns -1, 0, or 1
+result := utils.NaturalCompare("item2", "item10") // -1
 ```
 
 ### Other Utilities
@@ -385,6 +402,132 @@ exists := set.Has("b")
 length := set.Len()
 set.Clear()
 ```
+
+---
+
+## `shim/ast/` - AST Utilities
+
+```go
+import "github.com/microsoft/typescript-go/shim/ast"
+```
+
+Reach for these **before** writing a helper of your own — the shim already covers a wide surface. This list is curated to the functions most commonly reused when porting rules; see `shim/ast/shim.go` for the full inventory.
+
+### Navigation (paren-transparency)
+
+Use these instead of hand-rolled loops. See [AST_PATTERNS.md § ParenthesizedExpression](./AST_PATTERNS.md#parenthesizedexpression).
+
+- `ast.SkipParentheses(node)` — innermost non-paren expression
+- `ast.WalkUpParenthesizedExpressions(node)` — first non-paren ancestor
+
+### Optional chain
+
+- `ast.IsOptionalChain(node)` — true iff node is in an optional chain
+- `ast.IsOptionalChainRoot(node)` — true iff node introduces the chain
+- `ast.IsOutermostOptionalChain(node)` — true iff node is the top of its chain
+- Flag: `ast.NodeFlagsOptionalChain`
+
+### Node-kind predicates (prefer over `node.Kind == ast.Kind*`)
+
+- `ast.IsStringLiteralLike(node)` — covers `KindStringLiteral` + `KindNoSubstitutionTemplateLiteral`
+- `ast.IsTemplateLiteralKind(kind)` — any of the `KindTemplate*` family
+- `ast.IsNumericLiteral(node)`
+- `ast.IsIdentifier(node)`
+- `ast.IsCallExpression(node)`, `ast.IsNewExpression(node)`
+- `ast.IsBinaryExpression(node)` (check `OperatorToken.Kind` separately for specific operator matching)
+- `ast.IsPropertyAccessExpression(node)`, `ast.IsElementAccessExpression(node)`
+- `ast.IsAssignmentExpression(node, excludeCompoundAssignment)`
+- `ast.IsBindingPattern(node)` — object / array destructuring
+- `ast.IsClassLike(node)` — class declaration or expression
+- `ast.IsIterationStatement(node, lookInLabeledStatements)` — for/while variants
+
+### Function-like
+
+- `ast.IsFunctionLike(node)` / `ast.IsFunctionLikeDeclaration(node)` — covers all 7 function-like kinds
+- `ast.IsFunctionLikeOrClassStaticBlockDeclaration(node)`
+- `ast.GetThisContainer(node, …, …)` — **warning**: treats `PropertyDeclaration`, `ClassStaticBlockDeclaration`, `ModuleDeclaration`, etc. as `this` containers, which does NOT match ESLint's scope model; verify before reusing
+
+### Modifiers
+
+- `ast.HasSyntacticModifier(node, flags)` — bit-flag check (readonly, static, abstract, …)
+- `ast.GetCombinedModifierFlags(node)`
+
+---
+
+## `shim/scanner/` - Scanner Utilities
+
+```go
+import "github.com/microsoft/typescript-go/shim/scanner"
+```
+
+### SkipTrivia
+
+Skip whitespace, comments (line and block), BOM, shebang, and conflict markers to find the next token position:
+
+```go
+// Find the start position of the next meaningful token
+sourceText := ctx.SourceFile.Text()
+nextTokenPos := scanner.SkipTrivia(sourceText, startPos)
+```
+
+### Identifier character classification
+
+Unicode-aware, matches the scanner's own lexing rules. Use these instead of hand-written `[A-Za-z_$]` checks.
+
+- `scanner.IsIdentifierStart(ch rune) bool` — valid first character of an identifier
+- `scanner.IsIdentifierPart(ch rune) bool` — valid non-first character
+- `scanner.IsValidIdentifier(s string) bool` — whole-string check (start + parts + no reserved-word collision)
+
+### GetScannerForSourceFile
+
+Create a token-by-token scanner for more complex scanning needs. See [AST_PATTERNS.md](./AST_PATTERNS.md#token-scanning) for usage examples.
+
+---
+
+## `shim/checker/` - TypeChecker Native Methods
+
+```go
+import "github.com/microsoft/typescript-go/shim/checker"
+```
+
+For type-aware rules, **check `internal/utils/ts_api_utils.go` and `internal/utils/ts_eslint.go` first** — they wrap the common patterns with the correct invariants (e.g. `IsPromiseLike` handles subclass resolution, `NeedsToBeAwaited` handles generic constraints). Only fall through to the raw `Checker_*` functions below when no wrapper exists. Do **not** hand-roll type analysis on top of AST shape alone — the checker already answers those questions authoritatively.
+
+### Resolution & Signatures
+
+- `checker.Checker_getResolvedSignature(c, callLike)` — resolve the actual signature chosen for a call / new / decorator
+- `checker.Checker_getSignaturesOfType(c, t, kind)` — all call/construct signatures of a type
+- `checker.Checker_getReturnTypeOfSignature(c, sig)` — return type of a signature
+
+### Type Structure
+
+- `checker.Checker_getApparentType(c, t)` — apparent type (for member lookup; widens primitives to wrapper types)
+- `checker.Checker_getWidenedType(c, t)` — widened type (e.g. literal → base)
+- `checker.Checker_getBaseTypes(c, t)` — base types of an interface / class
+- `checker.Checker_getTypeArguments(c, t)` — type arguments of a generic instance
+- `checker.Checker_getBaseConstraintOfType(c, t)` — constraint of a type parameter (nil if unconstrained)
+
+### Type / Symbol Navigation
+
+- `checker.Checker_getTypeOfSymbol(c, sym)` — type of a symbol at its declaration
+- `checker.Checker_getPropertyOfType(c, t, name)` — look up a property symbol by name
+- `checker.Checker_getPropertiesOfType(c, t)` — all properties of a type
+- `checker.Checker_getIndexInfosOfType(c, t)` — index signatures of a type
+- `checker.Checker_getIndexTypeOfType(c, t, kind)` — value type for a given index kind
+
+### From AST Nodes
+
+- `checker.Checker_getTypeFromTypeNode(c, typeNode)` — type from a syntactic type annotation (`number`, `Foo<T>`, etc.)
+- `checker.Checker_isArrayType(c, t)` — array-type classification
+- `checker.IsTupleType(t)` — package-level tuple-type classification (does not need a Checker receiver)
+
+### Type / Symbol Field Accessors
+
+Internal struct fields that Go cannot expose via methods across packages are reachable through top-level accessors:
+
+- `checker.Type_flags(t)` — `TypeFlags` bitset
+- `checker.Type_symbol(t)` — associated symbol (for named types)
+
+See `shim/checker/shim.go` for the full surface (~50 functions). If you find yourself reaching for a method that isn't exposed, add it to the shim rather than duplicating the logic.
 
 ---
 

@@ -21,6 +21,13 @@ func TestParseRuleNames(t *testing.T) {
 		{"whitespace only", "   ", nil},
 		{"typescript-eslint scoped rule", "@typescript-eslint/no-unsafe-member-access", []string{"@typescript-eslint/no-unsafe-member-access"}},
 		{"mixed rules", "no-console, @typescript-eslint/no-unsafe-member-access, no-unused-vars", []string{"no-console", "@typescript-eslint/no-unsafe-member-access", "no-unused-vars"}},
+		{"single rule with -- description", "@typescript-eslint/consistent-type-assertions -- needed here", []string{"@typescript-eslint/consistent-type-assertions"}},
+		{"multiple rules with -- description", "no-console, no-debugger -- reason for disabling", []string{"no-console", "no-debugger"}},
+		{"rule with -- description and extra spaces", " no-console -- reason ", []string{"no-console"}},
+		{"wildcard with -- description", " -- just a description", nil},
+		{"empty description after --", "no-console -- ", []string{"no-console"}},
+		{"multiple -- separators", "no-console, no-debugger -- reason1 -- reason2", []string{"no-console", "no-debugger"}},
+		{"-- without space before is not separator", "no-console--not-stripped", []string{"no-console--not-stripped"}},
 	}
 
 	for _, tt := range tests {
@@ -32,6 +39,119 @@ func TestParseRuleNames(t *testing.T) {
 			for i, expected := range tt.expected {
 				if result[i] != expected {
 					t.Errorf("rule[%d]: expected %q, got %q", i, expected, result[i])
+				}
+			}
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// matchDirective
+// ---------------------------------------------------------------------------
+
+func TestMatchDirective(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expectedKind  directiveKind
+		expectedRules []string
+	}{
+		// ---- rslint- prefix: block disable/enable -------------------------
+		{"rslint-disable wildcard", "rslint-disable", directiveBlock, nil},
+		{"rslint-disable single rule", "rslint-disable no-console", directiveBlock, []string{"no-console"}},
+		{"rslint-disable multiple rules", "rslint-disable no-console, no-alert", directiveBlock, []string{"no-console", "no-alert"}},
+		{"rslint-disable scoped rule", "rslint-disable @typescript-eslint/no-explicit-any", directiveBlock, []string{"@typescript-eslint/no-explicit-any"}},
+		{"rslint-disable with -- description", "rslint-disable no-console -- reason", directiveBlock, []string{"no-console"}},
+		{"rslint-disable wildcard with -- description", "rslint-disable -- reason", directiveBlock, nil},
+		{"rslint-enable wildcard", "rslint-enable", directiveEnable, nil},
+		{"rslint-enable single rule", "rslint-enable no-console", directiveEnable, []string{"no-console"}},
+		{"rslint-enable multiple rules", "rslint-enable no-console, no-alert", directiveEnable, []string{"no-console", "no-alert"}},
+
+		// ---- rslint- prefix: line directives ------------------------------
+		{"rslint-disable-line wildcard", "rslint-disable-line", directiveLine, nil},
+		{"rslint-disable-line single rule", "rslint-disable-line no-console", directiveLine, []string{"no-console"}},
+		{"rslint-disable-line multiple rules", "rslint-disable-line no-console, no-alert", directiveLine, []string{"no-console", "no-alert"}},
+		{"rslint-disable-line with -- description", "rslint-disable-line no-console -- reason", directiveLine, []string{"no-console"}},
+		{"rslint-disable-next-line wildcard", "rslint-disable-next-line", directiveNextLine, nil},
+		{"rslint-disable-next-line single rule", "rslint-disable-next-line no-console", directiveNextLine, []string{"no-console"}},
+		{"rslint-disable-next-line multiple rules", "rslint-disable-next-line no-console, no-alert", directiveNextLine, []string{"no-console", "no-alert"}},
+		{"rslint-disable-next-line with -- description", "rslint-disable-next-line no-console -- reason", directiveNextLine, []string{"no-console"}},
+		{"rslint-disable-next-line scoped rule", "rslint-disable-next-line @typescript-eslint/no-explicit-any", directiveNextLine, []string{"@typescript-eslint/no-explicit-any"}},
+
+		// ---- eslint- prefix: block disable/enable -------------------------
+		{"eslint-disable wildcard", "eslint-disable", directiveBlock, nil},
+		{"eslint-disable single rule", "eslint-disable no-console", directiveBlock, []string{"no-console"}},
+		{"eslint-disable multiple rules", "eslint-disable no-console, no-alert", directiveBlock, []string{"no-console", "no-alert"}},
+		{"eslint-disable scoped rule", "eslint-disable @typescript-eslint/no-explicit-any", directiveBlock, []string{"@typescript-eslint/no-explicit-any"}},
+		{"eslint-disable with -- description", "eslint-disable no-console -- reason", directiveBlock, []string{"no-console"}},
+		{"eslint-disable wildcard with -- description", "eslint-disable -- reason", directiveBlock, nil},
+		{"eslint-enable wildcard", "eslint-enable", directiveEnable, nil},
+		{"eslint-enable single rule", "eslint-enable no-console", directiveEnable, []string{"no-console"}},
+		{"eslint-enable multiple rules", "eslint-enable no-console, no-alert", directiveEnable, []string{"no-console", "no-alert"}},
+
+		// ---- eslint- prefix: line directives ------------------------------
+		{"eslint-disable-line wildcard", "eslint-disable-line", directiveLine, nil},
+		{"eslint-disable-line single rule", "eslint-disable-line no-console", directiveLine, []string{"no-console"}},
+		{"eslint-disable-line multiple rules", "eslint-disable-line no-console, no-alert", directiveLine, []string{"no-console", "no-alert"}},
+		{"eslint-disable-line with -- description", "eslint-disable-line no-console -- reason", directiveLine, []string{"no-console"}},
+		{"eslint-disable-next-line wildcard", "eslint-disable-next-line", directiveNextLine, nil},
+		{"eslint-disable-next-line single rule", "eslint-disable-next-line no-console", directiveNextLine, []string{"no-console"}},
+		{"eslint-disable-next-line multiple rules", "eslint-disable-next-line no-console, no-alert", directiveNextLine, []string{"no-console", "no-alert"}},
+		{"eslint-disable-next-line with -- description", "eslint-disable-next-line no-console -- reason", directiveNextLine, []string{"no-console"}},
+
+		// ---- non-directive comments (should return directiveNone) ---------
+		{"empty string", "", directiveNone, nil},
+		{"random comment", "some random comment", directiveNone, nil},
+		{"tslint prefix not recognized", "tslint-disable no-console", directiveNone, nil},
+		{"partial prefix eslint", "eslint no-console", directiveNone, nil},
+		{"partial prefix rslint", "rslint no-console", directiveNone, nil},
+		{"eslint- without disable/enable", "eslint-check no-console", directiveNone, nil},
+		{"rslint- without disable/enable", "rslint-check no-console", directiveNone, nil},
+
+		// ---- edge cases ---------------------------------------------------
+		{"rslint-enable with -- description", "rslint-enable no-console -- reason", directiveEnable, []string{"no-console"}},
+		{"eslint-enable with -- description", "eslint-enable no-console -- reason", directiveEnable, []string{"no-console"}},
+		{"multiple rules with extra spaces", "rslint-disable  no-console ,  no-alert ", directiveBlock, []string{"no-console", "no-alert"}},
+		{"rule name with multiple -- separators", "rslint-disable no-console -- reason1 -- reason2", directiveBlock, []string{"no-console"}},
+		{"-- without space is not separator", "rslint-disable no-console--not-stripped", directiveBlock, []string{"no-console--not-stripped"}},
+
+		// ---- case sensitivity (directives are case-sensitive) -------------
+		{"uppercase RSLINT-DISABLE not recognized", "RSLINT-DISABLE no-console", directiveNone, nil},
+		{"uppercase ESLINT-DISABLE not recognized", "ESLINT-DISABLE no-console", directiveNone, nil},
+		{"mixed case Rslint-Disable not recognized", "Rslint-Disable no-console", directiveNone, nil},
+		{"mixed case Eslint-Enable not recognized", "Eslint-Enable no-console", directiveNone, nil},
+
+		// ---- no space between prefix and rule name ------------------------
+		{"rslint-disable no space before rule", "rslint-disable" + "no-console", directiveBlock, []string{"no-console"}}, // cspell:disable-line
+		{"eslint-disable no space before rule", "eslint-disable" + "no-console", directiveBlock, []string{"no-console"}}, // cspell:disable-line
+
+		// ---- typos / near-miss prefixes -----------------------------------
+		{"rslint-disabled (extra d)", "rslint-disabled no-console", directiveBlock, []string{"d no-console"}},
+		{"eslint-disabled (extra d)", "eslint-disabled no-console", directiveBlock, []string{"d no-console"}},
+
+		// ---- enable-line / enable-next-line (not valid ESLint directives) --
+		{"rslint-enable-line treated as enable rule -line", "rslint-enable-line", directiveEnable, []string{"-line"}},
+		{"rslint-enable-next-line treated as enable rule -next-line", "rslint-enable-next-line", directiveEnable, []string{"-next-line"}},
+		{"eslint-enable-line treated as enable rule -line", "eslint-enable-line", directiveEnable, []string{"-line"}},
+
+		// ---- whitespace variants ------------------------------------------
+		{"tab between prefix and rule", "rslint-disable\tno-console", directiveBlock, []string{"no-console"}},
+		{"only whitespace after prefix is wildcard", "rslint-disable   ", directiveBlock, nil},
+		{"only tab after prefix is wildcard", "eslint-disable\t", directiveBlock, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			kind, rules := matchDirective(tt.input)
+			if kind != tt.expectedKind {
+				t.Errorf("kind: expected %d, got %d", tt.expectedKind, kind)
+			}
+			if len(rules) != len(tt.expectedRules) {
+				t.Fatalf("expected %d rules, got %d: %v", len(tt.expectedRules), len(rules), rules)
+			}
+			for i, expected := range tt.expectedRules {
+				if rules[i] != expected {
+					t.Errorf("rule[%d]: expected %q, got %q", i, expected, rules[i])
 				}
 			}
 		})
