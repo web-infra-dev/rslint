@@ -77,12 +77,8 @@ var PreferToHaveBeenCalledRule = rule.Rule{
 					jestFnCall.MatcherEntry.Node,
 					buildPreferMatcherErrorMessage(),
 					rule.RuleFixReplaceRange(
-						core.NewTextRange(matcherCall.Arguments.Pos(), matcherCall.Arguments.End()),
-						"",
-					),
-					rule.RuleFixReplaceRange(
-						core.NewTextRange(replaceStart, matcherParent.End()),
-						replacementMatcher,
+						core.NewTextRange(replaceStart, node.End()),
+						replacementMatcher+"()",
 					),
 				)
 			},
