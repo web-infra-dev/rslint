@@ -306,6 +306,7 @@ preact
 preresolved
 Prettier
 progressbar
+promiseutil
 propertyassignment
 proptypes
 Ptrs

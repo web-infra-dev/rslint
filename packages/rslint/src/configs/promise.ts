@@ -6,7 +6,7 @@ const recommended: RslintConfigEntry = {
   plugins: ['promise'],
   rules: {
     // 'promise/always-return': 'error', // not implemented
-    // 'promise/no-return-wrap': 'error', // not implemented
+    'promise/no-return-wrap': 'error',
     'promise/param-names': 'error',
     // 'promise/catch-or-return': 'error', // not implemented
     // 'promise/no-native': 'off', // not implemented
