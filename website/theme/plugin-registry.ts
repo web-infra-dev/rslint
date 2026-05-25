@@ -150,8 +150,12 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     prefix: '@stylistic',
     group: '@stylistic/eslint-plugin',
     importName: 'stylisticPlugin',
-    presetName: 'stylisticPlugin.configs.recommended',
-    description: 'Stylistic / formatting rules',
+    presets: [
+      {
+        name: 'stylisticPlugin.configs.recommended',
+        description: 'Stylistic / formatting rules',
+      },
+    ],
   },
 ];
 
