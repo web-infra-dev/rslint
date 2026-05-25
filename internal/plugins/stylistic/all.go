@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_closing_tag_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_curly_brace_presence"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_curly_newline"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_equals_spacing"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -38,5 +39,6 @@ func GetAllRules() []rule.Rule {
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
 		jsx_curly_brace_presence.JsxCurlyBracePresenceRule,
 		jsx_curly_newline.JsxCurlyNewlineRule,
+		jsx_equals_spacing.JsxEqualsSpacingRule,
 	}
 }
