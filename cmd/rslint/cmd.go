@@ -317,14 +317,19 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineStarts := make([]int, numLines)
 	lineEnds := make([]int, numLines)
 
-	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
-	// but track byte positions for string slicing
+	// Iterate by runes to correctly handle multi-byte UTF-8 characters.
+	// Use utf8.DecodeRuneInString to get the true byte width of each rune
+	// (including invalid UTF-8 bytes, which decode as RuneError with size=1).
+	// `for _, char := range str` plus `utf8.RuneLen(char)` is unsafe here
+	// because invalid bytes yield RuneError (U+FFFD) and RuneLen returns 3
+	// (the encoded length of U+FFFD), throwing off the byte counter and
+	// eventually slicing past len(text).
 	codeboxText := text[codeboxStart:codeboxEnd]
-	bytePos := codeboxStart
-	for _, char := range codeboxText {
-		charBytes := utf8.RuneLen(char)
-		current, next := bytePos, bytePos+charBytes
-		bytePos = next
+	for i := 0; i < len(codeboxText); {
+		char, size := utf8.DecodeRuneInString(codeboxText[i:])
+		current := codeboxStart + i
+		next := current + size
+		i += size
 
 		if char == '\n' {
 			if line != codeboxEndLine {
@@ -348,6 +353,14 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	if line == codeboxEndLine {
 		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+	}
+	// If no non-space content was seen anywhere in the codebox,
+	// `indentSize` was never updated from the math.MaxInt sentinel.
+	// Clamping to 0 prevents `lineMap[line] + indentSize` from overflowing
+	// int in the render loop below (which would wrap to a large negative
+	// number and slice out of bounds).
+	if indentSize == math.MaxInt {
+		indentSize = 0
 	}
 
 	diagnosticHighlightActive := false
