@@ -212,7 +212,7 @@ func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func getParentIfThenified(node *ast.Node) *ast.Node {
+func getParentIfPromiseChained(node *ast.Node) *ast.Node {
 	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
 		return node
 	}
@@ -230,7 +230,7 @@ func getParentIfThenified(node *ast.Node) *ast.Node {
 
 	last := entries[len(entries)-1].Name
 	if last == "then" || last == "catch" {
-		return getParentIfThenified(grandParent)
+		return getParentIfPromiseChained(grandParent)
 	}
 
 	return node
@@ -315,10 +315,10 @@ func resolveAsyncAssertionReportNode(
 		return nil, false, false, false
 	}
 
-	thenifiedAssertionNode := getParentIfThenified(matcherMemberNode.Parent)
-	insideAssertionArray = thenifiedAssertionNode.Parent != nil && thenifiedAssertionNode.Parent.Kind == ast.KindArrayLiteralExpression
-	reportNode = thenifiedAssertionNode
-	if promiseCallNode := findPromiseCallExpressionNode(thenifiedAssertionNode); promiseCallNode != nil {
+	promiseChainedAssertionNode := getParentIfPromiseChained(matcherMemberNode.Parent)
+	insideAssertionArray = promiseChainedAssertionNode.Parent != nil && promiseChainedAssertionNode.Parent.Kind == ast.KindArrayLiteralExpression
+	reportNode = promiseChainedAssertionNode
+	if promiseCallNode := findPromiseCallExpressionNode(promiseChainedAssertionNode); promiseCallNode != nil {
 		reportNode = promiseCallNode
 		promiseWrapped = true
 	}
