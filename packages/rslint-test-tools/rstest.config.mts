@@ -470,6 +470,7 @@ export default defineConfig({
     './tests/eslint-plugin-stylistic/rules/jsx-curly-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-equals-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-first-prop-new-line.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-function-call-newline.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
