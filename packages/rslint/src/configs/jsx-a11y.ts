@@ -7,7 +7,8 @@ const recommended: RslintConfigEntry = {
   plugins: ['jsx-a11y'],
   rules: {
     'jsx-a11y/alt-text': 'error',
-    // 'jsx-a11y/anchor-ambiguous-text': 'off', // not implemented (off in upstream)
+    // 'off' to match upstream recommended (upstream marks it TODO: error).
+    'jsx-a11y/anchor-ambiguous-text': 'off',
     'jsx-a11y/anchor-has-content': 'error',
     'jsx-a11y/anchor-is-valid': 'error',
     'jsx-a11y/aria-activedescendant-has-tabindex': 'error',
