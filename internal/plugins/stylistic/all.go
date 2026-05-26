@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_curly_newline"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_curly_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_equals_spacing"
+	"github.com/web-infra-dev/rslint/internal/plugins/stylistic/rules/jsx_first_prop_new_line"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -42,5 +43,6 @@ func GetAllRules() []rule.Rule {
 		jsx_curly_newline.JsxCurlyNewlineRule,
 		jsx_curly_spacing.JsxCurlySpacingRule,
 		jsx_equals_spacing.JsxEqualsSpacingRule,
+		jsx_first_prop_new_line.JsxFirstPropNewLineRule,
 	}
 }
