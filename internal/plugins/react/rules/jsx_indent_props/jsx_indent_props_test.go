@@ -406,6 +406,31 @@ func TestJsxIndentPropsRule(t *testing.T) {
 			Tsx:     true,
 			Options: []interface{}{map[string]interface{}{"indentMode": "spaces"}},
 		},
+
+		// First prop sharing the opening tag's `?`/`:` line: upstream's
+		// getNodeIndent gives useOperator (line starts with the operator)
+		// priority over useBracket (line contains `<`), so the operator state
+		// survives the `<` and the bump carries to the new-line props.
+		// Confirmed valid via ESLint differential. (Regression guard: an
+		// earlier port reset the state on `<` unconditionally and reported
+		// false positives on these.)
+		{
+			Code:    "\n        const x = cond\n          ? <App foo\n              bar\n            />\n          : null\n      ",
+			Tsx:     true,
+			Options: []interface{}{float64(2)},
+		},
+		// `:` alternate is symmetric.
+		{
+			Code:    "\n        const x = cond\n          ? null\n          : <App foo\n              bar\n            />\n      ",
+			Tsx:     true,
+			Options: []interface{}{float64(2)},
+		},
+		// Multiple new-line props after the operator-line first prop — all bumped.
+		{
+			Code:    "\n        const y = cond\n          ? <App foo\n              bar\n              baz\n            />\n          : null\n      ",
+			Tsx:     true,
+			Options: []interface{}{float64(2)},
+		},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Default 4-space indent — child at 10 must be 12. ----
 		{
@@ -808,6 +833,20 @@ func TestJsxIndentPropsRule(t *testing.T) {
 					EndLine:   5,
 					EndColumn: 12,
 				},
+			},
+		},
+
+		// First prop on the `?`/`:` line, new-line prop at the UN-bumped column
+		// (12) — must report needs 14 (propIndent 12 + bump 2), proving the
+		// ternary bump is applied. Direct regression guard for useOperator
+		// preceding useBracket in the per-prop side effect.
+		{
+			Code:    "\n        const x = cond\n          ? <App foo\n            bar\n            />\n          : null\n      ",
+			Output:  []string{"\n        const x = cond\n          ? <App foo\n              bar\n            />\n          : null\n      "},
+			Tsx:     true,
+			Options: []interface{}{float64(2)},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "wrongIndent", Message: "Expected indentation of 14 space characters but found 12.", Line: 4, Column: 13},
 			},
 		},
 	})
