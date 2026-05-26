@@ -19,10 +19,10 @@ const recommended: RslintConfigEntry = {
     'no-global-assign': 'error',
     'no-import-assign': 'error',
     'no-invalid-regexp': 'error',
-    // 'no-irregular-whitespace': 'error', // not implemented
+    'no-irregular-whitespace': 'error',
     'no-misleading-character-class': 'error',
     // 'no-new-native-nonconstructor': 'error', // not implemented
-    // 'no-nonoctal-decimal-escape': 'error', // not implemented
+    'no-nonoctal-decimal-escape': 'error',
     'no-obj-calls': 'error',
     'no-octal': 'error',
     'no-prototype-builtins': 'error',
@@ -33,7 +33,7 @@ const recommended: RslintConfigEntry = {
     'no-shadow-restricted-names': 'error',
     'no-this-before-super': 'error',
     'no-undef': 'error',
-    // 'no-unexpected-multiline': 'error', // not implemented
+    'no-unexpected-multiline': 'error',
     'no-unreachable': 'error',
     'no-unsafe-finally': 'error',
     'no-unsafe-negation': 'error',
@@ -43,9 +43,9 @@ const recommended: RslintConfigEntry = {
     // 'no-unused-vars': 'error', // not implemented
     // 'no-unassigned-vars': 'error', // not implemented
     // 'no-useless-assignment': 'error', // not implemented
-    // 'no-useless-backreference': 'error', // not implemented
+    'no-useless-backreference': 'error',
     'no-useless-catch': 'error',
-    // 'no-useless-escape': 'error', // not implemented
+    'no-useless-escape': 'error',
     'no-with': 'error',
     // 'preserve-caught-error': 'error', // not implemented
     'require-yield': 'error',
