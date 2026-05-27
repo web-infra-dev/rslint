@@ -17,7 +17,7 @@ func buildPreferMatcherErrorMessage() rule.RuleMessage {
 }
 
 func isZeroLiteral(node *ast.Node) bool {
-	node = jestUtils.UnwrapTypeAssertions(node)
+	node = jestUtils.UnwrapBasicTypeAssertions(node)
 	if node == nil {
 		return false
 	}

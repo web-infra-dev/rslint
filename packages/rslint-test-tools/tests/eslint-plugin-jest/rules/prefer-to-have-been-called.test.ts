@@ -12,6 +12,8 @@ ruleTester.run('prefer-to-have-been-called', {} as never, {
     { code: 'expect(method).not.toHaveBeenCalledTimes(...x)' },
     { code: 'expect(a);' },
     { code: 'expect(method).not.resolves.toHaveBeenCalledTimes(0);' },
+    { code: 'expect(method).toBeCalledTimes(0!);' },
+    { code: 'expect(method).toBeCalledTimes(0 satisfies number);' },
     { code: 'expect(method).toBe([])' },
     { code: 'expect(fn.mock.calls).toEqual([])' },
     { code: 'expect(fn.mock.calls).toContain(1, 2, 3)' },

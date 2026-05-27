@@ -23,6 +23,8 @@ func TestPreferToHaveBeenCalledRule(t *testing.T) {
 			{Code: `expect(method).not.toHaveBeenCalledTimes(...x)`},
 			{Code: `expect(a);`},
 			{Code: `expect(method).not.resolves.toHaveBeenCalledTimes(0);`},
+			{Code: `expect(method).toBeCalledTimes(0!);`},
+			{Code: `expect(method).toBeCalledTimes(0 satisfies number);`},
 			{Code: `expect(method).toBe([])`},
 			{Code: `expect(fn.mock.calls).toEqual([])`},
 			{Code: `expect(fn.mock.calls).toContain(1, 2, 3)`},
