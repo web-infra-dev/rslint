@@ -88,6 +88,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
     './tests/eslint-plugin-react/rules/boolean-prop-naming.test.ts',
     './tests/eslint-plugin-react/rules/button-has-type.test.ts',
+    './tests/eslint-plugin-react/rules/checked-requires-onchange-or-readonly.test.ts',
     './tests/eslint-plugin-react/rules/forbid-component-props.test.ts',
     './tests/eslint-plugin-react/rules/forbid-dom-props.test.ts',
     './tests/eslint-plugin-react/rules/forbid-elements.test.ts',
@@ -468,7 +469,11 @@ export default defineConfig({
     './tests/eslint-plugin-stylistic/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-curly-brace-presence.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-curly-newline.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-curly-spacing.test.ts',
     './tests/eslint-plugin-stylistic/rules/jsx-equals-spacing.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-first-prop-new-line.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-function-call-newline.test.ts',
+    './tests/eslint-plugin-stylistic/rules/jsx-indent-props.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
