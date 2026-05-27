@@ -101,14 +101,23 @@ func isPragmaFactoryCallCore(callee *ast.Node, pragma string, tc *checker.Checke
 	// chain terminated by the parens: ESTree freezes it into a `ChainExpression`,
 	// so upstream's `node.callee.type === 'MemberExpression'` check fails and the
 	// call is NOT recognized. tsgo keeps the explicit ParenthesizedExpression
-	// wrapper (it's lost only if we flatten it), so detect that shape first. A
+	// wrapper, so record whether the callee was parenthesized before flattening,
+	// then reject it when the flattened callee is an optional chain. A
 	// non-optional `(React.createElement)(...)` stays transparent and IS
 	// recognized; a bare `React?.createElement(...)` / `React.createElement?.(...)`
 	// has no wrapping paren and is likewise recognized — all matching upstream.
-	if callee.Kind == ast.KindParenthesizedExpression && ast.IsOptionalChain(ast.SkipParentheses(callee)) {
+	wasParenthesized := callee.Kind == ast.KindParenthesizedExpression
+	callee = ast.SkipParentheses(callee)
+	if callee == nil {
+		// Only reachable when the parenthesized inner is empty (`()`), which is
+		// itself a syntax error (such files aren't linted); guard anyway so a
+		// recovered AST can never nil-deref through `IsOptionalChain` or the
+		// `callee.Kind` checks below.
 		return false
 	}
-	callee = ast.SkipParentheses(callee)
+	if wasParenthesized && ast.IsOptionalChain(callee) {
+		return false
+	}
 
 	// Bare callee: `createElement(arg)` / `cloneElement(arg)` — recognized
 	// only when destructured from the pragma module. Mirrors upstream's
