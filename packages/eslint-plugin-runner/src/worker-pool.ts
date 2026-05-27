@@ -170,7 +170,43 @@ const WORKER_FILE = (() => {
 const WORKER_EXIT_GRACE_MS = 5_000;
 
 /**
- * Terminate a worker, closing its piped stdout/stderr FIRST.
+ * Upper bound on how long `terminateWorker` waits for a piped stream to
+ * emit `'close'` after `destroy()` before giving up and terminating
+ * anyway. A normal close lands within a tick; this only guards a wedged
+ * worker whose stream never closes, so teardown can never stall.
+ */
+const PIPE_CLOSE_GRACE_MS = 1_000;
+
+/**
+ * Destroy one worker stdio pipe and resolve once it has ACTUALLY closed
+ * — or immediately if the stream is absent / already destroyed, and at
+ * the latest after `PIPE_CLOSE_GRACE_MS` so a stream that never emits
+ * `'close'` can't stall the caller.
+ */
+async function closePipe(stream: Worker['stdout']): Promise<void> {
+  if (!stream || stream.destroyed) return;
+  await new Promise<void>((resolveClosed) => {
+    const done = (): void => {
+      clearTimeout(timer);
+      stream.off('close', done);
+      resolveClosed();
+    };
+    const timer = setTimeout(done, PIPE_CLOSE_GRACE_MS);
+    stream.once('close', done);
+    try {
+      stream.destroy();
+    } catch {
+      // `destroy()` is not expected to throw synchronously, but guard so
+      // a faulty stream still settles (clearing the timer + listener)
+      // instead of leaking the promise, the timer, and the listener.
+      done();
+    }
+  });
+}
+
+/**
+ * Terminate a worker, closing its piped stdout/stderr FIRST and WAITING
+ * for them to actually close before killing the thread.
  *
  * Mitigates a windows-latest-only crash: `worker.terminate()` abruptly
  * kills the thread while its stdio named pipes are still live, and
@@ -179,16 +215,21 @@ const WORKER_EXIT_GRACE_MS = 5_000;
  * `uncaughtException` / `unhandledRejection` / `process.exit`, so the
  * only way that child can "exit unexpectedly" is a native fault). It
  * surfaced only in the high-terminate-churn `worker-pool-e2e` suite.
- * Closing our read end first makes the pipe teardown deterministic and
- * removes that race — and is sound teardown hygiene on every platform.
+ *
+ * `destroy()` alone is NOT enough: it only *initiates* the close, which
+ * completes on a later tick, so a `terminate()` called synchronously
+ * after it still races the in-flight teardown. Awaiting each pipe's
+ * `'close'` SERIALIZES the two — by the time we terminate, the pipes are
+ * already gone and there is no concurrent teardown left to fault.
+ * Bounded by `PIPE_CLOSE_GRACE_MS` so a wedged worker can't stall here.
+ *
  * Trailing worker output is intentionally dropped (the worker is being
  * killed); `destroy()` errors are swallowed by the `ignorePipeError`
  * listeners wired in `spawnWorker`. Returns `terminate()`'s promise so
  * callers can chain `.then` / `.catch` / `.finally` unchanged.
  */
-async function terminateWorker(worker: Worker): Promise<number> {
-  worker.stdout?.destroy();
-  worker.stderr?.destroy();
+export async function terminateWorker(worker: Worker): Promise<number> {
+  await Promise.all([closePipe(worker.stdout), closePipe(worker.stderr)]);
   return worker.terminate();
 }
 

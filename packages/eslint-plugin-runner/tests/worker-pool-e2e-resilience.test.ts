@@ -1,7 +1,8 @@
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
+import type { Worker } from 'node:worker_threads';
 
-import { WorkerPool } from '../src/worker-pool.js';
+import { WorkerPool, terminateWorker } from '../src/worker-pool.js';
 import type { LintTask } from '../src/worker-pool.js';
 
 import {
@@ -124,11 +125,9 @@ describe('WorkerPool end-to-end with a local fixture plugin', () => {
     await pool.init();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const workers = (pool as any).workers as Array<{
-      worker: { terminate(): Promise<number> };
-    }>;
+    const workers = (pool as any).workers as Array<{ worker: Worker }>;
     expect(workers.length).toBeGreaterThan(0);
-    void workers[0].worker.terminate();
+    void terminateWorker(workers[0].worker);
 
     const shutdownStart = Date.now();
     await pool.shutdown();

@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@rstest/core';
 
-import { WorkerPool } from '../src/worker-pool.js';
+import { WorkerPool, terminateWorker } from '../src/worker-pool.js';
 import type { LintTask } from '../src/worker-pool.js';
 
 import {
@@ -122,7 +122,7 @@ describe('WorkerPool end-to-end with a local fixture plugin', () => {
     // path is to terminate the worker (triggers a real 'exit') after
     // setting crashCount to the cap.
     internals.workers[0].crashCount = internals.opts.retryCap;
-    await internals.workers[0].worker.terminate();
+    await terminateWorker(internals.workers[0].worker);
 
     const result = await batchP;
     expect(result).toHaveLength(2);
@@ -293,7 +293,7 @@ describe('WorkerPool end-to-end with a local fixture plugin', () => {
     const firstBatch = pool.lintBatch([task('first.ts', 'const x = null;\n')]);
     await new Promise((r) => setTimeout(r, 30));
     internals.workers[0].crashCount = internals.opts.retryCap;
-    await internals.workers[0].worker.terminate();
+    await terminateWorker(internals.workers[0].worker);
 
     const firstResult = await firstBatch;
     expect(firstResult).toHaveLength(1);

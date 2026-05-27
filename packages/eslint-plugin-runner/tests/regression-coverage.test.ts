@@ -16,7 +16,7 @@ import path from 'node:path';
 import * as espree from 'espree';
 import { parseSync } from 'oxc-parser';
 
-import { WorkerPool } from '../src/worker-pool.js';
+import { WorkerPool, terminateWorker } from '../src/worker-pool.js';
 import { createSourceCode } from '../src/source-code/source-code.js';
 import { lintFile } from '../src/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../src/plugin/plugin-loader.js';
@@ -96,7 +96,7 @@ describe('WorkerPool respawn rejection drains pendingQueue', () => {
     //    Pre-fix: pendingQueue stays full forever.
     //    Post-fix: drainQueueIfAllSlotsDegraded() in the reject
     //              callback resolves siblings with pool_degraded.
-    await internals.workers[0].worker.terminate();
+    await terminateWorker(internals.workers[0].worker);
 
     // 5. Race sibling against a generous-but-bounded timeout. Pre-fix
     //    the race resolves with 'timeout'; post-fix sibling settles
@@ -1167,7 +1167,7 @@ describe('WorkerPool shutdown does not wait for already-exited workers', () => {
     const internals = pool as any;
     // Terminate worker[0]; its 'exit' event fires now. With retryCap=0
     // the slot is NOT respawned — it stays in this.workers as dead.
-    await internals.workers[0].worker.terminate();
+    await terminateWorker(internals.workers[0].worker);
     // Drain pendingQueue cascade.
     await new Promise((r) => setTimeout(r, 100));
 
@@ -1913,8 +1913,8 @@ describe('drainQueueIfAllSlotsDegraded does not fire during mid-respawn', () => 
 
     // Terminate both nearly simultaneously to trigger respawn race.
     await Promise.all([
-      internals.workers[0].worker.terminate(),
-      internals.workers[1].worker.terminate(),
+      terminateWorker(internals.workers[0].worker),
+      terminateWorker(internals.workers[1].worker),
     ]);
     void spawnCallNum;
 
@@ -2525,7 +2525,7 @@ describe('WorkerPool: worker crashing mid-init is correctly respawned', () => {
     const internals = pool as any;
     const originalSpawn = internals.spawnWorker.bind(internals);
     let firstSlot: {
-      worker: { terminate(): Promise<number> };
+      worker: import('node:worker_threads').Worker;
       id: number;
     } | null = null;
     let callIdx = 0;
@@ -2563,7 +2563,7 @@ describe('WorkerPool: worker crashing mid-init is correctly respawned', () => {
     // slot 0 in it. Pre-fix `this.workers` was empty until the final
     // assignment, so the respawn's findIndex returned -1 and the
     // replacement got terminated as an orphan.
-    await firstSlot!.worker.terminate();
+    await terminateWorker(firstSlot!.worker);
 
     // Give the respawn a moment to complete.
     await new Promise((r) => setTimeout(r, 500));
@@ -3006,7 +3006,7 @@ describe('WorkerPool: shutdown awaits in-flight respawn', () => {
     };
 
     // Crash the only worker → exit handler kicks off the (slow) respawn.
-    await internals.workers[0].worker.terminate();
+    await terminateWorker(internals.workers[0].worker);
     // Give the exit handler a tick to enter the respawn branch.
     await new Promise((r) => setTimeout(r, 50));
     expect(respawnStarted).toBe(true);
