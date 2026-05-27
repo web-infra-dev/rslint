@@ -304,6 +304,7 @@ nunc
 objectbindingpattern
 objectliteralexpression
 onblur
+onchange
 onclick
 onfocus
 onmouseout

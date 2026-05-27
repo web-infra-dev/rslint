@@ -88,6 +88,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/destructuring-assignment.test.ts',
     './tests/eslint-plugin-react/rules/boolean-prop-naming.test.ts',
     './tests/eslint-plugin-react/rules/button-has-type.test.ts',
+    './tests/eslint-plugin-react/rules/checked-requires-onchange-or-readonly.test.ts',
     './tests/eslint-plugin-react/rules/forbid-component-props.test.ts',
     './tests/eslint-plugin-react/rules/forbid-dom-props.test.ts',
     './tests/eslint-plugin-react/rules/forbid-elements.test.ts',
