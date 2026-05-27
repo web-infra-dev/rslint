@@ -11,6 +11,7 @@ alertdialog
 alink
 allman
 allowundefined
+analysed
 anee
 apos
 argl
@@ -19,6 +20,7 @@ arrayish
 arrayliteralexpression
 ascript
 assertee
+asynchrony
 autobinding
 autofixers
 autofocus
@@ -53,11 +55,13 @@ Buttom
 cachedvfs
 callees
 callsite
+callsites
 cand
 canonicalise
 canonicalised
 canonicalises
 catchable
+categorisation
 Cbar
 centralising
 CHARCLASS
@@ -66,8 +70,11 @@ CLASSSET
 clazz
 clientrc
 clippy
+clonable
 clsx
 co-locate
+codemod
+codemods
 codepoint
 codspeed
 CODSPEED
@@ -96,8 +103,10 @@ dedupe
 deprec
 Deque
 describedby
+destabilising
 desugars
 destructures
+desync
 dirxml
 disqualifier
 disqualifiers
@@ -148,6 +157,7 @@ Fooo
 foobarbaz
 foopy
 foos
+footgun
 foox
 Foox
 fooz
@@ -180,6 +190,7 @@ goroutines
 gotest
 graphlib
 handl
+hashtable
 haspopup
 hecker
 hgroup
@@ -227,6 +238,8 @@ lsquo
 macrolanguage
 marginx
 marginy
+materialise
+materialised
 McCabe
 menuitemcheckbox
 menuitemradio
@@ -236,6 +249,8 @@ Metas
 middot
 minimatch
 misalign
+miscategorise
+mmap
 mobx
 modns
 Modns
@@ -250,8 +265,10 @@ myfunc
 mylib
 mynamespace
 nanotime
+napi
 nbsp
 neighbour
+neighbouring
 nend
 Nent
 nilerr
@@ -272,6 +289,7 @@ noreferrer
 noregabi
 norf
 normalised
+normaliser
 normalises
 noscript
 notarole
@@ -286,6 +304,7 @@ nunc
 objectbindingpattern
 objectliteralexpression
 onblur
+onchange
 onclick
 onfocus
 onmouseout
@@ -305,12 +324,14 @@ Prag
 preact
 preresolved
 Prettier
+prioritises
 progressbar
 promiseutil
 propertyassignment
 proptypes
 Ptrs
 pullquote
+punct
 quasis
 quxx
 qwer
@@ -339,8 +360,14 @@ relints
 renderable
 Reparsed
 reparser
+repoint
+repoints
 reqs
+respawned
+respawning
+respawns
 rethrowing
+rewalks
 rivo
 roledescription
 roletype
@@ -389,6 +416,7 @@ stype
 subclassing
 subtag
 subtests
+supersets
 supertypes
 symb
 symbolname
@@ -403,6 +431,7 @@ testdata
 testrule
 textnodes
 thenables
+throughs
 tinyglobby
 tmdb
 tmpl
@@ -517,3 +546,6 @@ ZWSP
 Πfoo
 дelta
 Дelta
+résumé
+TSJSDoc
+unpadded

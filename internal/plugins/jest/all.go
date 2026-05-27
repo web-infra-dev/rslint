@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_contain"
@@ -41,6 +42,7 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		no_test_prefixes.NoTestPrefixesRule,
+		prefer_called_with.PreferCalledWithRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,

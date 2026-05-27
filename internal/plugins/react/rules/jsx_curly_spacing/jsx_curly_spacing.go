@@ -57,7 +57,18 @@ func nestedMap(m map[string]interface{}, key string) map[string]interface{} {
 // allowMultiline / spacing.objectLiterals from a config object (or treats
 // `true` as "use defaults"), then on lastPass falls back objectLiteralSpaces
 // to `when` when neither config nor defaults specify it.
-func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideConfig {
+//
+// stylisticScope selects how a per-side `spacing` object interacts with the
+// inherited default — the sole behavioral delta between the two upstream rules:
+//
+//   - false (eslint-plugin-react): objectLiteralSpaces starts from the default
+//     (top-level spacing.objectLiterals) and is only overridden when the
+//     per-side spacing carries an explicit `objectLiterals` key.
+//   - true (@stylistic/eslint-plugin): its normalizeConfig destructures
+//     `spacing = perSide.spacing ?? defaultSpacing`, so a per-side `spacing`
+//     object — even an empty `{}` — shadows the inherited default entirely;
+//     objectLiteralSpaces then derives from `spacing.objectLiterals ?? when`.
+func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool, stylisticScope bool) sideConfig {
 	cfg, _ := configOrTrue.(map[string]interface{})
 	when := d.when
 	if cfg != nil {
@@ -70,10 +81,23 @@ func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideCo
 		}
 	}
 	objectLiteralSpaces := d.objectLiteralSpaces
-	spacing := nestedMap(cfg, "spacing")
-	if spacing != nil {
-		if v, ok := spacing["objectLiterals"]; ok {
-			objectLiteralSpaces = stringValue(v, objectLiteralSpaces)
+	if stylisticScope {
+		// A present per-side `spacing` key (even an empty object) replaces the
+		// inherited default; an absent key keeps inheriting it. nestedMap yields
+		// nil for an absent-or-non-map value (and reads a nil cfg safely), so the
+		// hasKey test alone separates "present" from "inherit", matching
+		// @stylistic's `spacing = perSide.spacing ?? defaultSpacing`.
+		if _, hasKey := cfg["spacing"]; hasKey {
+			objectLiteralSpaces = ""
+			if spacing := nestedMap(cfg, "spacing"); spacing != nil {
+				objectLiteralSpaces = stringValue(spacing["objectLiterals"], "")
+			}
+		}
+	} else {
+		if spacing := nestedMap(cfg, "spacing"); spacing != nil {
+			if v, ok := spacing["objectLiterals"]; ok {
+				objectLiteralSpaces = stringValue(v, objectLiteralSpaces)
+			}
 		}
 	}
 	if lastPass && objectLiteralSpaces == "" {
@@ -96,7 +120,7 @@ func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideCo
 //
 // `attributes` defaults to true (i.e. always check attributes); `children`
 // defaults to false (i.e. don't check children unless explicitly enabled).
-func parseOptions(options any) (attrs *sideConfig, children *sideConfig) {
+func parseOptions(options any, stylisticScope bool) (attrs *sideConfig, children *sideConfig) {
 	const (
 		defaultWhen           = spacingNever
 		defaultAllowMultiline = true
@@ -136,10 +160,10 @@ func parseOptions(options any) (attrs *sideConfig, children *sideConfig) {
 	defaultCfg := normalizeConfig(originalConfig, defaults{
 		when:           defaultWhen,
 		allowMultiline: defaultAllowMultiline,
-	}, false)
+	}, false, stylisticScope)
 
-	attrs = resolveSideConfig(originalConfig, "attributes", defaultAttributes, defaultCfg)
-	children = resolveSideConfig(originalConfig, "children", defaultChildren, defaultCfg)
+	attrs = resolveSideConfig(originalConfig, "attributes", defaultAttributes, defaultCfg, stylisticScope)
+	children = resolveSideConfig(originalConfig, "children", defaultChildren, defaultCfg, stylisticScope)
 	return attrs, children
 }
 
@@ -152,7 +176,7 @@ func parseOptions(options any) (attrs *sideConfig, children *sideConfig) {
 // present we apply JS-truthy semantics (`false`/`0`/`""`/`null` → disabled,
 // anything else → enabled). Boolean-true is normalised to "use defaults"
 // by passing nil into normalizeConfig.
-func resolveSideConfig(originalConfig map[string]interface{}, key string, defaultEnabled bool, defaultCfg sideConfig) *sideConfig {
+func resolveSideConfig(originalConfig map[string]interface{}, key string, defaultEnabled bool, defaultCfg sideConfig, stylisticScope bool) *sideConfig {
 	raw, present := originalConfig[key]
 	enabled := defaultEnabled
 	if present {
@@ -165,7 +189,7 @@ func resolveSideConfig(originalConfig map[string]interface{}, key string, defaul
 	if present && !isBool(raw) {
 		cfg = raw
 	}
-	c := normalizeConfig(cfg, defaults(defaultCfg), true)
+	c := normalizeConfig(cfg, defaults(defaultCfg), true, stylisticScope)
 	return &c
 }
 
@@ -359,204 +383,217 @@ func fixByTrimmingWhitespace(text string, from, to int, mode, spacing string) ru
 	}
 }
 
-// JsxCurlySpacingRule enforces or disallows whitespace inside JSX braces in
-// attribute and child positions. Listens for `JsxExpression` (covers the
-// `JSXExpressionContainer` use-cases — both attribute initializers and
-// element children) and `JsxSpreadAttribute` (attribute spread).
-var JsxCurlySpacingRule = rule.Rule{
-	Name: "react/jsx-curly-spacing",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		attrsConfig, childrenConfig := parseOptions(options)
+// JsxCurlySpacingRule is the eslint-plugin-react variant of jsx-curly-spacing.
+var JsxCurlySpacingRule = BuildRule("react/jsx-curly-spacing", false)
 
-		text := ctx.SourceFile.Text()
+// BuildRule constructs the jsx-curly-spacing rule registered under name. The
+// rule enforces or disallows whitespace inside JSX braces in attribute and
+// child positions; it listens for `JsxExpression` (covers ESTree's
+// JSXExpressionContainer — both attribute initializers and element children)
+// and `JsxSpreadAttribute` (attribute spread).
+//
+// Both the eslint-plugin-react (`react/jsx-curly-spacing`) and
+// @stylistic/eslint-plugin (`@stylistic/jsx-curly-spacing`) variants share this
+// single implementation; the two upstream rules are case-identical (their test
+// suites match verbatim). stylisticScope captures their one option-normalization
+// delta (see normalizeConfig): pass false for the react variant, true for the
+// @stylistic variant.
+func BuildRule(name string, stylisticScope bool) rule.Rule {
+	return rule.Rule{
+		Name: name,
+		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+			attrsConfig, childrenConfig := parseOptions(options, stylisticScope)
 
-		validate := func(node *ast.Node) {
-			parent := node.Parent
-			if parent == nil {
-				return
-			}
+			text := ctx.SourceFile.Text()
 
-			var cfg *sideConfig
-			switch node.Kind {
-			case ast.KindJsxExpression:
-				// Children spread `<App>{...arr}</App>` is a JSXSpreadChild
-				// node in ESTree — upstream's rule registers a listener for
-				// JSXExpressionContainer only, so spread children are not
-				// covered. tsgo collapses both shapes into a single
-				// JsxExpression kind (distinguished by DotDotDotToken), so
-				// skip the spread variant here to keep behavior 1:1 with
-				// upstream.
-				if je := node.AsJsxExpression(); je != nil && je.DotDotDotToken != nil {
+			validate := func(node *ast.Node) {
+				parent := node.Parent
+				if parent == nil {
 					return
 				}
-				switch parent.Kind {
-				case ast.KindJsxAttribute:
+
+				var cfg *sideConfig
+				switch node.Kind {
+				case ast.KindJsxExpression:
+					// Children spread `<App>{...arr}</App>` is a JSXSpreadChild
+					// node in ESTree — upstream's rule registers a listener for
+					// JSXExpressionContainer only, so spread children are not
+					// covered. tsgo collapses both shapes into a single
+					// JsxExpression kind (distinguished by DotDotDotToken), so
+					// skip the spread variant here to keep behavior 1:1 with
+					// upstream.
+					if je := node.AsJsxExpression(); je != nil && je.DotDotDotToken != nil {
+						return
+					}
+					switch parent.Kind {
+					case ast.KindJsxAttribute:
+						cfg = attrsConfig
+					case ast.KindJsxElement, ast.KindJsxFragment:
+						cfg = childrenConfig
+					default:
+						return
+					}
+				case ast.KindJsxSpreadAttribute:
 					cfg = attrsConfig
-				case ast.KindJsxElement, ast.KindJsxFragment:
-					cfg = childrenConfig
 				default:
 					return
 				}
-			case ast.KindJsxSpreadAttribute:
-				cfg = attrsConfig
-			default:
-				return
-			}
-			if cfg == nil {
-				return
-			}
-
-			trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			start := trimmed.Pos()
-			end := trimmed.End()
-			if start >= end || text[start] != '{' || text[end-1] != '}' {
-				return
-			}
-			openPos := start
-			closePos := end - 1
-			innerLow := openPos + 1
-			innerHigh := closePos
-
-			scan := scanBraceBody(text, innerLow, innerHigh)
-
-			// Emit position for `{` and `}` reports — anchor at the brace token.
-			openRange := core.NewTextRange(openPos, openPos+1)
-			closeRange := core.NewTextRange(closePos, closePos+1)
-
-			// `isObjectLiteral` mirrors upstream's `first.value === second.value`
-			// — the next inner token is itself a `{`. For empty `{}` (no inner
-			// content), `secondPos == innerHigh`, so the next character is `}`,
-			// and `isObjectLiteral` is correctly false. For TS wrappers like
-			// `(`/`<`/`...`/`!`/`as`/`satisfies`, the first inner character is
-			// not `{`, so they correctly use `cfg.when`.
-			isObjectLiteral := scan.secondPos < innerHigh && text[scan.secondPos] == '{'
-			spacing := cfg.when
-			if isObjectLiteral {
-				spacing = cfg.objectLiteralSpaces
-			}
-
-			hasSpaceAfterOpen := scan.secondPos > innerLow
-			hasSpaceBeforeClose := scan.penultimateEnd < innerHigh
-			multilineAfterOpen := utils.ContainsLineTerminator(text, innerLow, scan.secondPos)
-			multilineBeforeClose := utils.ContainsLineTerminator(text, scan.penultimateEnd, innerHigh)
-
-			reportNoBeginningSpace := func() {
-				toLoc := scan.nextRealStart
-				if scan.secondPos < scan.nextRealStart {
-					// secondPos is the start of a leading comment;
-					// upstream trims only up to min(realToken, comment).
-					toLoc = scan.secondPos
+				if cfg == nil {
+					return
 				}
-				ctx.ReportRangeWithFixes(
-					openRange,
-					rule.RuleMessage{
-						Id:          "noSpaceAfter",
-						Description: "There should be no space after '{'",
-					},
-					fixByTrimmingWhitespace(text, innerLow, toLoc, "start", ""),
-				)
-			}
 
-			reportNoEndingSpace := func() {
-				fromLoc := scan.prevRealEnd
-				if scan.penultimateEnd > scan.prevRealEnd {
-					// penultimateEnd is the end of a trailing comment;
-					// upstream trims only from max(realToken, comment).
-					fromLoc = scan.penultimateEnd
+				trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
+				start := trimmed.Pos()
+				end := trimmed.End()
+				if start >= end || text[start] != '{' || text[end-1] != '}' {
+					return
 				}
-				ctx.ReportRangeWithFixes(
-					closeRange,
-					rule.RuleMessage{
-						Id:          "noSpaceBefore",
-						Description: "There should be no space before '}'",
-					},
-					fixByTrimmingWhitespace(text, fromLoc, innerHigh, "end", ""),
-				)
-			}
+				openPos := start
+				closePos := end - 1
+				innerLow := openPos + 1
+				innerHigh := closePos
 
-			reportNoBeginningNewline := func() {
-				ctx.ReportRangeWithFixes(
-					openRange,
-					rule.RuleMessage{
-						Id:          "noNewlineAfter",
-						Description: "There should be no newline after '{'",
-					},
-					fixByTrimmingWhitespace(text, innerLow, scan.nextRealStart, "start", spacing),
-				)
-			}
+				scan := scanBraceBody(text, innerLow, innerHigh)
 
-			reportNoEndingNewline := func() {
-				ctx.ReportRangeWithFixes(
-					closeRange,
-					rule.RuleMessage{
-						Id:          "noNewlineBefore",
-						Description: "There should be no newline before '}'",
-					},
-					fixByTrimmingWhitespace(text, scan.prevRealEnd, innerHigh, "end", spacing),
-				)
-			}
+				// Emit position for `{` and `}` reports — anchor at the brace token.
+				openRange := core.NewTextRange(openPos, openPos+1)
+				closeRange := core.NewTextRange(closePos, closePos+1)
 
-			reportRequiredBeginningSpace := func() {
-				ctx.ReportRangeWithFixes(
-					openRange,
-					rule.RuleMessage{
-						Id:          "spaceNeededAfter",
-						Description: "A space is required after '{'",
-					},
-					rule.RuleFix{
-						Text:  " ",
-						Range: core.NewTextRange(openPos+1, openPos+1),
-					},
-				)
-			}
-
-			reportRequiredEndingSpace := func() {
-				ctx.ReportRangeWithFixes(
-					closeRange,
-					rule.RuleMessage{
-						Id:          "spaceNeededBefore",
-						Description: "A space is required before '}'",
-					},
-					rule.RuleFix{
-						Text:  " ",
-						Range: core.NewTextRange(closePos, closePos),
-					},
-				)
-			}
-
-			switch spacing {
-			case spacingAlways:
-				if !hasSpaceAfterOpen {
-					reportRequiredBeginningSpace()
-				} else if !cfg.allowMultiline && multilineAfterOpen {
-					reportNoBeginningNewline()
+				// `isObjectLiteral` mirrors upstream's `first.value === second.value`
+				// — the next inner token is itself a `{`. For empty `{}` (no inner
+				// content), `secondPos == innerHigh`, so the next character is `}`,
+				// and `isObjectLiteral` is correctly false. For TS wrappers like
+				// `(`/`<`/`...`/`!`/`as`/`satisfies`, the first inner character is
+				// not `{`, so they correctly use `cfg.when`.
+				isObjectLiteral := scan.secondPos < innerHigh && text[scan.secondPos] == '{'
+				spacing := cfg.when
+				if isObjectLiteral {
+					spacing = cfg.objectLiteralSpaces
 				}
-				if !hasSpaceBeforeClose {
-					reportRequiredEndingSpace()
-				} else if !cfg.allowMultiline && multilineBeforeClose {
-					reportNoEndingNewline()
+
+				hasSpaceAfterOpen := scan.secondPos > innerLow
+				hasSpaceBeforeClose := scan.penultimateEnd < innerHigh
+				multilineAfterOpen := utils.ContainsLineTerminator(text, innerLow, scan.secondPos)
+				multilineBeforeClose := utils.ContainsLineTerminator(text, scan.penultimateEnd, innerHigh)
+
+				reportNoBeginningSpace := func() {
+					toLoc := scan.nextRealStart
+					if scan.secondPos < scan.nextRealStart {
+						// secondPos is the start of a leading comment;
+						// upstream trims only up to min(realToken, comment).
+						toLoc = scan.secondPos
+					}
+					ctx.ReportRangeWithFixes(
+						openRange,
+						rule.RuleMessage{
+							Id:          "noSpaceAfter",
+							Description: "There should be no space after '{'",
+						},
+						fixByTrimmingWhitespace(text, innerLow, toLoc, "start", ""),
+					)
 				}
-			case spacingNever:
-				if multilineAfterOpen {
-					if !cfg.allowMultiline {
+
+				reportNoEndingSpace := func() {
+					fromLoc := scan.prevRealEnd
+					if scan.penultimateEnd > scan.prevRealEnd {
+						// penultimateEnd is the end of a trailing comment;
+						// upstream trims only from max(realToken, comment).
+						fromLoc = scan.penultimateEnd
+					}
+					ctx.ReportRangeWithFixes(
+						closeRange,
+						rule.RuleMessage{
+							Id:          "noSpaceBefore",
+							Description: "There should be no space before '}'",
+						},
+						fixByTrimmingWhitespace(text, fromLoc, innerHigh, "end", ""),
+					)
+				}
+
+				reportNoBeginningNewline := func() {
+					ctx.ReportRangeWithFixes(
+						openRange,
+						rule.RuleMessage{
+							Id:          "noNewlineAfter",
+							Description: "There should be no newline after '{'",
+						},
+						fixByTrimmingWhitespace(text, innerLow, scan.nextRealStart, "start", spacing),
+					)
+				}
+
+				reportNoEndingNewline := func() {
+					ctx.ReportRangeWithFixes(
+						closeRange,
+						rule.RuleMessage{
+							Id:          "noNewlineBefore",
+							Description: "There should be no newline before '}'",
+						},
+						fixByTrimmingWhitespace(text, scan.prevRealEnd, innerHigh, "end", spacing),
+					)
+				}
+
+				reportRequiredBeginningSpace := func() {
+					ctx.ReportRangeWithFixes(
+						openRange,
+						rule.RuleMessage{
+							Id:          "spaceNeededAfter",
+							Description: "A space is required after '{'",
+						},
+						rule.RuleFix{
+							Text:  " ",
+							Range: core.NewTextRange(openPos+1, openPos+1),
+						},
+					)
+				}
+
+				reportRequiredEndingSpace := func() {
+					ctx.ReportRangeWithFixes(
+						closeRange,
+						rule.RuleMessage{
+							Id:          "spaceNeededBefore",
+							Description: "A space is required before '}'",
+						},
+						rule.RuleFix{
+							Text:  " ",
+							Range: core.NewTextRange(closePos, closePos),
+						},
+					)
+				}
+
+				switch spacing {
+				case spacingAlways:
+					if !hasSpaceAfterOpen {
+						reportRequiredBeginningSpace()
+					} else if !cfg.allowMultiline && multilineAfterOpen {
 						reportNoBeginningNewline()
 					}
-				} else if hasSpaceAfterOpen {
-					reportNoBeginningSpace()
-				}
-				if multilineBeforeClose {
-					if !cfg.allowMultiline {
+					if !hasSpaceBeforeClose {
+						reportRequiredEndingSpace()
+					} else if !cfg.allowMultiline && multilineBeforeClose {
 						reportNoEndingNewline()
 					}
-				} else if hasSpaceBeforeClose {
-					reportNoEndingSpace()
+				case spacingNever:
+					if multilineAfterOpen {
+						if !cfg.allowMultiline {
+							reportNoBeginningNewline()
+						}
+					} else if hasSpaceAfterOpen {
+						reportNoBeginningSpace()
+					}
+					if multilineBeforeClose {
+						if !cfg.allowMultiline {
+							reportNoEndingNewline()
+						}
+					} else if hasSpaceBeforeClose {
+						reportNoEndingSpace()
+					}
 				}
 			}
-		}
 
-		return rule.RuleListeners{
-			ast.KindJsxExpression:      validate,
-			ast.KindJsxSpreadAttribute: validate,
-		}
-	},
+			return rule.RuleListeners{
+				ast.KindJsxExpression:      validate,
+				ast.KindJsxSpreadAttribute: validate,
+			}
+		},
+	}
 }

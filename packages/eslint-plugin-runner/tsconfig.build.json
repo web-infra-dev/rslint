@@ -1,0 +1,7 @@
+{
+  "extends": ["../../tsconfig.build.json"],
+  "references": [],
+  "compilerOptions": {
+    "types": ["node"]
+  }
+}
