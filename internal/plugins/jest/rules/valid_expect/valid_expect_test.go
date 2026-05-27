@@ -17,10 +17,13 @@ func TestValidExpectRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{Code: "expect.hasAssertions"},
 			{Code: "expect.hasAssertions()"},
+			{Code: "expect.extend;"},
+			{Code: "expect.resolves;"},
 			{Code: "expect(\"something\").toEqual(\"else\");"},
 			{Code: "expect(true).toBeDefined();"},
 			{Code: "expect([1, 2, 3]).toEqual([1, 2, 3]);"},
 			{Code: "expect(undefined).not.toBeDefined();"},
+			{Code: "import { expect } from 'chai'; expect(foo).to.equal(bar);"},
 			{Code: "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).resolves.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", () => { return expect(Promise.reject(2)).rejects.toBeDefined(); });"},
 			{Code: "test(\"valid-expect\", () => { return expect(Promise.resolve(2)).resolves.not.toBeDefined(); });"},
@@ -611,6 +614,32 @@ func TestValidExpectRule(t *testing.T) {
 			},
 			{
 				Code: `test("valid-expect", () => {
+  Promise.all([foo(expect(Promise.resolve(2)).resolves.not.toBeDefined())]);
+});
+      `,
+				Output: []string{`test("valid-expect", async () => {
+  Promise.all([foo(await expect(Promise.resolve(2)).resolves.not.toBeDefined())]);
+});
+      `},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited", Line: 2, Column: 20, EndColumn: 73},
+				},
+			},
+			{
+				Code: `test("valid-expect", async () => {
+  await Promise.all([foo(expect(Promise.resolve(2)).resolves.not.toBeDefined())]);
+});
+      `,
+				Output: []string{`test("valid-expect", async () => {
+  await Promise.all([foo(await expect(Promise.resolve(2)).resolves.not.toBeDefined())]);
+});
+      `},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited", Line: 2, Column: 26, EndColumn: 79},
+				},
+			},
+			{
+				Code: `test("valid-expect", () => {
   const assertions = [
     expect(Promise.resolve(2)).resolves.not.toBeDefined(),
     expect(Promise.resolve(3)).resolves.not.toBeDefined(),
@@ -718,6 +747,12 @@ func TestValidExpectRule(t *testing.T) {
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "matcherNotFound", Column: 9, EndColumn: 35},
+				},
+			},
+			{
+				Code: "import { expect as pleaseExpect } from '@jest/globals'; pleaseExpect(Promise.resolve(2)).resolves.toBe(2);",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited", Column: 57, EndColumn: 106},
 				},
 			},
 		},

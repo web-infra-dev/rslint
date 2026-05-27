@@ -69,7 +69,7 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	localNode := resolveHeadLocalNode(callExpr)
-	name, originalNode, headType := resolveOriginalName(node, localName, localNode, ctx)
+	name, originalNode, headType := ResolveJestFunctionReference(node, localName, localNode, ctx)
 	if name == "" {
 		return nil
 	}
@@ -226,7 +226,7 @@ func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 	return nil, nil, ExpectParseReasonMatcherNotFound
 }
 
-func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
+func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
 	if ctx.TypeChecker == nil {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -237,7 +237,7 @@ func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, 
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
-	ident := resolveFirstIdentifier(callExpr.Expression)
+	ident := ResolveFirstIdentifier(callExpr.Expression)
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -288,10 +288,12 @@ func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
 	if callExpr == nil {
 		return nil
 	}
-	return resolveFirstIdentifier(callExpr.Expression)
+	return ResolveFirstIdentifier(callExpr.Expression)
 }
 
-func resolveFirstIdentifier(node *ast.Node) *ast.Node {
+// ResolveFirstIdentifier walks the left side of a call/member chain and returns
+// the first identifier it finds, if any.
+func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
@@ -300,13 +302,13 @@ func resolveFirstIdentifier(node *ast.Node) *ast.Node {
 	case ast.KindIdentifier:
 		return node
 	case ast.KindCallExpression:
-		return resolveFirstIdentifier(node.AsCallExpression().Expression)
+		return ResolveFirstIdentifier(node.AsCallExpression().Expression)
 	case ast.KindPropertyAccessExpression:
-		return resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
+		return ResolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
 	case ast.KindElementAccessExpression:
-		return resolveFirstIdentifier(node.AsElementAccessExpression().Expression)
+		return ResolveFirstIdentifier(node.AsElementAccessExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
-		return resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
+		return ResolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
 	}
 
 	return nil

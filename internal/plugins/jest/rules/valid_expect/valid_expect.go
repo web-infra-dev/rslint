@@ -25,6 +25,8 @@ type asyncDescriptor struct {
 	promiseWrapped bool
 }
 
+const expectParseReasonMatcherNotCalled = "matcher-not-called"
+
 func pluralSuffix(amount int) string {
 	if amount == 1 {
 		return ""
@@ -162,24 +164,45 @@ func readIntOption(options map[string]interface{}, key string, defaultValue int)
 	}
 }
 
-func isExpectChain(entries []utils.ParsedJestFnMemberEntry, settings map[string]interface{}) bool {
-	if len(entries) == 0 {
-		return false
+func resolveExpectName(node *ast.Node, localName string, ctx rule.RuleContext) string {
+	name, _, _ := utils.ResolveJestFunctionReference(node, localName, nil, ctx)
+	if name == "" {
+		return ""
 	}
-	return utils.ApplyGlobalJestAlias(entries[0].Name, settings) == "expect"
+	return utils.ApplyGlobalJestAlias(name, ctx.Settings)
 }
 
-func isTopLevelUncalledMemberAccess(node *ast.Node) bool {
-	if node == nil || !utils.IsMemberAccessNode(node) {
-		return false
+func parseExpectCallWithReason(node *ast.Node, ctx rule.RuleContext) (*utils.ParsedJestFnCall, string) {
+	parsed := utils.ParseJestFnCall(node, ctx)
+	if parsed != nil {
+		if parsed.Kind == utils.JestFnTypeExpect {
+			return parsed, utils.ExpectParseReasonNone
+		}
+		return nil, utils.ExpectParseReasonNone
 	}
-	if utils.IsMemberAccessNode(node.Parent) {
-		return false
+
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return nil, utils.ExpectParseReasonNone
 	}
-	if node.Parent != nil && node.Parent.Kind == ast.KindCallExpression && node.Parent.AsCallExpression().Expression == node {
-		return false
+
+	entries := utils.GetJestFnMemberEntries(node)
+	if len(entries) == 0 {
+		return nil, utils.ExpectParseReasonNone
 	}
-	return true
+
+	if resolveExpectName(node, entries[0].Name, ctx) != "expect" {
+		return nil, utils.ExpectParseReasonNone
+	}
+
+	_, _, reason := utils.FindExpectModifiersAndMatcher(entries[1:])
+	if reason == utils.ExpectParseReasonMatcherNotFound && utils.IsMemberAccessNode(node.Parent) {
+		reason = expectParseReasonMatcherNotCalled
+	}
+	if reason != utils.ExpectParseReasonNone && utils.FindTopMostCallExpression(node) != node {
+		return nil, utils.ExpectParseReasonNone
+	}
+
+	return nil, reason
 }
 
 func shouldBeAwaited(parsed *utils.ParsedJestFnCall, asyncMatchers []string) bool {
@@ -200,16 +223,30 @@ func isPromiseMethodCall(node *ast.Node) bool {
 	return strings.HasPrefix(callee, "Promise.")
 }
 
-func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
-	for current := node.Parent; current != nil; current = current.Parent {
-		if utils.IsFunction(current) {
-			return nil
-		}
-		if isPromiseMethodCall(current) {
-			return current
-		}
+func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
 	}
+
+	if node.Kind == ast.KindArrayLiteralExpression && node.Parent != nil && node.Parent.Kind == ast.KindCallExpression {
+		node = node.Parent
+	}
+
+	if isPromiseMethodCall(node) {
+		return node
+	}
+
 	return nil
+}
+
+func findPromiseCallExpressionNode(node *ast.Node) *ast.Node {
+	if node == nil || node.Parent == nil || node.Parent.Parent == nil {
+		return nil
+	}
+	if node.Parent.Kind != ast.KindCallExpression && node.Parent.Kind != ast.KindArrayLiteralExpression {
+		return nil
+	}
+	return getPromiseCallExpressionNode(node.Parent)
 }
 
 func getParentIfPromiseChained(node *ast.Node) *ast.Node {
@@ -354,27 +391,12 @@ func reportAsyncDescriptor(
 	ctx.ReportNode(descriptor.node, msg)
 }
 
-func reportUncalledMatcherMember(ctx rule.RuleContext, node *ast.Node) {
-	if !isTopLevelUncalledMemberAccess(node) {
-		return
+func findTopLevelMemberAccess(node *ast.Node) *ast.Node {
+	current := node
+	for current != nil && utils.IsMemberAccessNode(current.Parent) {
+		current = current.Parent
 	}
-
-	entries := utils.GetJestFnMemberEntries(node)
-	if !isExpectChain(entries, ctx.Settings) || len(entries) < 2 {
-		return
-	}
-
-	last := entries[len(entries)-1]
-	if len(entries) == 2 && (last.Name == "assertions" || last.Name == "hasAssertions") {
-		return
-	}
-
-	if utils.EXPECT_MODIFIER_NAMES[last.Name] {
-		ctx.ReportNode(last.Node, buildErrorMatcherNotFoundMessage())
-		return
-	}
-
-	ctx.ReportNode(last.Node, buildErrorMatcherNotCalledMessage())
+	return current
 }
 
 var ValidExpectRule = rule.Rule{
@@ -387,22 +409,36 @@ var ValidExpectRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				entries := utils.GetJestFnMemberEntries(node)
-				if !isExpectChain(entries, ctx.Settings) {
-					return
-				}
-				if len(entries) == 1 && node.Parent != nil && utils.IsMemberAccessNode(node.Parent) {
-					return
-				}
-
-				parsed := utils.ParseJestFnCall(node, ctx)
+				parsed, reason := parseExpectCallWithReason(node, ctx)
 				if parsed == nil {
-					_, _, reason := utils.FindExpectModifiersAndMatcher(entries[1:])
+					if reason == "" {
+						return
+					}
+
+					reportNode := node
+					if utils.IsMemberAccessNode(node.Parent) {
+						topMember := findTopLevelMemberAccess(node.Parent)
+						if topMember != nil {
+							reportNode = topMember
+						}
+					}
+
 					switch reason {
 					case utils.ExpectParseReasonMatcherNotFound:
-						ctx.ReportNode(node, buildErrorMatcherNotFoundMessage())
+						ctx.ReportNode(reportNode, buildErrorMatcherNotFoundMessage())
+					case expectParseReasonMatcherNotCalled:
+						entries := utils.GetJestFnMemberEntries(reportNode)
+						if len(entries) == 2 && (entries[1].Name == "assertions" || entries[1].Name == "hasAssertions") {
+							return
+						}
+						last := entries[len(entries)-1]
+						if utils.EXPECT_MODIFIER_NAMES[last.Name] {
+							ctx.ReportNode(last.Node, buildErrorMatcherNotFoundMessage())
+							return
+						}
+						ctx.ReportNode(last.Node, buildErrorMatcherNotCalledMessage())
 					case utils.ExpectParseReasonModifierUnknown:
-						ctx.ReportNode(node, buildErrorModifierUnknownMessage())
+						ctx.ReportNode(reportNode, buildErrorModifierUnknownMessage())
 					}
 					return
 				}
@@ -450,12 +486,6 @@ var ValidExpectRule = rule.Rule{
 				if insideAssertionArray {
 					arrayExceptions[reportNodeKey] = true
 				}
-			},
-			ast.KindPropertyAccessExpression: func(node *ast.Node) {
-				reportUncalledMatcherMember(ctx, node)
-			},
-			ast.KindElementAccessExpression: func(node *ast.Node) {
-				reportUncalledMatcherMember(ctx, node)
 			},
 			rule.ListenerOnExit(ast.KindEndOfFile): func(node *ast.Node) {
 				_ = node
