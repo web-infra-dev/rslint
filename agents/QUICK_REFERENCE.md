@@ -40,11 +40,11 @@ A quick reference for common commands, file locations, and checklists when porti
 
 Each rule lives in a per-group `all.go` that exports a `GetAllRules() []rule.Rule` slice. Append your rule there; `config.go` iterates each slice automatically — **do not edit `config.go`**.
 
-| Rule Type                                                                               | File to edit                         | Final registered key                                 |
-| --------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
-| ESLint Core                                                                             | `internal/rules/all.go`              | `"no-debugger"`                                      |
-| `@typescript-eslint`                                                                    | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
-| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, stylistic, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
+| Rule Type                                                                    | File to edit                         | Final registered key                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| ESLint Core                                                                  | `internal/rules/all.go`              | `"no-debugger"`                                      |
+| `@typescript-eslint`                                                         | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
+| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
 
 **How to add a rule**: in the relevant `all.go`, add the import path and append the rule var to the `GetAllRules()` return slice:
 

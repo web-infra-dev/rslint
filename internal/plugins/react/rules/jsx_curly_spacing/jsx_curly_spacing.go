@@ -58,17 +58,10 @@ func nestedMap(m map[string]interface{}, key string) map[string]interface{} {
 // `true` as "use defaults"), then on lastPass falls back objectLiteralSpaces
 // to `when` when neither config nor defaults specify it.
 //
-// stylisticScope selects how a per-side `spacing` object interacts with the
-// inherited default — the sole behavioral delta between the two upstream rules:
-//
-//   - false (eslint-plugin-react): objectLiteralSpaces starts from the default
-//     (top-level spacing.objectLiterals) and is only overridden when the
-//     per-side spacing carries an explicit `objectLiterals` key.
-//   - true (@stylistic/eslint-plugin): its normalizeConfig destructures
-//     `spacing = perSide.spacing ?? defaultSpacing`, so a per-side `spacing`
-//     object — even an empty `{}` — shadows the inherited default entirely;
-//     objectLiteralSpaces then derives from `spacing.objectLiterals ?? when`.
-func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool, stylisticScope bool) sideConfig {
+// objectLiteralSpaces starts from the default (top-level spacing.objectLiterals)
+// and is only overridden when the per-side spacing carries an explicit
+// `objectLiterals` key.
+func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideConfig {
 	cfg, _ := configOrTrue.(map[string]interface{})
 	when := d.when
 	if cfg != nil {
@@ -81,23 +74,9 @@ func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool, stylis
 		}
 	}
 	objectLiteralSpaces := d.objectLiteralSpaces
-	if stylisticScope {
-		// A present per-side `spacing` key (even an empty object) replaces the
-		// inherited default; an absent key keeps inheriting it. nestedMap yields
-		// nil for an absent-or-non-map value (and reads a nil cfg safely), so the
-		// hasKey test alone separates "present" from "inherit", matching
-		// @stylistic's `spacing = perSide.spacing ?? defaultSpacing`.
-		if _, hasKey := cfg["spacing"]; hasKey {
-			objectLiteralSpaces = ""
-			if spacing := nestedMap(cfg, "spacing"); spacing != nil {
-				objectLiteralSpaces = stringValue(spacing["objectLiterals"], "")
-			}
-		}
-	} else {
-		if spacing := nestedMap(cfg, "spacing"); spacing != nil {
-			if v, ok := spacing["objectLiterals"]; ok {
-				objectLiteralSpaces = stringValue(v, objectLiteralSpaces)
-			}
+	if spacing := nestedMap(cfg, "spacing"); spacing != nil {
+		if v, ok := spacing["objectLiterals"]; ok {
+			objectLiteralSpaces = stringValue(v, objectLiteralSpaces)
 		}
 	}
 	if lastPass && objectLiteralSpaces == "" {
@@ -120,7 +99,7 @@ func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool, stylis
 //
 // `attributes` defaults to true (i.e. always check attributes); `children`
 // defaults to false (i.e. don't check children unless explicitly enabled).
-func parseOptions(options any, stylisticScope bool) (attrs *sideConfig, children *sideConfig) {
+func parseOptions(options any) (attrs *sideConfig, children *sideConfig) {
 	const (
 		defaultWhen           = spacingNever
 		defaultAllowMultiline = true
@@ -160,10 +139,10 @@ func parseOptions(options any, stylisticScope bool) (attrs *sideConfig, children
 	defaultCfg := normalizeConfig(originalConfig, defaults{
 		when:           defaultWhen,
 		allowMultiline: defaultAllowMultiline,
-	}, false, stylisticScope)
+	}, false)
 
-	attrs = resolveSideConfig(originalConfig, "attributes", defaultAttributes, defaultCfg, stylisticScope)
-	children = resolveSideConfig(originalConfig, "children", defaultChildren, defaultCfg, stylisticScope)
+	attrs = resolveSideConfig(originalConfig, "attributes", defaultAttributes, defaultCfg)
+	children = resolveSideConfig(originalConfig, "children", defaultChildren, defaultCfg)
 	return attrs, children
 }
 
@@ -176,7 +155,7 @@ func parseOptions(options any, stylisticScope bool) (attrs *sideConfig, children
 // present we apply JS-truthy semantics (`false`/`0`/`""`/`null` → disabled,
 // anything else → enabled). Boolean-true is normalised to "use defaults"
 // by passing nil into normalizeConfig.
-func resolveSideConfig(originalConfig map[string]interface{}, key string, defaultEnabled bool, defaultCfg sideConfig, stylisticScope bool) *sideConfig {
+func resolveSideConfig(originalConfig map[string]interface{}, key string, defaultEnabled bool, defaultCfg sideConfig) *sideConfig {
 	raw, present := originalConfig[key]
 	enabled := defaultEnabled
 	if present {
@@ -189,7 +168,7 @@ func resolveSideConfig(originalConfig map[string]interface{}, key string, defaul
 	if present && !isBool(raw) {
 		cfg = raw
 	}
-	c := normalizeConfig(cfg, defaults(defaultCfg), true, stylisticScope)
+	c := normalizeConfig(cfg, defaults(defaultCfg), true)
 	return &c
 }
 
@@ -384,25 +363,18 @@ func fixByTrimmingWhitespace(text string, from, to int, mode, spacing string) ru
 }
 
 // JsxCurlySpacingRule is the eslint-plugin-react variant of jsx-curly-spacing.
-var JsxCurlySpacingRule = BuildRule("react/jsx-curly-spacing", false)
+var JsxCurlySpacingRule = BuildRule("react/jsx-curly-spacing")
 
 // BuildRule constructs the jsx-curly-spacing rule registered under name. The
 // rule enforces or disallows whitespace inside JSX braces in attribute and
 // child positions; it listens for `JsxExpression` (covers ESTree's
 // JSXExpressionContainer — both attribute initializers and element children)
 // and `JsxSpreadAttribute` (attribute spread).
-//
-// Both the eslint-plugin-react (`react/jsx-curly-spacing`) and
-// @stylistic/eslint-plugin (`@stylistic/jsx-curly-spacing`) variants share this
-// single implementation; the two upstream rules are case-identical (their test
-// suites match verbatim). stylisticScope captures their one option-normalization
-// delta (see normalizeConfig): pass false for the react variant, true for the
-// @stylistic variant.
-func BuildRule(name string, stylisticScope bool) rule.Rule {
+func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,
 		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-			attrsConfig, childrenConfig := parseOptions(options, stylisticScope)
+			attrsConfig, childrenConfig := parseOptions(options)
 
 			text := ctx.SourceFile.Text()
 
