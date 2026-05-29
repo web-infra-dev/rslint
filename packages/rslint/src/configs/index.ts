@@ -7,7 +7,6 @@ import { recommended as promiseRecommended } from './promise.js';
 import { recommended as jestRecommended, style as jestStyle } from './jest.js';
 import { recommended as unicornRecommended } from './unicorn.js';
 import { recommended as jsxA11yRecommended } from './jsx-a11y.js';
-import { recommended as stylisticRecommended } from './stylistic.js';
 
 export const ts = {
   configs: { base: tsBase, recommended: tsRecommended },
@@ -43,8 +42,4 @@ export const unicornPlugin = {
 
 export const jsxA11yPlugin = {
   configs: { recommended: jsxA11yRecommended },
-};
-
-export const stylisticPlugin = {
-  configs: { recommended: stylisticRecommended },
 };

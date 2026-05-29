@@ -10,11 +10,7 @@ import (
 // JsxIndentPropsRule is the eslint-plugin-react variant of jsx-indent-props.
 var JsxIndentPropsRule = BuildRule("react/jsx-indent-props")
 
-// BuildRule constructs the jsx-indent-props rule registered under name. Both
-// the react (`react/jsx-indent-props`) and @stylistic
-// (`@stylistic/jsx-indent-props`) variants are produced from this single
-// implementation — the two upstream rules are byte-identical (the @stylistic
-// fork carries no behavioral delta), so only the registered Name differs.
+// BuildRule constructs the jsx-indent-props rule registered under name.
 //
 // Ported from eslint-plugin-react's `jsx-indent-props` rule. The rule walks
 // every JsxOpeningElement / JsxSelfClosingElement, computes the expected

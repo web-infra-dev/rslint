@@ -13,7 +13,6 @@ import (
 	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
-	stylisticPlugin "github.com/web-infra-dev/rslint/internal/plugins/stylistic"
 	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	coreRules "github.com/web-infra-dev/rslint/internal/rules"
@@ -169,11 +168,6 @@ var KnownPlugins = []PluginInfo{
 		getAllRules: func() []rule.Rule { return reactHooksPlugin.GetAllRules() },
 	},
 	{
-		RulePrefix:  "@stylistic",
-		DeclNames:   []string{"@stylistic", "@stylistic/eslint-plugin"},
-		getAllRules: func() []rule.Rule { return stylisticPlugin.GetAllRules() },
-	},
-	{
 		RulePrefix:  "unicorn",
 		DeclNames:   []string{"eslint-plugin-unicorn", "unicorn"},
 		getAllRules: func() []rule.Rule { return unicornPlugin.GetAllRules() },
@@ -249,7 +243,6 @@ func RegisterAllRules() {
 		registerAllJestPluginRules()
 		registerAllJsxA11yPluginRules()
 		registerAllPromisePluginRules()
-		registerAllStylisticPluginRules()
 		registerAllUnicornPluginRules()
 		registerAllCoreEslintRules()
 	})
@@ -281,12 +274,6 @@ func registerAllJsxA11yPluginRules() {
 
 func registerAllPromisePluginRules() {
 	for _, rule := range promisePlugin.GetAllRules() {
-		GlobalRuleRegistry.Register(rule.Name, rule)
-	}
-}
-
-func registerAllStylisticPluginRules() {
-	for _, rule := range stylisticPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }
