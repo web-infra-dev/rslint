@@ -1,4 +1,4 @@
-package ipc
+package api
 
 import (
 	"encoding/json"

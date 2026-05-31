@@ -26,6 +26,10 @@ func runMain() int {
 			return runAPI()
 		}
 	}
-	// run in CLI mode for direct command line usage
-	return runCMD()
+	// Default: unified IPC CLI mode — the Node parent (cli.ts → engine.ts)
+	// drives stdin/stdout as a length-prefixed-JSON IPC frame stream; the Go
+	// child runs the init handshake + lint pipeline and forwards output /
+	// acks shutdown. On js/wasm this resolves to the native fallback
+	// (ipc_cli_js.go).
+	return runCLI(args)
 }
