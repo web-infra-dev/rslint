@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-type-assertion -- IPC wire boundary casts. Each site projects a decoded frame's `unknown` / `any` payload (JSON.parse output, Node stream error) into the typed message shape this module uses; the framing + JSON contract is validated at the read boundary, not at the cast. Bulk-disabling here instead of per-line keeps the parse sites readable. */
+/* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
 /**
  * Bidirectional IPC client over a Node Duplex pair (typically the CLI host
  * process's stdin/stdout, with a Go peer on the other side).

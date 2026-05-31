@@ -1,14 +1,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-// Re-export utilities that external consumers may depend on
-export {
-  JS_CONFIG_FILES,
-  findJSConfig,
-  findJSConfigUp,
-  findJSConfigsInDir,
-} from './utils/config-discovery.js';
-
 /**
  * Load a JS/TS config file.
  * - .js/.mjs: native import()

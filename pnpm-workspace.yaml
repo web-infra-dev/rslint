@@ -1,5 +1,6 @@
 packages:
   - 'packages/*'
+  - 'crates/rslint-native'
   - 'tests/bench-cli'
   - 'npm/rslint/*'
   - 'npm/tsgo/*'

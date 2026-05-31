@@ -17,6 +17,8 @@ module.exports = {
     'packages/rslint/pkg/mod',
     'cmd/tsgo',
     './agents',
+    'crates/rslint-native/index.js',
+    'crates/rslint-native/index.d.ts',
     'internal/linter/*_test.go',
     'internal/rules/valid_typeof/valid_typeof.md',
     'internal/plugins/jsx_a11y/rules/aria_props/aria_props.md',

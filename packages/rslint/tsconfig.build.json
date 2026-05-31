@@ -2,6 +2,7 @@
   "extends": ["../../tsconfig.build.json"],
   "references": [],
   "compilerOptions": {
-    "types": ["node"]
+    "types": ["node"],
+    "tsBuildInfoFile": "${configDir}/node_modules/.cache/rslint-core-typecheck.tsbuildinfo"
   }
 }

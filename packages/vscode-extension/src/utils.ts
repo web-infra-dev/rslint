@@ -21,7 +21,26 @@ export const fileExists = async (uri: Uri): Promise<boolean> => {
   }
 };
 
-export const PLATFORM_KEY = `${process.platform}-${arch()}`;
-export const PLATFORM_BIN_REQUEST = `@rslint/${PLATFORM_KEY}/rslint`;
+/**
+ * Returns the ordered list of platform-package requests to try-resolve when
+ * locating the bundled Go binary, mirroring `packages/rslint/bin/rslint.cjs`.
+ *
+ * The Go binary lives in the `@rslint/native-{tuple}` subpackage, reached via
+ * its `./bin` export. npm installs only the subpackage matching the host
+ * os/cpu/libc, so on linux we try gnu then musl and use whichever got
+ * installed — no libc sniffing (Go binaries are static, the gnu/musl
+ * distinction doesn't matter to them). Callers should resolve each candidate
+ * in order and use the first that succeeds.
+ */
+export const getPlatformBinRequests = (): string[] => {
+  const cpu = arch();
+  const tuples =
+    process.platform === 'linux'
+      ? [`linux-${cpu}-gnu`, `linux-${cpu}-musl`]
+      : process.platform === 'win32'
+        ? [`win32-${cpu}-msvc`]
+        : [`${process.platform}-${cpu}`];
+  return tuples.map((tuple) => `@rslint/native-${tuple}/bin`);
+};
 
 export type RslintBinPath = 'local' | 'built-in' | 'custom';

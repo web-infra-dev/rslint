@@ -1,0 +1,399 @@
+/* rslint-disable @typescript-eslint/no-unsafe-type-assertion */
+/**
+ * Plugin loader for the runner Worker.
+ *
+ * Each Worker calls {@link loadPluginsFromConfigs} once at startup to
+ * import every rslint config file assigned to it. The config files
+ * themselves carry live plugin instances on their `eslintPlugins` (or
+ * object-form `plugins`) maps; the worker pulls them out, sorts them
+ * by prefix, and caches the resulting `LoadedPlugins` per config
+ * directory for the worker's entire lifetime. Subsequent lint tasks
+ * select the right `LoadedPlugins` via `configKey` (= config directory).
+ *
+ * CJS / ESM unwrap. ESLint plugins ship in both module systems and the
+ * `eslintPlugins.<prefix>` value the user supplied can be either:
+ *
+ *   - the plugin object directly (the conventional shape), or
+ *   - a `{ default: pluginObj }` wrapper (when the user wrote
+ *     `import unicorn from 'eslint-plugin-unicorn'` in an ESM config
+ *     against a CJS plugin and the bundler injected the default).
+ *
+ * We pass through {@link unwrapPluginModule} so both shapes work.
+ *
+ * Node version requirement: ≥ 20, matching the package's
+ * `engines.node` field. Enforced at install time by the package
+ * manager and re-checked at startup by {@link ensureNodeVersion} so a
+ * direct-binary invocation against a too-old Node fails fast with a
+ * clear message instead of a cryptic syntax/feature error later.
+ */
+
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+import type { ConfigDescriptor } from '../types.js';
+
+/**
+ * Extension-aware config loader for worker init. Mirrors the strategy
+ * `packages/rslint/src/config-loader.ts::loadConfigFile` uses on the
+ * main thread so a `.ts`/`.mts` config file loads identically in both
+ * places.
+ *
+ * The previous implementation directly called `await import(url)` for
+ * every extension; on Node 20 (declared support floor) `.ts` configs
+ * have no native loader and a workspace that uses
+ * `rslint.config.ts` + `eslintPlugins` would fail worker init even
+ * though the main thread had already loaded the same file via jiti.
+ *
+ * Resolution order for `.ts`/`.mts`:
+ *
+ *   1. `process.features.typescript` (Node ≥ 22.6 with native TS) →
+ *      native `import()`.
+ *   2. Otherwise `jiti` (declared as optional peer in package.json).
+ *   3. If jiti is unavailable, throw an actionable error pointing the
+ *      user at either upgrading Node or `npm install -D jiti`.
+ *
+ * Cache-busting `?t=Date.now()`: NOT used here. Worker init imports
+ * each config once per worker lifetime; long-running LSP sessions
+ * rebuild the worker pool via CompatPool when configs change
+ * (host-side mtime + size fingerprint), so the host already controls
+ * staleness. Re-importing with `?t=` would mean every reconfigure
+ * pays a fresh module-graph build (≈300 ms for unicorn /
+ * typescript-eslint per worker) instead of relying on Node's ESM
+ * module cache for unchanged dependencies.
+ */
+async function importConfigFile(configFilePath: string): Promise<unknown> {
+  const ext = path.extname(configFilePath);
+  if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
+    return import(pathToFileURL(configFilePath).href);
+  }
+  if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
+    const useNative = Boolean(
+      (process.features as { typescript?: boolean }).typescript,
+    );
+    if (useNative) {
+      return import(pathToFileURL(configFilePath).href);
+    }
+    let jiti;
+    try {
+      const { createJiti } = (await import('jiti')) as {
+        createJiti: (
+          base: string,
+          opts?: { interopDefault?: boolean },
+        ) => { import: (p: string) => Promise<unknown> };
+      };
+      jiti = createJiti(path.dirname(configFilePath), {
+        interopDefault: true,
+      });
+    } catch {
+      throw new Error(
+        `Failed to load TypeScript config file in worker: ${configFilePath}\n` +
+          `To load .ts/.mts/.cts config files, either:\n` +
+          `  1. Use Node.js >= 22.6 (with native TypeScript support), or\n` +
+          `  2. Install jiti as a dev dependency: npm install -D jiti\n` +
+          `(The main thread successfully loaded this file, so the worker ` +
+          `must use the same fallback to stay consistent.)`,
+      );
+    }
+    const resolved = await jiti.import(configFilePath);
+    // jiti returns the module namespace — wrap so the rest of
+    // `loadPluginsFromConfigFile` can keep its
+    // `(configMod as { default?: unknown }).default ?? configMod`
+    // unwrap.
+    return resolved;
+  }
+  throw new Error(`Unsupported config file extension: ${ext}`);
+}
+
+/**
+ * Minimum Node major. Mirrors `engines.node` in package.json — keep the
+ * two in sync. Bump only when the codebase actually needs a newer API.
+ */
+const MIN_NODE_MAJOR = 20;
+
+/**
+ * Loaded plugin shape: only the fields the runner consumes. Plugins may
+ * carry far more (configs, processors, etc.) — we keep references intact
+ * for downstream needs but type only what we use.
+ */
+export interface LoadedPlugin {
+  prefix: string;
+  /** The unwrapped plugin module, ready for `plugin.rules['ruleName']`. */
+  plugin: {
+    meta?: { name?: string; version?: string };
+    name?: string;
+    rules?: Record<string, unknown>;
+    configs?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Loaded plugin set for a single rslint config. `rules` is keyed by
+ * `<prefix>/<ruleName>` and is the only lookup `lintFile` consults
+ * — the worker has already picked the right `LoadedPlugins` for this
+ * file via its `configKey` map before calling `lintFile`, so there's
+ * no cross-config prefix collision to worry about.
+ */
+export interface LoadedPlugins {
+  plugins: LoadedPlugin[];
+  rules: Map<string, unknown>;
+}
+
+/**
+ * Errors thrown by the loader carry enough context (the config that
+ * declared the failing plugin) for the runtime to surface actionable
+ * messages to users.
+ */
+export class PluginLoaderError extends Error {
+  constructor(
+    public readonly configPath: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'PluginLoaderError';
+  }
+}
+
+/**
+ * Load every plugin in `entries` and return them keyed by prefix, with a
+ * Import the user's rslint config file directly and extract plugin
+ * instances from its `eslintPlugins` (or object-form `plugins`)
+ * map(s). Each worker calls this through {@link loadPluginsFromConfigs}
+ * once per assigned config at init.
+ *
+ * Each worker independently imports the config (and transitively its
+ * plugins), naturally anchoring `node_modules` walks at the config's
+ * own location — which is what makes monorepo setups Just Work: a
+ * sub-package config gets its sub-package's node_modules, not the
+ * root's.
+ *
+ * @throws PluginLoaderError on config-import failure or a Node version
+ *   too old to satisfy {@link MIN_NODE_MAJOR}.
+ */
+export async function loadPluginsFromConfigFile(
+  configFilePath: string,
+): Promise<LoadedPlugins> {
+  ensureNodeVersion();
+
+  const plugins: LoadedPlugin[] = [];
+  const rules = new Map<string, unknown>();
+
+  let configMod: unknown;
+  try {
+    configMod = await importConfigFile(configFilePath);
+  } catch (err) {
+    throw new PluginLoaderError(
+      configFilePath,
+      `failed to import config file ${configFilePath}: ${
+        (err as Error)?.message ?? String(err)
+      }`,
+    );
+  }
+
+  // Config file's default export is `RslintConfigEntry[]`; each entry may
+  // carry `eslintPlugins: { <prefix>: pluginObj }`.
+  const exportedDefault =
+    (configMod as { default?: unknown }).default ?? configMod;
+  const configArray = Array.isArray(exportedDefault) ? exportedDefault : [];
+
+  // Track which prefixes we've already loaded so duplicate plugin
+  // declarations across config entries collapse to one LoadedPlugin
+  // (matches the host-side normalize step in
+  // packages/rslint/src/config-loader.ts).
+  const seenPrefix = new Set<string>();
+
+  // Source precedence per entry: explicit `eslintPlugins` overrides
+  // the object-form `plugins`. This mirrors `normalizeConfig` in
+  // packages/rslint/src/config-loader.ts — both paths must extract
+  // plugins from the same source, or the worker holds a plugin set
+  // that doesn't match what the main thread (or `loadPluginsFromConfigFile`
+  // alternative) believed was active. The object-form `plugins`
+  // fallback is critical: standard ESLint flat-config users set
+  // `plugins: { uc: unicornPlugin }` and never touch `eslintPlugins`
+  // — without folding, the worker would import zero plugins.
+  for (const entry of configArray) {
+    if (entry == null || typeof entry !== 'object') continue;
+    const e = entry as {
+      eslintPlugins?: unknown;
+      plugins?: unknown;
+    };
+    let source: Record<string, unknown> | null = null;
+    if (
+      e.eslintPlugins != null &&
+      typeof e.eslintPlugins === 'object' &&
+      !Array.isArray(e.eslintPlugins)
+    ) {
+      source = e.eslintPlugins as Record<string, unknown>;
+    } else if (
+      e.plugins != null &&
+      typeof e.plugins === 'object' &&
+      !Array.isArray(e.plugins)
+    ) {
+      source = e.plugins as Record<string, unknown>;
+    }
+    if (source == null) continue;
+    for (const prefix of Object.keys(source)) {
+      const pluginObj = source[prefix];
+      // `unwrapPluginModule` ALREADY prefers `.default` when present
+      // and falls back to the value itself, so we hand it the raw
+      // `pluginObj`. A previous (incorrect) call site wrapped this
+      // as `{ default: pluginObj }` first — that artificial wrap let
+      // the function only ever peel the synthetic outer layer, so a
+      // genuine `{ default: realPlugin }` shape (the one produced by
+      // `import * as p from 'pkg'` for a pure-ESM plugin package, or
+      // by some bundler interop output) was returned unchanged with
+      // its `.rules` still nested under `.default`, and every rule
+      // for that prefix silently dropped from the dispatch map.
+      const plugin = unwrapPluginModule(pluginObj);
+      if (plugin == null || typeof plugin !== 'object') continue;
+
+      // Cross-entry redefinition check, aligned with ESLint v10
+      // (`lib/config/flat-config-schema.js::pluginsSchema.merge`).
+      // The same prefix re-declared with the SAME plugin instance is
+      // a harmless dedupe (the second declaration adds no info).
+      // The same prefix re-declared with a DIFFERENT instance is a
+      // configuration error: rslint can only load ONE plugin object
+      // per prefix per worker, and silently picking either side
+      // would surprise the author who edited the config. Throw with
+      // ESLint's exact error message so users familiar with that
+      // diagnostic find rslint behaves the same way.
+      if (seenPrefix.has(prefix)) {
+        const existing = plugins.find((p) => p.prefix === prefix);
+        if (existing && existing.plugin !== plugin) {
+          throw new PluginLoaderError(
+            configFilePath,
+            `Cannot redefine plugin "${prefix}".`,
+          );
+        }
+        // Same instance — skip without throw (dedupe).
+        continue;
+      }
+      seenPrefix.add(prefix);
+
+      // unwrapPluginModule + the `plugin == null || typeof !== 'object'`
+      // continue above already narrow `plugin` to `LoadedPlugin['plugin']`.
+      const loaded: LoadedPlugin = {
+        prefix,
+        plugin,
+      };
+      plugins.push(loaded);
+
+      if (plugin.rules) {
+        for (const [ruleName, ruleDef] of Object.entries(plugin.rules)) {
+          rules.set(`${prefix}/${ruleName}`, ruleDef);
+        }
+      }
+    }
+  }
+
+  return { plugins, rules };
+}
+
+/**
+ * Import every config in `configs` and return a map keyed by each
+ * config's directory. This is the worker-side entry point for the new
+ * config-loads-in-worker flow: each worker calls this once at init,
+ * caches the result for its entire lifetime, and per-file lint tasks
+ * pick the right `LoadedPlugins` via `request.configKey === configDirectory`.
+ *
+ * Fail-fast on the first config import failure — same contract as the
+ * old `loadPlugins(entries, baseUrl)` path. Surfacing a partial success
+ * silently degrades lint quality across the workspace (files under the
+ * failing config get no plugin rules), so we prefer a clean, loud
+ * failure that the user can fix and retry.
+ */
+export async function loadPluginsFromConfigs(
+  configs: readonly ConfigDescriptor[],
+): Promise<Map<string, LoadedPlugins>> {
+  ensureNodeVersion();
+  // Parallelize the per-config dynamic imports. Each
+  // `loadPluginsFromConfigFile` is an independent `await import(...)`
+  // chain (resolving the config's plugin npm modules through Node's
+  // ESM loader); they share no mutable state. Serializing them — as
+  // the previous `for (...) await` loop did — meant a workspace with
+  // 5 nested configs each pulling in unicorn/typescript-eslint
+  // synchronously waited ~5×300 ms ≈ 1.5 s on worker init. The LSP
+  // first-lint after VS Code reload blocks on this. Promise.all keeps
+  // the same overall failure semantics (any rejection still surfaces)
+  // — `loadPluginsFromConfigFile` itself throws on `import()` failure
+  // and the caller catches once. Ordering of the returned Map is by
+  // insertion of `out.set(...)` calls; since we resolve all promises
+  // first then iterate `configs` in original order to populate the
+  // Map, the map's iteration order matches the input order exactly.
+  const loadedList = await Promise.all(
+    configs.map(async (cfg) => loadPluginsFromConfigFile(cfg.configPath)),
+  );
+  const out = new Map<string, LoadedPlugins>();
+  for (let i = 0; i < configs.length; i++) {
+    const dir = configs[i].configDirectory;
+    const existing = out.get(dir);
+    // Two ConfigDescriptors can share a `configDirectory` (e.g. the
+    // config-discovery layer surfacing `rslint.config.js` AND
+    // `rslint.config.mjs` in one folder). The map is keyed by
+    // directory, so a plain `out.set` would let the second config
+    // SILENTLY overwrite the first — files in that directory would then
+    // resolve against only the later config's plugins, losing the
+    // earlier ones with no signal. Merge instead (union of plugins +
+    // rules), warning loudly on a genuine same-key rule conflict.
+    out.set(
+      dir,
+      existing
+        ? mergeLoadedPlugins(existing, loadedList[i], dir)
+        : loadedList[i],
+    );
+  }
+  return out;
+}
+
+/**
+ * Merge two `LoadedPlugins` for the SAME `configDirectory`. Unions the
+ * plugin lists and rule maps. On a rule-key collision: same instance →
+ * harmless dedup; DIFFERENT instances → a real conflict (two plugins
+ * under one prefix in one directory), kept first-wins with a loud
+ * stderr warning so it isn't a silent drop.
+ */
+function mergeLoadedPlugins(
+  a: LoadedPlugins,
+  b: LoadedPlugins,
+  dir: string,
+): LoadedPlugins {
+  const rules = new Map(a.rules);
+  for (const [key, rule] of b.rules) {
+    const existing = rules.get(key);
+    if (existing !== undefined && existing !== rule) {
+      process.stderr.write(
+        `[rslint] plugin rule "${key}" is defined by more than one config ` +
+          `in the same directory (${dir}); keeping the first. Deduplicate ` +
+          `the rslint.config.* files for this directory.\n`,
+      );
+      continue;
+    }
+    rules.set(key, rule);
+  }
+  return { plugins: [...a.plugins, ...b.plugins], rules };
+}
+
+/**
+ * Unwrap CJS/ESM dual-shape: prefer `mod.default` if present (ESM/interop),
+ * fall back to `mod` itself (legacy CJS without `default`).
+ */
+function unwrapPluginModule(mod: unknown): LoadedPlugin['plugin'] | null {
+  if (mod == null || typeof mod !== 'object') return null;
+  // mod.default first if it exists
+  const m = mod as { default?: unknown };
+  if (m.default != null && typeof m.default === 'object') {
+    return m.default as LoadedPlugin['plugin'];
+  }
+  return mod as LoadedPlugin['plugin'];
+}
+
+function ensureNodeVersion(): void {
+  const v = process.versions.node;
+  const major = parseInt(v.split('.')[0], 10);
+  if (Number.isNaN(major) || major < MIN_NODE_MAJOR) {
+    throw new Error(
+      `[plugin-loader] Node ≥ ${MIN_NODE_MAJOR} required, current is v${v}. ` +
+        `See engines.node in this package's package.json.`,
+    );
+  }
+}

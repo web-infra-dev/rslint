@@ -557,3 +557,16 @@ omitempty
 perr
 unmarshals
 unstarted
+eacute
+libc
+msvc
+subpackages
+cdylib
+jsxtext
+native
+respawn
+rustc
+rustup
+serde
+SIGSEGV
+zigbuild

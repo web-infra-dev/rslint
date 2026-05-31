@@ -6,16 +6,33 @@ const os = require('node:os');
 const fs = require('node:fs');
 
 function getBinPath() {
+  // dev / local `build:bin` output sits next to this script
   if (fs.existsSync(path.resolve(__dirname, './rslint'))) {
     return path.resolve(__dirname, './rslint');
   }
   if (fs.existsSync(path.resolve(__dirname, './rslint.exe'))) {
     return path.resolve(__dirname, './rslint.exe');
   }
-  let platformKey = `${process.platform}-${os.arch()}`;
-
-  return require.resolve(
-    `@rslint/${platformKey}/rslint${process.platform === 'win32' ? '.exe' : ''}`,
+  // published: the Go binary lives in the @rslint/native-{tuple} subpackage,
+  // reached via its `./bin` export. npm installs only the subpackage matching
+  // the host os/cpu/libc, so on linux we just try gnu then musl and use
+  // whichever got installed — no libc sniffing (Go binaries are static, the
+  // gnu/musl distinction doesn't matter to them).
+  const arch = os.arch();
+  const tuples =
+    process.platform === 'linux'
+      ? [`linux-${arch}-gnu`, `linux-${arch}-musl`]
+      : process.platform === 'win32'
+        ? [`win32-${arch}-msvc`]
+        : [`${process.platform}-${arch}`];
+  for (const tuple of tuples) {
+    try {
+      return require.resolve(`@rslint/native-${tuple}/bin`);
+    } catch {}
+  }
+  throw new Error(
+    `rslint: no native binary for ${process.platform}-${arch} ` +
+      `(looked for @rslint/native-{${tuples.join(',')}})`,
   );
 }
 
