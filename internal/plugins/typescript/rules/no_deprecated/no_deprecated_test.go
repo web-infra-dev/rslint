@@ -172,12 +172,13 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 	}
 	diagnostics := []rule.RuleDiagnostic{}
 	var diagnosticsMu sync.Mutex
-	_, err = linter.RunLinter(
-		[]*compiler.Program{program},
-		true,
-		[]string{sourceFile.FileName()},
-		[]string{},
-		func(_ *ast.SourceFile) []linter.ConfiguredRule {
+	_, err = linter.RunLinter(linter.RunLinterOptions{
+		Programs:       []*compiler.Program{program},
+		SingleThreaded: true,
+		Scope: linter.FileScope{
+			Files: []string{sourceFile.FileName()},
+		},
+		GetRulesForFile: func(_ *ast.SourceFile) []linter.ConfiguredRule {
 			return []linter.ConfiguredRule{
 				{
 					Name:     "test",
@@ -188,12 +189,12 @@ func runNoDeprecatedDiagnosticsForFiles(t *testing.T, files map[string]string, e
 				},
 			}
 		},
-		func(diagnostic rule.RuleDiagnostic) {
+		OnDiagnostic: func(diagnostic rule.RuleDiagnostic) {
 			diagnosticsMu.Lock()
 			diagnostics = append(diagnostics, diagnostic)
 			diagnosticsMu.Unlock()
 		},
-	)
+	})
 	if err != nil {
 		t.Fatalf("error running linter: %v", err)
 	}
