@@ -1,0 +1,4970 @@
+// Rstest Snapshot v1
+
+exports[`no-type-alias > invalid 1`] = `
+{
+  "code": "type Foo = 'a';",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 2`] = `
+{
+  "code": "type Foo = 'a';",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 3`] = `
+{
+  "code": "type Foo = typeof import('foo');",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 4`] = `
+{
+  "code": "type Foo = 'a' | 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 5`] = `
+{
+  "code": "type Foo = 'a' | typeof import('foo');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 6`] = `
+{
+  "code": "type Foo = 'a' | 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 7`] = `
+{
+  "code": "type Foo = 'a' | 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 8`] = `
+{
+  "code": "type Foo = 'a' | 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 9`] = `
+{
+  "code": "type Foo = 'a' | 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 10`] = `
+{
+  "code": "type Foo = 'a' | 'b' | 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 11`] = `
+{
+  "code": "type Foo = 'a' | 'b' | 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 12`] = `
+{
+  "code": "type Foo = 'a' | 'b' | 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 13`] = `
+{
+  "code": "type Foo = 'a' | 'b' | 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 14`] = `
+{
+  "code": "type Foo = 'a' | 'b' | 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 15`] = `
+{
+  "code": "type Foo = 'a' | 'b' | 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 16`] = `
+{
+  "code": "type Foo = 'a' & 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 17`] = `
+{
+  "code": "type Foo = 'a' & 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 18`] = `
+{
+  "code": "type Foo = 'a' & 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 19`] = `
+{
+  "code": "type Foo = 'a' & 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 20`] = `
+{
+  "code": "type Foo = 'a' & 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 21`] = `
+{
+  "code": "type Foo = 'a' & 'b';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 22`] = `
+{
+  "code": "type Foo = 'a' & 'b' & 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 23`] = `
+{
+  "code": "type Foo = 'a' & 'b' & 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 24`] = `
+{
+  "code": "type Foo = 'a' & 'b' & 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 25`] = `
+{
+  "code": "type Foo = 'a' & 'b' & 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 26`] = `
+{
+  "code": "type Foo = 'a' & 'b' & 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 27`] = `
+{
+  "code": "type Foo = 'a' & 'b' & 'c';",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 28`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 29`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 30`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 31`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 32`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 33`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 34`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 35`] = `
+{
+  "code": "type Foo = 'a' | ('b' & 'c');",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 36`] = `
+{
+  "code": "type Foo = string;",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 37`] = `
+{
+  "code": "type Foo = string;",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 38`] = `
+{
+  "code": "type Foo = string;",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 39`] = `
+{
+  "code": "type Foo = string;",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 40`] = `
+{
+  "code": "type Foo = string;",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 41`] = `
+{
+  "code": "type Foo = string | string[];",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 42`] = `
+{
+  "code": "type Foo = string | string[];",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 43`] = `
+{
+  "code": "type Foo = string | string[];",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 44`] = `
+{
+  "code": "type Foo = string | string[];",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 45`] = `
+{
+  "code": "type Foo = string | string[];",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 46`] = `
+{
+  "code": "type Foo = string | string[];",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 47`] = `
+{
+  "code": "type Foo = string | string[] | number;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 48`] = `
+{
+  "code": "type Foo = string | string[] | number;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 49`] = `
+{
+  "code": "type Foo = string | string[] | number;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 50`] = `
+{
+  "code": "type Foo = string | string[] | number;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 51`] = `
+{
+  "code": "type Foo = string | string[] | number;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 52`] = `
+{
+  "code": "type Foo = string | string[] | number;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 53`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 54`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 55`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 56`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 57`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 58`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 59`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 60`] = `
+{
+  "code": "type Foo = string | (string[] & number);",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 61`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 62`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 63`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 64`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 65`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 66`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar | {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 67`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar | {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 68`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar | {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 69`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar | {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 70`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar | {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 71`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar & {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 72`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar & {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 73`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar & {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 74`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar & {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 75`] = `
+{
+  "code": "
+interface Bar {}
+type Foo = Bar & {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 76`] = `
+{
+  "code": "type Foo = () => void;",
+  "diagnostics": [
+    {
+      "message": "Type callbacks are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 77`] = `
+{
+  "code": "type Foo = () => void;",
+  "diagnostics": [
+    {
+      "message": "Type callbacks are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 78`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 79`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 80`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 81`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 82`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 83`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 84`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 85`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 86`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 87`] = `
+{
+  "code": "type Foo = {};",
+  "diagnostics": [
+    {
+      "message": "Type literals are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 88`] = `
+{
+  "code": "type Foo = {} | {};",
+  "diagnostics": [
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 89`] = `
+{
+  "code": "type Foo = {} | {};",
+  "diagnostics": [
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 90`] = `
+{
+  "code": "type Foo = {} | {};",
+  "diagnostics": [
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 91`] = `
+{
+  "code": "type Foo = {} & {};",
+  "diagnostics": [
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 92`] = `
+{
+  "code": "type Foo = {} & {};",
+  "diagnostics": [
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 93`] = `
+{
+  "code": "type Foo = {} & {};",
+  "diagnostics": [
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 94`] = `
+{
+  "code": "type Foo = (string & {}) | 'a' | 1;",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 95`] = `
+{
+  "code": "type Foo = (string & {}) | 'a' | 1;",
+  "diagnostics": [
+    {
+      "message": "Literals in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 96`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Type mapped types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 97`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Type mapped types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 98`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Type mapped types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 99`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Type mapped types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 100`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Type mapped types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 101`] = `
+{
+  "code": "
+type Foo<T> =
+  | {
+      readonly [P in keyof T]: T[P];
+    }
+  | {
+      readonly [P in keyof T]: T[P];
+    };
+      ",
+  "diagnostics": [
+    {
+      "message": "Mapped types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Mapped types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 102`] = `
+{
+  "code": "
+type Foo<T> =
+  | {
+      readonly [P in keyof T]: T[P];
+    }
+  | {
+      readonly [P in keyof T]: T[P];
+    };
+      ",
+  "diagnostics": [
+    {
+      "message": "Mapped types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Mapped types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 103`] = `
+{
+  "code": "
+type Foo<T> =
+  | {
+      readonly [P in keyof T]: T[P];
+    }
+  | {
+      readonly [P in keyof T]: T[P];
+    };
+      ",
+  "diagnostics": [
+    {
+      "message": "Mapped types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Mapped types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 104`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+} & {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Mapped types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Mapped types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 105`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+} & {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Mapped types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Mapped types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 106`] = `
+{
+  "code": "
+type Foo<T> = {
+  readonly [P in keyof T]: T[P];
+} & {
+  readonly [P in keyof T]: T[P];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Mapped types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Mapped types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 107`] = `
+{
+  "code": "export type ButtonProps = JSX.IntrinsicElements['button'];",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 108`] = `
+{
+  "code": "type Foo = [number] | [number, number];",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 109`] = `
+{
+  "code": "type Foo = [number] & [number, number];",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Tuple Types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 110`] = `
+{
+  "code": "type Foo = [number] | [number, number];",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 111`] = `
+{
+  "code": "type Foo = [number];",
+  "diagnostics": [
+    {
+      "message": "Type tuple types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 112`] = `
+{
+  "code": "type Foo = [number];",
+  "diagnostics": [
+    {
+      "message": "Type tuple types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 113`] = `
+{
+  "code": "type Foo = [number];",
+  "diagnostics": [
+    {
+      "message": "Type tuple types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 114`] = `
+{
+  "code": "type Foo = readonly [number] | keyof [number, number];",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 115`] = `
+{
+  "code": "type Foo = keyof [number] & [number, number];",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Tuple Types in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 116`] = `
+{
+  "code": "type Foo = [number] | readonly [number, number];",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 117`] = `
+{
+  "code": "type Foo = readonly [number];",
+  "diagnostics": [
+    {
+      "message": "Type tuple types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 118`] = `
+{
+  "code": "type Foo = keyof [number];",
+  "diagnostics": [
+    {
+      "message": "Type tuple types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 119`] = `
+{
+  "code": "type Foo = readonly [number];",
+  "diagnostics": [
+    {
+      "message": "Type tuple types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 120`] = `
+{
+  "code": "type Foo = new (bar: number) => string | null;",
+  "diagnostics": [
+    {
+      "message": "Type constructors are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 121`] = `
+{
+  "code": "type MyType<T> = T extends number ? number : null;",
+  "diagnostics": [
+    {
+      "message": "Type conditional types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 122`] = `
+{
+  "code": "type MyType<T> = T extends number ? number : null;",
+  "diagnostics": [
+    {
+      "message": "Type conditional types are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 123`] = `
+{
+  "code": "type Foo = keyof [string] | unique symbol;",
+  "diagnostics": [
+    {
+      "message": "Tuple Types in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Unhandled in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 124`] = `
+{
+  "code": "type Foo = Record<string, number>;",
+  "diagnostics": [
+    {
+      "message": "Type generics are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 125`] = `
+{
+  "code": "type Foo = \`foo-\${number}\`;",
+  "diagnostics": [
+    {
+      "message": "Type aliases are not allowed.",
+      "messageId": "noTypeAlias",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 126`] = `
+{
+  "code": "type Foo = \`a-\${number}\` | \`b-\${number}\`;",
+  "diagnostics": [
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in union types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-type-alias > invalid 127`] = `
+{
+  "code": "type Foo = \`a-\${number}\` & \`b-\${number}\`;",
+  "diagnostics": [
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+    {
+      "message": "Aliases in intersection types are not allowed.",
+      "messageId": "noCompositionAlias",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-type-alias",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
