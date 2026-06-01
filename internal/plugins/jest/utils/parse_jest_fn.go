@@ -343,3 +343,55 @@ func isValidJestCall(name string, members []string) bool {
 	_, ok := VALID_JEST_FN_CALL_CHAINS[chain]
 	return ok
 }
+
+func UnwrapBasicTypeAssertions(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			node = node.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			node = node.AsTypeAssertion().Expression
+		default:
+			return node
+		}
+	}
+	return node
+}
+
+func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			node = node.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			node = node.AsTypeAssertion().Expression
+		case ast.KindNonNullExpression:
+			node = node.AsNonNullExpression().Expression
+		case ast.KindSatisfiesExpression:
+			node = node.AsSatisfiesExpression().Expression
+		default:
+			return node
+		}
+	}
+	return node
+}
+
+func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
+	if entry == nil || entry.Node == nil || entry.Node.Parent == nil {
+		return nil, nil
+	}
+
+	parent := entry.Node.Parent
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		return parent.AsPropertyAccessExpression().Expression, parent
+	case ast.KindElementAccessExpression:
+		return parent.AsElementAccessExpression().Expression, parent
+	default:
+		return nil, nil
+	}
+}
