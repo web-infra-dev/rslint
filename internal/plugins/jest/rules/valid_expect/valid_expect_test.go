@@ -19,6 +19,7 @@ func TestValidExpectRule(t *testing.T) {
 			{Code: "expect.hasAssertions()"},
 			{Code: "expect.extend;"},
 			{Code: "expect.resolves;"},
+			{Code: "expect.resolves.toBe(2);"},
 			{Code: "expect(\"something\").toEqual(\"else\");"},
 			{Code: "expect(true).toBeDefined();"},
 			{Code: "expect([1, 2, 3]).toEqual([1, 2, 3]);"},
@@ -130,28 +131,28 @@ func TestValidExpectRule(t *testing.T) {
 			{
 				Code: "expect(\"something\", \"else\").toEqual(\"something\");",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 21, EndColumn: 27},
+					{MessageId: "tooManyArgs", Column: 21, EndColumn: 26},
 				},
 			},
 			{
 				Code:    "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
 				Options: map[string]interface{}{"maxArgs": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 29, EndColumn: 39},
+					{MessageId: "tooManyArgs", Column: 29, EndColumn: 38},
 				},
 			},
 			{
 				Code:    "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
 				Options: map[string]interface{}{"maxArgs": 2, "minArgs": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 29, EndColumn: 39},
+					{MessageId: "tooManyArgs", Column: 29, EndColumn: 38},
 				},
 			},
 			{
 				Code:    "expect(\"something\", \"else\", \"entirely\").toEqual(\"something\");",
 				Options: map[string]interface{}{"maxArgs": 2, "minArgs": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "tooManyArgs", Column: 29, EndColumn: 39},
+					{MessageId: "tooManyArgs", Column: 29, EndColumn: 38},
 				},
 			},
 			{
@@ -166,7 +167,7 @@ func TestValidExpectRule(t *testing.T) {
 				Options: map[string]interface{}{"maxArgs": 1, "minArgs": 3},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "notEnoughArgs", Column: 7, EndColumn: 8},
-					{MessageId: "tooManyArgs", Column: 21, EndColumn: 27},
+					{MessageId: "tooManyArgs", Column: 21, EndColumn: 26},
 				},
 			},
 			{
@@ -750,9 +751,35 @@ func TestValidExpectRule(t *testing.T) {
 				},
 			},
 			{
+				Code: "expect(true).assertions;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "matcherNotCalled", Column: 14, EndColumn: 24},
+				},
+			},
+			{
 				Code: "import { expect as pleaseExpect } from '@jest/globals'; pleaseExpect(Promise.resolve(2)).resolves.toBe(2);",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "asyncMustBeAwaited", Column: 57, EndColumn: 106},
+				},
+			},
+			{
+				Code: `test("valid-expect", () => {
+  Promise.all.x([
+    expect(Promise.resolve(2)).resolves.not.toBeDefined(),
+    expect(Promise.resolve(3)).resolves.not.toBeDefined(),
+  ]);
+});
+      `,
+				Output: []string{`test("valid-expect", async () => {
+  Promise.all.x([
+    await expect(Promise.resolve(2)).resolves.not.toBeDefined(),
+    await expect(Promise.resolve(3)).resolves.not.toBeDefined(),
+  ]);
+});
+      `},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "asyncMustBeAwaited", Line: 3, Column: 5, EndColumn: 58},
+					{MessageId: "asyncMustBeAwaited", Line: 4, Column: 5, EndColumn: 58},
 				},
 			},
 		},

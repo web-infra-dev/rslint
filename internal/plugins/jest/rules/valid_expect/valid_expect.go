@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strconv"
-	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -219,8 +218,12 @@ func isPromiseMethodCall(node *ast.Node) bool {
 		return false
 	}
 
-	callee := utils.CalleeChainName(node.AsCallExpression().Expression)
-	return strings.HasPrefix(callee, "Promise.")
+	callee := ast.SkipParentheses(node.AsCallExpression().Expression)
+	if !utils.IsMemberAccessNode(callee) {
+		return false
+	}
+
+	return utils.CalleeChainName(internalUtils.AccessExpressionObject(callee)) == "Promise"
 }
 
 func getPromiseCallExpressionNode(node *ast.Node) *ast.Node {
@@ -316,6 +319,9 @@ func expectOpenParenRange(sourceFile *ast.SourceFile, call *ast.Node) core.TextR
 func tooManyArgsRange(sourceFile *ast.SourceFile, args []*ast.Node, maxArgs int) core.TextRange {
 	start := internalUtils.TrimNodeTextRange(sourceFile, args[maxArgs]).Pos()
 	end := internalUtils.TrimNodeTextRange(sourceFile, args[len(args)-1]).End()
+	if end > start {
+		end--
+	}
 	return core.NewTextRange(start, end)
 }
 
@@ -428,9 +434,6 @@ var ValidExpectRule = rule.Rule{
 						ctx.ReportNode(reportNode, buildErrorMatcherNotFoundMessage())
 					case expectParseReasonMatcherNotCalled:
 						entries := utils.GetJestFnMemberEntries(reportNode)
-						if len(entries) == 2 && (entries[1].Name == "assertions" || entries[1].Name == "hasAssertions") {
-							return
-						}
 						last := entries[len(entries)-1]
 						if utils.EXPECT_MODIFIER_NAMES[last.Name] {
 							ctx.ReportNode(last.Node, buildErrorMatcherNotFoundMessage())
@@ -447,20 +450,22 @@ var ValidExpectRule = rule.Rule{
 				}
 
 				expectCall := parsed.Head.Local.Node.Parent
-				if expectCall != nil && expectCall.Kind == ast.KindCallExpression {
-					args := expectCall.AsCallExpression().Arguments.Nodes
-					if len(args) < opts.MinArgs {
-						ctx.ReportRange(
-							expectOpenParenRange(ctx.SourceFile, expectCall),
-							buildErrorNotEnoughArgsMessage(opts.MinArgs),
-						)
-					}
-					if len(args) > opts.MaxArgs {
-						ctx.ReportRange(
-							tooManyArgsRange(ctx.SourceFile, args, opts.MaxArgs),
-							buildErrorTooManyArgsMessage(opts.MaxArgs),
-						)
-					}
+				if expectCall == nil || expectCall.Kind != ast.KindCallExpression {
+					return
+				}
+
+				args := expectCall.AsCallExpression().Arguments.Nodes
+				if len(args) < opts.MinArgs {
+					ctx.ReportRange(
+						expectOpenParenRange(ctx.SourceFile, expectCall),
+						buildErrorNotEnoughArgsMessage(opts.MinArgs),
+					)
+				}
+				if len(args) > opts.MaxArgs {
+					ctx.ReportRange(
+						tooManyArgsRange(ctx.SourceFile, args, opts.MaxArgs),
+						buildErrorTooManyArgsMessage(opts.MaxArgs),
+					)
 				}
 
 				if parsed.MatcherEntry == nil || !shouldBeAwaited(parsed, opts.AsyncMatchers) {

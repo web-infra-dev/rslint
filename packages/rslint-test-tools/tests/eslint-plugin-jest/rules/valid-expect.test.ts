@@ -6,6 +6,7 @@ ruleTester.run('valid-expect', {} as never, {
   valid: [
     { code: 'expect.hasAssertions' },
     { code: 'expect.hasAssertions()' },
+    { code: 'expect.resolves.toBe(2);' },
     { code: 'expect("something").toEqual("else");' },
     { code: 'expect(true).toBeDefined();' },
     { code: 'expect([1, 2, 3]).toEqual([1, 2, 3]);' },
@@ -249,7 +250,7 @@ ruleTester.run('valid-expect', {} as never, {
       code: 'expect("something", "else").toEqual("something");',
       errors: [
         {
-          endColumn: 27,
+          endColumn: 26,
           column: 21,
           messageId: 'tooManyArgs',
           data: {
@@ -264,7 +265,7 @@ ruleTester.run('valid-expect', {} as never, {
       options: [{ maxArgs: 2 }],
       errors: [
         {
-          endColumn: 39,
+          endColumn: 38,
           column: 29,
           messageId: 'tooManyArgs',
           data: {
@@ -279,7 +280,7 @@ ruleTester.run('valid-expect', {} as never, {
       options: [{ maxArgs: 2, minArgs: 2 }],
       errors: [
         {
-          endColumn: 39,
+          endColumn: 38,
           column: 29,
           messageId: 'tooManyArgs',
           data: {
@@ -294,7 +295,7 @@ ruleTester.run('valid-expect', {} as never, {
       options: [{ maxArgs: 2, minArgs: 1 }],
       errors: [
         {
-          endColumn: 39,
+          endColumn: 38,
           column: 29,
           messageId: 'tooManyArgs',
           data: {
@@ -1234,6 +1235,44 @@ ruleTester.run('valid-expect', {} as never, {
         });
       `,
       errors: [{ endColumn: 35, column: 9, messageId: 'matcherNotFound' }],
+    },
+    {
+      code: 'expect(true).assertions;',
+      errors: [{ column: 14, endColumn: 24, messageId: 'matcherNotCalled' }],
+    },
+    {
+      code: `
+        test("valid-expect", () => {
+          Promise.all.x([
+            expect(Promise.resolve(2)).resolves.not.toBeDefined(),
+            expect(Promise.resolve(3)).resolves.not.toBeDefined(),
+          ]);
+        });
+      `,
+      output: `
+        test("valid-expect", async () => {
+          Promise.all.x([
+            await expect(Promise.resolve(2)).resolves.not.toBeDefined(),
+            await expect(Promise.resolve(3)).resolves.not.toBeDefined(),
+          ]);
+        });
+      `,
+      errors: [
+        {
+          line: 3,
+          column: 5,
+          endColumn: 58,
+          messageId: 'asyncMustBeAwaited',
+          data: { orReturned: ' or returned' },
+        },
+        {
+          line: 4,
+          column: 5,
+          endColumn: 58,
+          messageId: 'asyncMustBeAwaited',
+          data: { orReturned: ' or returned' },
+        },
+      ],
     },
   ],
 });
