@@ -73,14 +73,14 @@ func TestNoTypeAliasRule(t *testing.T) {
 		{
 			Code: `type ClassValue = string | number | undefined | null | false`,
 			Options: map[string]interface{}{
-				"allowAliases":       "in-unions-and-intersections",
-				"allowCallbacks":       "always",
-				"allowLiterals":        "in-unions-and-intersections",
-				"allowMappedTypes":     "in-unions-and-intersections",
-				"allowTupleTypes":      "in-unions-and-intersections",
-				"allowGenerics":        "always",
+				"allowAliases":          "in-unions-and-intersections",
+				"allowCallbacks":        "always",
+				"allowLiterals":         "in-unions-and-intersections",
+				"allowMappedTypes":      "in-unions-and-intersections",
+				"allowTupleTypes":       "in-unions-and-intersections",
+				"allowGenerics":         "always",
 				"allowConditionalTypes": "always",
-				"allowConstructors":    "always",
+				"allowConstructors":     "always",
 			},
 		},
 	}, []rule_tester.InvalidTestCase{
@@ -194,8 +194,8 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowCallbacks: never (default)
 		{
-			Code:    `type Foo = () => void`,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+			Code:   `type Foo = () => void`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 		{
 			Code:    `type Foo = () => void`,
@@ -279,8 +279,8 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowMappedTypes: never (default)
 		{
-			Code:    `type Foo<T> = { readonly [P in keyof T]: T[P] }`,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 15}},
+			Code:   `type Foo<T> = { readonly [P in keyof T]: T[P] }`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 15}},
 		},
 		{
 			Code:    `type Foo<T> = { readonly [P in keyof T]: T[P] }`,
@@ -306,8 +306,8 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowTupleTypes: never (default)
 		{
-			Code:    `type Foo = [string]`,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+			Code:   `type Foo = [string]`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 		{
 			Code:    `type Foo = [string]`,
@@ -365,8 +365,8 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowConditionalTypes: never (default)
 		{
-			Code:    `type Foo<T> = T extends number ? number : null`,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 15}},
+			Code:   `type Foo<T> = T extends number ? number : null`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 15}},
 		},
 		{
 			Code:    `type Foo<T> = T extends number ? number : null`,
@@ -376,8 +376,8 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowConstructors: never (default)
 		{
-			Code:    `type Foo = new (bar: number) => string | null`,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+			Code:   `type Foo = new (bar: number) => string | null`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 		{
 			Code:    `type Foo = new (bar: number) => string | null`,
@@ -387,12 +387,66 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowGenerics: never (default)
 		{
-			Code:    `type Foo = Record<string, number>`,
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+			Code:   `type Foo = Record<string, number>`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 		{
 			Code:    `type Foo = Record<string, number>`,
 			Options: map[string]interface{}{"allowGenerics": "never"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+
+		// Invalid option values: simple options should fall back to "never" when given composition-only values
+		{
+			Code:    `type Foo = () => void`,
+			Options: map[string]interface{}{"allowCallbacks": "in-unions"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo = () => void`,
+			Options: map[string]interface{}{"allowCallbacks": "in-intersections"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo = () => void`,
+			Options: map[string]interface{}{"allowCallbacks": "in-unions-and-intersections"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo<T> = T extends number ? number : null`,
+			Options: map[string]interface{}{"allowConditionalTypes": "in-unions"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 15}},
+		},
+		{
+			Code:    `type Foo = new (bar: number) => string | null`,
+			Options: map[string]interface{}{"allowConstructors": "in-unions"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo = Record<string, number>`,
+			Options: map[string]interface{}{"allowGenerics": "in-unions"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+
+		// Invalid option values: composition options should fall back to "never" when given invalid values
+		{
+			Code:    `type Foo = string`,
+			Options: map[string]interface{}{"allowAliases": "invalid"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo = {}`,
+			Options: map[string]interface{}{"allowLiterals": "invalid"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo<T> = { readonly [P in keyof T]: T[P] }`,
+			Options: map[string]interface{}{"allowMappedTypes": "invalid"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 15}},
+		},
+		{
+			Code:    `type Foo = [string]`,
+			Options: map[string]interface{}{"allowTupleTypes": "invalid"},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 	})

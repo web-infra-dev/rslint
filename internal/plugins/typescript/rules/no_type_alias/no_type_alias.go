@@ -36,6 +36,21 @@ type NoTypeAliasOptions struct {
 	AllowTupleTypes       optionValue `json:"allowTupleTypes"`
 }
 
+func parseSimpleOption(val string) optionValue {
+	if val == string(optionAlways) || val == string(optionNever) {
+		return optionValue(val)
+	}
+	return optionNever
+}
+
+func parseCompositionOption(val string) optionValue {
+	switch optionValue(val) {
+	case optionAlways, optionNever, optionInUnions, optionInIntersections, optionInUnionsAndIntersections:
+		return optionValue(val)
+	}
+	return optionNever
+}
+
 func parseOptions(options any) NoTypeAliasOptions {
 	opts := NoTypeAliasOptions{
 		AllowAliases:          optionNever,
@@ -60,28 +75,28 @@ func parseOptions(options any) NoTypeAliasOptions {
 		return opts
 	}
 	if v, ok := optsMap["allowAliases"].(string); ok {
-		opts.AllowAliases = optionValue(v)
+		opts.AllowAliases = parseCompositionOption(v)
 	}
 	if v, ok := optsMap["allowCallbacks"].(string); ok {
-		opts.AllowCallbacks = optionValue(v)
+		opts.AllowCallbacks = parseSimpleOption(v)
 	}
 	if v, ok := optsMap["allowConditionalTypes"].(string); ok {
-		opts.AllowConditionalTypes = optionValue(v)
+		opts.AllowConditionalTypes = parseSimpleOption(v)
 	}
 	if v, ok := optsMap["allowConstructors"].(string); ok {
-		opts.AllowConstructors = optionValue(v)
+		opts.AllowConstructors = parseSimpleOption(v)
 	}
 	if v, ok := optsMap["allowGenerics"].(string); ok {
-		opts.AllowGenerics = optionValue(v)
+		opts.AllowGenerics = parseSimpleOption(v)
 	}
 	if v, ok := optsMap["allowLiterals"].(string); ok {
-		opts.AllowLiterals = optionValue(v)
+		opts.AllowLiterals = parseCompositionOption(v)
 	}
 	if v, ok := optsMap["allowMappedTypes"].(string); ok {
-		opts.AllowMappedTypes = optionValue(v)
+		opts.AllowMappedTypes = parseCompositionOption(v)
 	}
 	if v, ok := optsMap["allowTupleTypes"].(string); ok {
-		opts.AllowTupleTypes = optionValue(v)
+		opts.AllowTupleTypes = parseCompositionOption(v)
 	}
 	return opts
 }
