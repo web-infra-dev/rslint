@@ -20,26 +20,6 @@ func buildUseToContainErrorMessage() rule.RuleMessage {
 	}
 }
 
-func unwrapTypeAssertions(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
-		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
-		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
-		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
-		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
-		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
-		default:
-			return node
-		}
-	}
-	return node
-}
-
 func getIncludesCalleeName(callee *ast.Node) (receiver *ast.Node, ok bool) {
 	if callee == nil {
 		return nil, false
@@ -145,7 +125,7 @@ var PreferToContainRule = rule.Rule{
 					return
 				}
 
-				unwrapped := unwrapTypeAssertions(matcherArg)
+				unwrapped := jestUtils.UnwrapTypeAssertions(matcherArg)
 				if unwrapped == nil {
 					return
 				}
