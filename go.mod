@@ -53,7 +53,7 @@ require (
 	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.44.0
+	golang.org/x/sys v0.45.0
 	golang.org/x/tools v0.45.0
 	gotest.tools/v3 v3.5.2
 )
@@ -73,6 +73,6 @@ require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
-	github.com/microsoft/typescript-go v0.0.0-20260512001534-adb2ab4ed7d7 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20260521185404-d99f6b2a5ff8 // indirect
 	golang.org/x/text v0.37.0
 )

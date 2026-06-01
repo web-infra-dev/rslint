@@ -23,17 +23,31 @@ interface RuleEntry {
   presets: { name: string; value: unknown }[];
 }
 
-const PLUGINS = PLUGIN_REGISTRY.map((p) => {
-  const mod = (rslintCore as Record<string, unknown>)[p.importName] as
-    | { configs?: { recommended?: RslintConfigEntry } }
+function resolvePresetConfig(
+  importName: string,
+  presetName: string,
+): RslintConfigEntry | undefined {
+  const mod = (rslintCore as Record<string, unknown>)[importName] as
+    | { configs?: Record<string, RslintConfigEntry> }
     | undefined;
-  const config = mod?.configs?.recommended;
-  return {
-    prefix: p.prefix,
-    group: p.group,
-    presets: p.presetName && config ? [{ config, name: p.presetName }] : [],
-  };
-});
+  const prefix = `${importName}.configs.`;
+  if (!presetName.startsWith(prefix)) return undefined;
+  const configKey = presetName.slice(prefix.length);
+  return mod?.configs?.[configKey];
+}
+
+const PLUGINS = PLUGIN_REGISTRY.map((p) => ({
+  prefix: p.prefix,
+  group: p.group,
+  presets: p.presets
+    .map(({ name }) => {
+      const config = resolvePresetConfig(p.importName, name);
+      return config ? { config, name } : null;
+    })
+    .filter((entry): entry is { config: RslintConfigEntry; name: string } =>
+      Boolean(entry),
+    ),
+}));
 
 function getFullRuleName(rule: RuleEntry): string {
   if (rule.group === 'eslint') return rule.name;

@@ -194,10 +194,16 @@ func buildFileOwnerMap(programs []*compiler.Program, configMap map[string]rslint
 //   - multi-config ownership: a file is linted by the program belonging to its
 //     nearest config (only active when len(configMap) > 1)
 //   - config `ignores`: files matching the user's ignore patterns are excluded
-//     from ALL diagnostics (lint rules, type-check, and the linted-file count)
+//     from lint rules and the linted-file count
 //
-// The returned slice is always len(programs). Entries are never nil — ignores
-// must apply to every program, including the gap-file fallback program.
+// These filters are consumed by RunLinter only in Phase 1 (lint). Phase 2
+// (type-check) does NOT consult them — type-check mirrors `tsgo --noEmit`
+// over the full tsconfig-determined program. See linter.go RunLinter doc
+// and website/docs/en/guide/type-checking.md for the contract.
+//
+// The returned slice is always len(programs). Entries are never nil — ignore
+// semantics must apply to every program in Phase 1, including the gap-file
+// fallback program.
 //
 // singleConfig / singleConfigDir are used when configMap is nil (single-config
 // mode). When configMap is non-nil, the per-file nearest config is looked up.

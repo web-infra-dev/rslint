@@ -290,7 +290,7 @@ func checkCallbackReturn(ctx rule.RuleContext, funcNode *ast.Node, methodName st
 }
 
 // ArrayCallbackReturnRule enforces return statements in callbacks of array methods
-var ArrayCallbackReturnRule = rule.CreateRule(rule.Rule{
+var ArrayCallbackReturnRule = rule.Rule{
 	Name: "array-callback-return",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
@@ -350,4 +350,4 @@ var ArrayCallbackReturnRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

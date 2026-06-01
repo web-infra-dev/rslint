@@ -1,12 +1,16 @@
 import type { RslintConfigEntry } from '../define-config.js';
 
+const base: RslintConfigEntry = {
+  files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+  plugins: ['@typescript-eslint'],
+};
+
 // Aligned with official @typescript-eslint/recommended.
 // Includes the eslint-recommended override layer (disables core rules handled by TS,
 // enables TS-beneficial rules).
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
-  files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
-  plugins: ['@typescript-eslint'],
+  ...base,
   languageOptions: {
     parserOptions: {
       projectService: true,
@@ -43,38 +47,38 @@ const recommended: RslintConfigEntry = {
     'prefer-spread': 'error',
 
     // Remaining eslint:recommended rules (not turned off by TS)
-    // 'no-control-regex': 'error', // not implemented
+    'no-control-regex': 'error',
     'no-delete-var': 'error',
-    // 'no-dupe-else-if': 'error', // not implemented
+    'no-dupe-else-if': 'error',
     'no-empty-character-class': 'error',
     // 'no-empty-static-block': 'error', // not implemented
     'no-ex-assign': 'error',
-    // 'no-extra-boolean-cast': 'error', // not implemented
-    // 'no-fallthrough': 'error', // not implemented
+    'no-extra-boolean-cast': 'error',
+    'no-fallthrough': 'error',
     'no-global-assign': 'error',
     'no-invalid-regexp': 'error',
-    // 'no-irregular-whitespace': 'error', // not implemented
-    // 'no-misleading-character-class': 'error', // not implemented
-    // 'no-nonoctal-decimal-escape': 'error', // not implemented
-    // 'no-octal': 'error', // not implemented
-    // 'no-prototype-builtins': 'error', // not implemented
-    // 'no-regex-spaces': 'error', // not implemented
+    'no-irregular-whitespace': 'error',
+    'no-misleading-character-class': 'error',
+    'no-nonoctal-decimal-escape': 'error',
+    'no-octal': 'error',
+    'no-prototype-builtins': 'error',
+    'no-regex-spaces': 'error',
     'no-self-assign': 'error',
-    // 'no-shadow-restricted-names': 'error', // not implemented
-    // 'no-unexpected-multiline': 'error', // not implemented
-    // 'no-unsafe-finally': 'error', // not implemented
-    // 'no-unsafe-optional-chaining': 'error', // not implemented
+    'no-shadow-restricted-names': 'error',
+    'no-unexpected-multiline': 'error',
+    'no-unsafe-finally': 'error',
+    'no-unsafe-optional-chaining': 'error',
     // 'no-unused-labels': 'error', // not implemented
     // 'no-unused-private-class-members': 'error', // not implemented
     // 'no-unassigned-vars': 'error', // not implemented
     // 'no-useless-assignment': 'error', // not implemented
-    // 'no-useless-backreference': 'error', // not implemented
-    // 'no-useless-catch': 'error', // not implemented
-    // 'no-useless-escape': 'error', // not implemented
+    'no-useless-backreference': 'error',
+    'no-useless-catch': 'error',
+    'no-useless-escape': 'error',
     // 'preserve-caught-error': 'error', // not implemented
-    // 'require-yield': 'error', // not implemented
+    'require-yield': 'error',
     'use-isnan': 'error',
-    // 'valid-typeof': 'error', // not implemented
+    'valid-typeof': 'error',
     'for-direction': 'error',
     'no-async-promise-executor': 'error',
     'no-case-declarations': 'error',
@@ -94,7 +98,7 @@ const recommended: RslintConfigEntry = {
     'no-array-constructor': 'off',
     '@typescript-eslint/no-array-constructor': 'error',
     '@typescript-eslint/no-duplicate-enum-values': 'error',
-    // '@typescript-eslint/no-empty-object-type': 'error', // not implemented
+    '@typescript-eslint/no-empty-object-type': 'error',
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-extra-non-null-assertion': 'error',
     '@typescript-eslint/no-misused-new': 'error',
@@ -103,8 +107,8 @@ const recommended: RslintConfigEntry = {
     '@typescript-eslint/no-require-imports': 'error',
     '@typescript-eslint/no-this-alias': 'error',
     '@typescript-eslint/no-unnecessary-type-constraint': 'error',
-    // '@typescript-eslint/no-unsafe-declaration-merging': 'error', // not implemented
-    // '@typescript-eslint/no-unsafe-function-type': 'error', // not implemented
+    '@typescript-eslint/no-unsafe-declaration-merging': 'error',
+    '@typescript-eslint/no-unsafe-function-type': 'error',
     'no-unused-expressions': 'off',
     '@typescript-eslint/no-unused-expressions': 'error',
     'no-unused-vars': 'off',
@@ -115,11 +119,11 @@ const recommended: RslintConfigEntry = {
       'error',
       { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
     ],
-    // '@typescript-eslint/no-wrapper-object-types': 'error', // not implemented
+    '@typescript-eslint/no-wrapper-object-types': 'error',
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',
     '@typescript-eslint/triple-slash-reference': 'error',
   },
 };
 
-export { recommended };
+export { base, recommended };

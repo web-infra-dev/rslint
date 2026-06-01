@@ -67,7 +67,7 @@ func isNegativeZero(node *ast.Node) bool {
 }
 
 // NoCompareNegZeroRule disallows comparisons to negative zero
-var NoCompareNegZeroRule = rule.CreateRule(rule.Rule{
+var NoCompareNegZeroRule = rule.Rule{
 	Name: "no-compare-neg-zero",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Define the operators we want to check
@@ -103,4 +103,4 @@ var NoCompareNegZeroRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

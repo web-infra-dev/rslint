@@ -1,4 +1,4 @@
-# react/require-optimization
+# require-optimization
 
 Enforce React components to declare a `shouldComponentUpdate` method (or use an equivalent optimization mechanism such as extending `React.PureComponent` or applying a PureRender decorator/mixin).
 

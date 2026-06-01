@@ -2,6 +2,7 @@ package jsx_a11y_plugin
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/alt_text"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_ambiguous_text"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_has_content"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/anchor_is_valid"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/aria_activedescendant_has_tabindex"
@@ -18,15 +19,22 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/img_redundant_alt"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/interactive_supports_focus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/label_has_associated_control"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/lang"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/media_has_caption"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/mouse_events_have_key_events"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_access_key"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_aria_hidden_on_focusable"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_autofocus"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_distracting_elements"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_interactive_element_to_noninteractive_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_element_interactions"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_element_to_interactive_role"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_noninteractive_tabindex"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_redundant_roles"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/no_static_element_interactions"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/prefer_tag_over_role"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/role_has_required_aria_props"
+	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/role_supports_aria_props"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/scope"
 	"github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y/rules/tabindex_no_positive"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -35,6 +43,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		alt_text.AltTextRule,
+		anchor_ambiguous_text.AnchorAmbiguousTextRule,
 		anchor_has_content.AnchorHasContentRule,
 		anchor_is_valid.AnchorIsValidRule,
 		aria_activedescendant_has_tabindex.AriaActivedescendantHasTabindexRule,
@@ -51,15 +60,22 @@ func GetAllRules() []rule.Rule {
 		img_redundant_alt.ImgRedundantAltRule,
 		interactive_supports_focus.InteractiveSupportsFocusRule,
 		label_has_associated_control.LabelHasAssociatedControlRule,
+		lang.LangRule,
 		media_has_caption.MediaHasCaptionRule,
 		mouse_events_have_key_events.MouseEventsHaveKeyEventsRule,
 		no_access_key.NoAccessKeyRule,
+		no_aria_hidden_on_focusable.NoAriaHiddenOnFocusableRule,
 		no_autofocus.NoAutofocusRule,
 		no_distracting_elements.NoDistractingElementsRule,
+		no_interactive_element_to_noninteractive_role.NoInteractiveElementToNoninteractiveRoleRule,
 		no_noninteractive_element_interactions.NoNoninteractiveElementInteractionsRule,
+		no_noninteractive_element_to_interactive_role.NoNoninteractiveElementToInteractiveRoleRule,
 		no_noninteractive_tabindex.NoNoninteractiveTabindexRule,
 		no_redundant_roles.NoRedundantRolesRule,
 		no_static_element_interactions.NoStaticElementInteractionsRule,
+		prefer_tag_over_role.PreferTagOverRoleRule,
+		role_has_required_aria_props.RoleHasRequiredAriaPropsRule,
+		role_supports_aria_props.RoleSupportsAriaPropsRule,
 		scope.ScopeRule,
 		tabindex_no_positive.TabindexNoPositiveRule,
 	}

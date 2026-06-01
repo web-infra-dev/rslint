@@ -35,6 +35,31 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
+// lintArgs is the parsed CLI flag set, decoupled from the global flag
+// package so each entry point can build it: parseLintFlags from argv, and
+// runCLI additionally from the IPC init-handshake payload.
+type lintArgs struct {
+	Init           bool
+	Config         string
+	ConfigStdin    bool // true → executeLintPipeline reads stdin as a config payload
+	Fix            bool
+	TypeCheck      bool
+	TypeCheckOnly  bool
+	TraceOut       string
+	CpuprofOut     string
+	SingleThreaded bool
+	Format         string
+	NoColor        bool
+	ForceColor     bool
+	Quiet          bool
+	MaxWarnings    int
+	StartTimeMs    int64
+	RuleFlags      []string
+	// Positional args resolved into existing-dir vs file paths.
+	AllowFiles []string
+	AllowDirs  []string
+}
+
 // ColorScheme contains all the color functions for different UI elements
 type ColorScheme struct {
 	RuleName    func(format string, a ...interface{}) string
@@ -317,14 +342,19 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineStarts := make([]int, numLines)
 	lineEnds := make([]int, numLines)
 
-	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
-	// but track byte positions for string slicing
+	// Iterate by runes to correctly handle multi-byte UTF-8 characters.
+	// Use utf8.DecodeRuneInString to get the true byte width of each rune
+	// (including invalid UTF-8 bytes, which decode as RuneError with size=1).
+	// `for _, char := range str` plus `utf8.RuneLen(char)` is unsafe here
+	// because invalid bytes yield RuneError (U+FFFD) and RuneLen returns 3
+	// (the encoded length of U+FFFD), throwing off the byte counter and
+	// eventually slicing past len(text).
 	codeboxText := text[codeboxStart:codeboxEnd]
-	bytePos := codeboxStart
-	for _, char := range codeboxText {
-		charBytes := utf8.RuneLen(char)
-		current, next := bytePos, bytePos+charBytes
-		bytePos = next
+	for i := 0; i < len(codeboxText); {
+		char, size := utf8.DecodeRuneInString(codeboxText[i:])
+		current := codeboxStart + i
+		next := current + size
+		i += size
 
 		if char == '\n' {
 			if line != codeboxEndLine {
@@ -348,6 +378,14 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	if line == codeboxEndLine {
 		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+	}
+	// If no non-space content was seen anywhere in the codebox,
+	// `indentSize` was never updated from the math.MaxInt sentinel.
+	// Clamping to 0 prevents `lineMap[line] + indentSize` from overflowing
+	// int in the render loop below (which would wrap to a large negative
+	// number and slice out of bounds).
+	if indentSize == math.MaxInt {
+		indentSize = 0
 	}
 
 	diagnosticHighlightActive := false
@@ -420,7 +458,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
 type repeatedFlag []string
 
-func (f *repeatedFlag) String() string   { return strings.Join(*f, ", ") }
+func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
 
 const usage = `🚀 Rslint - Rocket Speed Linter
@@ -434,6 +472,7 @@ Options:
   --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
   --type-check          Enable TypeScript type checking
+  --type-check-only     Run only TypeScript type checking (skip all lint rules)
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
@@ -482,6 +521,142 @@ func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
 	return fixed
 }
 
+// allowFileWarningKind categorizes why a CLI-specified file won't have lint
+// rules applied. These are Phase-1 (lint) concepts; Phase 2 (type-check) is
+// not affected by either case (it runs program-wide regardless of CLI scope
+// and rslint ignores).
+type allowFileWarningKind int
+
+const (
+	allowFileNotInProgram allowFileWarningKind = iota
+	allowFileIgnored
+)
+
+// allowFileWarning is the structured form of a "this CLI-specified file
+// won't be linted" diagnostic. Returned by collectAllowFileWarnings so the
+// emission policy (skip in --type-check-only, format with relative paths,
+// etc.) can be unit-tested without capturing stderr.
+type allowFileWarning struct {
+	Path string // absolute, normalized — matches what was put in allowFiles
+	Kind allowFileWarningKind
+}
+
+// formatAllowFileWarning renders an allowFileWarning for stderr emission,
+// resolving the absolute path against comparePathOptions. Returns "" for
+// unknown kinds so callers can safely ignore the empty case.
+func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions) string {
+	rel := tspath.ConvertToRelativePath(w.Path, opts)
+	switch w.Kind {
+	case allowFileNotInProgram:
+		return fmt.Sprintf("warning: %s was not found in the project, skipping", rel)
+	case allowFileIgnored:
+		return fmt.Sprintf("warning: %s is ignored because of a matching ignore pattern", rel)
+	}
+	return ""
+}
+
+// collectAllowFileWarnings explains, for each CLI-specified file in
+// allowFiles, why it won't be visited by Phase 1 (lint). A file lands in
+// the result if it is outside every Program, or if it is in some Program
+// but the nearest config's `ignores` patterns exclude it. Returns nil for
+// empty allowFiles.
+//
+// This is a Phase-1 concern only. In --type-check-only mode the lint phase
+// is skipped, so callers MUST gate emission on `!typeCheckOnly` — otherwise
+// users see misleading messages like "is ignored because of a matching
+// ignore pattern" while Phase 2 happily reports type errors for that same
+// file. See website/docs/en/guide/type-checking.md ("type-check is not
+// constrained by `files`/`ignores`").
+func collectAllowFileWarnings(
+	allowFiles []string,
+	programs []*compiler.Program,
+	configMap map[string]rslintconfig.RslintConfig,
+	rslintConfig rslintconfig.RslintConfig,
+	currentDirectory string,
+) []allowFileWarning {
+	if len(allowFiles) == 0 {
+		return nil
+	}
+	programFiles := make(map[string]struct{})
+	for _, prog := range programs {
+		for _, sf := range prog.GetSourceFiles() {
+			programFiles[sf.FileName()] = struct{}{}
+		}
+	}
+
+	// Cache FindNearestConfig results by directory to avoid redundant lookups
+	// when many files are in the same directory (e.g., lint-staged).
+	type cachedConfig struct {
+		cfgDir string
+		cfg    rslintconfig.RslintConfig
+	}
+	dirConfigCache := make(map[string]*cachedConfig)
+
+	var out []allowFileWarning
+	for _, f := range allowFiles {
+		if _, inProgram := programFiles[f]; !inProgram {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotInProgram})
+			continue
+		}
+		// File is in a Program — check if config would assign rules
+		var merged *rslintconfig.MergedConfig
+		if configMap != nil {
+			dir := tspath.GetDirectoryPath(f)
+			cached, ok := dirConfigCache[dir]
+			if !ok {
+				cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
+				cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
+				dirConfigCache[dir] = cached
+			}
+			if cached.cfg != nil {
+				merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
+			}
+		} else {
+			merged = rslintConfig.GetConfigForFile(f, currentDirectory)
+		}
+		if merged == nil {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
+		}
+	}
+	return out
+}
+
+// shouldShortCircuitOutput returns true when rslint should bail early
+// without printing diagnostics or a summary. The short-circuit exists so
+// that e.g. `rslint nonexistent-file.ts` returns 0 with no spurious output
+// when Phase 1 visited zero files.
+//
+// Any type-check mode (`--type-check` or `--type-check-only`) must NOT take
+// the short-circuit: Phase 2 runs program-wide and is not gated by the CLI
+// Scope/PerProgramFilter that drives lintedFileCount, so lintedFileCount==0
+// is a normal state in which Phase 2 may still have produced diagnostics.
+// Short-circuiting there would silently drop type errors that the user
+// explicitly asked for — see website/docs/en/guide/type-checking.md.
+func shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted bool, lintedFileCount int32) bool {
+	if typeCheckOnly || typeCheck {
+		return false
+	}
+	return scopeRestricted && lintedFileCount == 0
+}
+
+// validateTypeCheckOnlyFlags rejects --type-check-only combined with flags
+// whose semantics depend on the lint phase that this mode disables. Returns
+// (0, "") when the combination is valid (or --type-check-only isn't set);
+// otherwise returns (exitCode > 0, stderr message). Pulled out as a pure
+// function so the policy can be exercised in unit tests.
+func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (int, string) {
+	if !typeCheckOnly {
+		return 0, ""
+	}
+	if fix {
+		return 2, "error: --fix cannot be combined with --type-check-only (no lint rules run, nothing to fix)"
+	}
+	if len(ruleFlags) > 0 {
+		return 2, "error: --rule cannot be combined with --type-check-only (no lint rules run)"
+	}
+	return 0, ""
+}
+
 // resolveStartTime returns the start time for timing output.
 // If startTimeMs (epoch millis from the Node.js entry point) is positive,
 // it is used so the reported duration covers end-to-end execution.
@@ -493,58 +668,62 @@ func resolveStartTime(startTimeMs int64) time.Time {
 	return time.Now()
 }
 
-func runCMD() int {
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+// parseLintFlags parses the lint CLI flags out of argv into a lintArgs.
+// It uses a fresh FlagSet (not the global flag.CommandLine) so it is
+// callable more than once per process, and ContinueOnError so a bad flag
+// returns a fatal exit code instead of os.Exit-ing past caller cleanup.
+// A non-zero fatalExitCode means the caller should return it immediately
+// (the diagnostic was already printed to stderr).
+func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int) {
+	fs := flag.NewFlagSet("rslint", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
-	var (
-		init        bool
-		help        bool
-		config      string
-		configStdin bool
-		fix         bool
-		typeCheck   bool
+	var ruleFlags repeatedFlag
 
-		traceOut       string
-		cpuprofOut     string
-		singleThreaded bool
-		format         string
-		noColor        bool
-		forceColor     bool
-		quiet          bool
-		maxWarnings    int
-		startTimeMs    int64
-		ruleFlags      repeatedFlag
-	)
-	flag.StringVar(&format, "format", "default", "output format")
-	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
-	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
-	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
-	flag.BoolVar(&typeCheck, "type-check", false, "enable TypeScript type checking")
-	flag.BoolVar(&help, "help", false, "show help")
-	flag.BoolVar(&help, "h", false, "show help")
-	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
-	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
-	flag.BoolVar(&quiet, "quiet", false, "report errors only")
-	flag.IntVar(&maxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
+	fs.StringVar(&args.Format, "format", "default", "output format")
+	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
+	fs.BoolVar(&args.ConfigStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
+	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
+	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")
+	fs.BoolVar(&args.TypeCheck, "type-check", false, "enable TypeScript type checking")
+	fs.BoolVar(&args.TypeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
+	fs.BoolVar(&help, "help", false, "show help")
+	fs.BoolVar(&help, "h", false, "show help")
+	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
+	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
+	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
+	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
-	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
-	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
-	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
-	flag.Int64Var(&startTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
-	flag.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
+	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
+	fs.StringVar(&args.CpuprofOut, "cpuprof", "", "file to put cpu profiling to")
+	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
+	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
+	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 
-	flag.Parse()
+	if err := fs.Parse(argv); err != nil {
+		// ContinueOnError: fs already printed the diagnostic to stderr.
+		return args, help, 2
+	}
+	args.RuleFlags = []string(ruleFlags)
+
+	// --type-check-only implies --type-check and skips all lint rules.
+	// Reject incompatible flag combinations before doing any work.
+	if code, msg := validateTypeCheckOnlyFlags(args.TypeCheckOnly, args.Fix, args.RuleFlags); code != 0 {
+		fmt.Fprintln(os.Stderr, msg)
+		return args, help, code
+	}
+	if args.TypeCheckOnly {
+		args.TypeCheck = true
+	}
 
 	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
-	var allowFiles []string
-	var allowDirs []string
-	if args := flag.Args(); len(args) > 0 {
-		for _, arg := range args {
+	if positional := fs.Args(); len(positional) > 0 {
+		for _, arg := range positional {
 			absPath, err := filepath.Abs(arg)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
-				return 1
+				return lintArgs{}, help, 1
 			}
 			// NOTE: we intentionally do NOT call filepath.EvalSymlinks here.
 			// EvalSymlinks resolves symlinks (macOS /tmp → /private/tmp) and
@@ -559,17 +738,41 @@ func runCMD() int {
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {
-				allowDirs = append(allowDirs, normalized)
+				args.AllowDirs = append(args.AllowDirs, normalized)
 			} else {
-				allowFiles = append(allowFiles, normalized)
+				args.AllowFiles = append(args.AllowFiles, normalized)
 			}
 		}
 	}
 
-	if help {
-		flag.Usage()
-		return 0
-	}
+	return args, help, 0
+}
+
+// executeLintPipeline runs the full lint flow (config load → program build
+// → gap-file fallback → lint → optional --fix loop → report) and returns
+// the process exit code. Shared by the IPC entry (runCLI) and the wasm
+// native fallback.
+func executeLintPipeline(args lintArgs) int {
+	// Unpack into locals so the pipeline body below stays verbatim — only the
+	// flag-parse front matter lives in parseLintFlags.
+	init := args.Init
+	config := args.Config
+	configStdin := args.ConfigStdin
+	fix := args.Fix
+	typeCheck := args.TypeCheck
+	typeCheckOnly := args.TypeCheckOnly
+	traceOut := args.TraceOut
+	cpuprofOut := args.CpuprofOut
+	singleThreaded := args.SingleThreaded
+	format := args.Format
+	noColor := args.NoColor
+	forceColor := args.ForceColor
+	quiet := args.Quiet
+	maxWarnings := args.MaxWarnings
+	startTimeMs := args.StartTimeMs
+	ruleFlags := args.RuleFlags
+	allowFiles := args.AllowFiles
+	allowDirs := args.AllowDirs
 
 	// Override color detection based on flags
 	if noColor {
@@ -969,12 +1172,20 @@ func runCMD() int {
 	// tsconfig Coverage").
 	skipTypeCheck := buildTypeCheckSkipMask(len(programs), fallbackProgramIndex)
 
+	// In --type-check-only mode, skip the lint phase entirely by passing
+	// nil for GetRulesForFile. RunLinter's Phase 1 is gated on this being
+	// non-nil; Phase 2 (type-check) runs independently.
+	var rulesForFile linter.RuleHandler
+	if !typeCheckOnly {
+		rulesForFile = getRulesForFile
+	}
+
 	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 		PerProgramFilter:      toFileFilters(fileFilters),
-		GetRulesForFile:       getRulesForFile,
+		GetRulesForFile:       rulesForFile,
 		TypeInfoFiles:         typeInfoFiles,
 		TypeCheck:             typeCheck,
 		SkipTypeCheckPrograms: skipTypeCheck,
@@ -994,57 +1205,18 @@ func runCMD() int {
 	wg.Wait()
 
 	// Emit per-file warnings for CLI-specified files that won't be linted.
-	// Distinguish between "ignored by pattern" vs "no matching configuration"
-	// vs "not found in project", aligned with ESLint v10's warning behavior.
-	if len(allowFiles) > 0 {
-		programFiles := make(map[string]struct{})
-		for _, prog := range programs {
-			for _, sf := range prog.GetSourceFiles() {
-				programFiles[sf.FileName()] = struct{}{}
-			}
-		}
-		// Cache FindNearestConfig results by directory to avoid redundant lookups
-		// when many files are in the same directory (e.g., lint-staged).
-		type cachedConfig struct {
-			cfgDir string
-			cfg    rslintconfig.RslintConfig
-		}
-		dirConfigCache := make(map[string]*cachedConfig)
-
-		for _, f := range allowFiles {
-			_, inProgram := programFiles[f]
-
-			if !inProgram {
-				// File not in any Program — warn and skip
-				relPath := tspath.ConvertToRelativePath(f, comparePathOptions)
-				fmt.Fprintf(os.Stderr, "warning: %s was not found in the project, skipping\n", relPath)
-				continue
-			}
-
-			// File is in a Program — check if config would assign rules
-			var merged *rslintconfig.MergedConfig
-			if configMap != nil {
-				dir := tspath.GetDirectoryPath(f)
-				cached, ok := dirConfigCache[dir]
-				if !ok {
-					cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
-					cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
-					dirConfigCache[dir] = cached
-				}
-				if cached.cfg != nil {
-					merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
-				}
-			} else {
-				merged = rslintConfig.GetConfigForFile(f, currentDirectory)
-			}
-
-			if merged == nil {
-				relPath := tspath.ConvertToRelativePath(f, comparePathOptions)
-				fmt.Fprintf(os.Stderr, "warning: %s is ignored because of a matching ignore pattern\n", relPath)
-			}
+	// Distinguishes "not found in project" vs "ignored by pattern", aligned
+	// with ESLint v10's warning behavior. Skipped in --type-check-only mode:
+	// these are lint-phase concepts and would mislead users about Phase 2
+	// (which runs program-wide regardless of CLI scope and rslint ignores).
+	if !typeCheckOnly {
+		warnings := collectAllowFileWarnings(allowFiles, programs, configMap, rslintConfig, currentDirectory)
+		for _, w := range warnings {
+			fmt.Fprintln(os.Stderr, formatAllowFileWarning(w, comparePathOptions))
 		}
 	}
-	if (len(allowFiles) > 0 || len(allowDirs) > 0) && lintedfileCount == 0 {
+	scopeRestricted := len(allowFiles) > 0 || len(allowDirs) > 0
+	if shouldShortCircuitOutput(typeCheckOnly, typeCheck, scopeRestricted, lintedfileCount) {
 		return 0
 	}
 
@@ -1164,21 +1336,54 @@ func runCMD() int {
 		// Build the errors summary part.
 		// When type-check is enabled and there are type errors, split the display.
 		var errorsSummary string
-		if typeCheck {
+		switch {
+		case typeCheckOnly:
+			// Lint phase was skipped; only type errors are possible.
+			errorsSummary = fmt.Sprintf("%s %s",
+				errorsColorFunc("%d", typeErrorsCount),
+				pluralize(typeErrorsCount, "type error", "type errors"),
+			)
+		case typeCheck:
 			errorsSummary = fmt.Sprintf("%s %s, %s %s",
 				errorsColorFunc("%d", lintErrorsCount),
 				pluralize(lintErrorsCount, "lint error", "lint errors"),
 				errorsColorFunc("%d", typeErrorsCount),
 				pluralize(typeErrorsCount, "type error", "type errors"),
 			)
-		} else {
+		default:
 			errorsSummary = fmt.Sprintf("%s %s",
 				errorsColorFunc("%d", errorsCount),
 				pluralize(errorsCount, "error", "errors"),
 			)
 		}
 
-		if fix && fixedCount > 0 {
+		if typeCheckOnly {
+			// type-check-only: omit lint-file/rule/warning columns since no
+			// lint ran. Report the type-checked file count derived from
+			// non-skipped programs' root files (tsconfig include/files);
+			// transitive .d.ts imports are excluded for user readability.
+			seen := make(map[string]struct{})
+			for i, prog := range programs {
+				if i < len(skipTypeCheck) && skipTypeCheck[i] {
+					continue
+				}
+				for _, fn := range prog.CommandLine().FileNames() {
+					seen[fn] = struct{}{}
+				}
+			}
+			typeCheckedFileCount := len(seen)
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s %s(type-checked %s %s in %s using %s threads)%s\n",
+				errorsSummary,
+				colors.DimText(""),
+				colors.BoldText("%d", typeCheckedFileCount),
+				pluralize(typeCheckedFileCount, "file", "files"),
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""),
+			)
+		} else if fix && fixedCount > 0 {
 			fixText := pluralize(fixedCount, "issue", "issues")
 			fmt.Fprintf(
 				os.Stdout,
