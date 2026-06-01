@@ -66,6 +66,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_restricted_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_shadow"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_type_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_condition"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_parameter_property_assignment"
@@ -196,6 +197,7 @@ func GetAllRules() []rule.Rule {
 		no_redeclare.NoRedeclareRule,
 		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
 		no_this_alias.NoThisAliasRule,
+		no_type_alias.NoTypeAliasRule,
 		no_require_imports.NoRequireImportsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_types.NoRestrictedTypesRule,
