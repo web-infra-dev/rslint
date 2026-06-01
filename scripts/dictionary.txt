@@ -387,6 +387,7 @@ rspeedy
 rspress
 rsquo
 rstack
+rstackjs
 rstest
 saddr
 samp
