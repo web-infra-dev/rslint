@@ -5,6 +5,9 @@
 **/.vs
 **/.rslib
 
+# Skills
+.agents/skills/create-draft-release-notes
+
 .yarn/plugins
 .yarn/releases
 

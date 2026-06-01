@@ -1,8 +1,5 @@
-// Package jsx_equals_spacing implements jsx-equals-spacing, shared by both
-// eslint-plugin-react (`react/jsx-equals-spacing`) and @stylistic/eslint-plugin
-// (`@stylistic/jsx-equals-spacing`). The two upstream rules are byte-identical
-// — the @stylistic fork carries no behavioral delta — so a single BuildRule
-// constructs both; only the registered Name differs.
+// Package jsx_equals_spacing implements jsx-equals-spacing
+// (`react/jsx-equals-spacing`).
 //
 // The rule enforces or disallows spaces around the `=` sign in JSX attributes:
 // under `never` (default) there must be no space on either side of `=`, and
@@ -126,8 +123,6 @@ func analyzeEquals(s *scanner.Scanner, nameEnd int) (equalsInfo, bool) {
 }
 
 // BuildRule constructs the jsx-equals-spacing rule registered under `name`.
-// Both the react and @stylistic variants are produced from this single
-// implementation (see the package doc for why they share one body).
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,

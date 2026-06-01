@@ -127,7 +127,6 @@ espree
 estree
 fontstack
 stroustrup
-stylisticutil
 Éurströmming
 exclam
 execdir
@@ -388,6 +387,7 @@ rspeedy
 rspress
 rsquo
 rstack
+rstackjs
 rstest
 saddr
 samp
@@ -549,3 +549,11 @@ ZWSP
 résumé
 TSJSDoc
 unpadded
+acks
+backpressure
+kase
+lookback
+omitempty
+perr
+unmarshals
+unstarted

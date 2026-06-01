@@ -35,6 +35,31 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
+// lintArgs is the parsed CLI flag set, decoupled from the global flag
+// package so each entry point can build it: parseLintFlags from argv, and
+// runCLI additionally from the IPC init-handshake payload.
+type lintArgs struct {
+	Init           bool
+	Config         string
+	ConfigStdin    bool // true → executeLintPipeline reads stdin as a config payload
+	Fix            bool
+	TypeCheck      bool
+	TypeCheckOnly  bool
+	TraceOut       string
+	CpuprofOut     string
+	SingleThreaded bool
+	Format         string
+	NoColor        bool
+	ForceColor     bool
+	Quiet          bool
+	MaxWarnings    int
+	StartTimeMs    int64
+	RuleFlags      []string
+	// Positional args resolved into existing-dir vs file paths.
+	AllowFiles []string
+	AllowDirs  []string
+}
+
 // ColorScheme contains all the color functions for different UI elements
 type ColorScheme struct {
 	RuleName    func(format string, a ...interface{}) string
@@ -433,7 +458,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
 type repeatedFlag []string
 
-func (f *repeatedFlag) String() string   { return strings.Join(*f, ", ") }
+func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
 
 const usage = `🚀 Rslint - Rocket Speed Linter
@@ -643,70 +668,62 @@ func resolveStartTime(startTimeMs int64) time.Time {
 	return time.Now()
 }
 
-func runCMD() int {
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+// parseLintFlags parses the lint CLI flags out of argv into a lintArgs.
+// It uses a fresh FlagSet (not the global flag.CommandLine) so it is
+// callable more than once per process, and ContinueOnError so a bad flag
+// returns a fatal exit code instead of os.Exit-ing past caller cleanup.
+// A non-zero fatalExitCode means the caller should return it immediately
+// (the diagnostic was already printed to stderr).
+func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int) {
+	fs := flag.NewFlagSet("rslint", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
-	var (
-		init        bool
-		help        bool
-		config      string
-		configStdin bool
-		fix           bool
-		typeCheck     bool
-		typeCheckOnly bool
+	var ruleFlags repeatedFlag
 
-		traceOut       string
-		cpuprofOut     string
-		singleThreaded bool
-		format         string
-		noColor        bool
-		forceColor     bool
-		quiet          bool
-		maxWarnings    int
-		startTimeMs    int64
-		ruleFlags      repeatedFlag
-	)
-	flag.StringVar(&format, "format", "default", "output format")
-	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
-	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
-	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
-	flag.BoolVar(&typeCheck, "type-check", false, "enable TypeScript type checking")
-	flag.BoolVar(&typeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
-	flag.BoolVar(&help, "help", false, "show help")
-	flag.BoolVar(&help, "h", false, "show help")
-	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
-	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
-	flag.BoolVar(&quiet, "quiet", false, "report errors only")
-	flag.IntVar(&maxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
+	fs.StringVar(&args.Format, "format", "default", "output format")
+	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
+	fs.BoolVar(&args.ConfigStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
+	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
+	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")
+	fs.BoolVar(&args.TypeCheck, "type-check", false, "enable TypeScript type checking")
+	fs.BoolVar(&args.TypeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
+	fs.BoolVar(&help, "help", false, "show help")
+	fs.BoolVar(&help, "h", false, "show help")
+	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
+	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
+	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
+	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
-	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
-	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
-	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
-	flag.Int64Var(&startTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
-	flag.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
+	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
+	fs.StringVar(&args.CpuprofOut, "cpuprof", "", "file to put cpu profiling to")
+	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
+	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
+	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 
-	flag.Parse()
+	if err := fs.Parse(argv); err != nil {
+		// ContinueOnError: fs already printed the diagnostic to stderr.
+		return args, help, 2
+	}
+	args.RuleFlags = []string(ruleFlags)
 
 	// --type-check-only implies --type-check and skips all lint rules.
 	// Reject incompatible flag combinations before doing any work.
-	if code, msg := validateTypeCheckOnlyFlags(typeCheckOnly, fix, []string(ruleFlags)); code != 0 {
+	if code, msg := validateTypeCheckOnlyFlags(args.TypeCheckOnly, args.Fix, args.RuleFlags); code != 0 {
 		fmt.Fprintln(os.Stderr, msg)
-		return code
+		return args, help, code
 	}
-	if typeCheckOnly {
-		typeCheck = true
+	if args.TypeCheckOnly {
+		args.TypeCheck = true
 	}
 
 	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
-	var allowFiles []string
-	var allowDirs []string
-	if args := flag.Args(); len(args) > 0 {
-		for _, arg := range args {
+	if positional := fs.Args(); len(positional) > 0 {
+		for _, arg := range positional {
 			absPath, err := filepath.Abs(arg)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
-				return 1
+				return lintArgs{}, help, 1
 			}
 			// NOTE: we intentionally do NOT call filepath.EvalSymlinks here.
 			// EvalSymlinks resolves symlinks (macOS /tmp → /private/tmp) and
@@ -721,17 +738,41 @@ func runCMD() int {
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {
-				allowDirs = append(allowDirs, normalized)
+				args.AllowDirs = append(args.AllowDirs, normalized)
 			} else {
-				allowFiles = append(allowFiles, normalized)
+				args.AllowFiles = append(args.AllowFiles, normalized)
 			}
 		}
 	}
 
-	if help {
-		flag.Usage()
-		return 0
-	}
+	return args, help, 0
+}
+
+// executeLintPipeline runs the full lint flow (config load → program build
+// → gap-file fallback → lint → optional --fix loop → report) and returns
+// the process exit code. Shared by the IPC entry (runCLI) and the wasm
+// native fallback.
+func executeLintPipeline(args lintArgs) int {
+	// Unpack into locals so the pipeline body below stays verbatim — only the
+	// flag-parse front matter lives in parseLintFlags.
+	init := args.Init
+	config := args.Config
+	configStdin := args.ConfigStdin
+	fix := args.Fix
+	typeCheck := args.TypeCheck
+	typeCheckOnly := args.TypeCheckOnly
+	traceOut := args.TraceOut
+	cpuprofOut := args.CpuprofOut
+	singleThreaded := args.SingleThreaded
+	format := args.Format
+	noColor := args.NoColor
+	forceColor := args.ForceColor
+	quiet := args.Quiet
+	maxWarnings := args.MaxWarnings
+	startTimeMs := args.StartTimeMs
+	ruleFlags := args.RuleFlags
+	allowFiles := args.AllowFiles
+	allowDirs := args.AllowDirs
 
 	// Override color detection based on flags
 	if noColor {

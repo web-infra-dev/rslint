@@ -2404,13 +2404,9 @@ func TestJsxCurlySpacingRule(t *testing.T) {
 			},
 		},
 
-		// ---- Normalization scope (stylisticScope=false): react keeps inheriting ----
-		// Same input as the @stylistic extras' (a) lock-in, OPPOSITE result. In
-		// react mode (BuildRule stylisticScope=false) a per-side empty
-		// `spacing: {}` keeps INHERITING the top-level `objectLiterals: 'always'`,
-		// so a flush object literal is reported as needing surrounding space.
-		// (@stylistic falls back to when:'never' and accepts it — the one
-		// cross-fork delta, locked in on both sides.)
+		// A per-side empty `spacing: {}` keeps INHERITING the top-level
+		// `objectLiterals: 'always'`, so a flush object literal is reported as
+		// needing surrounding space.
 		{
 			Code:    `<App foo={{a: 1}} />`,
 			Tsx:     true,
