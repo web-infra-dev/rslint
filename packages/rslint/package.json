@@ -58,7 +58,7 @@
   ],
   "devDependencies": {
     "@eslint/plugin-kit": "0.3.5",
-    "@rslib/core": "0.21.2",
+    "@rslib/core": "0.22.0",
     "@rslint/api": "workspace:*",
     "@types/node": "24.0.14",
     "@types/picomatch": "4.0.2",
