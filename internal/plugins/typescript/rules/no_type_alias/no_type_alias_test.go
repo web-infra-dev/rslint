@@ -17,6 +17,9 @@ func TestNoTypeAliasRule(t *testing.T) {
 		{Code: `type Foo = 'a'`, Options: map[string]interface{}{"allowAliases": "always"}},
 		{Code: `type Foo = typeof bar`, Options: map[string]interface{}{"allowAliases": "always"}},
 		{Code: `type Foo = typeof import('foo')`, Options: map[string]interface{}{"allowAliases": "always"}},
+		{Code: `type Foo = (string)`, Options: map[string]interface{}{"allowAliases": "always"}},
+		{Code: `type Foo = readonly (string[])`, Options: map[string]interface{}{"allowAliases": "always"}},
+		{Code: `type Foo = unique symbol`, Options: map[string]interface{}{"allowAliases": "always"}},
 
 		// allowAliases: in-unions
 		{Code: `type Foo = 'a' | 'b'`, Options: map[string]interface{}{"allowAliases": "in-unions"}},
@@ -59,6 +62,8 @@ func TestNoTypeAliasRule(t *testing.T) {
 		{Code: `type Foo = keyof [string]`, Options: map[string]interface{}{"allowTupleTypes": "always"}},
 		{Code: `type Foo = keyof [string] | [number, number]`, Options: map[string]interface{}{"allowTupleTypes": "always"}},
 		{Code: `type Foo = keyof [string] | [number, number]`, Options: map[string]interface{}{"allowTupleTypes": "in-unions"}},
+		{Code: `type Foo = readonly ([string])`, Options: map[string]interface{}{"allowTupleTypes": "always"}},
+		{Code: `type Foo = keyof ([string])`, Options: map[string]interface{}{"allowTupleTypes": "always"}},
 
 		// allowConditionalTypes
 		{Code: `type Foo<T> = T extends number ? number : null`, Options: map[string]interface{}{"allowConditionalTypes": "always"}},
@@ -68,6 +73,7 @@ func TestNoTypeAliasRule(t *testing.T) {
 
 		// allowGenerics
 		{Code: `type Foo = Record<string, number>`, Options: map[string]interface{}{"allowGenerics": "always"}},
+		{Code: `type Foo = (Record<string, number>)`, Options: map[string]interface{}{"allowGenerics": "always"}},
 
 		// Mixed options (real-world style)
 		{
@@ -95,6 +101,14 @@ func TestNoTypeAliasRule(t *testing.T) {
 		},
 		{
 			Code:   `type Foo = typeof import('foo')`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:   `type Foo = (string)`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 13}},
+		},
+		{
+			Code:   `type Foo = unique symbol`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 
