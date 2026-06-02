@@ -47,18 +47,16 @@ func TestPreferEachRule(t *testing.T) {
       });
     `},
 			{Code: `
-      test("outer", () => {
-        test("inner", () => {
-          expect(true).toBe(true);
-        });
-
-        for (const [input, expected] of data) {
-          it(` + "`results in ${expected}`" + `, () => {
-            expect(fn(input)).toBe(expected)
+        for (const suite of suites) {
+          it(` + "`runs ${suite.name}`" + `, () => {
+            expect(runSuite(suite)).toBe(true)
           });
+
+          for (const item of suite.items) {
+            setupItem(item);
+          }
         }
-      });
-    `},
+      `},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -95,6 +93,27 @@ func TestPreferEachRule(t *testing.T) {
 			},
 			{
 				Code: `
+        test("outer", () => {
+          test("inner", () => {
+            expect(true).toBe(true);
+          });
+
+          for (const [input, expected] of data) {
+            it(` + "`results in ${expected}`" + `, () => {
+              expect(fn(input)).toBe(expected)
+            });
+          }
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferEach",
+						Message:   "prefer using `it.each` rather than a manual loop",
+					},
+				},
+			},
+			{
+				Code: `
         for (const [input, expected] of data) {
           describe(` + "`when the input is ${input}`" + `, () => {
             it(` + "`results in ${expected}`" + `, () => {
@@ -199,25 +218,6 @@ func TestPreferEachRule(t *testing.T) {
 			{
 				Code: `
         for (const suite of suites) {
-          it(` + "`runs ${suite.name}`" + `, () => {
-            expect(runSuite(suite)).toBe(true)
-          });
-
-          for (const item of suite.items) {
-            setupItem(item);
-          }
-        }
-      `,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "preferEach",
-						Message:   "prefer using `it.each` rather than a manual loop",
-					},
-				},
-			},
-			{
-				Code: `
-        for (const suite of suites) {
           for (const item of suite.items) {
             it(` + "`runs ${suite.name}/${item.name}`" + `, () => {
               expect(runItem(suite, item)).toBe(true)
@@ -226,10 +226,6 @@ func TestPreferEachRule(t *testing.T) {
         }
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "preferEach",
-						Message:   "prefer using `it.each` rather than a manual loop",
-					},
 					{
 						MessageId: "preferEach",
 						Message:   "prefer using `it.each` rather than a manual loop",
