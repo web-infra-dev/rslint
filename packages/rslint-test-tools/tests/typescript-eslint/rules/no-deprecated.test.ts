@@ -589,9 +589,7 @@ exists('/foo');
     `,
   ],
   invalid: [
-    // Skipped: React JSX deprecation requires React types (tsgolint parity)
     {
-      skip: true,
       code: noFormat`
         interface AProps {
           /** @deprecated */
@@ -1668,6 +1666,9 @@ exists('/foo');
       ],
     },
     {
+      // Skipped: assert.fail overload deprecation is in node:assert external .d.ts;
+      // TypeScript doesn't resolve the 2-arg overload as deprecated for imported symbols.
+      skip: true,
       code: `
         import assert from 'node:assert';
 
@@ -2953,6 +2954,8 @@ class B extends A {
       ],
     },
     {
+      // Skipped: aria-grabbed deprecation lives in lib.dom.d.ts (external .d.ts);
+      // root cause is external .d.ts deprecations not detected by symbol resolution.
       skip: true,
       code: 'const a = <div aria-grabbed></div>;',
       languageOptions: jsxLanguageOptions,
@@ -2968,7 +2971,6 @@ class B extends A {
       ],
     },
     {
-      skip: true,
       code: `
         declare namespace JSX {
           interface IntrinsicElements {
@@ -2997,7 +2999,6 @@ class B extends A {
       ],
     },
     {
-      skip: true,
       code: noFormat`
         import * as React from 'react';
 
@@ -3031,6 +3032,9 @@ class B extends A {
       ],
     },
     {
+      // Skipped: fs.exists deprecation is in @types/node/fs.d.ts (external .d.ts);
+      // not detected by symbol resolution for imported named bindings.
+      skip: true,
       code: `
 import { exists } from 'fs';
 exists('/foo');

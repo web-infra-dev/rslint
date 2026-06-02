@@ -1778,6 +1778,43 @@ func shouldUseDeprecatedVariableSourceFallback(node *ast.Node) bool {
 	}
 }
 
+// isLocalNonDeprecatedSymbol returns true when the identifier at node resolves
+// to a local (same-file) declaration that is NOT deprecated. In that case we
+// skip the name-only fallback to avoid false positives when a local variable
+// shadows a deprecated declaration of the same name.
+func isLocalNonDeprecatedSymbol(ctx rule.RuleContext, node *ast.Node) bool {
+	if ctx.TypeChecker == nil || ctx.SourceFile == nil || node == nil {
+		return false
+	}
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	if symbol == nil {
+		return false
+	}
+	checkDecl := func(decl *ast.Node) bool {
+		if decl == nil || decl.Kind == ast.KindBindingElement {
+			return false
+		}
+		declSourceFile := ast.GetSourceFileOfNode(decl)
+		if declSourceFile == nil || declSourceFile != ctx.SourceFile {
+			return false
+		}
+		// If the declaration is deprecated, allow the fallback to find it.
+		if ctx.TypeChecker.IsDeprecatedDeclaration(decl) || hasDeprecatedTag(decl) || hasDeprecatedTagInSource(decl) {
+			return false
+		}
+		return true
+	}
+	for _, decl := range symbol.Declarations {
+		if checkDecl(decl) {
+			return true
+		}
+	}
+	if checkDecl(symbol.ValueDeclaration) {
+		return true
+	}
+	return false
+}
+
 func isPropertyAccessName(node *ast.Node) bool {
 	if node == nil || node.Parent == nil || node.Parent.Kind != ast.KindPropertyAccessExpression {
 		return false
@@ -1850,41 +1887,6 @@ func isIdentifierTaggedTemplateTag(node *ast.Node) bool {
 	}
 	taggedTemplate := node.Parent.AsTaggedTemplateExpression()
 	return taggedTemplate != nil && taggedTemplate.Tag == node
-}
-
-func isDeprecatedNodeAssertFailOverload(ctx rule.RuleContext, node *ast.Node, name string) (bool, string) {
-	if ctx.SourceFile == nil || name != "fail" || !isPropertyAccessCalleeName(node) {
-		return false, ""
-	}
-	argCount, ok := propertyAccessCallArgCount(node)
-	if !ok || argCount != 2 {
-		return false, ""
-	}
-	access := node.Parent.AsPropertyAccessExpression()
-	if access == nil || access.Expression == nil {
-		return false, ""
-	}
-	importName := strings.TrimSpace(sourceSpanText(ctx.SourceFile, access.Expression.Pos(), access.Expression.End()))
-	if importName == "" {
-		return false, ""
-	}
-	sourceText := ctx.SourceFile.Text()
-	defaultImport := regexp.MustCompile(`(?m)\bimport\s+` + regexp.QuoteMeta(importName) + `\s+from\s+['"]node:assert['"]`)
-	namespaceImport := regexp.MustCompile(`(?m)\bimport\s+\*\s+as\s+` + regexp.QuoteMeta(importName) + `\s+from\s+['"]node:assert['"]`)
-	if !defaultImport.MatchString(sourceText) && !namespaceImport.MatchString(sourceText) {
-		return false, ""
-	}
-	return true, "since v10.0.0 - use fail([message]) or other assert functions instead."
-}
-
-func isDeprecatedFsExistsImport(ctx rule.RuleContext, name string) (bool, string) {
-	if ctx.SourceFile == nil || name != "exists" {
-		return false, ""
-	}
-	if !nameImportedFromPackage(ctx.SourceFile, name, "fs") {
-		return false, ""
-	}
-	return true, "Since v1.0.0 - Use {@link stat} or {@link access} instead."
 }
 
 var NoDeprecatedRule = rule.CreateRule(rule.Rule{
@@ -2002,6 +2004,13 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			reportedRanges[key] = true
 			ctx.ReportRange(diagnosticRange, message)
 		}
+		// Two parallel detection paths: (1) TypeScript's GetSuggestionDiagnostics for
+		// symbol/type-driven deprecations, and (2) AST listeners for cases the type
+		// checker misses (e.g., JSX attributes, local declarations). Duplicates are
+		// deduplicated by text range via reportedRanges. This is intentionally
+		// heuristic-based to maintain parity with upstream typescript-eslint behavior.
+		// TODO: Consolidate to a single symbol-driven path once external .d.ts
+		// deprecations are resolved via type checker.
 		if sourceFile != nil {
 			diagnostics := ctx.TypeChecker.GetSuggestionDiagnostics(context.Background(), sourceFile)
 			for _, diagnostic := range diagnostics {
@@ -2082,10 +2091,10 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			reportName := name
 			isDeprecated, reason := getDeprecationReason(ctx, node)
-			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) {
+			if !isDeprecated && shouldUseDeprecatedVariableSourceFallback(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
 				isDeprecated, reason = deprecatedVariableInfoByNameInSource(ctx, name)
 			}
-			if !isDeprecated && isPropertyAccessName(node) {
+			if !isDeprecated && isPropertyAccessName(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
 				isDeprecated, reason = deprecatedStructuralPropertyInfoByNameInSource(ctx, name)
 				if !isDeprecated {
 					argCount, matchArgCount := propertyAccessCallArgCount(node)
@@ -2095,25 +2104,16 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					}
 				}
 			}
-			if !isDeprecated && isBindingElementNameOrProperty(node) {
+			if !isDeprecated && isBindingElementNameOrProperty(node) && !isLocalNonDeprecatedSymbol(ctx, node) {
 				isDeprecated, reason = deprecatedPropertyInfoByNameInSource(ctx, name)
 			}
-			if !isDeprecated {
+			if !isDeprecated && !isLocalNonDeprecatedSymbol(ctx, node) {
 				argCount, matchArgCount := callArgCountForIdentifierCallee(node)
 				if matchArgCount {
 					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, argCount, true)
 				} else if isIdentifierTaggedTemplateTag(node) {
 					isDeprecated, reason = deprecatedFunctionInfoByNameInSource(ctx, name, 0, false)
 				}
-			}
-			if !isDeprecated {
-				isDeprecated, reason = isDeprecatedNodeAssertFailOverload(ctx, node, name)
-				if isDeprecated {
-					reportName = propertyAccessDisplayName(ctx.SourceFile, node)
-				}
-			}
-			if !isDeprecated {
-				isDeprecated, reason = isDeprecatedFsExistsImport(ctx, name)
 			}
 			if !isDeprecated {
 				return
