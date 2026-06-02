@@ -10,7 +10,7 @@ export default defineConfig([
       // Test fixtures — not real source code
       '**/fixtures/**',
       'packages/rslint-test-tools/tests/**',
-      'packages/eslint-plugin-runner/tests/**',
+      'packages/rslint/tests/eslint-plugin/**',
 
       // VSCode extension test artifacts
       'packages/vscode-extension/__tests__/**',

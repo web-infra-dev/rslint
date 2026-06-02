@@ -142,6 +142,13 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      # napi build produces @rslint/native's index.d.ts (needed by core's
+      # build:js dts) + the win32 .node (needed at test runtime).
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native run build
+
       - name: Download rslint.exe
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
@@ -155,7 +162,6 @@ jobs:
           pnpm --filter @rslint/core run build:js
           pnpm --filter @typescript-eslint/rule-tester build
           pnpm --filter rslint build
-          pnpm --filter @rslint/eslint-plugin-runner build
 
       - name: VSCode Test Cache
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
@@ -224,6 +230,13 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      # napi build produces @rslint/native's index.d.ts (needed by core's
+      # build:js dts) + the host .node (needed at test runtime).
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native run build
+
       - name: Format
         if: runner.os == 'Linux'
         run: pnpm format:check
@@ -279,8 +292,16 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
+
+      # build:js is one rslib build (library surface + eslint-plugin worker);
+      # the worker needs @rslint/native's index.d.ts from `napi build`.
       - name: Build
         run: |
+          pnpm --filter @rslint/native run build
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
   test-rust:
@@ -297,15 +318,10 @@ jobs:
           submodules: true
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+        uses: ./.github/actions/setup-rust
         with:
           components: rustfmt, clippy
-
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          workspaces: '.'
-          cache-on-failure: true
+          cache-workspaces: '.'
           # Workaround for Swatinem/rust-cache#341: on the new macos runner image
           # caching ~/.cargo/bin restores a broken `cargo` shim that resolves to
           # rustup-init, causing `cargo fmt`/`clippy` to fail with

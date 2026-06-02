@@ -1,0 +1,26 @@
+[package]
+name = "rslint-native"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = "3.9.0"
+napi-derive = "3.5.6"
+oxc_allocator = "0.133.0"
+# oxc_ast is a direct dependency solely to enable its `serialize` feature, which provides
+# `Program::to_estree_*_json`. The Program value itself comes back from oxc_parser.
+oxc_ast = { version = "0.133.0", features = ["serialize"] }
+# oxc_ast_visit's `serialize` feature gates the `utf8_to_utf16` module (UTF-8 -> UTF-16).
+oxc_ast_visit = { version = "0.133.0", features = ["serialize"] }
+oxc_parser = "0.133.0"
+oxc_span = "0.133.0"
+# token_map builds the AST cover from the ESTree JSON value.
+serde_json = "1"
+
+[build-dependencies]
+napi-build = "2.3.2"

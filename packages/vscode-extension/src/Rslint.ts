@@ -17,7 +17,7 @@ import {
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
 import type { Extension } from './Extension';
-import { fileExists, PLATFORM_BIN_REQUEST, RslintBinPath } from './utils';
+import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { loadConfigFile, normalizeConfig } from '@rslint/core/config-loader';
@@ -299,14 +299,22 @@ export class Rslint implements Disposable {
           paths: [searchRoot],
         }),
       );
-      const platformPackageBinPath = require.resolve(PLATFORM_BIN_REQUEST, {
-        paths: [pathToRslintCorePackage],
-      });
+      // Try each platform-package candidate in order, using the first that
+      // resolves (linux ships gnu/musl variants — only one is installed).
+      for (const request of getPlatformBinRequests()) {
+        try {
+          const platformPackageBinPath = require.resolve(request, {
+            paths: [pathToRslintCorePackage],
+          });
 
-      this.logger.debug(
-        `Using Rslint binary from node_modules: ${platformPackageBinPath}`,
-      );
-      return platformPackageBinPath;
+          this.logger.debug(
+            `Using Rslint binary from node_modules: ${platformPackageBinPath}`,
+          );
+          return platformPackageBinPath;
+        } catch {
+          // Candidate not installed; try the next one.
+        }
+      }
     } catch {
       this.logger.debug('No binary found in node_modules');
     }
@@ -339,22 +347,33 @@ export class Rslint implements Disposable {
           continue;
         }
 
-        const rslintPlatformPkgPath = yarnPnpApi.resolveRequest(
-          PLATFORM_BIN_REQUEST,
-          rslintCorePackage,
-        );
+        // Try each platform-package candidate in order, using the first that
+        // resolves (linux ships gnu/musl variants — only one is installed).
+        // PnP's resolveRequest throws (rather than returning null) for a
+        // candidate absent from the dependency map, so each lookup needs its
+        // own try/catch to fall through to the next tuple.
+        for (const request of getPlatformBinRequests()) {
+          try {
+            const rslintPlatformPkgPath = yarnPnpApi.resolveRequest(
+              request,
+              rslintCorePackage,
+            );
 
-        if (!rslintPlatformPkgPath) {
-          continue;
-        }
+            if (!rslintPlatformPkgPath) {
+              continue;
+            }
 
-        const rslintPlatformPkg = Uri.file(rslintPlatformPkgPath);
+            const rslintPlatformPkg = Uri.file(rslintPlatformPkgPath);
 
-        if (await fileExists(rslintPlatformPkg)) {
-          this.logger.debug(
-            `Using Rslint binary from PnP: ${rslintPlatformPkg.fsPath}`,
-          );
-          return rslintPlatformPkg.fsPath;
+            if (await fileExists(rslintPlatformPkg)) {
+              this.logger.debug(
+                `Using Rslint binary from PnP: ${rslintPlatformPkg.fsPath}`,
+              );
+              return rslintPlatformPkg.fsPath;
+            }
+          } catch {
+            // Candidate not registered in this PnP map; try the next one.
+          }
         }
       } catch {
         this.logger.debug('No binary found in PnP mode');

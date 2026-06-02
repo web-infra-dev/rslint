@@ -1,0 +1,35 @@
+{
+  "name": "@rslint/native-linux-arm64-musl",
+  "version": "0.5.3",
+  "license": "MIT",
+  "description": "rslint native binaries for linux-arm64-musl",
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "exports": {
+    ".": "./rslint.linux-arm64-musl.node",
+    "./bin": "./rslint",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "rslint.linux-arm64-musl.node",
+    "rslint"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "executableFiles": [
+      "./rslint"
+    ]
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "musl"
+  ]
+}

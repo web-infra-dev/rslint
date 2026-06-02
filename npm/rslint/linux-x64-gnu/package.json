@@ -1,0 +1,35 @@
+{
+  "name": "@rslint/native-linux-x64-gnu",
+  "version": "0.5.3",
+  "license": "MIT",
+  "description": "rslint native binaries for linux-x64-gnu",
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "exports": {
+    ".": "./rslint.linux-x64-gnu.node",
+    "./bin": "./rslint",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "rslint.linux-x64-gnu.node",
+    "rslint"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "executableFiles": [
+      "./rslint"
+    ]
+  },
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ]
+}

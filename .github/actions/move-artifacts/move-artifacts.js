@@ -33,7 +33,19 @@ async function moveArtifacts() {
   console.log('Starting artifact move process...');
 
   try {
-    // Find and move rslint binaries
+    // Move Go CLI binaries into the @rslint/native-{tuple} subpackages (flat,
+    // alongside the .node). Artifacts are named `{platform}-rslint`. Go
+    // binaries are statically linked, so one linux build serves both glibc and
+    // musl — it's copied into both the -gnu and -musl tuple dirs.
+    const platformToTuples = {
+      'darwin-arm64': ['darwin-arm64'],
+      'darwin-x64': ['darwin-x64'],
+      'linux-arm64': ['linux-arm64-gnu', 'linux-arm64-musl'],
+      'linux-x64': ['linux-x64-gnu', 'linux-x64-musl'],
+      'win32-arm64': ['win32-arm64-msvc'],
+      'win32-x64': ['win32-x64-msvc'],
+    };
+
     const rslintFiles = findBinaries('binaries', '-rslint');
     console.log(`Found ${rslintFiles.length} rslint binary files`);
 
@@ -41,20 +53,22 @@ async function moveArtifacts() {
       console.log(`Processing ${file}`);
       const isWindows = file.includes('win32');
       const filename = path.basename(file);
-      const dirname = filename.replace(/-rslint$/, '');
-      const targetDir = path.join('npm', 'rslint', dirname);
+      const platform = filename.replace(/-rslint$/, ''); // e.g. linux-x64
+      const tuples = platformToTuples[platform];
+      if (!tuples) {
+        console.log(`Warning: no tuple mapping for ${platform}, skipping`);
+        continue;
+      }
+      const binName = isWindows ? 'rslint.exe' : 'rslint';
 
-      const targetFile = path.join(
-        targetDir,
-        isWindows ? 'rslint.exe' : 'rslint',
-      );
-
-      // Create target directory and copy file
-      fs.mkdirSync(targetDir, { recursive: true });
-      fs.copyFileSync(file, targetFile);
-      fs.chmodSync(targetFile, 0o755); // Make executable
-
-      console.log(`Copied ${file} to ${targetFile}`);
+      for (const tuple of tuples) {
+        const targetDir = path.join('npm', 'rslint', tuple);
+        const targetFile = path.join(targetDir, binName);
+        fs.mkdirSync(targetDir, { recursive: true });
+        fs.copyFileSync(file, targetFile);
+        fs.chmodSync(targetFile, 0o755); // Make executable
+        console.log(`Copied ${file} to ${targetFile}`);
+      }
     }
 
     // Find and move tsgo binaries to lib directory
@@ -127,6 +141,26 @@ async function moveArtifacts() {
         }
       }
       console.log(`Copied built files to ${targetLibDir}`);
+    }
+
+    // Move napi `.node` parser binaries into the @rslint/native-{tuple}
+    // subpackages (flat, alongside the Go binary). Artifacts are named
+    // `rslint.{tuple}.node`; target is `npm/rslint/{tuple}/` (libc suffix kept
+    // so gnu/musl stay separate). Not chmod'd — a `.node` is dlopen'd.
+    const nodeFiles = findBinaries('binaries', 'rslint.');
+    console.log(`Found ${nodeFiles.length} napi .node files`);
+
+    for (const file of nodeFiles) {
+      console.log(`Processing ${file}`);
+      const filename = path.basename(file); // rslint.linux-x64-gnu.node
+      const tuple = filename.replace(/^rslint\./, '').replace(/\.node$/, ''); // linux-x64-gnu
+      const targetDir = path.join('npm', 'rslint', tuple);
+      const targetFile = path.join(targetDir, filename);
+
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.copyFileSync(file, targetFile);
+
+      console.log(`Copied ${file} to ${targetFile}`);
     }
 
     console.log('Artifact move process completed successfully!');

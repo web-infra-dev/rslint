@@ -1,0 +1,48 @@
+name: Setup Rust
+description: Install the pinned Rust toolchain and optionally enable build caching.
+
+inputs:
+  targets:
+    description: Comma-separated target triples to install (e.g. aarch64-unknown-linux-gnu).
+    required: false
+    default: ''
+  components:
+    description: Comma-separated rustup components to install (e.g. rustfmt, clippy).
+    required: false
+    default: ''
+  cache:
+    description: Whether to enable Swatinem/rust-cache.
+    required: false
+    default: 'true'
+  cache-key:
+    description: Extra key segment for the cache (e.g. the target triple on the napi matrix).
+    required: false
+    default: ''
+  cache-workspaces:
+    description: Workspaces passed to Swatinem/rust-cache (defaults to the repo root).
+    required: false
+    default: ''
+  cache-bin:
+    description: >
+      Whether rust-cache caches ~/.cargo/bin. Set 'false' on runner images where
+      caching the cargo shim breaks `cargo fmt`/`clippy` (Swatinem/rust-cache#341).
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
+      with:
+        targets: ${{ inputs.targets }}
+        components: ${{ inputs.components }}
+
+    - name: Rust cache
+      if: ${{ inputs.cache == 'true' }}
+      uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      with:
+        key: ${{ inputs.cache-key }}
+        workspaces: ${{ inputs.cache-workspaces }}
+        cache-bin: ${{ inputs.cache-bin }}
+        cache-on-failure: true

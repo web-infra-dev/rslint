@@ -1,23 +1,28 @@
 {
-  "name": "@rslint/darwin-arm64",
+  "name": "@rslint/native-darwin-arm64",
   "version": "0.5.3",
   "license": "MIT",
-  "description": "binary for rslint",
-  "homepage": "https://rslint.rs",
+  "description": "rslint native binaries for darwin-arm64",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",
     "url": "https://github.com/web-infra-dev/rslint"
   },
+  "exports": {
+    ".": "./rslint.darwin-arm64.node",
+    "./bin": "./rslint",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "rslint.darwin-arm64.node",
+    "rslint"
+  ],
   "publishConfig": {
     "access": "public",
     "executableFiles": [
       "./rslint"
     ]
   },
-  "files": [
-    "rslint"
-  ],
   "os": [
     "darwin"
   ],

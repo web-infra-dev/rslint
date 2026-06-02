@@ -21,6 +21,9 @@ async function publish_all() {
     { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
   ];
 
+  // build:js is one rslib build (library surface + eslint-plugin worker); the
+  // worker needs @rslint/native's index.d.ts from `napi build`.
+  await $`pnpm run --filter @rslint/native build`;
   await $`pnpm run --filter @rslint/core build:js`;
   await $`pnpm run --filter rslint build`;
 
