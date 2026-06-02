@@ -1,6 +1,5 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { loadConfigFile, normalizeConfig } from './config-loader.js';
 import { parseArgs, classifyArgs, isJSConfigFile } from './utils/args.js';
 import {
@@ -10,32 +9,7 @@ import {
 } from './utils/config-discovery.js';
 
 /**
- * Pass-through execution of the Go binary with stdio inherited.
- */
-function execBinary(binPath: string, argv: string[]): number {
-  try {
-    execFileSync(binPath, argv, { stdio: 'inherit' });
-    return 0;
-  } catch (error: unknown) {
-    if (isExecError(error)) return error.status;
-    process.stderr.write(`Failed to execute ${binPath}: ${String(error)}\n`);
-    return 1;
-  }
-}
-
-function isExecError(
-  error: unknown,
-): error is Record<string, unknown> & { status: number } {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'status' in error &&
-    typeof error.status === 'number'
-  );
-}
-
-/**
- * Load multiple JS configs and pipe to Go binary via stdin.
+ * Load multiple JS/TS configs and run them through the Go binary over IPC.
  * Tolerates individual config load failures — skips broken configs with a
  * warning and continues with the remaining configs.
  */
@@ -82,31 +56,21 @@ async function runWithJSConfigs(
     configEntries.push({ configDirectory: configDir, entries });
   }
 
-  // All configs failed to load — fall back to Go binary (JSON config path)
+  // Lazy import — keeps engine.ts (and its node:child_process dependency) out
+  // of the browser/wasm bundle, loaded only on the real CLI path.
+  const { runEngine } = await import('./engine.js');
+
+  // All configs failed to load — fall back to Go loading JSON config from disk
+  // (init with no configs → Go's ConfigStdin=false branch).
   if (configEntries.length === 0) {
-    return execBinary(binPath, goArgs);
+    return runEngine({ binPath, goArgs, configs: [], cwd });
   }
 
   // Filter out nested configs whose directory is covered by a parent config's
-  // global ignores. This aligns with ESLint v10 behavior: when walking the
-  // directory tree, global ignores prevent entering directories, so nested
-  // configs in ignored directories are never discovered.
+  // global ignores (ESLint v10 alignment). Then hand the configs to Go in the
+  // IPC `init` payload (no more `--config-stdin` stdin pipe).
   const filteredEntries = filterConfigsByParentIgnores(configEntries);
-
-  const payload = JSON.stringify({ configs: filteredEntries });
-
-  try {
-    execFileSync(binPath, ['--config-stdin', ...goArgs], {
-      input: payload,
-      stdio: ['pipe', 'inherit', 'inherit'],
-      cwd,
-    });
-    return 0;
-  } catch (error: unknown) {
-    if (isExecError(error)) return error.status;
-    process.stderr.write(`Failed to execute ${binPath}: ${String(error)}\n`);
-    return 1;
-  }
+  return runEngine({ binPath, goArgs, configs: filteredEntries, cwd });
 }
 
 export async function run(
@@ -117,9 +81,11 @@ export async function run(
   const cwd = process.cwd();
   const args = parseArgs(argv);
 
-  // --init: pass through to Go
+  // --init: pass through to Go (no config payload — Go writes the default
+  // config to disk and prints the "Created …" line, forwarded via `output`).
   if (args.init) {
-    return execBinary(binPath, ['--init']);
+    const { runEngine } = await import('./engine.js');
+    return runEngine({ binPath, goArgs: ['--init'], configs: [], cwd });
   }
 
   // Validate explicit --config flag
@@ -132,8 +98,7 @@ export async function run(
   }
 
   // Build Go args: start-time flag BEFORE positional args, because Go's
-  // flag.Parse stops at the first positional argument. If --start-time comes
-  // after positionals, it gets treated as a file path.
+  // flag.Parse stops at the first positional argument.
   const goArgs = [`--start-time=${startTime}`, ...args.rest];
 
   // Classify positional arguments into files and directories
@@ -158,9 +123,11 @@ export async function run(
     return runWithJSConfigs(binPath, jsConfigs, goArgs, cwd);
   }
 
-  // Fall back to Go binary (handles JSON config + deprecation warning)
+  // Fall back to Go binary (handles JSON config + deprecation warning); no
+  // config payload, so Go loads JSON config from disk itself.
   const jsonGoArgs = args.config
     ? ['--config', args.config, ...goArgs]
     : goArgs;
-  return execBinary(binPath, jsonGoArgs);
+  const { runEngine } = await import('./engine.js');
+  return runEngine({ binPath, goArgs: jsonGoArgs, configs: [], cwd });
 }

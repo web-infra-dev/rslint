@@ -32,6 +32,12 @@ type ParsedJestFnCallHeadEntry struct {
 	Node  *ast.Node
 }
 
+const (
+	ExpectParseReasonNone            = ""
+	ExpectParseReasonMatcherNotFound = "matcher-not-found"
+	ExpectParseReasonModifierUnknown = "modifier-unknown"
+)
+
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
 	parsed := ParseJestFnCall(node, ctx)
 	if parsed == nil || len(kinds) == 0 {
@@ -63,7 +69,7 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	localNode := resolveHeadLocalNode(callExpr)
-	name, originalNode, headType := resolveOriginalName(node, localName, localNode, ctx)
+	name, originalNode, headType := ResolveJestFunctionReference(node, localName, localNode, ctx)
 	if name == "" {
 		return nil
 	}
@@ -146,7 +152,7 @@ func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 }
 
 func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
-	modifierEntries, matcher, err := findModifiersAndMatcher(parsed.MemberEntries)
+	modifierEntries, matcher, err := FindExpectModifiersAndMatcher(parsed.MemberEntries)
 	if err != "" {
 		return false
 	}
@@ -176,51 +182,51 @@ func isInnerExpectCall(node *ast.Node, localName string, members []string, setti
 	return GetJestKind(name) == JestFnTypeExpect
 }
 
-func findModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
+func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
 	[]ParsedJestFnMemberEntry,
 	*ParsedJestFnMemberEntry,
 	string,
 ) {
 	if len(entries) == 0 {
-		return nil, nil, "matcher-not-found"
+		return nil, nil, ExpectParseReasonMatcherNotFound
 	}
 
 	modifiers := make([]ParsedJestFnMemberEntry, 0, len(entries))
 	for _, member := range entries {
 		parent := member.Node.Parent
 		if parent == nil {
-			return nil, nil, "modifier-unknown"
+			return nil, nil, ExpectParseReasonModifierUnknown
 		}
 
 		grandparent := parent.Parent
 		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
-			return modifiers, &member, ""
+			return modifiers, &member, ExpectParseReasonNone
 		}
 
 		switch len(modifiers) {
 		case 0:
 			if !EXPECT_MODIFIER_NAMES[member.Name] {
-				return nil, nil, "modifier-unknown"
+				return nil, nil, ExpectParseReasonModifierUnknown
 			}
 		case 1:
 			if member.Name != "not" {
-				return nil, nil, "modifier-unknown"
+				return nil, nil, ExpectParseReasonModifierUnknown
 			}
 			first := modifiers[0].Name
 			if first != "rejects" && first != "resolves" {
-				return nil, nil, "modifier-unknown"
+				return nil, nil, ExpectParseReasonModifierUnknown
 			}
 		default:
-			return nil, nil, "modifier-unknown"
+			return nil, nil, ExpectParseReasonModifierUnknown
 		}
 
 		modifiers = append(modifiers, member)
 	}
 
-	return nil, nil, "matcher-not-found"
+	return nil, nil, ExpectParseReasonMatcherNotFound
 }
 
-func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
+func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
 	if ctx.TypeChecker == nil {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -231,7 +237,7 @@ func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, 
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
-	ident := resolveFirstIdentifier(callExpr.Expression)
+	ident := ResolveFirstIdentifier(callExpr.Expression)
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -282,10 +288,12 @@ func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
 	if callExpr == nil {
 		return nil
 	}
-	return resolveFirstIdentifier(callExpr.Expression)
+	return ResolveFirstIdentifier(callExpr.Expression)
 }
 
-func resolveFirstIdentifier(node *ast.Node) *ast.Node {
+// ResolveFirstIdentifier walks the left side of a call/member chain and returns
+// the first identifier it finds, if any.
+func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
@@ -294,13 +302,13 @@ func resolveFirstIdentifier(node *ast.Node) *ast.Node {
 	case ast.KindIdentifier:
 		return node
 	case ast.KindCallExpression:
-		return resolveFirstIdentifier(node.AsCallExpression().Expression)
+		return ResolveFirstIdentifier(node.AsCallExpression().Expression)
 	case ast.KindPropertyAccessExpression:
-		return resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
+		return ResolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
 	case ast.KindElementAccessExpression:
-		return resolveFirstIdentifier(node.AsElementAccessExpression().Expression)
+		return ResolveFirstIdentifier(node.AsElementAccessExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
-		return resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
+		return ResolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
 	}
 
 	return nil
@@ -342,4 +350,56 @@ func isValidJestCall(name string, members []string) bool {
 
 	_, ok := VALID_JEST_FN_CALL_CHAINS[chain]
 	return ok
+}
+
+func UnwrapBasicTypeAssertions(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			node = node.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			node = node.AsTypeAssertion().Expression
+		default:
+			return node
+		}
+	}
+	return node
+}
+
+func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			node = node.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			node = node.AsTypeAssertion().Expression
+		case ast.KindNonNullExpression:
+			node = node.AsNonNullExpression().Expression
+		case ast.KindSatisfiesExpression:
+			node = node.AsSatisfiesExpression().Expression
+		default:
+			return node
+		}
+	}
+	return node
+}
+
+func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
+	if entry == nil || entry.Node == nil || entry.Node.Parent == nil {
+		return nil, nil
+	}
+
+	parent := entry.Node.Parent
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		return parent.AsPropertyAccessExpression().Expression, parent
+	case ast.KindElementAccessExpression:
+		return parent.AsElementAccessExpression().Expression, parent
+	default:
+		return nil, nil
+	}
 }

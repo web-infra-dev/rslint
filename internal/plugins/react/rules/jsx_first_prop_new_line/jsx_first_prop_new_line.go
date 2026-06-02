@@ -1,9 +1,5 @@
-// Package jsx_first_prop_new_line implements jsx-first-prop-new-line, shared by
-// both eslint-plugin-react (`react/jsx-first-prop-new-line`) and
-// @stylistic/eslint-plugin (`@stylistic/jsx-first-prop-new-line`). The two
-// upstream rules are byte-identical — the @stylistic fork carries no behavioral
-// delta — so a single BuildRule constructs both; only the registered Name
-// differs.
+// Package jsx_first_prop_new_line implements jsx-first-prop-new-line
+// (`react/jsx-first-prop-new-line`).
 //
 // The rule enforces the position of the first prop in a JSX element. Five modes
 // select when the first prop must (or must not) sit on its own line:
@@ -33,8 +29,6 @@ import (
 var JsxFirstPropNewLineRule = BuildRule("react/jsx-first-prop-new-line")
 
 // BuildRule constructs the jsx-first-prop-new-line rule registered under name.
-// Both the react and @stylistic variants are produced from this single
-// implementation (see the package doc for why they share one body).
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,

@@ -21,7 +21,7 @@ const recommended: RslintConfigEntry = {
     'jest/no-standalone-expect': 'error',
     'jest/no-test-prefixes': 'error',
     'jest/valid-describe-callback': 'error',
-    // 'jest/valid-expect': 'error', // not implemented
+    'jest/valid-expect': 'error',
     // 'jest/valid-expect-in-promise': 'error', // not implemented
     'jest/valid-title': 'error',
   },
