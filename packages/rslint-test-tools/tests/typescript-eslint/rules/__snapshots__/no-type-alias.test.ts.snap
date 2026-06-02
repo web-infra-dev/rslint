@@ -4814,7 +4814,7 @@ exports[`no-type-alias > invalid 123`] = `
       "ruleName": "@typescript-eslint/no-type-alias",
     },
     {
-      "message": "Unhandled in union types are not allowed.",
+      "message": "Aliases in union types are not allowed.",
       "messageId": "noCompositionAlias",
       "range": {
         "end": {
