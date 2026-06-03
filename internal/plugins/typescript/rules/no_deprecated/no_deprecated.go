@@ -1909,10 +1909,7 @@ func isLocalNonDeprecatedSymbol(ctx rule.RuleContext, node *ast.Node) bool {
 			return true
 		}
 	}
-	if checkDecl(symbol.ValueDeclaration) {
-		return true
-	}
-	return false
+	return checkDecl(symbol.ValueDeclaration)
 }
 
 func isPropertyAccessName(node *ast.Node) bool {
