@@ -403,3 +403,40 @@ func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *a
 		return nil, nil
 	}
 }
+
+func IsNamedMember(node *ast.Node, name string) bool {
+	if node == nil {
+		return false
+	}
+
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text == name
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text == name
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text == name
+	case ast.KindPrivateIdentifier:
+		return node.AsPrivateIdentifier().Text == name
+	default:
+		return false
+	}
+}
+
+// ReceiverBeforeInvocation returns the expression before .m() or ["m"]() on a
+// call, such as `expect(x).not` before `.toBe()`.
+func ReceiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
+	if matcherCall == nil || matcherCall.Kind != ast.KindCallExpression {
+		return nil
+	}
+
+	expr := matcherCall.AsCallExpression().Expression
+	switch expr.Kind {
+	case ast.KindPropertyAccessExpression:
+		return expr.AsPropertyAccessExpression().Expression
+	case ast.KindElementAccessExpression:
+		return expr.AsElementAccessExpression().Expression
+	default:
+		return nil
+	}
+}
