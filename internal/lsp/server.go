@@ -24,6 +24,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"golang.org/x/sync/errgroup"
 )
@@ -64,6 +65,8 @@ func NewServer(opts *ServerOptions) *Server {
 		refreshCh:             make(chan struct{}, 1),
 		debounceCh:            make(chan struct{}, 1),
 		pendingLintURIs:       make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:        make(chan pluginLintResult, 16),
+		docGeneration:         make(map[lsproto.DocumentUri]uint64),
 	}
 }
 
@@ -149,8 +152,8 @@ type Server struct {
 	backgroundCtx    context.Context
 	initializeParams *lsproto.InitializeParams
 	positionEncoding lsproto.PositionEncodingKind
-	watchEnabled bool
-	watchers     collections.SyncSet[project.WatcherID]
+	watchEnabled     bool
+	watchers         collections.SyncSet[project.WatcherID]
 
 	session *project.Session
 
@@ -161,18 +164,18 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	jsConfigs        map[string]config.RslintConfig                // configDirectory URI -> config entries (from JS/TS configs)
-	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
-	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
+	jsConfigs        map[string]config.RslintConfig // configDirectory URI -> config entries (from JS/TS configs)
+	jsonConfig       config.RslintConfig            // fallback JSON config (rslint.json/rslint.jsonc)
+	rslintConfigPath string                         // path to rslint.json/rslint.jsonc, empty if not found
 	// tsConfigPaths holds resolved parserOptions.project tsconfig paths.
 	// For the JSON-config path this is a single global list.
 	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
 	// which keys per-config-directory so a nested config with no tsconfig
 	// does not disable filtering for files under other configs.
 	tsConfigPaths         []string
-	tsConfigPathsByConfig map[string][]string // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
-	documents        map[lsproto.DocumentUri]string                // URI -> content
-	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	tsConfigPathsByConfig map[string][]string                           // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
+	documents             map[lsproto.DocumentUri]string                // URI -> content
+	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
 	// refreshCh receives signals from RefreshDiagnostics (called by Session's
 	// background goroutine) and is consumed by the main dispatch loop so that
@@ -184,6 +187,50 @@ type Server struct {
 	debounceCh      chan struct{}
 	pendingLintURIs map[lsproto.DocumentUri]struct{}
 	lintTimer       *time.Timer
+
+	// eslintPluginDispatch sends one plugin-lint batch to the Node host over
+	// the `rslint/pluginLint` reverse request and decodes its result.
+	// nil until the first config update installs it. Safe to call from a
+	// goroutine (it only touches sendRequest, which is goroutine-safe).
+	eslintPluginDispatch linter.EslintPluginDispatcher
+
+	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
+	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
+	// used, driving the real TS session); tests inject a mock to exercise the
+	// plugin-fix fold loop without spinning up a language service.
+	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) ([]rule.RuleDiagnostic, error)
+
+	// fixAllPluginTimeout bounds the eslint-plugin reverse requests issued
+	// during source.fixAll, summed across all passes. source.fixAll runs on the
+	// dispatch loop as a blocking method, so a wedged or mid-rebuild client that
+	// never answers the rslint/pluginLint request would otherwise stall
+	// all editor interaction. On expiry the remaining passes fold native-only
+	// fixes. Zero means use defaultFixAllPluginTimeout; tests set a small value
+	// to exercise the deadline without a real client.
+	fixAllPluginTimeout time.Duration
+
+	// pluginResultCh delivers eslint-plugin diagnostics computed off the
+	// dispatch loop (in a goroutine that calls eslintPluginDispatch) back to
+	// the main dispatch loop, which is the ONLY goroutine allowed to write
+	// the lock-free s.diagnostics map and publish. Mirrors refreshCh/debounceCh.
+	pluginResultCh chan pluginLintResult
+
+	// docGeneration tracks a per-URI revision counter. pushDiagnostics bumps it
+	// on every (re)lint and stamps the spawned plugin goroutine with the value.
+	// A plugin result whose generation no longer matches is stale (a newer
+	// keystroke already re-linted) and is dropped — cooperative ctx cancel does
+	// not guarantee the in-flight worker stops, so generation guards correctness.
+	// Only accessed from the main dispatch loop goroutine.
+	docGeneration map[lsproto.DocumentUri]uint64
+}
+
+// pluginLintResult carries one URI's eslint-plugin diagnostics from the
+// dispatch goroutine back to the main loop, tagged with the generation that
+// was current when the lint was kicked off.
+type pluginLintResult struct {
+	uri        lsproto.DocumentUri
+	generation uint64
+	diags      []rule.RuleDiagnostic
 }
 
 // FS implements project.ServiceHost.
@@ -423,6 +470,11 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 				s.pushDiagnostics(uri)
 			}
 			clear(s.pendingLintURIs)
+		case r := <-s.pluginResultCh:
+			// eslint-plugin diagnostics computed in a goroutine. Merge them
+			// into the lock-free s.diagnostics map and re-publish — on the
+			// main loop, the only goroutine permitted to touch s.diagnostics.
+			s.mergePluginDiagnostics(r)
 		case req := <-s.requestQueue:
 			requestCtx := ctx
 			if req.ID != nil {
@@ -650,6 +702,13 @@ func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOpt
 		s.session.DidChangeCompilerOptionsForInferredProjects(context.Background(), options)
 	}
 }
+
+// defaultFixAllPluginTimeout caps the synchronous source.fixAll plugin reverse
+// requests, summed across all fix passes. It must be generous enough not to cut
+// off a legitimately slow worker lint of a single file, but short enough that a
+// non-responsive client unblocks the dispatch loop promptly. On expiry the
+// fixAll stays native-only.
+const defaultFixAllPluginTimeout = 5 * time.Second
 
 func isBlockingMethod(method lsproto.Method) bool {
 	switch method {

@@ -11,7 +11,15 @@ const config = {
 
   sourcemap: true,
   platform: 'node',
-  external: ['@rslint/core', 'vscode'],
+  // `@rslint/core/eslint-plugin` MUST stay external (esbuild matches externals
+  // by exact specifier, so the bare `@rslint/core` entry does not cover this
+  // subpath — it needs its own entry). Its WorkerPool spawns the lint worker
+  // via `new Worker(new URL('./lint-worker.js', import.meta.url))`, so the ESM
+  // `index.js` must keep living next to `lint-worker.js` inside the installed
+  // `@rslint/core/dist/eslint-plugin/`. Bundling it into `dist/main.js` would
+  // break that sibling resolution. Unlike `config-loader` below, do NOT add a
+  // bundle override for it.
+  external: ['@rslint/core', '@rslint/core/eslint-plugin', 'vscode'],
   loader: {
     '': 'file',
   },

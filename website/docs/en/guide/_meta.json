@@ -16,6 +16,11 @@
   },
   {
     "type": "file",
+    "name": "eslint-plugins",
+    "label": "ESLint Plugins"
+  },
+  {
+    "type": "file",
     "name": "inline-directives",
     "label": "Inline Directives"
   },

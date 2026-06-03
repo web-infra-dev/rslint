@@ -141,6 +141,26 @@ ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are
 
 Presets like `ts.configs.recommended` already include their own `plugins` entry, so you only need this field when configuring plugin rules outside a preset.
 
+### eslintPlugins
+
+- **Type:** `Record<string, ESLintPlugin>`
+
+Mounts community ESLint plugins so their rules run inside rslint. Map a prefix key to an imported plugin object, then enable its rules under the `<prefix>/<rule>` namespace. Requires a JS/TS config — a live plugin object can't be expressed in JSON.
+
+```ts
+import examplePlugin from 'eslint-plugin-example';
+
+{
+  files: ['**/*.ts'],
+  eslintPlugins: { example: examplePlugin },
+  rules: {
+    'example/some-rule': 'error',
+  },
+}
+```
+
+See [ESLint plugin compatibility](/guide/eslint-plugins) for the supported and unsupported ESLint APIs.
+
 ### languageOptions
 
 - **Type:** `object`

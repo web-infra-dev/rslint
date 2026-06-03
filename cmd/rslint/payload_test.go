@@ -2,7 +2,43 @@ package main
 
 import (
 	"testing"
+
+	"github.com/microsoft/typescript-go/shim/tspath"
 )
+
+// TestParseConfigPayload_MultiConfig_OriginalConfigDirPreservesRaw pins the
+// Option-3 invariant at the parse layer: configMap is keyed by the NORMALIZED
+// dir (Go matches normalized file paths against it) while OriginalConfigDir
+// recovers the RAW string the JS host sent, so the eslint-plugin wire configKey
+// round-trips raw (byte-matching the worker's plugin map key) instead of Go's
+// normalized form.
+func TestParseConfigPayload_MultiConfig_OriginalConfigDirPreservesRaw(t *testing.T) {
+	// "C:\\proj" in JSON is the raw string `C:\proj`; "/posix/proj" is POSIX.
+	data := []byte(`{"configs":[{"configDirectory":"C:\\proj","entries":[]},{"configDirectory":"/posix/proj","entries":[]}]}`)
+	result, err := parseConfigPayload(data)
+	if err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if !result.IsMultiConfig {
+		t.Fatal("expected multi-config")
+	}
+
+	const winRaw = `C:\proj`
+	winNorm := tspath.NormalizePath(winRaw) // "C:/proj"
+	if winNorm == winRaw {
+		t.Fatalf("test precondition: NormalizePath should change %q (got identical)", winRaw)
+	}
+	if _, ok := result.ConfigMap[winNorm]; !ok {
+		t.Errorf("configMap missing normalized key %q", winNorm)
+	}
+	if got := result.OriginalConfigDir[winNorm]; got != winRaw {
+		t.Errorf("OriginalConfigDir[%q] = %q, want raw %q", winNorm, got, winRaw)
+	}
+	// POSIX: raw == normalized, round-trips trivially.
+	if got := result.OriginalConfigDir["/posix/proj"]; got != "/posix/proj" {
+		t.Errorf("posix OriginalConfigDir = %q, want /posix/proj", got)
+	}
+}
 
 func TestParseConfigPayload_MultiConfig(t *testing.T) {
 	data := []byte(`{

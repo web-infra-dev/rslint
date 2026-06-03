@@ -80,7 +80,7 @@ const v: number = bad;
 		if !strings.HasPrefix(d.RuleName, "TypeScript(") {
 			continue
 		}
-		if d.SourceFile != nil && d.SourceFile.FileName() == paths["entry.ts"] {
+		if d.SourceFile != nil && d.FilePath == paths["entry.ts"] {
 			gotEntryErr = true
 		}
 	}
@@ -119,7 +119,7 @@ export const x: T = {} as T;
 
 	hasDtsErr := false
 	for _, d := range diags {
-		if d.RuleName == "TypeScript(TS2307)" && strings.Contains(d.SourceFile.FileName(), "types.d.ts") {
+		if d.RuleName == "TypeScript(TS2307)" && strings.Contains(d.FilePath, "types.d.ts") {
 			hasDtsErr = true
 			break
 		}
@@ -157,7 +157,7 @@ export const x: T = {} as T;
 	}
 
 	for _, d := range diags {
-		if d.RuleName == "TypeScript(TS2307)" && d.SourceFile != nil && strings.HasSuffix(d.SourceFile.FileName(), "types.d.ts") {
+		if d.RuleName == "TypeScript(TS2307)" && d.SourceFile != nil && strings.HasSuffix(d.FilePath, "types.d.ts") {
 			t.Errorf("did not expect TS2307 from types.d.ts under skipLibCheck:true, got: %s", d.Message.Description)
 		}
 	}

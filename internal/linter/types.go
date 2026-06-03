@@ -11,7 +11,16 @@ type ConfiguredRule struct {
 	Settings         map[string]interface{}
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
-	Run              func(ctx rule.RuleContext) rule.RuleListeners
+	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
+	// worker (mounted via the config's `eslintPlugins`) rather than natively
+	// in Go. The linter splits these out and dispatches them; its Run is a
+	// no-op placeholder.
+	IsEslintPluginRule bool
+	// Options is the raw user-configured rule options (ESLint's
+	// post-severity args). Consumed when dispatching plugin rules to the
+	// Node worker; native rules read options through Run's closure instead.
+	Options any
+	Run     func(ctx rule.RuleContext) rule.RuleListeners
 }
 
 func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {

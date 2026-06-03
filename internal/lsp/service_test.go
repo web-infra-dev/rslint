@@ -21,6 +21,8 @@ func newTestServer() *Server {
 		refreshCh:       make(chan struct{}, 1),
 		debounceCh:      make(chan struct{}, 1),
 		pendingLintURIs: make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:  make(chan pluginLintResult, 16),
+		docGeneration:   make(map[lsproto.DocumentUri]uint64),
 	}
 }
 
@@ -395,6 +397,8 @@ func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 		refreshCh:       make(chan struct{}, 1),
 		debounceCh:      make(chan struct{}, 1),
 		pendingLintURIs: make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:  make(chan pluginLintResult, 16),
+		docGeneration:   make(map[lsproto.DocumentUri]uint64),
 	}, queue
 }
 
@@ -1292,7 +1296,6 @@ func TestCloseAndReopen(t *testing.T) {
 		t.Error("stale diagnostics should not reappear after reopen")
 	}
 }
-
 
 // ======== tsConfigPaths lifecycle tests ========
 

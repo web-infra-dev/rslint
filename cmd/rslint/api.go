@@ -147,6 +147,15 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if len(req.RuleOptions) > 0 {
 		for _, r := range rslintconfig.GlobalRuleRegistry.GetAllRules() {
 			if option, ok := req.RuleOptions[r.Name]; ok {
+				if r.IsEslintPluginRule {
+					// The api/wasm path runs native rules only — it never
+					// registers plugin placeholders or dispatches to a Node
+					// worker, so a plugin rule here would be silently no-op'd (a
+					// false green). It cannot occur today (api calls only
+					// RegisterAllRules), but surface it loudly if it ever does.
+					fmt.Fprintf(os.Stderr, "rslint: api does not support eslint-plugin rule %q; ignoring\n", r.Name)
+					continue
+				}
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
 					rule:   r,
 					option: option,
@@ -196,7 +205,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			RuleName:  d.RuleName,
 			MessageId: d.Message.Id,
 			Message:   d.Message.Description,
-			FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+			FilePath:  tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
 			Range: api.Range{
 				Start: api.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
