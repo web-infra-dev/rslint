@@ -2532,6 +2532,38 @@ exports[`no-deprecated > invalid 78`] = `
 exports[`no-deprecated > invalid 79`] = `
 {
   "code": "
+        import {
+          deprecatedVariable,
+        } from './deprecated';
+
+        const foo = deprecatedVariable;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`deprecatedVariable\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 6,
+        },
+        "start": {
+          "column": 21,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 80`] = `
+{
+  "code": "
         import { DeprecatedClass } from './deprecated';
 
         declare const x: DeprecatedClass;
@@ -2576,7 +2608,7 @@ exports[`no-deprecated > invalid 79`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 80`] = `
+exports[`no-deprecated > invalid 81`] = `
 {
   "code": "
         import { deprecatedFunction } from './deprecated';
@@ -2606,7 +2638,7 @@ exports[`no-deprecated > invalid 80`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 81`] = `
+exports[`no-deprecated > invalid 82`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2636,7 +2668,7 @@ exports[`no-deprecated > invalid 81`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 82`] = `
+exports[`no-deprecated > invalid 83`] = `
 {
   "code": "
         import { NormalClass } from './deprecated';
@@ -2666,7 +2698,7 @@ exports[`no-deprecated > invalid 82`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 83`] = `
+exports[`no-deprecated > invalid 84`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2696,7 +2728,7 @@ exports[`no-deprecated > invalid 83`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 84`] = `
+exports[`no-deprecated > invalid 85`] = `
 {
   "code": "
         import { NormalClass } from './deprecated';
@@ -2726,7 +2758,7 @@ exports[`no-deprecated > invalid 84`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 85`] = `
+exports[`no-deprecated > invalid 86`] = `
 {
   "code": "
         import { normalVariable } from './deprecated';
@@ -2756,7 +2788,7 @@ exports[`no-deprecated > invalid 85`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 86`] = `
+exports[`no-deprecated > invalid 87`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2786,7 +2818,7 @@ exports[`no-deprecated > invalid 86`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 87`] = `
+exports[`no-deprecated > invalid 88`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2816,7 +2848,7 @@ exports[`no-deprecated > invalid 87`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 88`] = `
+exports[`no-deprecated > invalid 89`] = `
 {
   "code": "
         import { deprecatedVariable } from './deprecated';
@@ -2848,7 +2880,7 @@ exports[`no-deprecated > invalid 88`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 89`] = `
+exports[`no-deprecated > invalid 90`] = `
 {
   "code": "
         import { normalFunction } from './deprecated';
@@ -2878,7 +2910,7 @@ exports[`no-deprecated > invalid 89`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 90`] = `
+exports[`no-deprecated > invalid 91`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2908,7 +2940,7 @@ exports[`no-deprecated > invalid 90`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 91`] = `
+exports[`no-deprecated > invalid 92`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2938,7 +2970,7 @@ exports[`no-deprecated > invalid 91`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 92`] = `
+exports[`no-deprecated > invalid 93`] = `
 {
   "code": "
         import { normalFunction } from './deprecated';
@@ -2968,7 +3000,7 @@ exports[`no-deprecated > invalid 92`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 93`] = `
+exports[`no-deprecated > invalid 94`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -2998,7 +3030,7 @@ exports[`no-deprecated > invalid 93`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 94`] = `
+exports[`no-deprecated > invalid 95`] = `
 {
   "code": "
         import { deprecatedFunctionWithOverloads } from './deprecated';
@@ -3028,7 +3060,7 @@ exports[`no-deprecated > invalid 94`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 95`] = `
+exports[`no-deprecated > invalid 96`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3058,7 +3090,7 @@ exports[`no-deprecated > invalid 95`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 96`] = `
+exports[`no-deprecated > invalid 97`] = `
 {
   "code": "
         import { reexportedDeprecatedFunctionWithOverloads } from './deprecated';
@@ -3088,7 +3120,7 @@ exports[`no-deprecated > invalid 96`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 97`] = `
+exports[`no-deprecated > invalid 98`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3118,7 +3150,7 @@ exports[`no-deprecated > invalid 97`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 98`] = `
+exports[`no-deprecated > invalid 99`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3148,7 +3180,7 @@ exports[`no-deprecated > invalid 98`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 99`] = `
+exports[`no-deprecated > invalid 100`] = `
 {
   "code": "
         import { reexportedDeprecatedFunctionWithOverloads } from './deprecated';
@@ -3178,7 +3210,7 @@ exports[`no-deprecated > invalid 99`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 100`] = `
+exports[`no-deprecated > invalid 101`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3208,7 +3240,7 @@ exports[`no-deprecated > invalid 100`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 101`] = `
+exports[`no-deprecated > invalid 102`] = `
 {
   "code": "
         import { reexportedDeprecatedFunctionWithOverloads } from './deprecated';
@@ -3238,7 +3270,7 @@ exports[`no-deprecated > invalid 101`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 102`] = `
+exports[`no-deprecated > invalid 103`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3268,7 +3300,7 @@ exports[`no-deprecated > invalid 102`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 103`] = `
+exports[`no-deprecated > invalid 104`] = `
 {
   "code": "
         import { ClassWithDeprecatedConstructor } from './deprecated';
@@ -3298,7 +3330,7 @@ exports[`no-deprecated > invalid 103`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 104`] = `
+exports[`no-deprecated > invalid 105`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3328,7 +3360,7 @@ exports[`no-deprecated > invalid 104`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 105`] = `
+exports[`no-deprecated > invalid 106`] = `
 {
   "code": "
         import { ReexportedClassWithDeprecatedConstructor } from './deprecated';
@@ -3358,7 +3390,7 @@ exports[`no-deprecated > invalid 105`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 106`] = `
+exports[`no-deprecated > invalid 107`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3388,7 +3420,7 @@ exports[`no-deprecated > invalid 106`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 107`] = `
+exports[`no-deprecated > invalid 108`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3418,7 +3450,7 @@ exports[`no-deprecated > invalid 107`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 108`] = `
+exports[`no-deprecated > invalid 109`] = `
 {
   "code": "
         import { ReexportedClassWithDeprecatedConstructor } from './deprecated';
@@ -3448,7 +3480,7 @@ exports[`no-deprecated > invalid 108`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 109`] = `
+exports[`no-deprecated > invalid 110`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3478,7 +3510,7 @@ exports[`no-deprecated > invalid 109`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 110`] = `
+exports[`no-deprecated > invalid 111`] = `
 {
   "code": "
         import { ReexportedClassWithDeprecatedConstructor } from './deprecated';
@@ -3508,7 +3540,7 @@ exports[`no-deprecated > invalid 110`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 111`] = `
+exports[`no-deprecated > invalid 112`] = `
 {
   "code": "
         import * as imported from './deprecated';
@@ -3538,7 +3570,7 @@ exports[`no-deprecated > invalid 111`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 112`] = `
+exports[`no-deprecated > invalid 113`] = `
 {
   "code": "
         import imported from './deprecated';
@@ -3568,7 +3600,7 @@ exports[`no-deprecated > invalid 112`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 113`] = `
+exports[`no-deprecated > invalid 114`] = `
 {
   "code": "
         async function fn() {
@@ -3599,7 +3631,7 @@ exports[`no-deprecated > invalid 113`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 114`] = `
+exports[`no-deprecated > invalid 115`] = `
 {
   "code": "
         /** @deprecated */
@@ -3630,7 +3662,7 @@ exports[`no-deprecated > invalid 114`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 115`] = `
+exports[`no-deprecated > invalid 116`] = `
 {
   "code": "
         /** @deprecated */
@@ -3661,7 +3693,7 @@ exports[`no-deprecated > invalid 115`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 116`] = `
+exports[`no-deprecated > invalid 117`] = `
 {
   "code": "
         /** @deprecated */
@@ -3694,7 +3726,7 @@ exports[`no-deprecated > invalid 116`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 117`] = `
+exports[`no-deprecated > invalid 118`] = `
 {
   "code": "
         /** @deprecated */
@@ -3725,7 +3757,7 @@ exports[`no-deprecated > invalid 117`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 118`] = `
+exports[`no-deprecated > invalid 119`] = `
 {
   "code": "
         /** @deprecated */
@@ -3757,7 +3789,7 @@ exports[`no-deprecated > invalid 118`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 119`] = `
+exports[`no-deprecated > invalid 120`] = `
 {
   "code": "
         /** @deprecated */
@@ -3790,7 +3822,7 @@ exports[`no-deprecated > invalid 119`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 120`] = `
+exports[`no-deprecated > invalid 121`] = `
 {
   "code": "
 class A {
@@ -3807,7 +3839,7 @@ class B extends A {
       ",
   "diagnostics": [
     {
-      "message": "\`new (): A\` is deprecated.",
+      "message": "\`super\` is deprecated.",
       "messageId": "deprecated",
       "range": {
         "end": {
@@ -3828,7 +3860,7 @@ class B extends A {
 }
 `;
 
-exports[`no-deprecated > invalid 121`] = `
+exports[`no-deprecated > invalid 122`] = `
 {
   "code": "
 class A {
@@ -3845,7 +3877,7 @@ class B extends A {
       ",
   "diagnostics": [
     {
-      "message": "\`new (): A\` is deprecated. test reason",
+      "message": "\`super\` is deprecated. test reason",
       "messageId": "deprecatedWithReason",
       "range": {
         "end": {
@@ -3866,7 +3898,7 @@ class B extends A {
 }
 `;
 
-exports[`no-deprecated > invalid 122`] = `
+exports[`no-deprecated > invalid 123`] = `
 {
   "code": "
         declare namespace JSX {
@@ -3906,7 +3938,7 @@ exports[`no-deprecated > invalid 122`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 123`] = `
+exports[`no-deprecated > invalid 124`] = `
 {
   "code": "
         import * as React from 'react';
@@ -3951,7 +3983,7 @@ exports[`no-deprecated > invalid 123`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 124`] = `
+exports[`no-deprecated > invalid 125`] = `
 {
   "code": "
         declare class A {
@@ -3986,7 +4018,7 @@ exports[`no-deprecated > invalid 124`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 125`] = `
+exports[`no-deprecated > invalid 126`] = `
 {
   "code": "
         declare class A {
@@ -4021,7 +4053,7 @@ exports[`no-deprecated > invalid 125`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 126`] = `
+exports[`no-deprecated > invalid 127`] = `
 {
   "code": "
         class A {
@@ -4058,7 +4090,7 @@ exports[`no-deprecated > invalid 126`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 127`] = `
+exports[`no-deprecated > invalid 128`] = `
 {
   "code": "
         declare class A {
@@ -4091,7 +4123,7 @@ exports[`no-deprecated > invalid 127`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 128`] = `
+exports[`no-deprecated > invalid 129`] = `
 {
   "code": "
         class A {
@@ -4126,7 +4158,7 @@ exports[`no-deprecated > invalid 128`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 129`] = `
+exports[`no-deprecated > invalid 130`] = `
 {
   "code": "
         const a = {
@@ -4159,7 +4191,7 @@ exports[`no-deprecated > invalid 129`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 130`] = `
+exports[`no-deprecated > invalid 131`] = `
 {
   "code": "
         const a = {
@@ -4192,7 +4224,7 @@ exports[`no-deprecated > invalid 130`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 131`] = `
+exports[`no-deprecated > invalid 132`] = `
 {
   "code": "
         const a = {
@@ -4225,7 +4257,7 @@ exports[`no-deprecated > invalid 131`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 132`] = `
+exports[`no-deprecated > invalid 133`] = `
 {
   "code": "
         const a = {
@@ -4260,7 +4292,7 @@ exports[`no-deprecated > invalid 132`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 133`] = `
+exports[`no-deprecated > invalid 134`] = `
 {
   "code": "
         enum Keys {
@@ -4298,7 +4330,7 @@ exports[`no-deprecated > invalid 133`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 134`] = `
+exports[`no-deprecated > invalid 135`] = `
 {
   "code": "
         const a = {
@@ -4332,7 +4364,7 @@ exports[`no-deprecated > invalid 134`] = `
 }
 `;
 
-exports[`no-deprecated > invalid 135`] = `
+exports[`no-deprecated > invalid 136`] = `
 {
   "code": "
         const stringObj = 'b';
@@ -4354,6 +4386,38 @@ exports[`no-deprecated > invalid 135`] = `
         "start": {
           "column": 21,
           "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 137`] = `
+{
+  "code": "
+        /** @deprecated */
+        const a = 1, b = 2;
+
+        a;
+        b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
         },
       },
       "ruleName": "@typescript-eslint/no-deprecated",

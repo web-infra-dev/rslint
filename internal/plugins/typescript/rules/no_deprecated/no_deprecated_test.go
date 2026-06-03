@@ -1,6 +1,7 @@
 package no_deprecated
 
 import (
+	"strings"
 	"sync"
 	"testing"
 
@@ -265,4 +266,122 @@ func TestNoDeprecatedReportsLetInitializedToUndefinedInTsxFixture(t *testing.T) 
 	if diagnostics[0].Message.Id != "deprecated" {
 		t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
 	}
+}
+
+func TestNoDeprecatedIgnoresNameOnlyFallbackForElementAccessAndJsxAny(t *testing.T) {
+	t.Parallel()
+
+	t.Run("element-access-cross-object-collision", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": `
+const a = { /** @deprecated */ b: 'string' };
+const a2 = { b: 'string' };
+a2['b'];
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected 0 diagnostics, got %#v", diagnostics)
+		}
+	})
+
+	t.Run("element-access-any-typed-object", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": `
+interface U1 { /** @deprecated */ shared: number }
+const obj: any = {};
+obj['shared'];
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected 0 diagnostics, got %#v", diagnostics)
+		}
+	})
+
+	t.Run("jsx-attribute-any-props", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.tsx": `
+declare namespace JSX {
+  interface Element {}
+  interface IntrinsicAttributes {}
+}
+
+interface U2 { /** @deprecated */ foo: number }
+declare function Comp(p: any): any;
+const x = <Comp foo={1} />;
+			`,
+		}, "main.tsx", nil)
+		if len(diagnostics) != 0 {
+			t.Fatalf("expected 0 diagnostics, got %#v", diagnostics)
+		}
+	})
+}
+
+func TestNoDeprecatedMultilineImportsAndMultiDeclarators(t *testing.T) {
+	t.Parallel()
+
+	t.Run("shorthand-property-assignment-still-reports-deprecated-variable", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": `
+/** @deprecated */
+declare const test: string;
+const bar = { test };
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		if diagnostics[0].Message.Id != "deprecated" {
+			t.Fatalf("expected deprecated message id, got %s", diagnostics[0].Message.Id)
+		}
+		if !strings.Contains(diagnostics[0].Message.Description, "`test`") {
+			t.Fatalf("expected test diagnostic, got %#v", diagnostics[0].Message)
+		}
+	})
+
+	t.Run("multiline-import-only-reports-usage", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"dep.ts": `
+/** @deprecated */
+export const oldValue = 1;
+			`,
+			"main.ts": `
+import {
+  oldValue,
+} from './dep';
+
+oldValue;
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		if diagnostics[0].Message.Id != "deprecated" {
+			t.Fatalf("expected deprecated message id, got %s", diagnostics[0].Message.Id)
+		}
+		if !strings.Contains(diagnostics[0].Message.Description, "oldValue") {
+			t.Fatalf("expected oldValue diagnostic, got %#v", diagnostics[0].Message)
+		}
+	})
+
+	t.Run("statement-jsdoc-only-applies-to-first-declarator", func(t *testing.T) {
+		t.Parallel()
+		diagnostics := runNoDeprecatedDiagnosticsForFiles(t, map[string]string{
+			"main.ts": `
+/** @deprecated */ const a = 1, b = 2;
+a;
+b;
+			`,
+		}, "main.ts", nil)
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %#v", diagnostics)
+		}
+		if !strings.Contains(diagnostics[0].Message.Description, "`a`") {
+			t.Fatalf("expected only a to be reported, got %#v", diagnostics[0].Message)
+		}
+	})
 }

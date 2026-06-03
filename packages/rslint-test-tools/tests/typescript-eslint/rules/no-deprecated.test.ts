@@ -587,6 +587,34 @@ exists('/foo');
       const key = null;
       const c = a[key as any];
     `,
+    `
+      const a = { /** @deprecated */ b: 'string' };
+      const a2 = { b: 'string' };
+
+      a2['b'];
+    `,
+    `
+      interface U1 {
+        /** @deprecated */
+        shared: number;
+      }
+
+      const obj: any = {};
+      obj['shared'];
+    `,
+    {
+      code: noFormat`
+        interface U2 {
+          /** @deprecated */
+          foo: number;
+        }
+
+        declare function Comp(p: any): any;
+
+        const x = <Comp foo={1} />;
+      `,
+      languageOptions: jsxLanguageOptions,
+    },
   ],
   invalid: [
     {
@@ -2135,6 +2163,25 @@ exists('/foo');
     },
     {
       code: `
+        import {
+          deprecatedVariable,
+        } from './deprecated';
+
+        const foo = deprecatedVariable;
+      `,
+      errors: [
+        {
+          column: 21,
+          data: { name: 'deprecatedVariable' },
+          endColumn: 39,
+          endLine: 6,
+          line: 6,
+          messageId: 'deprecated',
+        },
+      ],
+    },
+    {
+      code: `
         import { DeprecatedClass } from './deprecated';
 
         declare const x: DeprecatedClass;
@@ -3319,6 +3366,25 @@ exists('/foo');
           endColumn: 30,
           endLine: 7,
           line: 7,
+          messageId: 'deprecated',
+        },
+      ],
+    },
+    {
+      code: `
+        /** @deprecated */
+        const a = 1, b = 2;
+
+        a;
+        b;
+      `,
+      errors: [
+        {
+          column: 9,
+          data: { name: 'a' },
+          endColumn: 10,
+          endLine: 5,
+          line: 5,
           messageId: 'deprecated',
         },
       ],
