@@ -1,0 +1,50 @@
+# ESLint plugin compatibility
+
+The `eslintPlugins` field mounts a community ESLint plugin so its rules run
+inside rslint, alongside the native rules. Their diagnostics merge into the same
+report. It works the same way in the CLI and the VS Code extension.
+
+## Usage
+
+Import the plugin, put it under a prefix key, and reference its rules as
+`'<prefix>/<rule>'`:
+
+```js
+import examplePlugin from 'eslint-plugin-example';
+
+export default [
+  {
+    files: ['**/*.ts'],
+    eslintPlugins: { example: examplePlugin },
+    rules: {
+      'example/some-rule': 'error',
+    },
+  },
+];
+```
+
+- Only a JS/TS config (`.js` / `.mjs` / `.ts` / `.mts`) can use `eslintPlugins` —
+  it carries a live plugin object, which a JSON config can't.
+- The prefix key is yours to choose, but it must not collide with one of
+  rslint's built-in plugin prefixes (see [Rules & Presets](/config/rules-and-presets));
+  rslint throws a clear error on a collision.
+- Plugin rule fixes and suggestions are supported; fixes participate in `--fix`
+  and the editor's `source.fixAll`.
+
+## Unsupported ESLint APIs
+
+A plugin rule's `create(context)` gets the standard ESLint v10 surface:
+`context.report` (with `messageId` / `data` / `fix` / `suggest`),
+`context.options`, `context.settings`, `context.languageOptions`, AST and
+esquery visitors, and `sourceCode` (tokens, comments, and scope analysis such as
+`getScope` and `getDeclaredVariables`).
+
+These ESLint APIs are **not** available to plugin rules — a rule that relies on
+one loads without error but never reports:
+
+| ESLint API                                                                                                                                                                                  | Where you'd use it                                                    | In rslint                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------ |
+| `sourceCode.parserServices` — `program`, `getTypeChecker()`, `esTreeNodeToTSNodeMap`                                                                                                        | type-aware rules (enabled by `languageOptions.parserOptions.project`) | empty — no type checker, so type-aware rules can't run |
+| `languageOptions.parser`                                                                                                                                                                    | a custom parser in the config                                         | ignored — rslint always parses with its own parser     |
+| `processor`                                                                                                                                                                                 | a config's processor                                                  | not applied to plugin rules                            |
+| `onCodePathStart` / `onCodePathEnd` / `onCodePathSegmentStart` / `onCodePathSegmentEnd` / `onCodePathSegmentLoop` / `onUnreachableCodePathSegmentStart` / `onUnreachableCodePathSegmentEnd` | code-path (control-flow) analysis                                     | not implemented — these listeners never fire           |

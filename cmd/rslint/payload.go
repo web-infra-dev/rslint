@@ -20,6 +20,16 @@ type parsedPayload struct {
 	// nil when using legacy single-config mode.
 	ConfigMap map[string]rslintconfig.RslintConfig
 
+	// OriginalConfigDir maps each normalized ConfigMap key back to the raw
+	// configDirectory string the JS host sent. The eslint-plugin wire configKey
+	// uses this RAW form so it is byte-identical to the worker's plugin map key
+	// (the host keys that map on the same raw string); Go's normalized key is
+	// only for its own file matching. This makes the CLI round-trip the routing
+	// token faithfully — the same property the LSP path has — instead of two
+	// sides independently normalizing the path and having to agree. nil in
+	// legacy single-config mode.
+	OriginalConfigDir map[string]string
+
 	// singleConfig and singleConfigDir are set in legacy single-config mode.
 	SingleConfig    rslintconfig.RslintConfig
 	SingleConfigDir string
@@ -42,13 +52,20 @@ func parseConfigPayload(data []byte) (*parsedPayload, error) {
 
 	if len(multiPayload.Configs) > 0 {
 		configMap := make(map[string]rslintconfig.RslintConfig, len(multiPayload.Configs))
+		originalConfigDir := make(map[string]string, len(multiPayload.Configs))
 		for _, cfg := range multiPayload.Configs {
+			// configMap is keyed by the normalized dir (Go matches normalized
+			// file paths against it); originalConfigDir recovers the raw string
+			// for the eslint-plugin wire configKey. Both are populated in this
+			// one loop from the same NormalizePath call, so they cannot disagree.
 			configDir := tspath.NormalizePath(cfg.ConfigDirectory)
 			configMap[configDir] = cfg.Entries
+			originalConfigDir[configDir] = cfg.ConfigDirectory
 		}
 		return &parsedPayload{
-			ConfigMap:     configMap,
-			IsMultiConfig: true,
+			ConfigMap:         configMap,
+			OriginalConfigDir: originalConfigDir,
+			IsMultiConfig:     true,
 		}, nil
 	}
 

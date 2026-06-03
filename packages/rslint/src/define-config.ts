@@ -5,17 +5,36 @@
 export type RuleSeverity = 'off' | 'warn' | 'error';
 
 /**
+ * Single source of truth for the prefixes owned by rslint's built-in
+ * (natively-ported) plugins. The `KnownPlugin` type union and the
+ * `NATIVE_PLUGIN_PREFIXES` runtime Set both derive from this, so adding a ported
+ * plugin is a one-line change (no second list to keep in sync).
+ */
+const NATIVE_PLUGINS = [
+  '@typescript-eslint',
+  'import',
+  'jest',
+  'jsx-a11y',
+  'promise',
+  'react',
+  'react-hooks',
+  'unicorn',
+] as const;
+
+/**
  * Plugin declaration names recognized by rslint's loader.
  */
-export type KnownPlugin =
-  | '@typescript-eslint'
-  | 'import'
-  | 'jest'
-  | 'jsx-a11y'
-  | 'promise'
-  | 'react'
-  | 'react-hooks'
-  | 'unicorn';
+export type KnownPlugin = (typeof NATIVE_PLUGINS)[number];
+
+/**
+ * Prefixes owned by rslint's built-in (natively-ported) plugins. A user
+ * `eslintPlugins` prefix may not collide with these — native rules always
+ * win, so a collision would silently shadow the mounted plugin. Typed as
+ * ReadonlySet<string> so callers can probe arbitrary user-supplied strings.
+ */
+export const NATIVE_PLUGIN_PREFIXES: ReadonlySet<string> = new Set(
+  NATIVE_PLUGINS,
+);
 
 /**
  * Rule-specific options object. Each rule defines its own shape; until per-rule
@@ -74,6 +93,19 @@ export interface LanguageOptions {
 }
 
 /**
+ * A real ESLint plugin object, as exported by community packages
+ * (`eslint-plugin-unicorn`, etc.). Only the fields rslint consumes are
+ * typed; the open index keeps arbitrary plugin shapes assignable.
+ */
+export interface ESLintPlugin {
+  meta?: { name?: string; version?: string };
+  name?: string;
+  rules?: Record<string, unknown>;
+  configs?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
  * A single entry in an rslint config array. Multiple entries may target
  * different file globs and are merged at lint time.
  */
@@ -115,6 +147,19 @@ export interface RslintConfigEntry {
   settings?: Record<string, any>;
   /** Rule configuration map. */
   rules?: RulesRecord;
+  /**
+   * Real ESLint plugins mounted by prefix, e.g. `{ unicorn }` after
+   * `import unicorn from 'eslint-plugin-unicorn'`. Their JS rule functions
+   * run in a Node worker; only `{prefix, ruleNames}` metadata reaches the
+   * Go core. The live objects never cross the wire — the worker re-imports
+   * this config file to obtain them, so local-path and monorepo-versioned
+   * plugins resolve correctly.
+   *
+   * @example
+   * import unicorn from 'eslint-plugin-unicorn';
+   * export default [{ eslintPlugins: { unicorn }, rules: { 'unicorn/no-null': 'error' } }];
+   */
+  eslintPlugins?: Record<string, ESLintPlugin>;
 }
 
 /** Top-level rslint config: an array of entries. */

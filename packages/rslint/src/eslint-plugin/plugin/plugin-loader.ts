@@ -31,6 +31,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
+import { selectPluginSource, unwrapPluginModule } from '../../plugin-source.js';
 
 /**
  * Extension-aware config loader for worker init. Mirrors the strategy
@@ -54,7 +55,7 @@ import type { ConfigDescriptor } from '../types.js';
  *
  * Cache-busting `?t=Date.now()`: NOT used here. Worker init imports
  * each config once per worker lifetime; long-running LSP sessions
- * rebuild the worker pool via CompatPool when configs change
+ * rebuild the worker pool via PluginLintPool when configs change
  * (host-side mtime + size fingerprint), so the host already controls
  * staleness. Re-importing with `?t=` would mean every reconfigure
  * pays a fresh module-graph build (≈300 ms for unicorn /
@@ -196,10 +197,11 @@ export async function loadPluginsFromConfigFile(
     (configMod as { default?: unknown }).default ?? configMod;
   const configArray = Array.isArray(exportedDefault) ? exportedDefault : [];
 
-  // Track which prefixes we've already loaded so duplicate plugin
-  // declarations across config entries collapse to one LoadedPlugin
-  // (matches the host-side normalize step in
-  // packages/rslint/src/config-loader.ts).
+  // Track which prefixes we've already loaded: a re-declared prefix with the
+  // SAME plugin instance is deduped (collapse to one LoadedPlugin), while a
+  // DIFFERENT instance throws below. This worker-init check — NOT the host-side
+  // collectPluginMeta dedupe (which silently first-wins) — is where a genuine
+  // cross-entry prefix conflict is actually caught.
   const seenPrefix = new Set<string>();
 
   // Source precedence per entry: explicit `eslintPlugins` overrides
@@ -212,25 +214,7 @@ export async function loadPluginsFromConfigFile(
   // `plugins: { uc: unicornPlugin }` and never touch `eslintPlugins`
   // — without folding, the worker would import zero plugins.
   for (const entry of configArray) {
-    if (entry == null || typeof entry !== 'object') continue;
-    const e = entry as {
-      eslintPlugins?: unknown;
-      plugins?: unknown;
-    };
-    let source: Record<string, unknown> | null = null;
-    if (
-      e.eslintPlugins != null &&
-      typeof e.eslintPlugins === 'object' &&
-      !Array.isArray(e.eslintPlugins)
-    ) {
-      source = e.eslintPlugins as Record<string, unknown>;
-    } else if (
-      e.plugins != null &&
-      typeof e.plugins === 'object' &&
-      !Array.isArray(e.plugins)
-    ) {
-      source = e.plugins as Record<string, unknown>;
-    }
+    const source = selectPluginSource(entry);
     if (source == null) continue;
     for (const prefix of Object.keys(source)) {
       const pluginObj = source[prefix];
@@ -244,7 +228,7 @@ export async function loadPluginsFromConfigFile(
       // by some bundler interop output) was returned unchanged with
       // its `.rules` still nested under `.default`, and every rule
       // for that prefix silently dropped from the dispatch map.
-      const plugin = unwrapPluginModule(pluginObj);
+      const plugin = unwrapPluginModule<LoadedPlugin['plugin']>(pluginObj);
       if (plugin == null || typeof plugin !== 'object') continue;
 
       // Cross-entry redefinition check, aligned with ESLint v10
@@ -371,20 +355,6 @@ function mergeLoadedPlugins(
     rules.set(key, rule);
   }
   return { plugins: [...a.plugins, ...b.plugins], rules };
-}
-
-/**
- * Unwrap CJS/ESM dual-shape: prefer `mod.default` if present (ESM/interop),
- * fall back to `mod` itself (legacy CJS without `default`).
- */
-function unwrapPluginModule(mod: unknown): LoadedPlugin['plugin'] | null {
-  if (mod == null || typeof mod !== 'object') return null;
-  // mod.default first if it exists
-  const m = mod as { default?: unknown };
-  if (m.default != null && typeof m.default === 'object') {
-    return m.default as LoadedPlugin['plugin'];
-  }
-  return mod as LoadedPlugin['plugin'];
 }
 
 function ensureNodeVersion(): void {

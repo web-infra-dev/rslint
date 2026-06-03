@@ -139,7 +139,9 @@ function isGlobalIgnoreEntry(
   return (
     entry.files == null &&
     entry.rules == null &&
-    entry.plugins == null &&
+    // An empty `plugins: []` is "no plugins" — `normalizeConfig` always emits
+    // the array, so treat it like absent (matches Go's `len(Plugins) == 0`).
+    (entry.plugins == null || entry.plugins.length === 0) &&
     entry.languageOptions == null &&
     entry.settings == null
   );

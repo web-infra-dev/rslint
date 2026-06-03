@@ -185,6 +185,7 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 	diagnostic := rule.RuleDiagnostic{
 		RuleName:   "test-rule",
 		SourceFile: sourceFile,
+		FilePath:   sourceFile.FileName(),
 		Range:      core.NewTextRange(startOffset, endOffset),
 		Message:    rule.RuleMessage{Id: "test", Description: "Test diagnostic"},
 		Severity:   rule.SeverityError,

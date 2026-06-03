@@ -1569,7 +1569,7 @@ describe('applyOptionDefaults clones user-supplied option objects', () => {
     const { applyOptionDefaults } =
       await import('../../src/eslint-plugin/linter/options-defaults.js');
     // Single user-supplied object shared across multiple lint calls
-    // (matches the in-process `compat-task-builder` pattern where
+    // (matches the in-process `plugin-lint-protocol` pattern where
     // `sharedRules` lands on every file's task by reference).
     const sharedUserOpt = { allow: ['Array'] };
     const sharedUserOptions = [sharedUserOpt];

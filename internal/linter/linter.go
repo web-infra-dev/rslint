@@ -75,7 +75,7 @@ type runProgramOptions struct {
 	// out by GetRulesForFile, this just guards rules with optional
 	// TypeChecker usage. nil = no gap-file distinction.
 	TypeInfoFiles map[string]struct{}
-	OnDiagnostic DiagnosticHandler
+	OnDiagnostic  DiagnosticHandler
 }
 
 // runLintRulesInProgram lints files in a single Program. Files are filtered
@@ -94,42 +94,10 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		return 0
 	}
 
-	// Pre-compute FileInfo for Scope.Files once to avoid N×M stat calls in the loop.
-	var allowFileInfos []os.FileInfo
-	if opts.Scope.Files != nil {
-		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
-	}
-
-	// Collect files to lint (applying all filters).
-	var filesToLint []*ast.SourceFile
-	for _, file := range opts.Program.GetSourceFiles() {
-		p := string(file.Path())
-		// skip lint node_modules and bundled files
-		// FIXME: we may have better api to tell whether a file is a bundled file or not
-		skipFile := false
-		for _, skipPattern := range opts.ExcludePaths {
-			if strings.Contains(p, skipPattern) {
-				skipFile = true
-				break
-			}
-		}
-		if skipFile {
-			continue
-		}
-		// Filter by Scope.Files / Scope.Dirs (OR logic: match either one).
-		if opts.Scope.Files != nil || opts.Scope.Dirs != nil {
-			fileAllowed := opts.Scope.Files != nil && isFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
-			dirAllowed := opts.Scope.Dirs != nil && isDirAllowed(file.FileName(), opts.Scope.Dirs)
-			if !fileAllowed && !dirAllowed {
-				continue
-			}
-		}
-		// Caller-supplied filter (multi-config ownership / config `ignores`).
-		if opts.FileFilter != nil && !opts.FileFilter(file.FileName()) {
-			continue
-		}
-		filesToLint = append(filesToLint, file)
-	}
+	// Collect files to lint (applying all filters). Shared with
+	// CollectLintTargets so the eslint-plugin dispatch path observes the
+	// exact same file set as native linting.
+	filesToLint := collectFilesToLint(opts)
 
 	lintedFileCount := int32(len(filesToLint))
 
@@ -183,6 +151,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:      textRange,
 						Message:    msg,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -196,6 +165,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:    msg,
 						FixesPtr:   &fixes,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -209,6 +179,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:     msg,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -222,6 +193,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:      trimmedRange,
 						Message:    msg,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -236,6 +208,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:    msg,
 						FixesPtr:   &fixes,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -250,6 +223,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:     msg,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -265,6 +239,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -279,6 +254,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -459,6 +435,90 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 		LintedFileCount: lintedFileCount.Load(),
 		ExecutedRules:   collectMapKeys(&executedRules),
 	}, nil
+}
+
+// collectFilesToLint applies the ExcludePaths / Scope / FileFilter layers
+// to a program's source files. Shared by runLintRulesInProgram (native
+// lint) and CollectLintTargets (eslint-plugin dispatch) so both observe an
+// identical file set.
+func collectFilesToLint(opts runProgramOptions) []*ast.SourceFile {
+	var allowFileInfos []os.FileInfo
+	if opts.Scope.Files != nil {
+		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
+	}
+	var filesToLint []*ast.SourceFile
+	for _, file := range opts.Program.GetSourceFiles() {
+		p := string(file.Path())
+		// skip lint node_modules and bundled files
+		skipFile := false
+		for _, skipPattern := range opts.ExcludePaths {
+			if strings.Contains(p, skipPattern) {
+				skipFile = true
+				break
+			}
+		}
+		if skipFile {
+			continue
+		}
+		// Filter by Scope.Files / Scope.Dirs (OR logic: match either one).
+		if opts.Scope.Files != nil || opts.Scope.Dirs != nil {
+			fileAllowed := opts.Scope.Files != nil && isFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
+			dirAllowed := opts.Scope.Dirs != nil && isDirAllowed(file.FileName(), opts.Scope.Dirs)
+			if !fileAllowed && !dirAllowed {
+				continue
+			}
+		}
+		// Caller-supplied filter (multi-config ownership / config `ignores`).
+		if opts.FileFilter != nil && !opts.FileFilter(file.FileName()) {
+			continue
+		}
+		filesToLint = append(filesToLint, file)
+	}
+	return filesToLint
+}
+
+// LintTarget is one file paired with the rules configured for it, as
+// resolved by RunLinterOptions.GetRulesForFile.
+type LintTarget struct {
+	File  *ast.SourceFile
+	Rules []ConfiguredRule
+}
+
+// CollectLintTargets resolves, for every file RunLinter would lint, the
+// rules configured for it — WITHOUT running them. The CLI/LSP host uses it
+// to split out eslint-plugin rules and dispatch them to the Node worker in
+// parallel with native linting, reusing the exact same file-set filtering
+// as RunLinter (ExcludePaths / Scope / per-program ownership + ignores).
+func CollectLintTargets(opts RunLinterOptions) []LintTarget {
+	if opts.GetRulesForFile == nil {
+		return nil
+	}
+	excludePaths := opts.ExcludePaths
+	if excludePaths == nil {
+		excludePaths = utils.ExcludePaths
+	}
+	var targets []LintTarget
+	for i, program := range opts.Programs {
+		var perProgramFilter FileFilter
+		if i < len(opts.PerProgramFilter) {
+			perProgramFilter = opts.PerProgramFilter[i]
+		}
+		filter := composeOwnedFilter(perProgramFilter, buildOwnedFileSet(program))
+		files := collectFilesToLint(runProgramOptions{
+			Program:      program,
+			Scope:        opts.Scope,
+			ExcludePaths: excludePaths,
+			FileFilter:   filter,
+		})
+		for _, file := range files {
+			rules := opts.GetRulesForFile(file)
+			if len(rules) == 0 {
+				continue
+			}
+			targets = append(targets, LintTarget{File: file, Rules: rules})
+		}
+	}
+	return targets
 }
 
 // LintSingleFile runs lint rules against a single file in a single program.

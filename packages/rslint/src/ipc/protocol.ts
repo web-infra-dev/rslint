@@ -32,7 +32,10 @@ export type MessageKind =
   | 'cancel'
   | 'output'
   | 'log'
-  | 'shutdown';
+  | 'shutdown'
+  // Go → Node reverse request: run JS ESLint-plugin rules for a batch of
+  // files in the worker pool and return the diagnostics.
+  | 'pluginLint';
 
 /**
  * Single IPC frame (JSON-decoded). `id` is 0 for notifications and a positive

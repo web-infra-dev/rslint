@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 )
@@ -22,5 +23,6 @@ func runCLI(args []string) int {
 		fmt.Fprint(os.Stderr, usage)
 		return 0
 	}
-	return executeLintPipeline(parsed)
+	// js/wasm has no Node IPC host, so no eslint-plugin dispatch (nil).
+	return executeLintPipeline(parsed, context.Background(), nil)
 }

@@ -1,43 +1,43 @@
 /**
- * Unit tests for the shared compat-batch boundary helpers used by
- * both the CLI host (engine.ts) and the LSP host (CompatPool.ts).
+ * Unit tests for the shared eslintPlugins lint boundary helpers used by
+ * both the CLI host (engine.ts) and the LSP host (PluginLintPool.ts).
  *
- * `buildCompatTasksByConfigKey` forwards each file's `configKey`
- * verbatim — the worker picks the right `LoadedPlugins` from its
- * per-config map via that key. The helper here is responsible for:
+ * `buildPluginLintTasks` forwards each file's `configKey` verbatim — the
+ * worker picks the right `LoadedPlugins` from its per-config map via that
+ * key. The helper here is responsible for:
  *
  *   - emitting `configKey` on every task (empty string when absent),
  *   - firing `onUnknownConfigKey` for hosts that want a clearer log
  *     before the worker's internal-error parseError lands,
- *   - propagating the shared `rules` / `collectFixes` /
- *     `suggestionsMode` block to every task,
+ *   - propagating the shared `rules` / `fix` / `suggestionsMode` block to
+ *     every task (wire `fix` maps to the worker's `collectFixes`),
  *   - forwarding `languageOptions` / `settings` opaquely to the worker.
  */
 
 import { describe, test, expect } from '@rstest/core';
 
 import {
-  buildCompatTasksByConfigKey,
-  buildCompatBatchResult,
-  type CompatBatchInput,
-} from '../../../src/eslint-plugin/plugin/compat-task-builder.js';
+  buildPluginLintTasks,
+  buildPluginLintResult,
+  type EslintPluginLintRequest,
+} from '../../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 import type { LintFileResult } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 
 function input(
-  files: CompatBatchInput['files'],
-  opts: Partial<CompatBatchInput> = {},
-): CompatBatchInput {
+  files: EslintPluginLintRequest['files'],
+  opts: Partial<EslintPluginLintRequest> = {},
+): EslintPluginLintRequest {
   return {
     files,
     rules: opts.rules ?? { 'uc/no-null': { options: [] } },
-    collectFixes: opts.collectFixes,
+    fix: opts.fix,
     suggestionsMode: opts.suggestionsMode,
   };
 }
 
-describe('buildCompatTasksByConfigKey', () => {
+describe('buildPluginLintTasks', () => {
   test('configKey absent on file → empty string on task', () => {
-    const tasks = buildCompatTasksByConfigKey(
+    const tasks = buildPluginLintTasks(
       input([{ path: '/a.ts', text: 'const x = 1;' }]),
       { configDirSet: new Set() },
     );
@@ -46,7 +46,7 @@ describe('buildCompatTasksByConfigKey', () => {
   });
 
   test('configKey known in set → passed through verbatim', () => {
-    const tasks = buildCompatTasksByConfigKey(
+    const tasks = buildPluginLintTasks(
       input([{ path: '/proj/pkg-a/a.ts', text: '', configKey: '/proj/pkg-a' }]),
       { configDirSet: new Set(['/proj/pkg-a']) },
     );
@@ -56,7 +56,7 @@ describe('buildCompatTasksByConfigKey', () => {
 
   test('configKey unknown → onUnknownConfigKey fires, key still passed through', () => {
     const warnings: Array<{ filePath: string; configKey: string }> = [];
-    const tasks = buildCompatTasksByConfigKey(
+    const tasks = buildPluginLintTasks(
       input([{ path: '/x.ts', text: '', configKey: '/nowhere' }]),
       {
         configDirSet: new Set(['/proj/pkg-a']),
@@ -73,15 +73,15 @@ describe('buildCompatTasksByConfigKey', () => {
   });
 
   test('configKey unknown without onUnknownConfigKey → still no throw', () => {
-    const tasks = buildCompatTasksByConfigKey(
+    const tasks = buildPluginLintTasks(
       input([{ path: '/x.ts', text: '', configKey: '/nowhere' }]),
       { configDirSet: new Set() },
     );
     expect(tasks[0].configKey).toBe('/nowhere');
   });
 
-  test('shared rules / collectFixes / suggestionsMode propagate to every task', () => {
-    const tasks = buildCompatTasksByConfigKey(
+  test('shared rules / fix / suggestionsMode propagate to every task', () => {
+    const tasks = buildPluginLintTasks(
       input(
         [
           { path: '/a.ts', text: '' },
@@ -92,7 +92,7 @@ describe('buildCompatTasksByConfigKey', () => {
             'uc/no-null': { options: [{ checkStrictEquality: true }] },
             'uc/prefer-array-some': { options: [] },
           },
-          collectFixes: true,
+          fix: true,
           suggestionsMode: 'eager',
         },
       ),
@@ -100,6 +100,7 @@ describe('buildCompatTasksByConfigKey', () => {
     );
     expect(tasks).toHaveLength(2);
     for (const t of tasks) {
+      // wire `fix:true` maps to the worker's per-task `collectFixes`.
       expect(t.collectFixes).toBe(true);
       expect(t.suggestionsMode).toBe('eager');
       expect(Object.keys(t.rules).sort()).toEqual([
@@ -112,8 +113,8 @@ describe('buildCompatTasksByConfigKey', () => {
     }
   });
 
-  test('rules / collectFixes / suggestionsMode defaults are sensible', () => {
-    const tasks = buildCompatTasksByConfigKey(
+  test('rules / fix / suggestionsMode defaults are sensible', () => {
+    const tasks = buildPluginLintTasks(
       { files: [{ path: '/a.ts', text: '' }] },
       { configDirSet: new Set() },
     );
@@ -125,7 +126,7 @@ describe('buildCompatTasksByConfigKey', () => {
   test('languageOptions and settings pass through opaquely', () => {
     const langOpts = { parserOptions: { ecmaVersion: 2024 as const } };
     const settings = { react: { version: '19.0.0' } };
-    const tasks = buildCompatTasksByConfigKey(
+    const tasks = buildPluginLintTasks(
       input([
         {
           path: '/a.tsx',
@@ -141,7 +142,7 @@ describe('buildCompatTasksByConfigKey', () => {
   });
 });
 
-describe('buildCompatBatchResult', () => {
+describe('buildPluginLintResult', () => {
   test('projects to the 5-field wire shape, drops aggregate convenience fields', () => {
     const results: LintFileResult[] = [
       {
@@ -163,7 +164,7 @@ describe('buildCompatBatchResult', () => {
         cancelled: false,
       },
     ];
-    const projected = buildCompatBatchResult(results);
+    const projected = buildPluginLintResult(results);
     expect(projected.results).toHaveLength(1);
     const r = projected.results[0];
     // Exactly the 5 Go-visible fields, no more.
@@ -195,7 +196,7 @@ describe('buildCompatBatchResult', () => {
         ],
       },
     ];
-    const projected = buildCompatBatchResult(results);
+    const projected = buildPluginLintResult(results);
     expect(projected.results[0].parseError).toBe('parse: unexpected token');
     expect(projected.results[0].ruleErrors).toEqual([
       { rule: 'uc/no-null', message: 'create threw: x undefined' },
@@ -203,6 +204,6 @@ describe('buildCompatBatchResult', () => {
   });
 
   test('empty input yields empty results array (not undefined)', () => {
-    expect(buildCompatBatchResult([])).toEqual({ results: [] });
+    expect(buildPluginLintResult([])).toEqual({ results: [] });
   });
 });

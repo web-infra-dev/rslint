@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -58,6 +59,11 @@ type lintArgs struct {
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
+	// EslintPlugins carries the {prefix, ruleNames} metadata for ESLint
+	// plugins mounted via the config's `eslintPlugins`. Used to register
+	// placeholder rules so plugin rule names resolve; the live plugins run
+	// in the Node worker.
+	EslintPlugins []rslintconfig.EslintPluginEntry
 }
 
 // ColorScheme contains all the color functions for different UI elements
@@ -124,6 +130,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 		diag := rule.RuleDiagnostic{
 			RuleName:   fmt.Sprintf("TypeScript(TS%d)", d.Code()),
 			SourceFile: d.File(),
+			FilePath:   d.File().FileName(),
 			Range:      d.Loc(),
 			Message:    rule.RuleMessage{Description: d.String()},
 			Severity:   rule.SeverityError,
@@ -166,7 +173,7 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
 	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
-	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
 	output := fmt.Sprintf(
 		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
 		severity,
@@ -234,7 +241,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	diagnostic := Diagnostic{
 		RuleName: d.RuleName,
 		Message:  d.Message.Description,
-		FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+		FilePath: tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
 		Range: Range{
 			Start: Location{
 				Line:   startLine + 1, // Convert to 1-based indexing
@@ -326,7 +333,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString("\n  ")
 	w.WriteString(colors.BorderText("╭─┴──────────("))
 	w.WriteByte(' ')
-	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
 	location := fmt.Sprintf("%s:%d:%d", filePath, diagnosticStartLine+1, diagnosticStartColumn+1)
 	w.WriteString(colors.FileName("%s", location))
 	w.WriteByte(' ')
@@ -485,7 +492,7 @@ Options:
 func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
 	m := make(map[string][]rule.RuleDiagnostic)
 	for _, d := range diags {
-		f := d.SourceFile.FileName()
+		f := d.FilePath
 		m[f] = append(m[f], d)
 	}
 	return m
@@ -752,7 +759,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 // → gap-file fallback → lint → optional --fix loop → report) and returns
 // the process exit code. Shared by the IPC entry (runCLI) and the wasm
 // native fallback.
-func executeLintPipeline(args lintArgs) int {
+func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
 	// Unpack into locals so the pipeline body below stays verbatim — only the
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
@@ -829,11 +836,20 @@ func executeLintPipeline(args lintArgs) int {
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
+	// Register placeholder rules for mounted ESLint plugins so their rule
+	// names resolve (and route to the Node worker) instead of being dropped.
+	rslintconfig.RegisterEslintPluginRules(args.EslintPlugins)
 	var rslintConfig rslintconfig.RslintConfig
 
 	// configMap holds per-directory configs for multi-config (monorepo) support.
 	// Only populated in the configStdin path; nil otherwise (single-config mode).
 	var configMap map[string]rslintconfig.RslintConfig
+
+	// originalConfigDir maps each normalized configMap key back to the raw
+	// configDirectory the JS host sent, so the eslint-plugin wire configKey
+	// round-trips raw (byte-matching the worker's plugin map key). nil outside
+	// multi-config mode (single-config / JSON configs never mount plugins).
+	var originalConfigDir map[string]string
 
 	programs := []*compiler.Program{}
 	// programConfigDirs tracks which configDir each program belongs to (parallel to programs).
@@ -863,6 +879,7 @@ func executeLintPipeline(args lintArgs) int {
 		if payload.IsMultiConfig {
 			// Multi-config format
 			configMap = payload.ConfigMap
+			originalConfigDir = payload.OriginalConfigDir
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
@@ -1180,7 +1197,7 @@ func executeLintPipeline(args lintArgs) int {
 		rulesForFile = getRulesForFile
 	}
 
-	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1192,7 +1209,27 @@ func executeLintPipeline(args lintArgs) int {
 		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
-	})
+	}
+	// Dispatch eslint-plugin rules to the Node worker in parallel with the
+	// native lint pass; results are awaited + merged before output / --fix.
+	// ONLY when plugins are actually configured — otherwise the whole reverse-
+	// dispatch (including buildPluginFileInputs' extra per-file rule resolution
+	// over every file) is skipped so the native-only path pays nothing for the
+	// feature.
+	hasEslintPlugins := len(args.EslintPlugins) > 0
+	pluginResolver := pluginConfigResolver{
+		configMap:         configMap,
+		originalConfigDir: originalConfigDir,
+		rslintConfig:      rslintConfig,
+		currentDirectory:  currentDirectory,
+	}
+	var pluginCh <-chan []rule.RuleDiagnostic
+	if hasEslintPlugins {
+		pluginInputs := buildPluginFileInputs(runOpts, pluginResolver)
+		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix))
+	}
+
+	lintResult, err := linter.RunLinter(runOpts)
 
 	close(diagnosticsChan)
 	if err != nil {
@@ -1203,6 +1240,11 @@ func executeLintPipeline(args lintArgs) int {
 	lintedfileCount := lintResult.LintedFileCount
 
 	wg.Wait()
+	// Merge eslint-plugin diagnostics (dispatched in parallel) now that the
+	// native diagnostics goroutine has drained.
+	if pluginCh != nil {
+		allDiags = append(allDiags, (<-pluginCh)...)
+	}
 
 	// Emit per-file warnings for CLI-specified files that won't be linted.
 	// Distinguishes "not found in project" vs "ignored by pattern", aligned
@@ -1242,7 +1284,7 @@ func executeLintPipeline(args lintArgs) int {
 			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
 			fixSkipMask := buildTypeCheckSkipMask(len(newPrograms), newFallbackIdx)
 			var passDiags []rule.RuleDiagnostic
-			passResult, _ := linter.RunLinter(linter.RunLinterOptions{
+			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1256,11 +1298,25 @@ func executeLintPipeline(args lintArgs) int {
 					passDiags = append(passDiags, d)
 					diagsMu.Unlock()
 				},
-			})
+			}
+			// Re-dispatch plugin rules each pass (only when configured): the
+			// worker re-reads the post-fix file content, and merging here keeps
+			// plugin diagnostics from being lost when allDiags is replaced.
+			var fixPluginCh <-chan []rule.RuleDiagnostic
+			if hasEslintPlugins {
+				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginResolver)
+				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
+			}
+			passResult, _ := linter.RunLinter(fixRunOpts)
 			if passResult != nil {
 				for name := range passResult.ExecutedRules {
 					lintResult.ExecutedRules[name] = struct{}{}
 				}
+			}
+			// Merge this pass's plugin diagnostics before applying fixes so
+			// plugin fixes participate and plugin diagnostics survive.
+			if fixPluginCh != nil {
+				passDiags = append(passDiags, (<-fixPluginCh)...)
 			}
 
 			// Replace allDiags with latest post-fix diagnostics.
