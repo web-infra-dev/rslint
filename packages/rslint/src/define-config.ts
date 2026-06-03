@@ -126,3 +126,27 @@ export type RslintConfig = RslintConfigEntry[];
 export function defineConfig(config: RslintConfig): RslintConfig {
   return config;
 }
+
+/**
+ * Define a global-ignores config entry.
+ *
+ * Mirrors ESLint's `globalIgnores` helper: returns a config entry that contains
+ * only `ignores`. Because the entry has no `files` (and no rules/plugins/etc.),
+ * the patterns are treated as *global* ignores — applied across every other
+ * config entry — instead of being scoped to a single entry's `files`.
+ *
+ * @example
+ * export default defineConfig([
+ *   globalIgnores(['dist/**', 'coverage/**']),
+ *   { files: ['src/**'], rules: { 'no-console': 'error' } },
+ * ]);
+ */
+export function globalIgnores(ignorePatterns: string[]): RslintConfigEntry {
+  if (!Array.isArray(ignorePatterns)) {
+    throw new TypeError('ignorePatterns must be an array');
+  }
+  if (ignorePatterns.length === 0) {
+    throw new TypeError('ignorePatterns must contain at least one pattern');
+  }
+  return { ignores: ignorePatterns };
+}

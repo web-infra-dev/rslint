@@ -71,13 +71,11 @@ rslint --init
 A typical TypeScript project configuration:
 
 ```ts
-import { defineConfig, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, ts } from '@rslint/core';
 
 export default defineConfig([
   // Global ignores — files excluded from all rules
-  {
-    ignores: ['**/dist/**', '**/fixtures/**'],
-  },
+  globalIgnores(['**/dist/**', '**/fixtures/**']),
   // Preset with recommended rules
   ts.configs.recommended,
   // Custom rule overrides
