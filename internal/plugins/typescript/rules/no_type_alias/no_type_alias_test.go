@@ -19,7 +19,6 @@ func TestNoTypeAliasRule(t *testing.T) {
 		{Code: `type Foo = typeof import('foo')`, Options: map[string]interface{}{"allowAliases": "always"}},
 		{Code: `type Foo = (string)`, Options: map[string]interface{}{"allowAliases": "always"}},
 		{Code: `type Foo = readonly (string[])`, Options: map[string]interface{}{"allowAliases": "always"}},
-		{Code: `type Foo = unique symbol`, Options: map[string]interface{}{"allowAliases": "always"}},
 
 		// allowAliases: in-unions
 		{Code: `type Foo = 'a' | 'b'`, Options: map[string]interface{}{"allowAliases": "in-unions"}},
@@ -110,6 +109,11 @@ func TestNoTypeAliasRule(t *testing.T) {
 		{
 			Code:   `type Foo = unique symbol`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
+		},
+		{
+			Code:    `type Foo = unique symbol`,
+			Options: map[string]interface{}{"allowAliases": "always"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noTypeAlias", Line: 1, Column: 12}},
 		},
 
 		// Union aliases with default / never

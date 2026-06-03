@@ -335,7 +335,7 @@ var NoTypeAliasRule = rule.CreateRule(rule.Rule{
 			if node.Kind == ast.KindTypeOperator {
 				typeOp := node.AsTypeOperatorNode()
 				if typeOp != nil {
-					if typeOp.Operator == ast.KindKeyOfKeyword || typeOp.Operator == ast.KindUniqueKeyword {
+					if typeOp.Operator == ast.KindKeyOfKeyword {
 						checkAndReport(opts.AllowAliases, isTopLevel, t, "Aliases")
 						return
 					}
