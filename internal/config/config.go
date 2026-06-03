@@ -15,9 +15,8 @@ import (
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
 	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
-	coreRules "github.com/web-infra-dev/rslint/internal/rules"
-
 	"github.com/web-infra-dev/rslint/internal/rule"
+	coreRules "github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // RslintConfig represents the top-level configuration array

@@ -243,16 +243,20 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
 
+			if len(req.RuleOptions) == 0 {
+				rules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), configDirectory, false)
+				return rules
+			}
+
 			var settings map[string]interface{}
 			if merged := rslintConfig.GetConfigForFile(sourceFile.FileName(), configDirectory); merged != nil && len(merged.Settings) > 0 {
 				settings = rslintconfig.CloneSettings(merged.Settings)
 			}
-
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
-
 				return linter.ConfiguredRule{
-					Name:     r.rule.Name,
-					Settings: settings,
+					Name:             r.rule.Name,
+					Settings:         settings,
+					RequiresTypeInfo: r.rule.RequiresTypeInfo,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return r.rule.Run(ctx, r.option)
 					},
@@ -284,7 +288,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   int(lintResult.LintedFileCount),
-		RuleCount:   len(rulesWithOptions),
+		RuleCount:   len(lintResult.ExecutedRules),
 	}
 	// Only include encoded source files if requested
 	if req.IncludeEncodedSourceFiles {
