@@ -20,7 +20,7 @@ jobs:
   publish-crates:
     name: ${{ inputs.dry_run == true && 'Dry Run - Crates' || 'Publish Crates' }}
     runs-on: ubuntu-22.04
-    environment: release
+    environment: crate
     permissions:
       contents: read
       # For crates.io Trusted Publishing.
