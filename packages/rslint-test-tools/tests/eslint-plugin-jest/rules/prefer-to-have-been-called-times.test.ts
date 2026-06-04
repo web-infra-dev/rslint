@@ -20,6 +20,7 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
     { code: 'expect(fn.mock.length).toEqual(1);' },
     { code: 'expect(fn.mock.calls).toEqual([]);' },
     { code: 'expect(fn.mock.calls).toContain(1, 2, 3);' },
+    { code: 'expect((fn.mock.calls)).toEqual([]);' },
   ],
   invalid: [
     {
@@ -62,6 +63,17 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
         {
           messageId: 'preferMatcher',
           column: 34,
+          line: 1,
+        },
+      ],
+    },
+    {
+      code: 'expect((method.mock.calls)).toHaveLength(1);',
+      output: 'expect(method).toHaveBeenCalledTimes(1);',
+      errors: [
+        {
+          messageId: 'preferMatcher',
+          column: 29,
           line: 1,
         },
       ],

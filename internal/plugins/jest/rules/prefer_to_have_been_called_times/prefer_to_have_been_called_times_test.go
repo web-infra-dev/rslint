@@ -31,7 +31,7 @@ func TestPreferToHaveBeenCalledTimesRule(t *testing.T) {
 			{Code: `expect(fn.mock.length).toEqual(1);`},
 			{Code: `expect(fn.mock.calls).toEqual([]);`},
 			{Code: `expect(fn.mock.calls).toContain(1, 2, 3);`},
-			{Code: `expect((fn.mock.calls)).toHaveLength(1);`},
+			{Code: `expect((fn.mock.calls)).toEqual([]);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -77,6 +77,15 @@ func TestPreferToHaveBeenCalledTimesRule(t *testing.T) {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferMatcher", Line: 1, Column: 27},
+				},
+			},
+			{
+				Code: `expect((method.mock.calls)).toHaveLength(1);`,
+				Output: []string{
+					`expect(method).toHaveBeenCalledTimes(1);`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferMatcher", Line: 1, Column: 29},
 				},
 			},
 		},
