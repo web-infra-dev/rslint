@@ -154,8 +154,9 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 	ctx := s.backgroundCtx
 
 	go func() {
-		// onDiagnostic is invoked synchronously (DispatchEslintPluginRules runs
-		// no goroutines), so the local slice needs no lock.
+		// onDiagnostic is invoked serially (DispatchEslintPluginRules emits
+		// diagnostics single-threaded after its batches complete; here there is
+		// only ever one batch), so the local slice needs no lock.
 		var diags []rule.RuleDiagnostic
 		err := linter.DispatchEslintPluginRules(
 			ctx,
@@ -228,8 +229,9 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 // reverse-request response is routed by readLoop (server.go pendingServer-
 // Requests), never by the dispatch loop, so awaiting our own request cannot
 // deadlock — the same reason the native fixAll pass may block on the language
-// service. onDiagnostic is invoked synchronously (DispatchEslintPluginRules
-// runs no goroutines), so the local slice needs no lock. Returns nil when the
+// service. onDiagnostic is invoked serially (DispatchEslintPluginRules emits
+// diagnostics single-threaded after its batches complete; this path has only
+// one batch), so the local slice needs no lock. Returns nil when the
 // file has no plugin rules.
 //
 // The caller (computeFixAllContent) passes a ctx already bounded by a deadline

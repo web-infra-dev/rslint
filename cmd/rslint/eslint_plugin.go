@@ -100,19 +100,22 @@ func dispatchPluginLintAsync(
 ) <-chan []rule.RuleDiagnostic {
 	ch := make(chan []rule.RuleDiagnostic, 1)
 	go func() {
-		// onDiagnostic is invoked synchronously (DispatchEslintPluginRules runs
-		// no goroutines), so the local slice needs no lock.
+		// onDiagnostic is invoked serially (DispatchEslintPluginRules fans batches
+		// out to goroutines but emits diagnostics single-threaded after Wait), so
+		// the local slice needs no lock.
 		var diags []rule.RuleDiagnostic
 		if dispatch != nil && len(inputs) > 0 {
 			err := linter.DispatchEslintPluginRules(ctx, dispatch, inputs, fix, suggestionsMode,
 				func(d rule.RuleDiagnostic) { diags = append(diags, d) })
 			if err != nil && !errors.Is(err, context.Canceled) {
 				fmt.Fprintf(os.Stderr, "rslint: eslint-plugin lint error: %v\n", err)
-				// A total dispatch failure means NONE of these files ran their
-				// plugin rules. Surface it as an error diagnostic so the exit
-				// code reflects the failure instead of a stderr-only false green
-				// (per-file worker failures already surface inside Dispatch-
-				// EslintPluginRules; this covers the whole-batch dispatch error).
+				// A dispatch error means one or more batches failed to run their
+				// plugin rules (concurrent batches no longer abort each other, so
+				// the rest may have succeeded and already emitted). Surface it as
+				// an error diagnostic so the exit code reflects the failure instead
+				// of a stderr-only false green (per-file worker failures already
+				// surface inside DispatchEslintPluginRules; this covers a batch
+				// dispatch error).
 				diags = append(diags, linter.NewEslintPluginErrorDiagnostic(
 					dispatchFailurePath(inputs), "rslint/plugin-lint-error",
 					"ESLint plugin lint dispatch failed: "+err.Error()))
@@ -123,9 +126,10 @@ func dispatchPluginLintAsync(
 	return ch
 }
 
-// dispatchFailurePath anchors a whole-batch dispatch-failure diagnostic to a
-// real file so it renders with a location. The failure is batch-wide; the first
-// input is representative.
+// dispatchFailurePath anchors a dispatch-failure diagnostic to a real file so it
+// renders with a location. One representative input suffices: the diagnostic
+// exists to surface the failure and non-zero the exit code, not to attribute it
+// to a specific file.
 func dispatchFailurePath(inputs []linter.EslintPluginFileInput) string {
 	if len(inputs) > 0 {
 		return inputs[0].Path
