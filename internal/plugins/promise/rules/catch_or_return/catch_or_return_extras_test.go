@@ -34,7 +34,9 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			{Code: `frank()?.then(go).catch(doIt)`},
 
 			// ---- Dimension 4: computed element-access ['catch'] ----
-			// Upstream hardcodes 'catch' for element-access; confirmed valid here.
+			// IsPromiseLikeCall requires a PropertyAccessExpression callee, so
+			// element-access calls like ["catch"]() are not recognised as promise
+			// statements and are silently ignored — no error reported.
 			{Code: `frank().then(go)["catch"](doIt)`},
 
 			// ---- Dimension 4: nested function — inner returned promise ----

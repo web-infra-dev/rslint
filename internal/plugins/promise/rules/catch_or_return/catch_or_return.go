@@ -101,14 +101,6 @@ func isAllowedPromiseTermination(expression *ast.Node, opts Options) bool {
 		}
 	}
 
-	// somePromise['catch']() — element access with string literal 'catch' (upstream hardcodes this)
-	if callee != nil && ast.IsElementAccessExpression(callee) {
-		arg := ast.SkipOuterExpressions(callee.AsElementAccessExpression().ArgumentExpression, skipTransparent)
-		if arg != nil && arg.Kind == ast.KindStringLiteral && arg.AsStringLiteral().Text == "catch" {
-			return true
-		}
-	}
-
 	// cy.get().then(a, b) — Cypress chains
 	return promiseutil.IsMemberCallWithObjectName("cy", expression)
 }
