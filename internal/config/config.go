@@ -10,6 +10,7 @@ import (
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
 	jsxA11yPlugin "github.com/web-infra-dev/rslint/internal/plugins/jsx_a11y"
+	nPlugin "github.com/web-infra-dev/rslint/internal/plugins/n"
 	promisePlugin "github.com/web-infra-dev/rslint/internal/plugins/promise"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
@@ -152,6 +153,11 @@ var KnownPlugins = []PluginInfo{
 		getAllRules: func() []rule.Rule { return jsxA11yPlugin.GetAllRules() },
 	},
 	{
+		RulePrefix:  "n",
+		DeclNames:   []string{"eslint-plugin-n", "n"},
+		getAllRules: func() []rule.Rule { return nPlugin.GetAllRules() },
+	},
+	{
 		RulePrefix:  "promise",
 		DeclNames:   []string{"eslint-plugin-promise", "promise"},
 		getAllRules: func() []rule.Rule { return promisePlugin.GetAllRules() },
@@ -241,6 +247,7 @@ func RegisterAllRules() {
 		registerAllReactHooksPluginRules()
 		registerAllJestPluginRules()
 		registerAllJsxA11yPluginRules()
+		registerAllNPluginRules()
 		registerAllPromisePluginRules()
 		registerAllUnicornPluginRules()
 		registerAllCoreEslintRules()
@@ -273,6 +280,12 @@ func registerAllJsxA11yPluginRules() {
 
 func registerAllPromisePluginRules() {
 	for _, rule := range promisePlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
+}
+
+func registerAllNPluginRules() {
+	for _, rule := range nPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }

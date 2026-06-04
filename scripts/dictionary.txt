@@ -570,3 +570,14 @@ rustup
 serde
 SIGSEGV
 zigbuild
+cipheriv
+decipheriv
+fips
+freelist
+lchmod
+linklist
+prng
+unenroll
+unprefix
+userland
+wasi
