@@ -133,6 +133,27 @@ hey
 			// ---- Branch lock-in: isIgnoredAssignment — non-assignment operator ----
 			// `globalThis += x` uses += (assignment operator): still matches.
 			{Code: `hey.then(x => { globalThis += x })`},
+
+			// ---- switch: all cases + default return ----
+			{Code: `hey.then(function(x) { switch(x){case 1:return 1;default:return 2} })`},
+			// empty fallthrough case — case 1 has no stmts so it is skipped in the check
+			{Code: `hey.then(function(x) { switch(x){case 1:case 2:return 1;default:return 2} })`},
+			// case with throw instead of return
+			{Code: `hey.then(function(x) { switch(x){case 1:throw new Error();default:return 2} })`},
+
+			// ---- try/catch: both branches terminate ----
+			{Code: `hey.then(function() { try{return 1}catch(e){return 2} })`},
+			// no catch clause — only try+finally; if try terminates the statement terminates
+			{Code: `hey.then(function() { try{return 1}finally{} })`},
+			// catch throws instead of returning
+			{Code: `hey.then(function() { try{return 1}catch(e){throw e} })`},
+
+			// ---- loops: body terminates ----
+			{Code: `hey.then(function() { while(true){return 1} })`},
+			{Code: `hey.then(function() { for(;;){return 1} })`},
+			{Code: `hey.then(function() { do{return 1}while(x) })`},
+			// loop body throws
+			{Code: `hey.then(function() { while(true){throw new Error()} })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized callback — still reports ----
@@ -221,6 +242,48 @@ p.then(function(x) {
     return x * 2;
   }
 })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+
+			// ---- switch: no default clause — execution can fall through ----
+			{
+				Code:   `hey.then(function(x) { switch(x){case 1:return 1} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// one case has statements but does not terminate
+			{
+				Code:   `hey.then(function(x) { switch(x){case 1:doSomething();default:return 2} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// default clause itself does not terminate
+			{
+				Code:   `hey.then(function(x) { switch(x){case 1:return 1;default:doSomething()} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+
+			// ---- try/catch: one branch does not terminate ----
+			// try terminates but catch is empty
+			{
+				Code:   `hey.then(function() { try{return 1}catch(e){} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// try is empty, catch returns
+			{
+				Code:   `hey.then(function() { try{}catch(e){return 1} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+
+			// ---- loops: body does not terminate ----
+			{
+				Code:   `hey.then(function() { while(true){} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			{
+				Code:   `hey.then(function() { for(;;){} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			{
+				Code:   `hey.then(function() { do{}while(x) })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
 		},

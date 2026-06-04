@@ -105,6 +105,43 @@ func stmtTerminates(s *ast.Node) bool {
 			return false
 		}
 		return stmtTerminates(is.ThenStatement) && stmtTerminates(is.ElseStatement)
+	case ast.KindSwitchStatement:
+		sw := s.AsSwitchStatement()
+		if sw.CaseBlock == nil {
+			return false
+		}
+		hasDefault := false
+		for _, clause := range sw.CaseBlock.AsCaseBlock().Clauses.Nodes {
+			if clause.Kind == ast.KindDefaultClause {
+				hasDefault = true
+			}
+			stmts := clause.Statements()
+			if len(stmts) > 0 && !allPathsTerminate(stmts) {
+				return false
+			}
+		}
+		return hasDefault
+	case ast.KindTryStatement:
+		ts := s.AsTryStatement()
+		if ts.TryBlock == nil || !allPathsTerminate(ts.TryBlock.Statements()) {
+			return false
+		}
+		if ts.CatchClause != nil {
+			cc := ts.CatchClause.AsCatchClause()
+			if cc.Block == nil || !allPathsTerminate(cc.Block.Statements()) {
+				return false
+			}
+		}
+		return true
+	case ast.KindWhileStatement:
+		ws := s.AsWhileStatement()
+		return ws.Statement != nil && stmtTerminates(ws.Statement)
+	case ast.KindForStatement:
+		fs := s.AsForStatement()
+		return fs.Statement != nil && stmtTerminates(fs.Statement)
+	case ast.KindDoStatement:
+		ds := s.AsDoStatement()
+		return ds.Statement != nil && stmtTerminates(ds.Statement)
 	}
 	return false
 }
