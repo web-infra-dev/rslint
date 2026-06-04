@@ -1,4 +1,4 @@
-# promise/always-return
+# always-return
 
 ## Rule Details
 
