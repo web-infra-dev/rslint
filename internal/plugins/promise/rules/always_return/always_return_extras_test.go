@@ -189,6 +189,16 @@ hey
 				Code:   `hey.then(function(x) { if (x) { process.abort(); } })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
+			// process?.exit() — optional chain on process itself; not a terminator.
+			{
+				Code:   `hey.then(function(x) { process?.exit(0); })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// process.exit?.() — optional call on exit; not a terminator.
+			{
+				Code:   `hey.then(function(x) { process.exit?.(0); })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
 
 			// ---- Branch lock-in: isLastCallback — returned from function (not last) ----
 			// return hey.then(cb): parent is ReturnStatement in an outer function -> isLastCallback = false.

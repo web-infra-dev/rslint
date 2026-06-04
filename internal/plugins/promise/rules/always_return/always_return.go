@@ -211,7 +211,11 @@ func isProcessExitOrAbort(node *ast.Node) bool {
 	if node == nil || !ast.IsCallExpression(node) {
 		return false
 	}
-	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
+	call := node.AsCallExpression()
+	if call.QuestionDotToken != nil {
+		return false
+	}
+	callee := ast.SkipOuterExpressions(call.Expression, skipTransparent)
 	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
 		return false
 	}
