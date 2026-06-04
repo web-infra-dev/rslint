@@ -9,7 +9,7 @@ import {
   GetAstInfoResponse,
 } from './service.js';
 
-export { defineConfig } from './define-config.js';
+export { defineConfig, globalIgnores } from './define-config.js';
 export type { RslintConfigEntry } from './define-config.js';
 export {
   ts,
