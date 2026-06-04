@@ -52,7 +52,7 @@ describe('plugin-loader error message quality', () => {
     await withTempConfig(
       {
         'rslint.config.mjs': `import broken from 'eslint-plugin-totally-nonexistent-${Date.now()}';
-export default [{ eslintPlugins: { foo: broken } }];
+export default [{ plugins: { foo: broken } }];
 `,
       },
       async (configPath) => {
@@ -93,8 +93,8 @@ export default [{ eslintPlugins: { foo: broken } }];
         'rslint.config.mjs': `import a from './plugin-a.mjs';
 import b from './plugin-b.mjs';
 export default [
-  { eslintPlugins: { sharedPrefix: a } },
-  { eslintPlugins: { sharedPrefix: b } },
+  { plugins: { sharedPrefix: a } },
+  { plugins: { sharedPrefix: b } },
 ];
 `,
       },
@@ -129,8 +129,8 @@ export default [
         'plugin.mjs': `export default { meta: { name: 'shared' }, rules: { r: { meta: {}, create() { return {}; } } } };`,
         'rslint.config.mjs': `import p from './plugin.mjs';
 export default [
-  { eslintPlugins: { sharedPrefix: p } },
-  { eslintPlugins: { sharedPrefix: p } },
+  { plugins: { sharedPrefix: p } },
+  { plugins: { sharedPrefix: p } },
 ];
 `,
       },
@@ -154,7 +154,7 @@ export default [
   // for `.js/.mjs/.cjs` and for `.ts` only on Node ≥ 22.6 (with
   // native TypeScript support); on Node 20 (the declared support
   // floor in `engines.node`) any user with a `rslint.config.ts` +
-  // eslintPlugins would hit worker init failure even though the host
+  // object-form plugins would hit worker init failure even though the host
   // had successfully loaded the same file via jiti.
   test('G1: loadPluginsFromConfigFile handles .ts config via the same extension-aware path the host uses', async () => {
     await withTempConfig(
@@ -169,7 +169,7 @@ export default [
     files: ['src/**/*.ts'],
     // @ts-ignore — type comes from @rslint/core but we don't depend
     // on it in this fixture; the runner only needs the runtime shape.
-    eslintPlugins: { ts: plugin as unknown as Record<string, unknown> },
+    plugins: { ts: plugin as unknown as Record<string, unknown> },
   },
 ];`,
       },

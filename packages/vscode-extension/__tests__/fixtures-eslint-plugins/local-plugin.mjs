@@ -1,5 +1,5 @@
 // A minimal self-contained ESLint plugin, mounted via the config's
-// `eslintPlugins`. Kept dependency-free so the fixture needs no node_modules:
+// `plugins`. Kept dependency-free so the fixture needs no node_modules:
 //   - no-null            reports every `null` literal (suggestion only)
 //   - prefer-array-some  reports `.filter` member access, with an auto fix
 //                        (filter -> some) so it participates in source.fixAll

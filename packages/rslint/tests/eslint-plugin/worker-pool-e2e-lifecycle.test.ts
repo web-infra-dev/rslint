@@ -329,7 +329,7 @@ export default {
           fs.writeFile(
             cfgPath,
             `import plugin from './_u11-plugin.mjs';
-export default [{ eslintPlugins: { u11: plugin } }];
+export default [{ plugins: { u11: plugin } }];
 `,
             'utf8',
           ),

@@ -1,7 +1,7 @@
 /**
  * Differential harness: run a community ESLint-plugin rule through BOTH
  *  - ESLint v10 (in-process `Linter.verify`), and
- *  - rslint's `eslintPlugins` feature (via the CLI),
+ *  - rslint's `plugins` feature (via the CLI),
  * then compare the normalized diagnostics. A rule "matches" only when both
  * engines emit a byte-identical set of {ruleId, message, line, column,
  * endLine, endColumn, severity}.
@@ -273,7 +273,7 @@ function runRslintChunk(
         : "'error'";
       entries.push(
         `  { files: [${JSON.stringify(filename)}], ` +
-          `eslintPlugins: { ${alias}: ${pkgVar.get(c.pkg)} }, ` +
+          `plugins: { ${alias}: ${pkgVar.get(c.pkg)} }, ` +
           `rules: { ${JSON.stringify(ruleId)}: ${ruleVal} } }`,
       );
     }

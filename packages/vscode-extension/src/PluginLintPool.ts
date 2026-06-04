@@ -2,7 +2,7 @@
  * VS Code-side host for ESLint-plugin lint requests.
  *
  * The Go LSP server lints natively, but rules mounted via a config's
- * `eslintPlugins` run in JS. So when Go encounters such a rule it sends a
+ * object-form `plugins` run in JS. So when Go encounters such a rule it sends a
  * server→client `rslint/pluginLint` request back to this extension;
  * we answer it from an in-process WorkerPool owned by `@rslint/core`'s
  * `createPluginLintHost`. This file is a thin lifecycle wrapper over that

@@ -164,7 +164,7 @@ describe('normalizeConfig', () => {
   });
 });
 
-describe('normalizeConfig — eslintPlugins', () => {
+describe('normalizeConfig — community plugins (object-form)', () => {
   type NormalizedPluginEntry = {
     eslintPlugins?: Record<string, { ruleNames: string[] }>;
     plugins?: string[];
@@ -174,11 +174,11 @@ describe('normalizeConfig — eslintPlugins', () => {
     rules: { 'no-foo': {}, 'no-bar': {} },
   };
 
-  test('strips live plugin objects and emits sorted {ruleNames} meta', () => {
+  test('object-form plugins: strips live objects, emits sorted {ruleNames} meta', () => {
     const [entry] = normalizeConfig([
       {
         files: ['**/*.ts'],
-        eslintPlugins: { local: mockPlugin },
+        plugins: { local: mockPlugin },
         rules: { 'local/no-foo': 'error' },
       },
     ]) as NormalizedPluginEntry[];
@@ -192,39 +192,44 @@ describe('normalizeConfig — eslintPlugins', () => {
     expect(JSON.stringify(entry)).not.toContain('meta');
   });
 
-  test('merges plugin prefixes with user string plugins, deduped', () => {
+  test('array-form plugins: native names pass through as the string[] gate, no carrier', () => {
     const [entry] = normalizeConfig([
       {
         files: ['**/*.ts'],
-        plugins: ['@typescript-eslint', 'local'],
-        eslintPlugins: { local: mockPlugin },
+        plugins: ['@typescript-eslint', 'import'],
         rules: {},
       },
     ]) as NormalizedPluginEntry[];
-    expect(entry.plugins).toEqual(['@typescript-eslint', 'local']);
+    // Array form is the native-name whitelist: it reaches Go as the plugins
+    // string[] and emits NO community-plugin carrier (no live objects).
+    expect(entry.plugins).toEqual(['@typescript-eslint', 'import']);
+    expect(entry.eslintPlugins).toBeUndefined();
   });
 
   test('throws when a mounted plugin has no rules object', () => {
     expect(() =>
       normalizeConfig([
-        { files: ['**/*.ts'], eslintPlugins: { bad: { meta: {} } }, rules: {} },
+        { files: ['**/*.ts'], plugins: { bad: { meta: {} } }, rules: {} },
       ]),
     ).toThrow(/must expose a "rules" object/);
   });
 
-  test('throws when a prefix collides with a native plugin', () => {
+  test('throws when an object-form prefix collides with a native plugin name', () => {
+    // Asymmetry: a native NAME is legal in the array form (previous test) but
+    // illegal as an object-form KEY — native rules always win, so mounting a
+    // community plugin under a native prefix would silently shadow it.
     expect(() =>
       normalizeConfig([
         {
           files: ['**/*.ts'],
-          eslintPlugins: { '@typescript-eslint': mockPlugin },
+          plugins: { '@typescript-eslint': mockPlugin },
           rules: {},
         },
       ]),
     ).toThrow(/collides with the built-in plugin/);
   });
 
-  test('entries without eslintPlugins carry no eslintPlugins field', () => {
+  test('entries with no plugins carry no community-plugin field', () => {
     const [entry] = normalizeConfig([
       { files: ['**/*.ts'], rules: {} },
     ]) as NormalizedPluginEntry[];
@@ -232,22 +237,12 @@ describe('normalizeConfig — eslintPlugins', () => {
     expect(entry.plugins).toEqual([]);
   });
 
-  test('empty eslintPlugins {} does not shadow object-form plugins', () => {
+  test('empty object-form plugins {} is a no-op (no carrier, empty gate)', () => {
     const [entry] = normalizeConfig([
-      {
-        files: ['**/*.ts'],
-        eslintPlugins: {},
-        plugins: { local: mockPlugin },
-        rules: { 'local/no-foo': 'error' },
-      },
+      { files: ['**/*.ts'], plugins: {}, rules: {} },
     ]) as NormalizedPluginEntry[];
-    // An empty `eslintPlugins` must fall through to the object-form `plugins`
-    // so its prefix + rule names still reach Go; otherwise every `local/*`
-    // rule is silently gated out.
-    expect(entry.eslintPlugins).toEqual({
-      local: { ruleNames: ['no-bar', 'no-foo'] },
-    });
-    expect(entry.plugins).toEqual(['local']);
+    expect(entry.eslintPlugins).toBeUndefined();
+    expect(entry.plugins).toEqual([]);
   });
 });
 
@@ -265,7 +260,7 @@ describe('collectPluginMeta', () => {
         entries: normalizeConfig([
           {
             files: ['**/*.ts'],
-            eslintPlugins: { local: mockPlugin },
+            plugins: { local: mockPlugin },
             rules: {},
           },
         ]),
@@ -295,14 +290,14 @@ describe('collectPluginMeta', () => {
         configPath: '/a/rslint.config.mjs',
         configDirectory: '/a',
         entries: normalizeConfig([
-          { eslintPlugins: { local: mockPlugin }, rules: {} },
+          { plugins: { local: mockPlugin }, rules: {} },
         ]),
       },
       {
         configPath: '/b/rslint.config.mjs',
         configDirectory: '/b',
         entries: normalizeConfig([
-          { eslintPlugins: { local: { rules: { zzz: {} } } }, rules: {} },
+          { plugins: { local: { rules: { zzz: {} } } }, rules: {} },
         ]),
       },
     ]);

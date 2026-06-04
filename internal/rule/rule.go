@@ -87,7 +87,7 @@ type Rule struct {
 	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a placeholder rule whose actual execution
 	// happens in a Node worker — an ESLint-plugin rule mounted via the
-	// config's `eslintPlugins`. Its Run is a no-op in Go; the linter
+	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
 	Run                func(ctx RuleContext, options any) RuleListeners

@@ -15,27 +15,17 @@
  */
 
 /**
- * Select the plugin map for a config entry. A non-empty `eslintPlugins`
- * wins over the object-form `plugins` (standard ESLint flat-config users
- * write `plugins: { uc: unicornPlugin }`). An empty `eslintPlugins` ({})
- * is treated as absent so it never shadows a populated object-form
- * `plugins`. Array-form `plugins` (the JSON-config name whitelist) is
- * ignored — it carries no live objects. Returns null when neither yields
- * a non-empty plugin object map.
+ * Select the live community-plugin map for a config entry: the object-form
+ * `plugins` (standard ESLint flat-config users write
+ * `plugins: { uc: unicornPlugin }`). Array-form `plugins` (the native-name
+ * whitelist) is ignored — it carries no live objects. Returns null when
+ * `plugins` is absent or not an object map.
  */
 export function selectPluginSource(
   entry: unknown,
 ): Record<string, unknown> | null {
   if (entry == null || typeof entry !== 'object') return null;
-  const e = entry as { eslintPlugins?: unknown; plugins?: unknown };
-  if (
-    e.eslintPlugins != null &&
-    typeof e.eslintPlugins === 'object' &&
-    !Array.isArray(e.eslintPlugins) &&
-    Object.keys(e.eslintPlugins).length > 0
-  ) {
-    return e.eslintPlugins as Record<string, unknown>;
-  }
+  const e = entry as { plugins?: unknown };
   if (
     e.plugins != null &&
     typeof e.plugins === 'object' &&

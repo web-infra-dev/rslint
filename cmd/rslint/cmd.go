@@ -60,7 +60,7 @@ type lintArgs struct {
 	AllowFiles []string
 	AllowDirs  []string
 	// EslintPlugins carries the {prefix, ruleNames} metadata for ESLint
-	// plugins mounted via the config's `eslintPlugins`. Used to register
+	// plugins mounted via the config's object-form `plugins`. Used to register
 	// placeholder rules so plugin rule names resolve; the live plugins run
 	// in the Node worker.
 	EslintPlugins []rslintconfig.EslintPluginEntry

@@ -267,6 +267,28 @@ describe('filterConfigsByParentIgnores', () => {
     expect(dirs(result)).toEqual([P()]);
   });
 
+  test('empty array-form or object-form plugins still counts as a global ignore', () => {
+    // An ignores-only entry stays "global" even with an empty `plugins`. Since
+    // `plugins` is a union (string[] XOR object), isGlobalIgnoreEntry must treat
+    // both an empty array AND an empty object as "no plugins" — otherwise the
+    // entry would lose global-ignore status and stop blocking nested discovery.
+    for (const emptyPlugins of [{ plugins: [] }, { plugins: {} }]) {
+      const result = filterConfigsByParentIgnores([
+        cfg(
+          P(),
+          { ignores: ['__tests__/**'], ...emptyPlugins },
+          ruleEntry(['**/*.ts'], {}),
+        ),
+        cfg(
+          P('__tests__', 'fixtures'),
+          ruleEntry(['**/*.ts'], { 'no-console': 'error' }),
+        ),
+      ]);
+      expect(result).toHaveLength(1);
+      expect(dirs(result)).toEqual([P()]);
+    }
+  });
+
   test('filters with **/prefix/** pattern', () => {
     const result = filterConfigsByParentIgnores([
       cfg(P(), globalIgnore('**/fixtures/**'), ruleEntry(['**/*.ts'], {})),

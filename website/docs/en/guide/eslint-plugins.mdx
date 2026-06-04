@@ -1,13 +1,13 @@
 # ESLint plugin compatibility
 
-The `eslintPlugins` field mounts a community ESLint plugin so its rules run
-inside rslint, alongside the native rules. Their diagnostics merge into the same
-report. It works the same way in the CLI and the VS Code extension.
+The object-form `plugins` field mounts a community ESLint plugin so its rules
+run inside rslint, alongside the native rules. Their diagnostics merge into the
+same report. It works the same way in the CLI and the VS Code extension.
 
 ## Usage
 
-Import the plugin, put it under a prefix key, and reference its rules as
-`'<prefix>/<rule>'`:
+Import the plugin, put it under a prefix key in `plugins`, and reference its
+rules as `'<prefix>/<rule>'`:
 
 ```js
 import examplePlugin from 'eslint-plugin-example';
@@ -15,7 +15,7 @@ import examplePlugin from 'eslint-plugin-example';
 export default [
   {
     files: ['**/*.ts'],
-    eslintPlugins: { example: examplePlugin },
+    plugins: { example: examplePlugin },
     rules: {
       'example/some-rule': 'error',
     },
@@ -23,8 +23,12 @@ export default [
 ];
 ```
 
-- Only a JS/TS config (`.js` / `.mjs` / `.ts` / `.mts`) can use `eslintPlugins` —
-  it carries a live plugin object, which a JSON config can't.
+- The object form of `plugins` (a `{ prefix: pluginObject }` map) mounts a
+  community plugin. The array form (`plugins: ['@typescript-eslint']`) is the
+  built-in native-plugin whitelist — a single entry uses one form, so to combine
+  native and community plugins, split them into separate config entries.
+- Only a JS/TS config (`.js` / `.mjs` / `.ts` / `.mts`) can mount a community
+  plugin — it carries a live plugin object, which a JSON config can't.
 - The prefix key is yours to choose, but it must not collide with one of
   rslint's built-in plugin prefixes (see [Rules & Presets](/config/rules-and-presets));
   rslint throws a clear error on a collision.

@@ -12,7 +12,7 @@ type ConfiguredRule struct {
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
-	// worker (mounted via the config's `eslintPlugins`) rather than natively
+	// worker (mounted via the config's object-form `plugins`) rather than natively
 	// in Go. The linter splits these out and dispatches them; its Run is a
 	// no-op placeholder.
 	IsEslintPluginRule bool

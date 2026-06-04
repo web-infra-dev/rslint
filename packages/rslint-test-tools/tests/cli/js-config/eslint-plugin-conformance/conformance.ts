@@ -1,7 +1,7 @@
 /**
  * Shared per-plugin conformance suite. Each `<plugin>.test.ts` calls
  * `runConformanceSuite` with its own curated cases; this lints every minimal
- * trigger through BOTH rslint's `eslintPlugins` feature (via the CLI) and
+ * trigger through BOTH rslint's `plugins` feature (via the CLI) and
  * ESLint v10 (in-process) and asserts byte-identical diagnostics. Engine
  * fan-out is batched in `harness.ts`, so each plugin spawns rslint only a
  * handful of times.
@@ -47,7 +47,7 @@ export function runConformanceSuite(
   let clv: Promise<Verdict[]> | undefined;
   const cleanVerdicts = () => (clv ??= compareCases(cleanCases));
 
-  describe(`${pkg} — eslintPlugins ≡ ESLint v10`, () => {
+  describe(`${pkg} — plugins ≡ ESLint v10`, () => {
     test('the curated set is non-empty', () => {
       expect(cases.length).toBeGreaterThan(0);
     });

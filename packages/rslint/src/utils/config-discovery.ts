@@ -139,9 +139,13 @@ function isGlobalIgnoreEntry(
   return (
     entry.files == null &&
     entry.rules == null &&
-    // An empty `plugins: []` is "no plugins" — `normalizeConfig` always emits
-    // the array, so treat it like absent (matches Go's `len(Plugins) == 0`).
-    (entry.plugins == null || entry.plugins.length === 0) &&
+    // No meaningful plugins: absent, an empty array-form whitelist, or an empty
+    // object-form map. `plugins` is a union (string[] native names XOR a live
+    // community-plugin object), so branch on the shape before measuring length.
+    (entry.plugins == null ||
+      (Array.isArray(entry.plugins)
+        ? entry.plugins.length === 0
+        : Object.keys(entry.plugins).length === 0)) &&
     entry.languageOptions == null &&
     entry.settings == null
   );

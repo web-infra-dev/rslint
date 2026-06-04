@@ -49,7 +49,7 @@ const PLUGIN_CONFIG = `import local from './local-plugin.mjs';
 export default [
   {
     files: ['**/*.ts'],
-    eslintPlugins: { local },
+    plugins: { local },
     rules: { 'local/no-null': 'error', 'local/prefer-array-some': 'error' },
   },
 ];
@@ -84,7 +84,7 @@ async function lint(
   return { dir, exitCode: res.exitCode, diags };
 }
 
-describe('CLI eslintPlugins end-to-end', () => {
+describe('CLI community plugins (object-form) end-to-end', () => {
   test('plugin rules produce diagnostics at precise locations', async () => {
     const { dir, diags } = await lint({
       'local-plugin.mjs': LOCAL_PLUGIN,
@@ -131,14 +131,20 @@ describe('CLI eslintPlugins end-to-end', () => {
   });
 
   test('mixed native + plugin rules both report on one file', async () => {
+    // Native and community plugins are separate `plugins` forms (array vs
+    // object), so they live in two entries; both match `**/*.ts` and merge.
     const MIXED_CONFIG = `import local from './local-plugin.mjs';
 export default [
   {
     files: ['**/*.ts'],
     languageOptions: { parserOptions: { projectService: false, project: ['./tsconfig.json'] } },
-    eslintPlugins: { local },
     plugins: ['@typescript-eslint'],
-    rules: { 'local/no-null': 'error', '@typescript-eslint/no-explicit-any': 'error' },
+    rules: { '@typescript-eslint/no-explicit-any': 'error' },
+  },
+  {
+    files: ['**/*.ts'],
+    plugins: { local },
+    rules: { 'local/no-null': 'error' },
   },
 ];
 `;
@@ -166,7 +172,7 @@ export default [
 
   test('a plugin with no rules object fails fast (non-zero exit)', async () => {
     const dir = await createTempDir({
-      'rslint.config.mjs': `export default [{ files: ['**/*.ts'], eslintPlugins: { bad: { meta: {} } }, rules: { 'bad/x': 'error' } }];\n`,
+      'rslint.config.mjs': `export default [{ files: ['**/*.ts'], plugins: { bad: { meta: {} } }, rules: { 'bad/x': 'error' } }];\n`,
       'tsconfig.json': TSCONFIG,
       'd.ts': 'const x = 1;\n',
     });
@@ -186,9 +192,13 @@ export default [
   {
     files: ['**/*.ts'],
     languageOptions: { parserOptions: { projectService: false, project: ['./tsconfig.json'] } },
-    eslintPlugins: { local },
     plugins: ['@typescript-eslint'],
-    rules: { 'local/prefer-array-some': 'error', '@typescript-eslint/no-inferrable-types': 'error' },
+    rules: { '@typescript-eslint/no-inferrable-types': 'error' },
+  },
+  {
+    files: ['**/*.ts'],
+    plugins: { local },
+    rules: { 'local/prefer-array-some': 'error' },
   },
 ];
 `;

@@ -3,15 +3,16 @@ import * as vscode from 'vscode';
 import fs from 'node:fs';
 import path from 'node:path';
 
-// End-to-end VS Code coverage for the `eslintPlugins` reverse-dispatch path:
-// the LSP server lints natively but dispatches rules mounted via a config's
-// `eslintPlugins` to the extension-side worker pool (PluginLintPool), then
-// merges + publishes. The Go merge/dispatch units are covered in
-// internal/lsp/eslint_plugin_test.go; this exercises the full editor loop.
+// End-to-end VS Code coverage for the object-form `plugins` reverse-dispatch
+// path: the LSP server lints natively but dispatches rules mounted via a
+// config's object-form `plugins` to the extension-side worker pool
+// (PluginLintPool), then merges + publishes. The Go merge/dispatch units are
+// covered in internal/lsp/eslint_plugin_test.go; this exercises the full loop.
 //
-// Fixture: rslint.config.mjs mounts ./local-plugin.mjs under `eslintPlugins`
-// with rules local/no-null + local/prefer-array-some, plus native no-console.
-suite('rslint eslintPlugins integration', function () {
+// Fixture: rslint.config.mjs mounts ./local-plugin.mjs under object-form
+// `plugins` with rules local/no-null + local/prefer-array-some, plus native
+// no-console.
+suite('rslint object-form plugins integration', function () {
   this.timeout(120000);
 
   function workspaceRoot(): string {
@@ -62,7 +63,7 @@ suite('rslint eslintPlugins integration', function () {
     );
     const msgs = messages(diagnostics);
 
-    // Both eslintPlugins rules must come back from the worker...
+    // Both plugin rules must come back from the worker...
     assert.ok(
       diagnostics.some((d) => d.message.includes('local/no-null')),
       `Expected local/no-null. Got: ${msgs}`,

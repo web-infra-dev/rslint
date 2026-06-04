@@ -1,5 +1,5 @@
 /**
- * Conformance: eslint-plugin-promise rules mounted in rslint via `eslintPlugins` must
+ * Conformance: eslint-plugin-promise rules mounted in rslint via `plugins` must
  * report identically to ESLint v10. Shared assertion + excluded-category notes
  * live in ./conformance.ts.
  */

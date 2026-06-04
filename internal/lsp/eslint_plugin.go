@@ -106,7 +106,7 @@ func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *str
 //
 // For the JSON-config fallback there is no JS config directory, so the key is
 // empty — the worker has no plugins registered for that path anyway (JSON
-// configs cannot mount eslintPlugins), and a file with no plugin rules never
+// configs cannot mount object-form plugins), and a file with no plugin rules never
 // reaches dispatch.
 func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
 	if len(s.jsConfigs) > 0 {

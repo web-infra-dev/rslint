@@ -121,13 +121,13 @@ For rule severity levels, option format, and plugin configuration, see [Rules & 
 
 ### plugins
 
-- **Type:** `string[]`
+- **Type:** `string[] | Record<string, ESLintPlugin>`
 
-Plugin names that this entry activates. A plugin name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside `rules`.
+Plugins enabled for this entry, in one of two forms.
 
-Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `promise`, `react`.
+**Array of names** — built-in (natively-ported) plugins. A name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside `rules`.
 
-ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are not part of any plugin and can be enabled directly in `rules` without listing anything here.
+Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `jsx-a11y`, `promise`, `react`, `react-hooks`, `unicorn`.
 
 ```ts
 {
@@ -139,25 +139,23 @@ ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are
 }
 ```
 
-Presets like `ts.configs.recommended` already include their own `plugins` entry, so you only need this field when configuring plugin rules outside a preset.
-
-### eslintPlugins
-
-- **Type:** `Record<string, ESLintPlugin>`
-
-Mounts community ESLint plugins so their rules run inside rslint. Map a prefix key to an imported plugin object, then enable its rules under the `<prefix>/<rule>` namespace. Requires a JS/TS config — a live plugin object can't be expressed in JSON.
+**Object of plugin instances** — community ESLint plugins. Map a prefix key to an imported plugin object, then enable its rules under the `<prefix>/<rule>` namespace. The plugin's JS rules run in a Node worker. Requires a JS/TS config — a live plugin object can't be expressed in JSON.
 
 ```ts
 import examplePlugin from 'eslint-plugin-example';
 
 {
   files: ['**/*.ts'],
-  eslintPlugins: { example: examplePlugin },
+  plugins: { example: examplePlugin },
   rules: {
     'example/some-rule': 'error',
   },
 }
 ```
+
+A single entry uses one form. To combine built-in and community plugins, declare them in separate config entries (merged at lint time). A community prefix may not collide with a built-in plugin name.
+
+ESLint core rules (unprefixed names like `no-unused-vars` or `prefer-const`) are not part of any plugin and can be enabled directly in `rules` without listing anything here. Presets like `ts.configs.recommended` already include their own `plugins` entry, so you only need this field when configuring plugin rules outside a preset.
 
 See [ESLint plugin compatibility](/guide/eslint-plugins) for the supported and unsupported ESLint APIs.
 

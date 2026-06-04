@@ -10,7 +10,7 @@ import {
 } from './service.js';
 
 export { defineConfig, globalIgnores } from './define-config.js';
-export type { RslintConfigEntry } from './define-config.js';
+export type { RslintConfigEntry, ESLintPlugin } from './define-config.js';
 export {
   ts,
   js,

@@ -4,14 +4,14 @@
  *
  * Each Worker calls {@link loadPluginsFromConfigs} once at startup to
  * import every rslint config file assigned to it. The config files
- * themselves carry live plugin instances on their `eslintPlugins` (or
- * object-form `plugins`) maps; the worker pulls them out, sorts them
+ * themselves carry live plugin instances on their object-form `plugins`
+ * maps; the worker pulls them out, sorts them
  * by prefix, and caches the resulting `LoadedPlugins` per config
  * directory for the worker's entire lifetime. Subsequent lint tasks
  * select the right `LoadedPlugins` via `configKey` (= config directory).
  *
  * CJS / ESM unwrap. ESLint plugins ship in both module systems and the
- * `eslintPlugins.<prefix>` value the user supplied can be either:
+ * `plugins.<prefix>` value the user supplied can be either:
  *
  *   - the plugin object directly (the conventional shape), or
  *   - a `{ default: pluginObj }` wrapper (when the user wrote
@@ -42,7 +42,7 @@ import { selectPluginSource, unwrapPluginModule } from '../../plugin-source.js';
  * The previous implementation directly called `await import(url)` for
  * every extension; on Node 20 (declared support floor) `.ts` configs
  * have no native loader and a workspace that uses
- * `rslint.config.ts` + `eslintPlugins` would fail worker init even
+ * `rslint.config.ts` + object-form `plugins` would fail worker init even
  * though the main thread had already loaded the same file via jiti.
  *
  * Resolution order for `.ts`/`.mts`:
@@ -158,8 +158,8 @@ export class PluginLoaderError extends Error {
 /**
  * Load every plugin in `entries` and return them keyed by prefix, with a
  * Import the user's rslint config file directly and extract plugin
- * instances from its `eslintPlugins` (or object-form `plugins`)
- * map(s). Each worker calls this through {@link loadPluginsFromConfigs}
+ * instances from its object-form `plugins` map(s). Each worker calls
+ * this through {@link loadPluginsFromConfigs}
  * once per assigned config at init.
  *
  * Each worker independently imports the config (and transitively its
@@ -192,7 +192,7 @@ export async function loadPluginsFromConfigFile(
   }
 
   // Config file's default export is `RslintConfigEntry[]`; each entry may
-  // carry `eslintPlugins: { <prefix>: pluginObj }`.
+  // carry `plugins: { <prefix>: pluginObj }`.
   const exportedDefault =
     (configMod as { default?: unknown }).default ?? configMod;
   const configArray = Array.isArray(exportedDefault) ? exportedDefault : [];
@@ -204,15 +204,14 @@ export async function loadPluginsFromConfigFile(
   // cross-entry prefix conflict is actually caught.
   const seenPrefix = new Set<string>();
 
-  // Source precedence per entry: explicit `eslintPlugins` overrides
-  // the object-form `plugins`. This mirrors `normalizeConfig` in
-  // packages/rslint/src/config-loader.ts — both paths must extract
-  // plugins from the same source, or the worker holds a plugin set
-  // that doesn't match what the main thread (or `loadPluginsFromConfigFile`
-  // alternative) believed was active. The object-form `plugins`
-  // fallback is critical: standard ESLint flat-config users set
-  // `plugins: { uc: unicornPlugin }` and never touch `eslintPlugins`
-  // — without folding, the worker would import zero plugins.
+  // Per entry, the live community plugins come from the object-form
+  // `plugins` map (`plugins: { uc: unicornPlugin }`), selected via the
+  // shared `selectPluginSource`. This mirrors `normalizeConfig` in
+  // packages/rslint/src/config-loader.ts — both paths must extract plugins
+  // from the same source, or the worker holds a plugin set that doesn't
+  // match what the main thread believed was active. Array-form `plugins`
+  // (the native-name whitelist) carries no live objects and yields no
+  // source here.
   for (const entry of configArray) {
     const source = selectPluginSource(entry);
     if (source == null) continue;

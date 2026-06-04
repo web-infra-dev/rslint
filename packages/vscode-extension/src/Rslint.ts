@@ -59,8 +59,8 @@ export class Rslint implements Disposable {
   /**
    * Hosts the in-process WorkerPool that answers Go's reverse
    * `rslint/pluginLint` requests for rules mounted via a config's
-   * `eslintPlugins`. Lazily spins workers — stays a no-op no-worker host
-   * until a config actually mounts plugins.
+   * object-form `plugins`. Lazily spins workers — stays a no-op no-worker
+   * host until a config actually mounts plugins.
    */
   private readonly pluginLintPool: PluginLintPool;
 
@@ -138,8 +138,8 @@ export class Rslint implements Disposable {
       await this.client.start();
 
       // Answer Go's reverse `rslint/pluginLint` requests: Go lints
-      // natively but dispatches rules mounted via a config's `eslintPlugins`
-      // back to us, where the JS WorkerPool runs them. The generic
+      // natively but dispatches rules mounted via a config's object-form
+      // `plugins` back to us, where the JS WorkerPool runs them. The generic
       // string-method overload of `onRequest` handles server-initiated custom
       // requests. Cancellation is a nice-to-have — `host.lint` runs a whole
       // batch and Go's generation counter already discards stale responses;

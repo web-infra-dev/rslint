@@ -101,12 +101,12 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
         );
       }
 
-      // Extract ESLint-plugin metadata. Live plugin objects carry
-      // functions and must NEVER reach the serializable payload sent to
-      // Go — only {prefix, ruleNames} crosses the wire. The worker
-      // re-imports this config file to obtain the live instances. Source
-      // selection (eslintPlugins over object-form plugins) is shared with
-      // the worker loader via `selectPluginSource` so the two never drift.
+      // Extract ESLint-plugin metadata from the object-form `plugins`. Live
+      // plugin objects carry functions and must NEVER reach the serializable
+      // payload sent to Go — only {prefix, ruleNames} crosses the wire. The
+      // worker re-imports this config file to obtain the live instances.
+      // Source selection (object-form `plugins`) is shared with the worker
+      // loader via `selectPluginSource` so the two never drift.
       const pluginSource = selectPluginSource(entry);
       const eslintPluginMeta: Record<string, { ruleNames: string[] }> = {};
       const pluginPrefixes: string[] = [];
@@ -114,14 +114,14 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
         for (const prefix of Object.keys(pluginSource)) {
           if (NATIVE_PLUGIN_PREFIXES.has(prefix)) {
             throw new Error(
-              `[rslint] Config entry at index ${index}: eslintPlugins prefix "${prefix}" collides with the built-in plugin of the same name; choose a different prefix.`,
+              `[rslint] Config entry at index ${index}: plugins prefix "${prefix}" collides with the built-in plugin of the same name; choose a different prefix.`,
             );
           }
           const plugin = unwrapPluginModule(pluginSource[prefix]);
           const pluginRules = plugin?.rules;
           if (pluginRules == null || typeof pluginRules !== 'object') {
             throw new Error(
-              `[rslint] Config entry at index ${index}: eslintPlugins["${prefix}"] must expose a "rules" object.`,
+              `[rslint] Config entry at index ${index}: plugins["${prefix}"] must expose a "rules" object.`,
             );
           }
           eslintPluginMeta[prefix] = {
@@ -133,9 +133,9 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
 
       // The serializable `plugins` handed to Go is a string[] of declared
       // prefixes (its native-plugin gate keys off this set). Merge any
-      // string entries the user wrote with the mounted eslintPlugins
-      // prefixes; drop the live object-form `plugins` (functions can't be
-      // JSON-serialized to Go).
+      // array-form (native) names the user wrote with the object-form
+      // (community) prefixes; drop the live object-form `plugins` values
+      // (functions can't be JSON-serialized to Go).
       const stringPlugins = Array.isArray(entry.plugins)
         ? entry.plugins.filter((p): p is string => typeof p === 'string')
         : [];

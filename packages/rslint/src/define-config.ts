@@ -27,10 +27,11 @@ const NATIVE_PLUGINS = [
 export type KnownPlugin = (typeof NATIVE_PLUGINS)[number];
 
 /**
- * Prefixes owned by rslint's built-in (natively-ported) plugins. A user
- * `eslintPlugins` prefix may not collide with these — native rules always
- * win, so a collision would silently shadow the mounted plugin. Typed as
- * ReadonlySet<string> so callers can probe arbitrary user-supplied strings.
+ * Prefixes owned by rslint's built-in (natively-ported) plugins. A community
+ * plugin mounted under an object-form `plugins` key may not collide with these
+ * — native rules always win, so a collision would silently shadow the mounted
+ * plugin. Typed as ReadonlySet<string> so callers can probe arbitrary
+ * user-supplied strings.
  */
 export const NATIVE_PLUGIN_PREFIXES: ReadonlySet<string> = new Set(
   NATIVE_PLUGINS,
@@ -127,39 +128,40 @@ export interface RslintConfigEntry {
   /** Language-level configuration (parser, etc.). */
   languageOptions?: LanguageOptions;
   /**
-   * Plugin names to enable for this entry. Built-in plugins are listed for
-   * autocomplete; arbitrary strings are still accepted so future/third-party
-   * plugins don't trip the type checker.
+   * Plugins enabled for this entry. Two forms:
    *
-   * Each built-in value maps to the original ESLint plugin it ports rules from:
+   * - **Array of names** — built-in (natively-ported) plugins, e.g.
+   *   `plugins: ['@typescript-eslint', 'unicorn']`. Built-in names are listed
+   *   for autocomplete; arbitrary strings are still accepted. Each built-in
+   *   maps to the ESLint plugin it ports rules from:
+   *   `'@typescript-eslint'` → `@typescript-eslint/eslint-plugin`,
+   *   `'import'` → `eslint-plugin-import`, `'jest'` → `eslint-plugin-jest`,
+   *   `'jsx-a11y'` → `eslint-plugin-jsx-a11y`, `'promise'` → `eslint-plugin-promise`,
+   *   `'react'` → `eslint-plugin-react`, `'react-hooks'` → `eslint-plugin-react-hooks`,
+   *   `'unicorn'` → `eslint-plugin-unicorn`.
    *
-   * - `'@typescript-eslint'` → `@typescript-eslint/eslint-plugin`
-   * - `'import'`             → `eslint-plugin-import`
-   * - `'jest'`               → `eslint-plugin-jest`
-   * - `'jsx-a11y'`           → `eslint-plugin-jsx-a11y`
-   * - `'promise'`            → `eslint-plugin-promise`
-   * - `'react'`              → `eslint-plugin-react`
-   * - `'react-hooks'`        → `eslint-plugin-react-hooks`
-   * - `'unicorn'`            → `eslint-plugin-unicorn`
+   * - **Object of plugin instances** — community ESLint plugins mounted by
+   *   prefix, e.g. `{ unicorn }` after `import unicorn from 'eslint-plugin-unicorn'`.
+   *   Their JS rule functions run in a Node worker; only `{prefix, ruleNames}`
+   *   metadata reaches the Go core. The live objects never cross the wire — the
+   *   worker re-imports this config file to obtain them, so local-path and
+   *   monorepo-versioned plugins resolve correctly. A prefix may not collide
+   *   with a built-in plugin name.
+   *
+   * A single entry uses one form. To combine built-in and community plugins,
+   * declare them in separate config entries (merged at lint time).
+   *
+   * @example
+   * plugins: ['@typescript-eslint', 'unicorn']
+   * @example
+   * import unicorn from 'eslint-plugin-unicorn';
+   * export default [{ plugins: { unicorn }, rules: { 'unicorn/no-null': 'error' } }];
    */
-  plugins?: (KnownPlugin | (string & {}))[];
+  plugins?: (KnownPlugin | (string & {}))[] | Record<string, ESLintPlugin>;
   /** Shared settings accessible to rules. */
   settings?: Record<string, any>;
   /** Rule configuration map. */
   rules?: RulesRecord;
-  /**
-   * Real ESLint plugins mounted by prefix, e.g. `{ unicorn }` after
-   * `import unicorn from 'eslint-plugin-unicorn'`. Their JS rule functions
-   * run in a Node worker; only `{prefix, ruleNames}` metadata reaches the
-   * Go core. The live objects never cross the wire — the worker re-imports
-   * this config file to obtain them, so local-path and monorepo-versioned
-   * plugins resolve correctly.
-   *
-   * @example
-   * import unicorn from 'eslint-plugin-unicorn';
-   * export default [{ eslintPlugins: { unicorn }, rules: { 'unicorn/no-null': 'error' } }];
-   */
-  eslintPlugins?: Record<string, ESLintPlugin>;
 }
 
 /** Top-level rslint config: an array of entries. */

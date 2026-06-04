@@ -8,7 +8,7 @@ import (
 )
 
 // EslintPluginEntry is the metadata Go receives for one ESLint plugin
-// mounted via a config's `eslintPlugins`. The live plugin object stays in
+// mounted via a config's object-form `plugins`. The live plugin object stays in
 // Node (the worker re-imports the config file to obtain it); Go only needs
 // the prefix and rule names so it can (a) register placeholder rules that
 // make `<prefix>/<rule>` resolvable instead of being silently dropped, and
@@ -40,7 +40,7 @@ func RegisterEslintPluginRules(entries []EslintPluginEntry) {
 			fullName := entry.Prefix + "/" + ruleName
 			if existing, ok := GlobalRuleRegistry.GetRule(fullName); ok && !existing.IsEslintPluginRule {
 				fmt.Fprintf(os.Stderr,
-					"rslint: eslintPlugins rule %q is shadowed by a built-in rule of the same name; using the built-in.\n",
+					"rslint: plugin rule %q is shadowed by a built-in rule of the same name; using the built-in.\n",
 					fullName)
 				continue
 			}
