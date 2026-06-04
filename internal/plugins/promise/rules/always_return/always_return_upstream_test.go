@@ -122,35 +122,35 @@ hey
 			},
 			{
 				Code:   `hey.then(function() { doSomethingWicked(); })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 10}},
 			},
 			{
 				Code:   `hey.then(function() { if (x) { return x; } })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 23}},
 			},
 			{
 				Code:   `hey.then(function() { if (x) { return x; } else { }})`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 23}},
 			},
 			{
 				Code:   `hey.then(function() { if (x) { } else { return x; }})`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 23}},
 			},
 			{
 				Code:   `hey.then(function() { if (x) { process.chdir(); } else { return x; }})`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 23}},
 			},
 			{
 				Code:   `hey.then(function() { if (x) { return you.then(function() { return x; }); } })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 23}},
 			},
 			{
 				Code:   `hey.then( x => { x ? x.id : null })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 11}},
 			},
 			{
 				Code:   `hey.then(function(x) { x ? x.id : null })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 1, Column: 10}},
 			},
 			{
 				Code: `(function() {
@@ -172,7 +172,7 @@ hey.then(({x, y}) => {
     throw new Error(x || y)
   }
 })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 3, Column: 3}},
 			},
 			{
 				Code: `
@@ -181,7 +181,7 @@ hey.then(({x, y}) => {
     return x
   }
 })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg, Line: 3, Column: 3}},
 			},
 			// ---- upstream invalid: ignoreLastCallback ----
 			{

@@ -75,40 +75,71 @@ func isFunctionWithBlockBody(node *ast.Node) bool {
 	return false
 }
 
-// allPathsTerminate reports whether every execution path through the given
-// statement list ends with a return, throw, or process.exit/abort call.
+// stmtsTerminate walks stmts and returns (terminates, reportNode):
+//
+//	(true,  nil)   — every execution path through stmts terminates.
+//	(false, node)  — paths do not all terminate; node is the first branching
+//	                 statement (if/switch/try/loop) to blame, matching upstream's
+//	                 code-path-segment reporting.
+//	(false, nil)   — paths do not terminate, but no specific sub-node can be
+//	                 blamed (flat body); the caller should fall back to cb.
+//
 // Nested function scopes are not entered.
-func allPathsTerminate(stmts []*ast.Node) bool {
+func stmtsTerminate(stmts []*ast.Node) (bool, *ast.Node) {
+	var candidate *ast.Node
 	for _, s := range stmts {
-		if stmtTerminates(s) {
-			return true
+		ok, node := stmtTerminates(s)
+		if ok {
+			// A terminating statement was reached — all paths from here are
+			// covered, including any incomplete paths left open by earlier
+			// branching statements (e.g. if-without-else followed by return).
+			return true, nil
+		}
+		// Record the first specific blame node; a later terminator may still
+		// override the whole thing with (true, nil).
+		if candidate == nil {
+			candidate = node // nil for flat stmts, non-nil for branching ones
 		}
 	}
-	return false
+	return false, candidate
 }
 
-func stmtTerminates(s *ast.Node) bool {
+// stmtTerminates returns (terminates, reportNode):
+//
+//	(true,  nil)   — statement terminates all paths.
+//	(false, s)     — branching statement that does not terminate; s is the node
+//	                 to report on (the statement itself).
+//	(false, nil)   — non-branching statement that does not terminate; no specific
+//	                 blame sub-node; the caller propagates nil upward.
+func stmtTerminates(s *ast.Node) (bool, *ast.Node) {
 	if s == nil {
-		return false
+		return false, nil
 	}
 	switch s.Kind {
 	case ast.KindReturnStatement, ast.KindThrowStatement:
-		return true
+		return true, nil
 	case ast.KindExpressionStatement:
-		expr := s.AsExpressionStatement().Expression
-		return isProcessExitOrAbort(expr)
+		if isProcessExitOrAbort(s.AsExpressionStatement().Expression) {
+			return true, nil
+		}
+		return false, nil
 	case ast.KindBlock:
-		return allPathsTerminate(s.Statements())
+		return stmtsTerminate(s.Statements())
 	case ast.KindIfStatement:
 		is := s.AsIfStatement()
 		if is.ElseStatement == nil {
-			return false
+			return false, s
 		}
-		return stmtTerminates(is.ThenStatement) && stmtTerminates(is.ElseStatement)
+		tOk, _ := stmtTerminates(is.ThenStatement)
+		eOk, _ := stmtTerminates(is.ElseStatement)
+		if tOk && eOk {
+			return true, nil
+		}
+		return false, s
 	case ast.KindSwitchStatement:
 		sw := s.AsSwitchStatement()
 		if sw.CaseBlock == nil {
-			return false
+			return false, s
 		}
 		hasDefault := false
 		for _, clause := range sw.CaseBlock.AsCaseBlock().Clauses.Nodes {
@@ -116,34 +147,63 @@ func stmtTerminates(s *ast.Node) bool {
 				hasDefault = true
 			}
 			stmts := clause.Statements()
-			if len(stmts) > 0 && !allPathsTerminate(stmts) {
-				return false
+			if len(stmts) > 0 {
+				if ok, _ := stmtsTerminate(stmts); !ok {
+					return false, s
+				}
 			}
 		}
-		return hasDefault
+		if !hasDefault {
+			return false, s
+		}
+		return true, nil
 	case ast.KindTryStatement:
 		ts := s.AsTryStatement()
-		if ts.TryBlock == nil || !allPathsTerminate(ts.TryBlock.Statements()) {
-			return false
+		if ts.TryBlock == nil {
+			return false, s
+		}
+		if ok, _ := stmtsTerminate(ts.TryBlock.Statements()); !ok {
+			return false, s
 		}
 		if ts.CatchClause != nil {
 			cc := ts.CatchClause.AsCatchClause()
-			if cc.Block == nil || !allPathsTerminate(cc.Block.Statements()) {
-				return false
+			if cc.Block == nil {
+				return false, s
+			}
+			if ok, _ := stmtsTerminate(cc.Block.Statements()); !ok {
+				return false, s
 			}
 		}
-		return true
+		return true, nil
 	case ast.KindWhileStatement:
 		ws := s.AsWhileStatement()
-		return ws.Statement != nil && stmtTerminates(ws.Statement)
+		if ws.Statement == nil {
+			return false, s
+		}
+		if ok, _ := stmtTerminates(ws.Statement); !ok {
+			return false, s
+		}
+		return true, nil
 	case ast.KindForStatement:
 		fs := s.AsForStatement()
-		return fs.Statement != nil && stmtTerminates(fs.Statement)
+		if fs.Statement == nil {
+			return false, s
+		}
+		if ok, _ := stmtTerminates(fs.Statement); !ok {
+			return false, s
+		}
+		return true, nil
 	case ast.KindDoStatement:
 		ds := s.AsDoStatement()
-		return ds.Statement != nil && stmtTerminates(ds.Statement)
+		if ds.Statement == nil {
+			return false, s
+		}
+		if ok, _ := stmtTerminates(ds.Statement); !ok {
+			return false, s
+		}
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
 // isProcessExitOrAbort reports whether node is a call to process.exit() or process.abort().
@@ -321,9 +381,11 @@ var AlwaysReturnRule = rule.Rule{
 				if body == nil {
 					return
 				}
-				stmts := body.Statements()
-				if !allPathsTerminate(stmts) {
-					ctx.ReportNode(cb, buildThenShouldReturnOrThrowMessage())
+				if ok, reportOn := stmtsTerminate(body.Statements()); !ok {
+					if reportOn == nil {
+						reportOn = cb
+					}
+					ctx.ReportNode(reportOn, buildThenShouldReturnOrThrowMessage())
 				}
 			},
 		}
