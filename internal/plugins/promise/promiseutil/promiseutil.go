@@ -54,3 +54,24 @@ func IsPromiseStatic(name string) bool {
 		return false
 	}
 }
+
+// IsMemberCallWithObjectName mirrors eslint-plugin-promise's lib/is-member-call-with-object-name.
+// It reports whether node is a call expression whose callee's root object is an identifier
+// named objectName, following the member chain recursively.
+func IsMemberCallWithObjectName(objectName string, node *ast.Node) bool {
+	if node == nil || !ast.IsCallExpression(node) {
+		return false
+	}
+	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
+	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+		return false
+	}
+	obj := ast.SkipOuterExpressions(callee.AsPropertyAccessExpression().Expression, skipTransparent)
+	if obj == nil {
+		return false
+	}
+	if ast.IsIdentifier(obj) && obj.AsIdentifier().Text == objectName {
+		return true
+	}
+	return IsMemberCallWithObjectName(objectName, obj)
+}

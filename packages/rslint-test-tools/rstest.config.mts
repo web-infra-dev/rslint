@@ -453,6 +453,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise
+    './tests/eslint-plugin-promise/rules/catch-or-return.test.ts',
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
 
