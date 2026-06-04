@@ -141,7 +141,7 @@ func isLastCallback(thenCall *ast.Node) bool {
 	target := thenCall
 	for {
 		parent := target.Parent
-		// Skip outer expression wrappers (parens, TS type assertions, non-null) on parent side
+		// Skip parenthesized wrappers on the parent side.
 		for parent != nil && ast.IsOuterExpression(parent, skipTransparent) {
 			target = parent
 			parent = target.Parent
