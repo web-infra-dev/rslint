@@ -455,6 +455,7 @@ export default defineConfig({
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
+    './tests/eslint-plugin-promise/rules/prefer-await-to-then.test.ts',
 
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
