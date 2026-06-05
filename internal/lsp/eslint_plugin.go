@@ -181,20 +181,35 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 			linter.SuggestionsModeEager, // suggestionsMode
 			func(d rule.RuleDiagnostic) { diags = append(diags, d) },
 		)
-		// context.Canceled means the worker cooperatively dropped the batch
-		// (newer request superseded it); generation already guards staleness,
-		// so just don't deliver. Other errors are logged; the editor never
-		// sees worker stderr, but a per-file crash is surfaced as a diagnostic
-		// inside DispatchEslintPluginRules itself.
+		// Categorize like the fixAll sibling (lintPluginRulesSync): a superseded
+		// batch (context.Canceled) is silent; a client that never answered within
+		// pluginReverseTimeout (context.DeadlineExceeded) is benign and expected —
+		// logging it at error severity would spam every debounced relint — so it
+		// gets an info-level note, not an error. Only a genuine failure is an
+		// error. Generation already guards staleness, so a non-delivered result
+		// just leaves the pass native-only.
 		if err != nil {
-			if !errors.Is(err, context.Canceled) {
+			switch {
+			case errors.Is(err, context.Canceled):
+			case errors.Is(err, context.DeadlineExceeded):
+				log.Printf("[rslint] eslint-plugin lint for %s timed out (client unresponsive); leaving it native-only", uri)
+			default:
 				log.Printf("[rslint] eslint-plugin lint error for %s: %v", uri, err)
 			}
 			return
 		}
+		// Deliver the freshly-computed result. Prefer the buffered send so a valid
+		// result is never raced away by a deadline that expired in the gap between
+		// the worker returning and this select; fall back to the ctx.Done() drop
+		// only if the buffer is genuinely full (dispatch loop not draining).
+		result := pluginLintResult{uri: uri, generation: generation, diags: diags}
 		select {
-		case s.pluginResultCh <- pluginLintResult{uri: uri, generation: generation, diags: diags}:
-		case <-ctx.Done():
+		case s.pluginResultCh <- result:
+		default:
+			select {
+			case s.pluginResultCh <- result:
+			case <-ctx.Done():
+			}
 		}
 	}()
 }

@@ -707,10 +707,15 @@ func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOpt
 
 // defaultPluginReverseTimeout caps each eslint-plugin reverse request to the
 // client — the source.fixAll passes (summed) and each background diagnostics
-// dispatch. It must be generous enough not to cut off a legitimately slow worker
-// lint of a single file, but short enough that a non-responsive client unblocks
-// the dispatch loop / drains the dispatch goroutine promptly.
-const defaultPluginReverseTimeout = 5 * time.Second
+// dispatch. It is a generous BACKSTOP, not a precise budget: a superseded
+// diagnostics dispatch is already discarded by the generation stamp, so this
+// only has to bound a client that is genuinely wedged (never answers and is
+// never superseded). 30s sits well above any legitimate single-file plugin lint
+// — so a slow-but-valid lint is never cut off — while still freeing a dead
+// client's goroutine and unblocking the fixAll dispatch loop in bounded time.
+// (Fine-grained supersede cancellation via $/cancelRequest, which would let this
+// be tightened, is a separate follow-up; see dispatchPluginLint.)
+const defaultPluginReverseTimeout = 30 * time.Second
 
 func isBlockingMethod(method lsproto.Method) bool {
 	switch method {

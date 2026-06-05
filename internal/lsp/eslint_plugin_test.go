@@ -3,7 +3,10 @@ package lsp
 import (
 	"context"
 	"errors"
+	"log"
+	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -650,6 +653,10 @@ func TestDispatchPluginLint_TimesOutWedgedClient(t *testing.T) {
 	s.documents[uri] = "const bar = 1;"
 	s.docGeneration[uri] = 1
 
+	var logBuf syncBuffer
+	log.SetOutput(&logBuf)
+	defer log.SetOutput(os.Stderr)
+
 	released := make(chan error, 1)
 	s.eslintPluginDispatch = func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
 		<-ctx.Done() // wedged client: only the deadline releases us
@@ -666,5 +673,80 @@ func TestDispatchPluginLint_TimesOutWedgedClient(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("dispatch goroutine never released — the reverse request leaked")
+	}
+
+	// The DeadlineExceeded must be logged as a BENIGN timeout, not an rslint
+	// "lint error" — at error severity it would spam every debounced relint.
+	deadline := time.Now().Add(time.Second)
+	for !strings.Contains(logBuf.String(), "timed out") {
+		if time.Now().After(deadline) {
+			t.Fatalf("expected a benign timeout log line, got %q", logBuf.String())
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	if strings.Contains(logBuf.String(), "lint error") {
+		t.Errorf("DeadlineExceeded mislabeled as an rslint error: %q", logBuf.String())
+	}
+}
+
+// syncBuffer is a goroutine-safe log sink for asserting what
+// dispatchPluginLint's background goroutine logs.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf strings.Builder
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// TestDispatchPluginLint_DeliversSuccessResultNotRacedAway pins that a
+// successful lint's result reaches pluginResultCh: the send is preferred over
+// the ctx.Done() drop, so a freshly-computed result is never raced away by a
+// deadline that expires in the gap before the send (the buffered channel has
+// room).
+func TestDispatchPluginLint_DeliversSuccessResultNotRacedAway(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpok", RuleNames: []string{"no-bar"}},
+	})
+	s := newTestServer()
+	s.backgroundCtx = context.Background()
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{
+			Plugins: []string{"tpok"},
+			Rules:   config.Rules{"tpok/no-bar": "error"},
+		},
+	}
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	s.documents[uri] = "const bar = 1;"
+	s.docGeneration[uri] = 7
+
+	s.eslintPluginDispatch = func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		return &linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+			FilePath:    req.Files[0].Path,
+			Diagnostics: []linter.EslintPluginDiagnostic{{RuleName: "tpok/no-bar", Message: "bad", StartPos: 6, EndPos: 9}},
+		}}}, nil
+	}
+
+	s.dispatchPluginLint(uri, 7)
+
+	select {
+	case r := <-s.pluginResultCh:
+		if r.generation != 7 {
+			t.Errorf("delivered generation %d, want 7", r.generation)
+		}
+		if len(r.diags) != 1 || r.diags[0].RuleName != "tpok/no-bar" {
+			t.Errorf("expected the plugin diagnostic delivered, got %+v", r.diags)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("successful plugin result was not delivered to pluginResultCh")
 	}
 }

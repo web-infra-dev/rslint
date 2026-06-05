@@ -247,20 +247,42 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ).toThrow(/collides with the built-in plugin/);
   });
 
-  test('throws when an object-form prefix is a native eslint-plugin-* decl-name', () => {
-    // `eslint-plugin-import` normalizes to the native `import` prefix in Go, so
-    // mounting a community plugin under it would otherwise pass the JS guard but
-    // be silently dropped by the Go gate. Reject it loudly like a direct
-    // native-prefix collision.
-    expect(() =>
-      normalizeConfig([
-        {
-          files: ['**/*.ts'],
-          plugins: { 'eslint-plugin-import': mockPlugin },
-          rules: {},
-        },
-      ]),
-    ).toThrow(/collides with the built-in plugin/);
+  const RESERVED_DECL_ALIASES = [
+    'eslint-plugin-import',
+    'eslint-plugin-jest',
+    'eslint-plugin-jsx-a11y',
+    'eslint-plugin-promise',
+    'eslint-plugin-react-hooks',
+    'eslint-plugin-unicorn',
+  ];
+  for (const alias of RESERVED_DECL_ALIASES) {
+    test(`throws when an object-form prefix is the native decl-name ${alias}`, () => {
+      // Each `eslint-plugin-*` alias normalizes to a native prefix in Go, so a
+      // community plugin mounted under it would otherwise pass the JS guard but
+      // be silently dropped by the Go gate. Reject it loudly.
+      expect(() =>
+        normalizeConfig([
+          { files: ['**/*.ts'], plugins: { [alias]: mockPlugin }, rules: {} },
+        ]),
+      ).toThrow(/collides with the built-in plugin/);
+    });
+  }
+
+  test('accepts an eslint-plugin-* key that is NOT a native decl-name', () => {
+    // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
+    // so reserving it would wrongly false-reject a legitimate community mount.
+    // The asymmetry must be exact: only the 6 aliased names are reserved.
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { 'eslint-plugin-react': mockPlugin },
+        rules: { 'eslint-plugin-react/no-foo': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.plugins).toContain('eslint-plugin-react');
+    expect(entry.eslintPlugins).toEqual({
+      'eslint-plugin-react': { ruleNames: ['no-bar', 'no-foo'] },
+    });
   });
 
   test('entries with no plugins carry no community-plugin field', () => {

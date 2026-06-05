@@ -5,10 +5,12 @@
 export type RuleSeverity = 'off' | 'warn' | 'error';
 
 /**
- * Single source of truth for the prefixes owned by rslint's built-in
- * (natively-ported) plugins. The `KnownPlugin` type union and the
- * `NATIVE_PLUGIN_RESERVED_NAMES` runtime Set both derive from this, so adding a ported
- * plugin is a one-line change (no second list to keep in sync).
+ * Source of truth for the rule prefixes owned by rslint's built-in
+ * (natively-ported) plugins; the `KnownPlugin` type union derives from it.
+ * `NATIVE_PLUGIN_RESERVED_NAMES` unions these prefixes with the alternate
+ * `eslint-plugin-*` declaration names (`NATIVE_PLUGIN_DECL_ALIASES`), so a
+ * ported plugin that also has such an alias must be added to BOTH lists here —
+ * kept in sync with config.go's PluginInfo.DeclNames (a Go test guards the drift).
  */
 const NATIVE_PLUGINS = [
   '@typescript-eslint',
