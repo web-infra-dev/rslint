@@ -141,12 +141,19 @@ hey
 			// case with throw instead of return
 			{Code: `hey.then(function(x) { switch(x){case 1:throw new Error();default:return 2} })`},
 
-			// ---- try/catch: both branches terminate ----
+			// ---- try/catch: all paths terminate ----
 			{Code: `hey.then(function() { try{return 1}catch(e){return 2} })`},
-			// no catch clause — only try+finally; if try terminates the statement terminates
-			{Code: `hey.then(function() { try{return 1}finally{} })`},
 			// catch throws instead of returning
 			{Code: `hey.then(function() { try{return 1}catch(e){throw e} })`},
+			// explicit throw in try; catch always executes and returns
+			{Code: `hey.then(function() { try{throw err}catch(e){return 1} })`},
+			// return of a function call in try; catch terminates — all paths covered
+			{Code: `hey.then(function() { try{return foo()}catch(e){return 2} })`},
+
+			// ---- try/finally: finally returns, covers all paths ----
+			// eslint-plugin-promise@7.3.0 crashes on finally{return}; binder correctly
+			// sees HasImplicitReturn=false since every path exits through the finally return.
+			{Code: `hey.then(function() { try{foo()}catch(e){bar()}finally{return 2} })`},
 
 			// ---- loops: body terminates ----
 			{Code: `hey.then(function() { while(true){return 1} })`},
@@ -154,6 +161,16 @@ hey
 			{Code: `hey.then(function() { do{return 1}while(x) })`},
 			// loop body throws
 			{Code: `hey.then(function() { while(true){throw new Error()} })`},
+			// infinite loop with condition on body — end after loop is unreachable
+			{Code: `hey.then(function() { while(true){} })`},
+			{Code: `hey.then(function() { for(;;){} })`},
+			// infinite loop with conditional return inside — end still unreachable (no break)
+			{Code: `hey.then(function() { while(true){ if(x){return 1} } })`},
+
+			// ---- switch: fall-through to terminating default ----
+			// case 1 has no terminator but falls through to default:return 2; all paths covered
+			{Code: `hey.then(function(x) { switch(x){case 1:doSomething();default:return 2} })`},
+
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized callback — still reports ----
@@ -260,11 +277,6 @@ p.then(function(x) {
 				Code:   `hey.then(function(x) { switch(x){case 1:return 1} })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
-			// one case has statements but does not terminate
-			{
-				Code:   `hey.then(function(x) { switch(x){case 1:doSomething();default:return 2} })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
-			},
 			// default clause itself does not terminate
 			{
 				Code:   `hey.then(function(x) { switch(x){case 1:return 1;default:doSomething()} })`,
@@ -272,28 +284,55 @@ p.then(function(x) {
 			},
 
 			// ---- try/catch: one branch does not terminate ----
-			// try terminates but catch is empty
+			// foo() may throw; empty catch falls through to end
 			{
-				Code:   `hey.then(function() { try{return 1}catch(e){} })`,
+				Code:   `hey.then(function() { try{foo()}catch(e){} })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
-			// try is empty, catch returns
+			// try is empty, catch returns — but try may not throw, so end after try is reachable
 			{
 				Code:   `hey.then(function() { try{}catch(e){return 1} })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
+			// return of a function call in try: call might throw; catch is empty
+			{
+				Code:   `hey.then(function() { try{return foo()}catch(e){} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// try/finally with empty finally: normal path (try falls through) reaches end
+			{
+				Code:   `hey.then(function() { try{foo()}catch(e){return 1}finally{} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
 
-			// ---- loops: body does not terminate ----
+			// ---- loops: non-infinite condition may be false on entry — end reachable ----
+			// while(x): x might be false initially, loop skipped entirely
 			{
-				Code:   `hey.then(function() { while(true){} })`,
+				Code:   `hey.then(function() { while(x){return 1} })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
+			// for(;c;): same — condition c might be false
 			{
-				Code:   `hey.then(function() { for(;;){} })`,
+				Code:   `hey.then(function() { for(;c;){return 1} })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
+			// do-while: body executes once but condition is re-checked; no terminator in body
 			{
 				Code:   `hey.then(function() { do{}while(x) })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// break exits an infinite loop; code after loop is reachable
+			{
+				Code:   `hey.then(function() { while(true){break} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			{
+				Code:   `hey.then(function() { for(;;){break} })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
+			},
+			// break inside a conditional: one path exits the loop, making end reachable
+			{
+				Code:   `hey.then(function() { for(;;){ if(x){break}; return 1 } })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: thenMsg}},
 			},
 		},

@@ -75,135 +75,35 @@ func isFunctionWithBlockBody(node *ast.Node) bool {
 	return false
 }
 
-// stmtsTerminate walks stmts and returns (terminates, reportNode):
-//
-//	(true,  nil)   — every execution path through stmts terminates.
-//	(false, node)  — paths do not all terminate; node is the first branching
-//	                 statement (if/switch/try/loop) to blame, matching upstream's
-//	                 code-path-segment reporting.
-//	(false, nil)   — paths do not terminate, but no specific sub-node can be
-//	                 blamed (flat body); the caller should fall back to cb.
-//
-// Nested function scopes are not entered.
-func stmtsTerminate(stmts []*ast.Node) (bool, *ast.Node) {
-	var candidate *ast.Node
+// hasProcessExitInFlatBody scans the top-level statements of a function body
+// for a process.exit() or process.abort() call. The binder doesn't model these
+// as "never", so we treat them as terminators before consulting the binder.
+func hasProcessExitInFlatBody(stmts []*ast.Node) bool {
 	for _, s := range stmts {
-		ok, node := stmtTerminates(s)
-		if ok {
-			// A terminating statement was reached — all paths from here are
-			// covered, including any incomplete paths left open by earlier
-			// branching statements (e.g. if-without-else followed by return).
-			return true, nil
-		}
-		// Record the first specific blame node; a later terminator may still
-		// override the whole thing with (true, nil).
-		if candidate == nil {
-			candidate = node // nil for flat stmts, non-nil for branching ones
+		if s.Kind == ast.KindExpressionStatement {
+			if isProcessExitOrAbort(s.AsExpressionStatement().Expression) {
+				return true
+			}
 		}
 	}
-	return false, candidate
+	return false
 }
 
-// stmtTerminates returns (terminates, reportNode):
-//
-//	(true,  nil)   — statement terminates all paths.
-//	(false, s)     — branching statement that does not terminate; s is the node
-//	                 to report on (the statement itself).
-//	(false, nil)   — non-branching statement that does not terminate; no specific
-//	                 blame sub-node; the caller propagates nil upward.
-func stmtTerminates(s *ast.Node) (bool, *ast.Node) {
-	if s == nil {
-		return false, nil
+// findReportNode returns the first if-statement found by scanning stmts
+// (recursing into nested blocks). Returns nil when no if-statement exists,
+// causing the caller to fall back to reporting on the callback itself.
+func findReportNode(stmts []*ast.Node) *ast.Node {
+	for _, s := range stmts {
+		switch s.Kind {
+		case ast.KindBlock:
+			if node := findReportNode(s.Statements()); node != nil {
+				return node
+			}
+		case ast.KindIfStatement:
+			return s
+		}
 	}
-	switch s.Kind {
-	case ast.KindReturnStatement, ast.KindThrowStatement:
-		return true, nil
-	case ast.KindExpressionStatement:
-		if isProcessExitOrAbort(s.AsExpressionStatement().Expression) {
-			return true, nil
-		}
-		return false, nil
-	case ast.KindBlock:
-		return stmtsTerminate(s.Statements())
-	case ast.KindIfStatement:
-		is := s.AsIfStatement()
-		if is.ElseStatement == nil {
-			return false, s
-		}
-		tOk, _ := stmtTerminates(is.ThenStatement)
-		eOk, _ := stmtTerminates(is.ElseStatement)
-		if tOk && eOk {
-			return true, nil
-		}
-		return false, s
-	case ast.KindSwitchStatement:
-		sw := s.AsSwitchStatement()
-		if sw.CaseBlock == nil {
-			return false, s
-		}
-		hasDefault := false
-		for _, clause := range sw.CaseBlock.AsCaseBlock().Clauses.Nodes {
-			if clause.Kind == ast.KindDefaultClause {
-				hasDefault = true
-			}
-			stmts := clause.Statements()
-			if len(stmts) > 0 {
-				if ok, _ := stmtsTerminate(stmts); !ok {
-					return false, s
-				}
-			}
-		}
-		if !hasDefault {
-			return false, s
-		}
-		return true, nil
-	case ast.KindTryStatement:
-		ts := s.AsTryStatement()
-		if ts.TryBlock == nil {
-			return false, s
-		}
-		if ok, _ := stmtsTerminate(ts.TryBlock.Statements()); !ok {
-			return false, s
-		}
-		if ts.CatchClause != nil {
-			cc := ts.CatchClause.AsCatchClause()
-			if cc.Block == nil {
-				return false, s
-			}
-			if ok, _ := stmtsTerminate(cc.Block.Statements()); !ok {
-				return false, s
-			}
-		}
-		return true, nil
-	case ast.KindWhileStatement:
-		ws := s.AsWhileStatement()
-		if ws.Statement == nil {
-			return false, s
-		}
-		if ok, _ := stmtTerminates(ws.Statement); !ok {
-			return false, s
-		}
-		return true, nil
-	case ast.KindForStatement:
-		fs := s.AsForStatement()
-		if fs.Statement == nil {
-			return false, s
-		}
-		if ok, _ := stmtTerminates(fs.Statement); !ok {
-			return false, s
-		}
-		return true, nil
-	case ast.KindDoStatement:
-		ds := s.AsDoStatement()
-		if ds.Statement == nil {
-			return false, s
-		}
-		if ok, _ := stmtTerminates(ds.Statement); !ok {
-			return false, s
-		}
-		return true, nil
-	}
-	return false, nil
+	return nil
 }
 
 // isProcessExitOrAbort reports whether node is a call to process.exit() or process.abort().
@@ -337,20 +237,12 @@ func isIgnoredAssignment(stmt *ast.Node, ignoredVars []string) bool {
 // getRootObjectName returns the root identifier name of a member-access chain.
 // Mirrors upstream getRootObjectName: Identifier → name, MemberExpression → recurse on object.
 func getRootObjectName(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
 	node = ast.SkipOuterExpressions(node, skipTransparent)
-	if node == nil {
-		return ""
+	for node != nil && ast.IsAccessExpression(node) {
+		node = ast.SkipOuterExpressions(utils.AccessExpressionObject(node), skipTransparent)
 	}
-	switch node.Kind {
-	case ast.KindIdentifier:
+	if node != nil && ast.IsIdentifier(node) {
 		return node.AsIdentifier().Text
-	case ast.KindPropertyAccessExpression:
-		return getRootObjectName(node.AsPropertyAccessExpression().Expression)
-	case ast.KindElementAccessExpression:
-		return getRootObjectName(node.AsElementAccessExpression().Expression)
 	}
 	return ""
 }
@@ -385,12 +277,26 @@ var AlwaysReturnRule = rule.Rule{
 				if body == nil {
 					return
 				}
-				if ok, reportOn := stmtsTerminate(body.Statements()); !ok {
-					if reportOn == nil {
-						reportOn = cb
-					}
-					ctx.ReportNode(reportOn, buildThenShouldReturnOrThrowMessage())
+
+				// process.exit/abort special case: the binder doesn't model these as
+				// "never", so check the flat body first before consulting the binder.
+				if hasProcessExitInFlatBody(body.Statements()) {
+					return
 				}
+
+				// Use the binder's control-flow result (NodeFlagsHasImplicitReturn).
+				// This correctly handles loops, switch fall-through, try-finally, break,
+				// and all other control-flow constructs without type information.
+				if !utils.IsFunctionEndReachable(cb) {
+					return
+				}
+
+				// End is reachable — find a specific report location if possible.
+				reportOn := findReportNode(body.Statements())
+				if reportOn == nil {
+					reportOn = cb
+				}
+				ctx.ReportNode(reportOn, buildThenShouldReturnOrThrowMessage())
 			},
 		}
 	},
