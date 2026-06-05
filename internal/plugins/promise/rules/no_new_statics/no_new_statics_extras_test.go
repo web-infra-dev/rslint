@@ -131,6 +131,32 @@ func TestNoNewStaticsExtras(t *testing.T) {
 				},
 			},
 
+			// ---- Dimension 3: Autofix — comment between `new` and callee ----
+			// Only whitespace after `new` is stripped; comments are preserved.
+			{
+				Code:   "new/*comment*/Promise.resolve()",
+				Output: []string{"/*comment*/Promise.resolve()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "avoidNewStatic", Message: "Avoid calling 'new' on 'Promise.resolve()'"},
+				},
+			},
+			// Newline between `new` and callee.
+			{
+				Code:   "new\nPromise.resolve()",
+				Output: []string{"Promise.resolve()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "avoidNewStatic", Message: "Avoid calling 'new' on 'Promise.resolve()'"},
+				},
+			},
+			// Multiple spaces between `new` and callee.
+			{
+				Code:   "new  Promise.resolve()",
+				Output: []string{"Promise.resolve()"},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "avoidNewStatic", Message: "Avoid calling 'new' on 'Promise.resolve()'"},
+				},
+			},
+
 			// ---- Real-user: flagged in class method ----
 			{
 				Code:   `class A { m() { return new Promise.resolve(1) } }`,

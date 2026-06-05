@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -55,10 +56,19 @@ var NoNewStaticsRule = rule.Rule{
 					return
 				}
 
-				// Fix: remove "new " (4 chars) from the start of the expression.
-				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-				removeRange := nodeRange.WithEnd(nodeRange.Pos() + 4)
-				ctx.ReportNodeWithFixes(node, buildMessage(methodName), rule.RuleFixRemoveRange(removeRange))
+				// Fix: remove "new" (3 chars) plus any trailing whitespace chars
+				// (' ', '\t', '\r', '\n'). Comments and other non-whitespace
+				// between `new` and the callee are preserved:
+				//   new Promise.resolve()    → Promise.resolve()
+				//   new  Promise.resolve()   → Promise.resolve()
+				//   new/*c*/Promise.resolve() → /*c*/Promise.resolve()
+				start := int(utils.TrimNodeTextRange(ctx.SourceFile, node).Pos())
+				end := start + 3 // len("new") == 3
+				src := ctx.SourceFile.Text()
+				for end < len(src) && (src[end] == ' ' || src[end] == '\t' || src[end] == '\r' || src[end] == '\n') {
+					end++
+				}
+				ctx.ReportNodeWithFixes(node, buildMessage(methodName), rule.RuleFixRemoveRange(core.NewTextRange(start, end)))
 			},
 		}
 	},
