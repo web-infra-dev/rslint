@@ -6,6 +6,7 @@ import {
   RelativePattern,
   WorkspaceFolder,
   OutputChannel,
+  type CancellationToken,
 } from 'vscode';
 import {
   Executable,
@@ -141,13 +142,14 @@ export class Rslint implements Disposable {
       // natively but dispatches rules mounted via a config's object-form
       // `plugins` back to us, where the JS WorkerPool runs them. The generic
       // string-method overload of `onRequest` handles server-initiated custom
-      // requests. Cancellation is a nice-to-have — `host.lint` runs a whole
-      // batch and Go's generation counter already discards stale responses;
-      // wiring per-batch cancel into the pool is a follow-up.
+      // requests. The handler's CancellationToken — fired when Go sends
+      // $/cancelRequest for a superseded keystroke / closed document — is
+      // threaded through to the pool, which bridges it to an AbortSignal and
+      // cancels the in-flight worker tasks.
       this.client.onRequest(
         'rslint/pluginLint',
-        async (params: EslintPluginLintRequest) =>
-          this.pluginLintPool.lint(params),
+        async (params: EslintPluginLintRequest, token: CancellationToken) =>
+          this.pluginLintPool.lint(params, token),
       );
 
       if (traceEnabled) {

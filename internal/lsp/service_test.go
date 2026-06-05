@@ -15,14 +15,15 @@ import (
 // Session is nil so session calls are safely skipped via nil guards.
 func newTestServer() *Server {
 	return &Server{
-		jsConfigs:       make(map[string]config.RslintConfig),
-		documents:       make(map[lsproto.DocumentUri]string),
-		diagnostics:     make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
-		refreshCh:       make(chan struct{}, 1),
-		debounceCh:      make(chan struct{}, 1),
-		pendingLintURIs: make(map[lsproto.DocumentUri]struct{}),
-		pluginResultCh:  make(chan pluginLintResult, 16),
-		docGeneration:   make(map[lsproto.DocumentUri]uint64),
+		jsConfigs:              make(map[string]config.RslintConfig),
+		documents:              make(map[lsproto.DocumentUri]string),
+		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		refreshCh:              make(chan struct{}, 1),
+		debounceCh:             make(chan struct{}, 1),
+		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:         make(chan pluginLintResult, 16),
+		docGeneration:          make(map[lsproto.DocumentUri]uint64),
+		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}
 }
 
@@ -389,16 +390,17 @@ func TestRapidChanges_VersionTracking(t *testing.T) {
 func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 	queue := make(chan *lsproto.Message, 10)
 	return &Server{
-		jsConfigs:       make(map[string]config.RslintConfig),
-		documents:       make(map[lsproto.DocumentUri]string),
-		diagnostics:     make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
-		outgoingQueue:   queue,
-		backgroundCtx:   context.Background(),
-		refreshCh:       make(chan struct{}, 1),
-		debounceCh:      make(chan struct{}, 1),
-		pendingLintURIs: make(map[lsproto.DocumentUri]struct{}),
-		pluginResultCh:  make(chan pluginLintResult, 16),
-		docGeneration:   make(map[lsproto.DocumentUri]uint64),
+		jsConfigs:              make(map[string]config.RslintConfig),
+		documents:              make(map[lsproto.DocumentUri]string),
+		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		outgoingQueue:          queue,
+		backgroundCtx:          context.Background(),
+		refreshCh:              make(chan struct{}, 1),
+		debounceCh:             make(chan struct{}, 1),
+		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:         make(chan pluginLintResult, 16),
+		docGeneration:          make(map[lsproto.DocumentUri]uint64),
+		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}, queue
 }
 

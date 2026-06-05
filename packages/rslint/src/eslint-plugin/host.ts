@@ -16,8 +16,16 @@ import {
 import type { ConfigDescriptor } from './types.js';
 
 export interface PluginLintHost {
-  /** Run one reverse batch: build per-file tasks, lint, project results. */
-  lint(req: EslintPluginLintRequest): Promise<EslintPluginLintResult>;
+  /**
+   * Run one reverse batch: build per-file tasks, lint, project results. An
+   * optional AbortSignal cancels the dispatched worker tasks — the LSP path
+   * wires it to a superseding keystroke / document close so the worker stops
+   * instead of running to completion.
+   */
+  lint(
+    req: EslintPluginLintRequest,
+    signal?: AbortSignal,
+  ): Promise<EslintPluginLintResult>;
   /** Drain in-flight tasks and terminate the worker pool. Idempotent. */
   shutdown(): Promise<void>;
 }
@@ -49,7 +57,7 @@ export async function createPluginLintHost(
   // back; LSP: the same URI) — so no normalization is needed or wanted here.
   const configDirSet = new Set(configs.map((c) => c.configDirectory));
   return {
-    async lint(req) {
+    async lint(req, signal) {
       const tasks = buildPluginLintTasks(req, {
         configDirSet,
         onUnknownConfigKey: (filePath, configKey) =>
@@ -59,8 +67,23 @@ export async function createPluginLintHost(
             text: `eslint-plugin: file ${filePath} carries unknown configKey ${configKey}`,
           }),
       });
-      const results = await pool.lintBatch(tasks);
-      return buildPluginLintResult(results);
+      // Cancel the dispatched worker tasks if the caller aborts (a superseding
+      // keystroke / document close). cancelTask works whether the task is still
+      // queued or already running (cooperative SAB cancel-flag).
+      const dispatchedTaskIds: number[] = [];
+      const onAbort = () => {
+        for (const id of dispatchedTaskIds) pool.cancelTask(id);
+      };
+      signal?.addEventListener('abort', onAbort);
+      try {
+        const results = await pool.lintBatch(tasks, (taskId) => {
+          dispatchedTaskIds.push(taskId);
+          if (signal?.aborted) pool.cancelTask(taskId);
+        });
+        return buildPluginLintResult(results);
+      } finally {
+        signal?.removeEventListener('abort', onAbort);
+      }
     },
     async shutdown() {
       await pool.shutdown();

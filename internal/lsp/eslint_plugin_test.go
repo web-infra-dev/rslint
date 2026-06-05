@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -748,5 +749,161 @@ func TestDispatchPluginLint_DeliversSuccessResultNotRacedAway(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("successful plugin result was not delivered to pluginResultCh")
+	}
+}
+
+// TestSendCancelRequest_QueuesCancelNotification pins that sendCancelRequest
+// emits a $/cancelRequest notification carrying the reverse-request id.
+func TestSendCancelRequest_QueuesCancelNotification(t *testing.T) {
+	s, queue := newTestServerWithQueue()
+	s.sendCancelRequest(jsonrpc.NewIDString("ts42"))
+	select {
+	case msg := <-queue:
+		req := msg.AsRequest()
+		if req.Method != lsproto.MethodCancelRequest {
+			t.Fatalf("method = %q, want %q", req.Method, lsproto.MethodCancelRequest)
+		}
+		cp, ok := req.Params.(*lsproto.CancelParams)
+		if !ok {
+			t.Fatalf("params type = %T, want *lsproto.CancelParams", req.Params)
+		}
+		if cp.Id.String == nil || *cp.Id.String != "ts42" {
+			t.Errorf("cancel id = %+v, want string \"ts42\"", cp.Id)
+		}
+	default:
+		t.Fatal("no $/cancelRequest notification was queued")
+	}
+}
+
+// TestDispatchPluginLint_SupersedeCancelsPrior pins the full supersede path: a
+// newer keystroke's dispatch cancels the prior in-flight one Go-side AND sends
+// the client a $/cancelRequest for its reverse-request id (so the Node worker
+// stops instead of running to completion). Uses the real sendRequest path so the
+// id sink + reqID registration are exercised end to end.
+func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpsup", RuleNames: []string{"no-bar"}},
+	})
+	s, queue := newTestServerWithQueue()
+	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
+	s.backgroundCtx = context.Background()
+	s.pluginReverseTimeout = 500 * time.Millisecond // backstop so residual goroutines exit
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{Plugins: []string{"tpsup"}, Rules: config.Rules{"tpsup/no-bar": "error"}},
+	}
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	s.documents[uri] = "const bar = 1;"
+	s.docGeneration[uri] = 1
+
+	// First dispatch: real sendRequest mints an id, fills reqID via the sink,
+	// then blocks on a response that never comes.
+	s.dispatchPluginLint(uri, 1)
+
+	var firstID *jsonrpc.ID
+	deadline := time.Now().Add(2 * time.Second)
+	for firstID == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("first dispatch never registered its reverse-request id")
+		}
+		s.inflightPluginDispatchMu.Lock()
+		if h := s.inflightPluginDispatch[uri]; h != nil {
+			firstID = h.reqID
+		}
+		s.inflightPluginDispatchMu.Unlock()
+		time.Sleep(2 * time.Millisecond)
+	}
+
+	// Drain the first rslint/pluginLint request off the queue.
+	select {
+	case <-queue:
+	case <-time.After(time.Second):
+		t.Fatal("first reverse request was not sent")
+	}
+
+	// Supersede: a newer keystroke dispatches again — must cancel the first.
+	s.docGeneration[uri] = 2
+	s.dispatchPluginLint(uri, 2)
+
+	// The supersede must $/cancelRequest the prior reverse request, and it must
+	// be the FIRST thing queued after the supersede — cancel runs synchronously
+	// at the top of dispatchPluginLint, before the new goroutine sends its own
+	// request — so a refactor that moved cancel below the new send fails here.
+	select {
+	case msg := <-queue:
+		req := msg.AsRequest()
+		if req.Method != lsproto.MethodCancelRequest {
+			t.Fatalf("first message after supersede = %q, want %q (cancel must precede the new request)", req.Method, lsproto.MethodCancelRequest)
+		}
+		cp, ok := req.Params.(*lsproto.CancelParams)
+		if !ok || cp.Id.String == nil || *cp.Id.String != firstID.String() {
+			t.Fatalf("cancel targeted %+v, want the prior id %s", req.Params, firstID.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("supersede did not $/cancelRequest the prior reverse request")
+	}
+}
+
+// TestHandleDidClose_CancelsInflightDispatch pins that closing a document with
+// an in-flight plugin dispatch cancels it (Go-side + $/cancelRequest) — the
+// close path has no superseding keystroke to do it.
+func TestHandleDidClose_CancelsInflightDispatch(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpclose", RuleNames: []string{"no-bar"}},
+	})
+	s, queue := newTestServerWithQueue()
+	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
+	s.backgroundCtx = context.Background()
+	s.pluginReverseTimeout = 500 * time.Millisecond
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{Plugins: []string{"tpclose"}, Rules: config.Rules{"tpclose/no-bar": "error"}},
+	}
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	s.documents[uri] = "const bar = 1;"
+	s.docGeneration[uri] = 1
+
+	s.dispatchPluginLint(uri, 1)
+
+	var firstID *jsonrpc.ID
+	deadline := time.Now().Add(2 * time.Second)
+	for firstID == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("dispatch never registered its reverse-request id")
+		}
+		s.inflightPluginDispatchMu.Lock()
+		if h := s.inflightPluginDispatch[uri]; h != nil {
+			firstID = h.reqID
+		}
+		s.inflightPluginDispatchMu.Unlock()
+		time.Sleep(2 * time.Millisecond)
+	}
+	<-queue // drain the rslint/pluginLint request
+
+	if err := s.handleDidClose(context.Background(), &lsproto.DidCloseTextDocumentParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+	}); err != nil {
+		t.Fatalf("handleDidClose: %v", err)
+	}
+
+	// Close must $/cancelRequest the in-flight dispatch.
+	select {
+	case msg := <-queue:
+		req := msg.AsRequest()
+		if req.Method != lsproto.MethodCancelRequest {
+			t.Fatalf("first message after close = %q, want %q", req.Method, lsproto.MethodCancelRequest)
+		}
+		cp, ok := req.Params.(*lsproto.CancelParams)
+		if !ok || cp.Id.String == nil || *cp.Id.String != firstID.String() {
+			t.Fatalf("cancel targeted %+v, want the in-flight id %s", req.Params, firstID.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("handleDidClose did not $/cancelRequest the in-flight dispatch")
+	}
+
+	// Registry entry cleared.
+	s.inflightPluginDispatchMu.Lock()
+	_, stillThere := s.inflightPluginDispatch[uri]
+	s.inflightPluginDispatchMu.Unlock()
+	if stillThere {
+		t.Error("in-flight dispatch entry should be removed after close")
 	}
 }

@@ -18,6 +18,7 @@
  * module would fail; a dynamic `import()` loads it correctly.
  */
 
+import type { CancellationToken } from 'vscode';
 import type { Logger } from './logger';
 import type {
   ConfigDescriptor,
@@ -137,13 +138,29 @@ export class PluginLintPool {
    * (init pending / failed, or never configured) return empty results so Go's
    * plugin-rule diagnostics simply come back empty rather than erroring.
    */
-  async lint(req: EslintPluginLintRequest): Promise<EslintPluginLintResult> {
+  async lint(
+    req: EslintPluginLintRequest,
+    token?: CancellationToken,
+  ): Promise<EslintPluginLintResult> {
     // Wait for any in-flight lifecycle op so we lint against the settled host,
     // not one mid-rebuild.
     await this.opChain;
     const host = this.host;
     if (!host) return { results: [] };
-    return host.lint(req);
+    // Bridge the LSP CancellationToken → AbortSignal for the core host, so a
+    // superseding keystroke / close (Go sends $/cancelRequest) stops the worker
+    // instead of letting it run to completion.
+    let signal: AbortSignal | undefined;
+    if (token) {
+      const ac = new AbortController();
+      if (token.isCancellationRequested) ac.abort();
+      else
+        token.onCancellationRequested(() => {
+          ac.abort();
+        });
+      signal = ac.signal;
+    }
+    return host.lint(req, signal);
   }
 
   /** Shut down the worker pool. Idempotent. */

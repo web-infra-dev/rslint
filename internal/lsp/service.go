@@ -422,6 +422,9 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 	// than resetting it to 0 on a later reopen — prevents a generation collision
 	// where a pre-close worker result could match a freshly reopened document.
 	s.docGeneration[uri]++
+	// Cancel an in-flight plugin dispatch for the closed doc so its Node worker
+	// stops instead of running to completion — no superseding keystroke will.
+	s.cancelInflightPluginDispatch(uri)
 
 	if s.session != nil {
 		// Push empty diagnostics to clear the client's display before closing

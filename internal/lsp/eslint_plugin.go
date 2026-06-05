@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -138,31 +139,54 @@ func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
 //
 // Must be called from the main dispatch loop (it reads jsConfigs + documents
 // to build the input and the generation map).
-//
-// Follow-up (not needed for correctness): when a newer keystroke supersedes an
-// in-flight dispatch we currently rely on generation to drop the stale result,
-// but the Node worker keeps running until it finishes. Sending the client a
-// `$/cancelRequest` for the superseded reverse-request id (s.sendRequest mints
-// "ts%d" ids) would free that worker CPU sooner. It only saves work, never
-// changes the published diagnostics, so it is deferred.
 func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) {
+	// Supersede any prior in-flight dispatch for this URI FIRST — before the
+	// no-plugin-work early return below. Even a relint that yields no plugin
+	// rules (the file became globally ignored, or its plugin-rule set dropped to
+	// empty via a configUpdate) must still cancel the prior dispatch so its Node
+	// worker stops instead of running to completion. Go-side frees the goroutine;
+	// a $/cancelRequest tells the client to stop the worker.
+	s.cancelInflightPluginDispatch(uri)
+
 	input, ok := s.buildPluginFileInput(uri, nil)
 	if !ok {
 		return
 	}
 	dispatch := s.installEslintPluginDispatch()
-	// Bound the reverse request: backgroundCtx only cancels at shutdown, so a
-	// registered-but-unresponsive client would otherwise leak this goroutine and
-	// its pendingServerRequests entry forever (each relint spawns another). Same
-	// deadline budget as the source.fixAll path.
+
+	// Bound the reverse request as a backstop: even with supersede-cancel, a
+	// client that neither answers nor is ever superseded (the user stops typing)
+	// would otherwise leak this goroutine + its pendingServerRequests entry.
 	timeout := s.pluginReverseTimeout
 	if timeout <= 0 {
 		timeout = defaultPluginReverseTimeout
 	}
 	ctx, cancel := context.WithTimeout(s.backgroundCtx, timeout)
 
+	// Register so a later supersede/close can cancel us; sendRequest fills in the
+	// reverse-request id via the sink so cancelInflightPluginDispatch can
+	// $/cancelRequest it.
+	handle := &pluginDispatchHandle{cancel: cancel}
+	s.inflightPluginDispatchMu.Lock()
+	s.inflightPluginDispatch[uri] = handle
+	s.inflightPluginDispatchMu.Unlock()
+	ctx = context.WithValue(ctx, pluginReqIDSinkKey{}, func(id *jsonrpc.ID) {
+		s.inflightPluginDispatchMu.Lock()
+		if s.inflightPluginDispatch[uri] == handle {
+			handle.reqID = id
+			s.inflightPluginDispatchMu.Unlock()
+			return
+		}
+		// Already superseded before the id was minted: the supersede saw a nil
+		// reqID and could not $/cancelRequest. Send it now so the client still
+		// stops the worker — closes the narrow reqID==nil race window.
+		s.inflightPluginDispatchMu.Unlock()
+		s.sendCancelRequest(id)
+	})
+
 	go func() {
 		defer cancel()
+		defer s.clearInflightPluginDispatch(uri, handle)
 		// onDiagnostic is invoked serially (DispatchEslintPluginRules emits
 		// diagnostics single-threaded after its batches complete; here there is
 		// only ever one batch), so the local slice needs no lock.
@@ -212,6 +236,37 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 			}
 		}
 	}()
+}
+
+// cancelInflightPluginDispatch cancels and $/cancelRequests the in-flight
+// background plugin dispatch for uri, if any. Called when a newer keystroke
+// supersedes it (dispatchPluginLint) or the document closes (handleDidClose).
+func (s *Server) cancelInflightPluginDispatch(uri lsproto.DocumentUri) {
+	s.inflightPluginDispatchMu.Lock()
+	handle, ok := s.inflightPluginDispatch[uri]
+	var reqID *jsonrpc.ID
+	if ok {
+		reqID = handle.reqID
+		delete(s.inflightPluginDispatch, uri)
+	}
+	s.inflightPluginDispatchMu.Unlock()
+	if !ok {
+		return
+	}
+	handle.cancel() // Go-side: sendRequest's ctx.Done frees the goroutine + pending entry
+	if reqID != nil {
+		s.sendCancelRequest(reqID) // client-side: stop the Node worker
+	}
+}
+
+// clearInflightPluginDispatch removes handle from the registry once its
+// goroutine finishes, but only if a later dispatch has not already replaced it.
+func (s *Server) clearInflightPluginDispatch(uri lsproto.DocumentUri, handle *pluginDispatchHandle) {
+	s.inflightPluginDispatchMu.Lock()
+	if s.inflightPluginDispatch[uri] == handle {
+		delete(s.inflightPluginDispatch, uri)
+	}
+	s.inflightPluginDispatchMu.Unlock()
 }
 
 // mergePluginDiagnostics merges a plugin lint result into s.diagnostics and

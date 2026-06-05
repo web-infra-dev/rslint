@@ -47,26 +47,27 @@ func NewServer(opts *ServerOptions) *Server {
 		panic("Cwd is required")
 	}
 	return &Server{
-		r:                     opts.In,
-		w:                     opts.Out,
-		stderr:                opts.Err,
-		requestQueue:          make(chan *lsproto.RequestMessage, 100),
-		outgoingQueue:         make(chan *lsproto.Message, 100),
-		pendingClientRequests: make(map[jsonrpc.ID]pendingClientRequest),
-		pendingServerRequests: make(map[jsonrpc.ID]chan *lsproto.ResponseMessage),
-		cwd:                   opts.Cwd,
-		fs:                    opts.FS,
-		defaultLibraryPath:    opts.DefaultLibraryPath,
-		typingsLocation:       opts.TypingsLocation,
-		parseCache:            opts.ParseCache,
-		jsConfigs:             make(map[string]config.RslintConfig),
-		documents:             make(map[lsproto.DocumentUri]string),
-		diagnostics:           make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
-		refreshCh:             make(chan struct{}, 1),
-		debounceCh:            make(chan struct{}, 1),
-		pendingLintURIs:       make(map[lsproto.DocumentUri]struct{}),
-		pluginResultCh:        make(chan pluginLintResult, 16),
-		docGeneration:         make(map[lsproto.DocumentUri]uint64),
+		r:                      opts.In,
+		w:                      opts.Out,
+		stderr:                 opts.Err,
+		requestQueue:           make(chan *lsproto.RequestMessage, 100),
+		outgoingQueue:          make(chan *lsproto.Message, 100),
+		pendingClientRequests:  make(map[jsonrpc.ID]pendingClientRequest),
+		pendingServerRequests:  make(map[jsonrpc.ID]chan *lsproto.ResponseMessage),
+		cwd:                    opts.Cwd,
+		fs:                     opts.FS,
+		defaultLibraryPath:     opts.DefaultLibraryPath,
+		typingsLocation:        opts.TypingsLocation,
+		parseCache:             opts.ParseCache,
+		jsConfigs:              make(map[string]config.RslintConfig),
+		documents:              make(map[lsproto.DocumentUri]string),
+		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		refreshCh:              make(chan struct{}, 1),
+		debounceCh:             make(chan struct{}, 1),
+		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:         make(chan pluginLintResult, 16),
+		docGeneration:          make(map[lsproto.DocumentUri]uint64),
+		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}
 }
 
@@ -216,6 +217,14 @@ type Server struct {
 	// the main dispatch loop, which is the ONLY goroutine allowed to write
 	// the lock-free s.diagnostics map and publish. Mirrors refreshCh/debounceCh.
 	pluginResultCh chan pluginLintResult
+
+	// inflightPluginDispatch tracks the in-flight background plugin dispatch per
+	// URI so a superseding keystroke (or a document close) can cancel it — both
+	// Go-side (free the goroutine + pending-request entry) and on the client (a
+	// $/cancelRequest so the Node worker stops instead of running to completion).
+	// Guarded by inflightPluginDispatchMu.
+	inflightPluginDispatch   map[lsproto.DocumentUri]*pluginDispatchHandle
+	inflightPluginDispatchMu sync.Mutex
 
 	// docGeneration tracks a per-URI revision counter. pushDiagnostics bumps it
 	// on every (re)lint and stamps the spawned plugin goroutine with the value.
@@ -547,6 +556,11 @@ func (s *Server) writeLoop(ctx context.Context) error {
 
 func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params any) (any, error) {
 	id := jsonrpc.NewIDString(fmt.Sprintf("ts%d", s.clientSeq.Add(1)))
+	// Hand the minted id to a caller that registered a sink (dispatchPluginLint),
+	// so a later supersede can $/cancelRequest this exact reverse request.
+	if sink, ok := ctx.Value(pluginReqIDSinkKey{}).(func(*jsonrpc.ID)); ok {
+		sink(id)
+	}
 	req := &lsproto.RequestMessage{
 		ID:     id,
 		Method: method,
@@ -575,6 +589,33 @@ func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params 
 		}
 		return resp.Result, nil
 	}
+}
+
+// pluginReqIDSinkKey carries a callback (set by dispatchPluginLint) that
+// sendRequest invokes with the reverse-request id it mints, so a later supersede
+// can $/cancelRequest that exact request.
+type pluginReqIDSinkKey struct{}
+
+// pluginDispatchHandle is the cancel handle for an in-flight background plugin
+// dispatch: cancel() frees the Go goroutine + pending-request entry; reqID (once
+// sendRequest mints it) lets us tell the client to cancel the Node worker.
+type pluginDispatchHandle struct {
+	cancel context.CancelFunc
+	reqID  *jsonrpc.ID
+}
+
+// sendCancelRequest asks the client to cancel a reverse request we issued (a
+// superseded eslint-plugin dispatch) so its Node worker stops instead of running
+// to completion. Best-effort: a notification, no reply expected.
+func (s *Server) sendCancelRequest(id *jsonrpc.ID) {
+	var raw lsproto.IntegerOrString
+	if n, ok := id.TryInt(); ok {
+		raw.Integer = &n
+	} else {
+		str := id.String()
+		raw.String = &str
+	}
+	s.outgoingQueue <- lsproto.CancelRequestInfo.NewNotificationMessage(&lsproto.CancelParams{Id: raw}).Message()
 }
 
 func (s *Server) sendResult(id *jsonrpc.ID, result any) {
