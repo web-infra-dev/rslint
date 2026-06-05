@@ -508,6 +508,7 @@ export default defineConfig({
     './tests/eslint-plugin-promise/rules/no-multiple-resolved.test.ts',
     './tests/eslint-plugin-promise/rules/no-nesting.test.ts',
     './tests/eslint-plugin-promise/rules/no-new-statics.test.ts',
+    './tests/eslint-plugin-promise/rules/no-return-in-finally.test.ts',
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',

@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_multiple_resolved"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_nesting"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_new_statics"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_in_finally"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_wrap"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/param_names"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/valid_params"
@@ -21,6 +22,7 @@ func GetAllRules() []rule.Rule {
 		no_multiple_resolved.NoMultipleResolvedRule,
 		no_nesting.NoNestingRule,
 		no_new_statics.NoNewStaticsRule,
+		no_return_in_finally.NoReturnInFinallyRule,
 		no_return_wrap.NoReturnWrapRule,
 		param_names.ParamNamesRule,
 		valid_params.ValidParamsRule,
