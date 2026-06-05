@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -785,5 +786,73 @@ func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
 	sgFixes := sg.Fixes()
 	if len(sgFixes) != 1 || sgFixes[0].Text != "z" || sgFixes[0].Range.Pos() != 6 || sgFixes[0].Range.End() != 7 {
 		t.Errorf("suggestion fix not rebuilt correctly: %+v", sgFixes)
+	}
+}
+
+// TestDispatchEslintPlugin_EmitsInBatchOrderDespiteOutOfOrderCompletion pins the
+// #1050 determinism invariant: batches dispatch concurrently but diagnostics are
+// EMITTED in batch (input) order, keeping CLI output / --fix stable run to run.
+// The goroutines here finish in REVERSE order (batch 0 sleeps longest); emission
+// must still be f0,f1,f2,f3.
+func TestDispatchEslintPlugin_EmitsInBatchOrderDespiteOutOfOrderCompletion(t *testing.T) {
+	const n = 4
+	files := make([]EslintPluginFileInput, n)
+	texts := make([]string, n)
+	for i := range files {
+		texts[i] = "x\n"
+		files[i] = EslintPluginFileInput{
+			Path:      fmt.Sprintf("/f%d.ts", i),
+			ConfigKey: "/cfg",
+			Text:      &texts[i],
+			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct option → own batch
+		}
+	}
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		var idx int
+		_, _ = fmt.Sscanf(req.Files[0].Path, "/f%d.ts", &idx)
+		// Earlier batches sleep longer, so they complete LAST.
+		time.Sleep(time.Duration(n-idx) * 15 * time.Millisecond)
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath:    req.Files[0].Path,
+			Diagnostics: []EslintPluginDiagnostic{{RuleName: "uc/x", Message: "m", StartPos: 0, EndPos: 1}},
+		}}}, nil
+	}
+	var order []string
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+		order = append(order, d.FilePath)
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"/f0.ts", "/f1.ts", "/f2.ts", "/f3.ts"}
+	if !reflect.DeepEqual(order, want) {
+		t.Errorf("emission order = %v, want batch order %v", order, want)
+	}
+}
+
+// TestDispatchEslintPlugin_RealErrorOutranksCanceled pins that with concurrent
+// batches, an earlier batch's context.Canceled (a superseded file) does not mask
+// a later batch's genuine transport error — the real error surfaces.
+func TestDispatchEslintPlugin_RealErrorOutranksCanceled(t *testing.T) {
+	mkFile := func(i int) EslintPluginFileInput {
+		txt := "x\n"
+		return EslintPluginFileInput{
+			Path:      fmt.Sprintf("/f%d.ts", i),
+			ConfigKey: "/cfg",
+			Text:      &txt,
+			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)},
+		}
+	}
+	files := []EslintPluginFileInput{mkFile(0), mkFile(1)}
+	boom := errors.New("transport boom")
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if req.Files[0].Path == "/f0.ts" {
+			// earlier batch: cooperative cancel (worker dropped a superseded file)
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: "/f0.ts", Cancelled: true}}}, nil
+		}
+		return nil, boom // later batch: a real transport failure
+	}
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {})
+	if !errors.Is(err, boom) {
+		t.Fatalf("expected the real transport error to surface, got %v", err)
 	}
 }

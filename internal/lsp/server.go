@@ -200,14 +200,16 @@ type Server struct {
 	// plugin-fix fold loop without spinning up a language service.
 	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) ([]rule.RuleDiagnostic, error)
 
-	// fixAllPluginTimeout bounds the eslint-plugin reverse requests issued
-	// during source.fixAll, summed across all passes. source.fixAll runs on the
-	// dispatch loop as a blocking method, so a wedged or mid-rebuild client that
-	// never answers the rslint/pluginLint request would otherwise stall
-	// all editor interaction. On expiry the remaining passes fold native-only
-	// fixes. Zero means use defaultFixAllPluginTimeout; tests set a small value
-	// to exercise the deadline without a real client.
-	fixAllPluginTimeout time.Duration
+	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
+	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across
+	// passes, where it runs on the dispatch loop as a blocking method) and the
+	// background diagnostics dispatch (per request). A wedged or mid-rebuild
+	// client that never answers would otherwise stall editor interaction or leak
+	// the dispatch goroutine + its pending-request entry. On expiry fixAll folds
+	// native-only fixes and the diagnostics dispatch is dropped. Zero means use
+	// defaultPluginReverseTimeout; tests set a small value to exercise the
+	// deadline without a real client.
+	pluginReverseTimeout time.Duration
 
 	// pluginResultCh delivers eslint-plugin diagnostics computed off the
 	// dispatch loop (in a goroutine that calls eslintPluginDispatch) back to
@@ -703,12 +705,12 @@ func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOpt
 	}
 }
 
-// defaultFixAllPluginTimeout caps the synchronous source.fixAll plugin reverse
-// requests, summed across all fix passes. It must be generous enough not to cut
-// off a legitimately slow worker lint of a single file, but short enough that a
-// non-responsive client unblocks the dispatch loop promptly. On expiry the
-// fixAll stays native-only.
-const defaultFixAllPluginTimeout = 5 * time.Second
+// defaultPluginReverseTimeout caps each eslint-plugin reverse request to the
+// client — the source.fixAll passes (summed) and each background diagnostics
+// dispatch. It must be generous enough not to cut off a legitimately slow worker
+// lint of a single file, but short enough that a non-responsive client unblocks
+// the dispatch loop / drains the dispatch goroutine promptly.
+const defaultPluginReverseTimeout = 5 * time.Second
 
 func isBlockingMethod(method lsproto.Method) bool {
 	switch method {

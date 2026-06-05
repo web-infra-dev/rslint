@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -211,12 +212,23 @@ func DispatchEslintPluginRules(
 			onDiagnostic(d)
 		}
 	}
+	// A real (non-cancellation) error outranks a cooperative cancel: with batches
+	// running concurrently, a later batch's genuine transport failure must not be
+	// masked by an earlier batch's context.Canceled (a superseded file). Fall
+	// back to a Canceled only when every failing batch was canceled.
+	var canceledErr error
 	for _, batchErr := range batchErrs {
-		if batchErr != nil {
+		if batchErr == nil {
+			continue
+		}
+		if !errors.Is(batchErr, context.Canceled) {
 			return batchErr
 		}
+		if canceledErr == nil {
+			canceledErr = batchErr
+		}
 	}
-	return nil
+	return canceledErr
 }
 
 // dispatchOneBatch sends one batch's reverse request and rebuilds its

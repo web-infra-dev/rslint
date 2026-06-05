@@ -7,7 +7,7 @@ export type RuleSeverity = 'off' | 'warn' | 'error';
 /**
  * Single source of truth for the prefixes owned by rslint's built-in
  * (natively-ported) plugins. The `KnownPlugin` type union and the
- * `NATIVE_PLUGIN_PREFIXES` runtime Set both derive from this, so adding a ported
+ * `NATIVE_PLUGIN_RESERVED_NAMES` runtime Set both derive from this, so adding a ported
  * plugin is a one-line change (no second list to keep in sync).
  */
 const NATIVE_PLUGINS = [
@@ -21,21 +21,38 @@ const NATIVE_PLUGINS = [
   'unicorn',
 ] as const;
 
+// Alternate `eslint-plugin-*` declaration names that Go normalizes onto a
+// native prefix (mirrors config.go's PluginInfo.DeclNames). A community plugin
+// must not be mounted under one of these either: Go would normalize the key
+// onto the native prefix, and the gate — which keys off the un-normalized
+// `<prefix>/<rule>` — would then silently drop the community rules.
+const NATIVE_PLUGIN_DECL_ALIASES = [
+  'eslint-plugin-import',
+  'eslint-plugin-jest',
+  'eslint-plugin-jsx-a11y',
+  'eslint-plugin-promise',
+  'eslint-plugin-react-hooks',
+  'eslint-plugin-unicorn',
+] as const;
+
 /**
  * Plugin declaration names recognized by rslint's loader.
  */
 export type KnownPlugin = (typeof NATIVE_PLUGINS)[number];
 
 /**
- * Prefixes owned by rslint's built-in (natively-ported) plugins. A community
- * plugin mounted under an object-form `plugins` key may not collide with these
- * — native rules always win, so a collision would silently shadow the mounted
- * plugin. Typed as ReadonlySet<string> so callers can probe arbitrary
- * user-supplied strings.
+ * Names reserved by rslint's built-in (natively-ported) plugins: the rule
+ * prefixes AND the alternate `eslint-plugin-*` declaration names Go normalizes
+ * onto them. A community plugin mounted under an object-form `plugins` key may
+ * not collide with any of these — native rules always win, and Go would
+ * normalize an aliased key onto a native prefix and the gate would then silently
+ * drop the community rules. Typed as ReadonlySet<string> so callers can probe
+ * arbitrary user-supplied strings.
  */
-export const NATIVE_PLUGIN_PREFIXES: ReadonlySet<string> = new Set(
-  NATIVE_PLUGINS,
-);
+export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
+  ...NATIVE_PLUGINS,
+  ...NATIVE_PLUGIN_DECL_ALIASES,
+]);
 
 /**
  * Rule-specific options object. Each rule defines its own shape; until per-rule

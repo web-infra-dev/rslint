@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { NATIVE_PLUGIN_PREFIXES } from './define-config.js';
+import { NATIVE_PLUGIN_RESERVED_NAMES } from './define-config.js';
 import { selectPluginSource, unwrapPluginModule } from './plugin-source.js';
 
 /**
@@ -112,7 +112,7 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       const pluginPrefixes: string[] = [];
       if (pluginSource != null) {
         for (const prefix of Object.keys(pluginSource)) {
-          if (NATIVE_PLUGIN_PREFIXES.has(prefix)) {
+          if (NATIVE_PLUGIN_RESERVED_NAMES.has(prefix)) {
             throw new Error(
               `[rslint] Config entry at index ${index}: plugins prefix "${prefix}" collides with the built-in plugin of the same name; choose a different prefix.`,
             );

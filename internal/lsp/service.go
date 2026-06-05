@@ -596,9 +596,9 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 	// (it is in-process and does not depend on a client reply). Once the budget
 	// expires lintPluginRulesSync returns nil and the remaining passes fold
 	// native-only fixes.
-	pluginTimeout := s.fixAllPluginTimeout
+	pluginTimeout := s.pluginReverseTimeout
 	if pluginTimeout <= 0 {
-		pluginTimeout = defaultFixAllPluginTimeout
+		pluginTimeout = defaultPluginReverseTimeout
 	}
 	pluginCtx, cancelPlugin := context.WithTimeout(ctx, pluginTimeout)
 	defer cancelPlugin()
@@ -615,8 +615,13 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 		// too, not just native. The plugin pass lints the SAME currentContent, so
 		// its fix byte offsets align with ApplyRuleFixes's input; suggestionsMode
 		// is "off" because fixAll applies only autofixes.
-		if pluginDiags := s.lintPluginRulesSync(pluginCtx, uri, currentContent, true, linter.SuggestionsModeOff); len(pluginDiags) > 0 {
-			ruleDiags = append(ruleDiags, pluginDiags...)
+		// Skip the plugin pass once the budget is spent: lintPluginRulesSync on an
+		// already-expired pluginCtx would still enqueue a (wasted) reverse request
+		// to the client before returning nil.
+		if pluginCtx.Err() == nil {
+			if pluginDiags := s.lintPluginRulesSync(pluginCtx, uri, currentContent, true, linter.SuggestionsModeOff); len(pluginDiags) > 0 {
+				ruleDiags = append(ruleDiags, pluginDiags...)
+			}
 		}
 
 		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)

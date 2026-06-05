@@ -151,9 +151,18 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 		return
 	}
 	dispatch := s.installEslintPluginDispatch()
-	ctx := s.backgroundCtx
+	// Bound the reverse request: backgroundCtx only cancels at shutdown, so a
+	// registered-but-unresponsive client would otherwise leak this goroutine and
+	// its pendingServerRequests entry forever (each relint spawns another). Same
+	// deadline budget as the source.fixAll path.
+	timeout := s.pluginReverseTimeout
+	if timeout <= 0 {
+		timeout = defaultPluginReverseTimeout
+	}
+	ctx, cancel := context.WithTimeout(s.backgroundCtx, timeout)
 
 	go func() {
+		defer cancel()
 		// onDiagnostic is invoked serially (DispatchEslintPluginRules emits
 		// diagnostics single-threaded after its batches complete; here there is
 		// only ever one batch), so the local slice needs no lock.
@@ -235,7 +244,7 @@ func (s *Server) mergePluginDiagnostics(r pluginLintResult) {
 // file has no plugin rules.
 //
 // The caller (computeFixAllContent) passes a ctx already bounded by a deadline
-// (fixAllPluginTimeout) so a wedged or mid-rebuild client that never answers
+// (pluginReverseTimeout) so a wedged or mid-rebuild client that never answers
 // cannot stall the dispatch loop: on expiry DispatchEslintPluginRules returns a
 // context error and this returns nil, leaving the pass native-only.
 //
@@ -258,7 +267,7 @@ func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUr
 	)
 	if err != nil {
 		// context.Canceled means the editor aborted the fixAll request;
-		// context.DeadlineExceeded means the fixAllPluginTimeout budget elapsed
+		// context.DeadlineExceeded means the pluginReverseTimeout budget elapsed
 		// (an unresponsive client) — both leave this pass native-only. Other
 		// errors (worker crash, etc.) are logged but likewise leave the pass
 		// native-only rather than failing the whole fixAll; a per-file plugin

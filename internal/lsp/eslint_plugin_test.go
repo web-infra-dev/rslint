@@ -412,7 +412,7 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 			Rules:   config.Rules{"tptimeout/no-bar": "error"},
 		},
 	}
-	s.fixAllPluginTimeout = 20 * time.Millisecond
+	s.pluginReverseTimeout = 20 * time.Millisecond
 	uri := lsproto.DocumentUri("file:///proj/a.ts")
 	const original = "const bar = 1;"
 	s.documents[uri] = original
@@ -453,8 +453,12 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	if elapsed > 2*time.Second {
 		t.Errorf("fixAll took %v; the plugin deadline should bound the stall", elapsed)
 	}
-	if dispatchCalls == 0 {
-		t.Error("expected the plugin dispatcher to be invoked (then time out)")
+	// The plugin pass is dispatched EXACTLY ONCE: pass 0 invokes it (and times
+	// out); every later pass is skipped because pluginCtx is already expired. A
+	// regression that re-dispatched on the expired ctx would send a wasted
+	// reverse request to the client per remaining pass.
+	if dispatchCalls != 1 {
+		t.Errorf("expected exactly 1 plugin dispatch (pass 0; later passes skip on expiry), got %d", dispatchCalls)
 	}
 }
 
@@ -622,4 +626,45 @@ func titleSet(m map[string]*lsproto.CodeAction) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// TestDispatchPluginLint_TimesOutWedgedClient pins that the background
+// diagnostics dispatch does not leak its goroutine when a registered-but-
+// unresponsive client never answers: pluginReverseTimeout bounds it.
+// backgroundCtx alone only cancels at shutdown, so without the deadline the
+// goroutine + its pendingServerRequests entry would leak on every relint.
+func TestDispatchPluginLint_TimesOutWedgedClient(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpleak", RuleNames: []string{"no-bar"}},
+	})
+	s := newTestServer()
+	s.backgroundCtx = context.Background()
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{
+			Plugins: []string{"tpleak"},
+			Rules:   config.Rules{"tpleak/no-bar": "error"},
+		},
+	}
+	s.pluginReverseTimeout = 30 * time.Millisecond
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	s.documents[uri] = "const bar = 1;"
+	s.docGeneration[uri] = 1
+
+	released := make(chan error, 1)
+	s.eslintPluginDispatch = func(ctx context.Context, _ linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		<-ctx.Done() // wedged client: only the deadline releases us
+		released <- ctx.Err()
+		return nil, ctx.Err()
+	}
+
+	s.dispatchPluginLint(uri, 1)
+
+	select {
+	case err := <-released:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Errorf("dispatch released with %v, want context.DeadlineExceeded", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("dispatch goroutine never released — the reverse request leaked")
+	}
 }

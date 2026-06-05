@@ -247,6 +247,22 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ).toThrow(/collides with the built-in plugin/);
   });
 
+  test('throws when an object-form prefix is a native eslint-plugin-* decl-name', () => {
+    // `eslint-plugin-import` normalizes to the native `import` prefix in Go, so
+    // mounting a community plugin under it would otherwise pass the JS guard but
+    // be silently dropped by the Go gate. Reject it loudly like a direct
+    // native-prefix collision.
+    expect(() =>
+      normalizeConfig([
+        {
+          files: ['**/*.ts'],
+          plugins: { 'eslint-plugin-import': mockPlugin },
+          rules: {},
+        },
+      ]),
+    ).toThrow(/collides with the built-in plugin/);
+  });
+
   test('entries with no plugins carry no community-plugin field', () => {
     const [entry] = normalizeConfig([
       { files: ['**/*.ts'], rules: {} },
