@@ -14,6 +14,10 @@ export function parseArgs(argv: string[]) {
     options: {
       config: { type: 'string' },
       init: { type: 'boolean' },
+      // Detected so the JS host can size the ESLint-plugin worker pool to a
+      // single worker. NOT skipped below, so it still forwards to Go in
+      // `rest` (Go's native pass honors the same flag independently).
+      singleThreaded: { type: 'boolean' },
       // Register known Go string-valued flags so their values are not
       // mistaken for positional file/dir arguments.
       format: { type: 'string' },
@@ -72,6 +76,8 @@ export function parseArgs(argv: string[]) {
     config: (values.config as string) ?? null,
     // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     init: (values.init as boolean) ?? false,
+    // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+    singleThreaded: (values.singleThreaded as boolean) ?? false,
     rest,
     positionals,
   };

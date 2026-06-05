@@ -18,7 +18,7 @@ import {
  * Exercises the full happy path inside the runner package (WorkerPool
  * → worker_threads loading the user's rslint config → round-robin
  * lintBatch → oxc-parser → normalize → scope → context → listeners →
- * CompatFileResult-shaped data). The plugin here is the local fixture
+ * plugin-lint-result-shaped data). The plugin here is the local fixture
  * plugin (`fixtures/local-plugin.mjs`), not an external dependency.
  */
 
@@ -226,7 +226,7 @@ describe.skipIf(process.platform === 'win32')(
       // In-flight tasks resolve with a sentinel parseError instead of
       // hanging the caller forever. worker-pool.ts:539-548 maps the
       // shutdown-kind rejection back to a result-shaped failure so
-      // callers (internal/linter) see one file as compat-failed rather
+      // callers (internal/linter) see one file as plugin-lint-failed rather
       // than the whole batch throwing.
       const wedgeResults = await wedgeP;
       expect(wedgeResults).toHaveLength(1);
@@ -329,7 +329,7 @@ export default {
           fs.writeFile(
             cfgPath,
             `import plugin from './_u11-plugin.mjs';
-export default [{ eslintPlugins: { u11: plugin } }];
+export default [{ plugins: { u11: plugin } }];
 `,
             'utf8',
           ),

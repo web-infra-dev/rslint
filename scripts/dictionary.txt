@@ -395,6 +395,7 @@ scopemanager
 sectionhead
 Seeked
 segs
+sonarjs
 setsize
 setstate
 Setstate
@@ -570,4 +571,5 @@ rustup
 serde
 SIGSEGV
 zigbuild
+lockfiles
 smajobber

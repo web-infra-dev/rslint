@@ -50,11 +50,13 @@ rules: {
 
 ## plugins
 
-- **Type:** `string[]`
+- **Type:** `string[] | Record<string, ESLintPlugin>`
 
-Plugin names to enable. Available plugins:
+In **array form**, the names of the built-in (native) plugins to enable. Available plugins:
 
 <PluginPrefixTable />
+
+In **object form** (`{ prefix: pluginObject }`), community ESLint plugins mounted by prefix — see [ESLint plugin compatibility](/guide/eslint-plugins). A single entry uses one form.
 
 ESLint core rules (e.g. `no-unused-vars`, `prefer-const`, `no-var`) have no prefix and do not belong to any plugin — they can be enabled directly in `rules` without listing anything in `plugins`.
 

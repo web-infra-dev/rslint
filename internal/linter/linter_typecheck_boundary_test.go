@@ -54,7 +54,7 @@ func TestBoundary_DefaultLibsTypeCheckClean(t *testing.T) {
 				if d.SourceFile == nil {
 					continue
 				}
-				name := d.SourceFile.FileName()
+				name := d.FilePath
 				if strings.HasPrefix(name, "bundled:") || strings.Contains(name, "/libs/lib.") {
 					t.Errorf("default-lib invariant violated under %s: diagnostic %s in %s",
 						tc.name, d.RuleName, name)
@@ -102,7 +102,7 @@ func TestBoundary_DefaultLibsCleanAcrossPrograms(t *testing.T) {
 		if d.SourceFile == nil {
 			continue
 		}
-		name := d.SourceFile.FileName()
+		name := d.FilePath
 		if strings.HasPrefix(name, "bundled:") || strings.Contains(name, "/libs/lib.") {
 			t.Errorf("default-lib invariant violated across programs: %s in %s",
 				d.RuleName, name)
@@ -223,7 +223,7 @@ func TestBoundary_DiagnosticsStableAcrossRepeatedRuns(t *testing.T) {
 				continue
 			}
 			line, char := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, d.Range.Pos())
-			suffix := d.SourceFile.FileName()
+			suffix := d.FilePath
 			if i := strings.LastIndex(suffix, "/"); i >= 0 {
 				suffix = suffix[i+1:]
 			}
@@ -307,7 +307,7 @@ func TestBoundary_DiagnosticsStableUnderParallelism(t *testing.T) {
 				continue
 			}
 			line, char := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, d.Range.Pos())
-			parts := strings.Split(d.SourceFile.FileName(), "/")
+			parts := strings.Split(d.FilePath, "/")
 			tail := parts[len(parts)-1]
 			out = append(out, fp{d.RuleName, tail, line + 1, int(char) + 1})
 		}

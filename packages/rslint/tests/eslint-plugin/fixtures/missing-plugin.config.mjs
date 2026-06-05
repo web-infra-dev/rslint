@@ -7,7 +7,7 @@ import nope from 'eslint-plugin-this-does-not-exist';
 
 export default [
   {
-    eslintPlugins: {
+    plugins: {
       nope,
     },
   },

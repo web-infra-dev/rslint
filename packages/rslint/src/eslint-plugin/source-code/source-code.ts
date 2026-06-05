@@ -182,6 +182,13 @@ export interface SourceCode {
   getCommentsAfter(node: ESTreeNode): Comment[];
   getCommentsInside(node: ESTreeNode): Comment[];
   getAllComments(): Comment[];
+  /**
+   * All code tokens AND comments merged into one stream sorted by `range[0]`
+   * — ESLint's `SourceCode#tokensAndComments`. Stylistic whitespace rules
+   * (`comma-spacing`, `no-multi-spaces`, `indent`, `indent-binary-ops`,
+   * `space-in-parens`, ...) read this array directly.
+   */
+  readonly tokensAndComments: readonly Token[];
   // NOTE: `getJSDocComment(node)` was removed in ESLint v10 with no
   // replacement; rslint mirrors that removal. Rules that need adjacent
   // JSDoc can walk `getCommentsBefore(node)` themselves.
@@ -582,6 +589,12 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     hasBOM,
     get scopeManager(): unknown {
       return getScopeManager();
+    },
+    // ESLint's `SourceCode#tokensAndComments`: the code-token stream merged
+    // with comments, sorted by `range[0]`. Reuses the lazy/cached `streamFor`
+    // merge (same array `getTokens(..., {includeComments:true})` uses).
+    get tokensAndComments(): readonly Token[] {
+      return streamFor(true);
     },
     // Full ESTree + TypeScript visitor-keys map (vendored from
     // oxc-parser 0.133, drift-guarded against ESLint's keys; see

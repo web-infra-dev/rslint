@@ -60,7 +60,7 @@ import { applyDisableDirectives } from './apply-disable-directives.js';
  * `LoadedPlugins` for this file (via `configKey` → per-config map);
  * `lintFile` only consults that selected set's `rules` lookup.
  *
- * Returning `null` means "rule not found" — Go's compat dispatcher
+ * Returning `null` means "rule not found" — Go's plugin-lint dispatcher
  * surfaces that as a `ruleErrors` entry. Same prefix can appear under
  * multiple configs in a monorepo, but each config has its own
  * `LoadedPlugins`, so there are no cross-config collisions here.
@@ -154,7 +154,7 @@ export interface LintFileRequest {
   cancelFlag?: Int32Array;
   /**
    * Identity of the rslint config that owns THIS file — the
-   * `configDirectory` Go writes into `CompatLintFile.ConfigKey`. The
+   * `configDirectory` Go writes into `EslintPluginLintFile.ConfigKey`. The
    * worker uses this to pick the right `LoadedPlugins` from its
    * per-config map (`Map<configDirectory, LoadedPlugins>`).
    *
@@ -199,9 +199,11 @@ export function lintFile(
   };
 
   // Worker reads the source from disk by default — text is NOT in the
-  // IPC payload. See LintFileRequest's doc comment for the multi-pass
-  // --fix coherence rationale. The `req.text` override is for in-process
-  // unit tests only.
+  // IPC payload (avoids the ~60MB structuredClone of shipping every file).
+  // See LintFileRequest's doc comment for the multi-pass --fix coherence
+  // rationale. The `req.text` override carries an in-memory frame when the
+  // host has one: the LSP editor overlay (unsaved buffer) and each fixAll
+  // pass's in-progress fixed content — and in-process unit tests.
   let sourceText: string;
   if (req.text !== undefined) {
     sourceText = req.text;

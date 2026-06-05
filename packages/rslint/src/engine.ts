@@ -51,6 +51,17 @@ export interface EngineRunOptions {
   stdout?: NodeJS.WritableStream;
   /** stderr sink (default process.stderr). */
   stderr?: NodeJS.WritableStream;
+  /**
+   * ESLint-plugin {prefix, ruleNames} metadata forwarded to Go in the
+   * `init` payload so it registers placeholder rules for plugin rule names.
+   */
+  eslintPluginEntries?: Array<{ prefix: string; ruleNames: string[] }>;
+  /**
+   * Per-config descriptors (configPath + configDirectory) for configs that
+   * mount ESLint plugins; used to init the worker pool that answers Go's
+   * reverse `pluginLint` requests. Empty ⇒ no pool, zero overhead.
+   */
+  pluginConfigs?: Array<{ configPath: string; configDirectory: string }>;
 }
 
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
@@ -107,13 +118,57 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   }
   const ipc = new IpcClient(child.stdout, child.stdin);
 
+  // Host the ESLint-plugin worker pool that answers Go's reverse
+  // `pluginLint` requests. Loaded via a runtime dynamic import: the
+  // `: string` path type stops the library dts build (which excludes
+  // src/eslint-plugin/**) from type-checking the worker module, and
+  // `webpackIgnore` keeps rslib from bundling it into the engine chunk — it
+  // must stay a sibling so the worker's `import.meta.url` resolution finds
+  // lint-worker.js. Resolves at runtime to dist/eslint-plugin/index.js.
+  let pluginHost: {
+    lint(req: unknown): Promise<unknown>;
+    shutdown(): Promise<void>;
+  } | null = null;
+  const pluginConfigs = opts.pluginConfigs ?? [];
+  if (pluginConfigs.length > 0) {
+    const pluginEntry: string = './eslint-plugin/index.js';
+    try {
+      const mod: {
+        createPluginLintHost: (
+          configs: Array<{ configPath: string; configDirectory: string }>,
+          onLog?: (rec: {
+            level: string;
+            source: string;
+            text: string;
+          }) => void,
+          singleThreaded?: boolean,
+        ) => Promise<{
+          lint(req: unknown): Promise<unknown>;
+          shutdown(): Promise<void>;
+        }>;
+      } = await import(/* webpackIgnore: true */ pluginEntry);
+      pluginHost = await mod.createPluginLintHost(
+        pluginConfigs,
+        (rec) => stderr.write(`[rslint:plugin] ${rec.text}\n`),
+        opts.runtime?.singleThreaded,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      stderr.write(`rslint: failed to start ESLint-plugin worker: ${msg}\n`);
+      safeKillGo(child);
+      return 2;
+    }
+  }
+
   // Without our own SIGINT handler Node's default action _exit(130)s
   // immediately, leaving the Go child to discover the disconnect via stdin EOF
   // — which a wedged child can't. Intercept and force it down first.
   const onSignal = () => {
     // No log: a user Ctrl-C (SIGINT) or a normal SIGTERM/SIGHUP teardown is the
-    // expected path, not an error — just forward the kill to the Go child.
+    // expected path, not an error — forward the kill to the Go child and tear
+    // the worker pool down so its threads don't outlive us.
     safeKillGo(child);
+    void pluginHost?.shutdown();
   };
   process.on('SIGINT', onSignal);
   process.on('SIGTERM', onSignal);
@@ -124,81 +179,102 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
     process.off('SIGHUP', onSignal);
   };
 
-  // Wire handlers BEFORE start so the first frame Go writes is routable.
-  ipc.setInboundHandler((msg) => {
-    switch (msg.kind) {
-      case 'shutdown':
-        // Go signals it's done; teardown happens via the 'exit' event below.
-        return { ok: true };
-      default:
-        throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
-    }
-  });
-  ipc.registerNotification(
-    'output',
-    (msg: IpcMessage<{ stream?: string; text?: string }>) => {
-      const text = msg.data?.text;
-      if (text != null) stdout.write(text);
-    },
-  );
-  ipc.start();
+  // try/finally so the worker pool is always drained — every exit path
+  // (init failure as well as normal completion) runs the `finally`, which
+  // tears down the signal handlers and the plugin worker pool. Without this
+  // the init-failure returns below leaked a graceful drain (the pool's
+  // threads were only reaped by the outer process.exit), whereas the normal
+  // and signal paths drained it cleanly. `pluginHost?.shutdown()` is
+  // null-safe (no pool ⇒ no-op) and idempotent (WorkerPool.shutdown guards
+  // on `closed`), so the signal handler firing shutdown first is harmless.
+  try {
+    // Wire handlers BEFORE start so the first frame Go writes is routable.
+    ipc.setInboundHandler(async (msg) => {
+      switch (msg.kind) {
+        case 'shutdown':
+          // Go signals it's done; teardown happens via the 'exit' event below.
+          return { ok: true };
+        case 'pluginLint':
+          // Go dispatched a plugin-lint batch in parallel with native linting.
+          // Answer from the worker pool; an absent pool (no plugins configured)
+          // yields empty results. Never throws — per-file/-rule failures travel
+          // inside the result payload.
+          return pluginHost ? pluginHost.lint(msg.data) : { results: [] };
+        default:
+          throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
+      }
+    });
+    ipc.registerNotification(
+      'output',
+      (msg: IpcMessage<{ stream?: string; text?: string }>) => {
+        const text = msg.data?.text;
+        if (text != null) stdout.write(text);
+      },
+    );
+    ipc.start();
 
-  // Send `init` and await Go's ack, racing the child dropping out.
-  {
-    let outcome: RaceResult<IpcMessage<unknown>>;
-    try {
-      outcome = await raceWithExit(
-        ipc.sendRequest('init', {
-          ...(opts.extraInit ?? {}),
-          configs: opts.configs,
-          runtime: {
-            forceColor: opts.runtime?.forceColor,
-            singleThreaded: opts.runtime?.singleThreaded,
-          },
-        }),
-      );
-    } catch {
-      // The init request can reject when the Go child exits cleanly before we
-      // read its init ack: a fast path (--help / --init) closes the pipe the
-      // moment its work is done, and the stdout-EOF seal that rejects the
-      // pending request can beat the child 'exit' event into the race above
-      // (observed on Linux, where stdout 'end' tends to precede 'exit'). The
-      // child's exit code is the source of truth — a clean (0) exit means Go
-      // finished its job, so honor it; only a non-zero exit is a real failure.
-      safeKillGo(child);
-      const state = await childExit;
-      removeSignalHandlers();
-      if (state.code === 0) return 0;
-      stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
-      return state.code;
+    // Send `init` and await Go's ack, racing the child dropping out.
+    {
+      let outcome: RaceResult<IpcMessage<unknown>>;
+      try {
+        outcome = await raceWithExit(
+          ipc.sendRequest('init', {
+            ...(opts.extraInit ?? {}),
+            configs: opts.configs,
+            eslintPlugins: opts.eslintPluginEntries,
+            runtime: {
+              forceColor: opts.runtime?.forceColor,
+              singleThreaded: opts.runtime?.singleThreaded,
+            },
+          }),
+        );
+      } catch {
+        // The init request can reject when the Go child exits cleanly before we
+        // read its init ack: a fast path (--help / --init) closes the pipe the
+        // moment its work is done, and the stdout-EOF seal that rejects the
+        // pending request can beat the child 'exit' event into the race above
+        // (observed on Linux, where stdout 'end' tends to precede 'exit'). The
+        // child's exit code is the source of truth — a clean (0) exit means Go
+        // finished its job, so honor it; only a non-zero exit is a real failure.
+        safeKillGo(child);
+        const state = await childExit;
+        if (state.code === 0) return 0;
+        stderr.write(`rslint: init failed (Go exited ${state.code})\n`);
+        return state.code;
+      }
+      if (outcome.kind === 'exit') {
+        return outcome.state.code;
+      }
+      const data = outcome.value.data;
+      const ok =
+        typeof data === 'object' &&
+        data !== null &&
+        'ok' in data &&
+        data.ok === true;
+      if (!ok) {
+        stderr.write(
+          `rslint: Go rejected init: ${JSON.stringify(outcome.value.data)}\n`,
+        );
+        safeKillGo(child);
+        await childExit;
+        return 2;
+      }
     }
-    if (outcome.kind === 'exit') {
-      removeSignalHandlers();
-      return outcome.state.code;
-    }
-    const data = outcome.value.data;
-    const ok =
-      typeof data === 'object' &&
-      data !== null &&
-      'ok' in data &&
-      data.ok === true;
-    if (!ok) {
-      stderr.write(
-        `rslint: Go rejected init: ${JSON.stringify(outcome.value.data)}\n`,
-      );
-      safeKillGo(child);
-      await childExit;
-      removeSignalHandlers();
-      return 2;
-    }
+
+    // Output forwarding + shutdown ack happen in the handlers above; just wait
+    // for the Go child to finish (it exits with its own lint exit code).
+    const finalExit = await childExit;
+    ipc.close();
+    return finalExit.code;
+  } finally {
+    // Single cleanup site for every return above: drop the process-level
+    // signal listeners and drain the plugin worker pool. Both are no-ops
+    // when already done (removeSignalHandlers off()s detached listeners;
+    // pluginHost?.shutdown() is null-safe + idempotent), so this is safe
+    // even on the normal path and after the signal handler already fired.
+    removeSignalHandlers();
+    await pluginHost?.shutdown();
   }
-
-  // Output forwarding + shutdown ack happen in the handlers above; just wait
-  // for the Go child to finish (it exits with its own lint exit code).
-  const finalExit = await childExit;
-  ipc.close();
-  removeSignalHandlers();
-  return finalExit.code;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────

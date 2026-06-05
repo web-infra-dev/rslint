@@ -85,7 +85,12 @@ type RuleListeners map[ast.Kind](func(node *ast.Node))
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
-	Run              func(ctx RuleContext, options any) RuleListeners
+	// IsEslintPluginRule marks a placeholder rule whose actual execution
+	// happens in a Node worker — an ESLint-plugin rule mounted via the
+	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
+	// splits these out and dispatches them to the plugin-lint host.
+	IsEslintPluginRule bool
+	Run                func(ctx RuleContext, options any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
@@ -157,8 +162,18 @@ type RuleDiagnostic struct {
 	FixesPtr *[]RuleFix
 	// nil if no suggestions were provided
 	Suggestions *[]RuleSuggestion
-	SourceFile  *ast.SourceFile
-	Severity    DiagnosticSeverity
+	// SourceFile is the file this diagnostic anchors to. It is the
+	// ast.SourceFileLike interface (Text + ECMALineMap) rather than a
+	// concrete *ast.SourceFile so that ESLint-plugin diagnostics — which
+	// are produced in a Node worker and have no ts-go AST — can supply a
+	// lightweight text-only implementation (internal/linter.textSourceFile)
+	// and still render line/column through the scanner.
+	SourceFile ast.SourceFileLike
+	// FilePath is the diagnostic's file name. Stored separately because
+	// ast.SourceFileLike exposes no FileName(); native diagnostics set it
+	// from SourceFile.FileName(), plugin diagnostics from the wire path.
+	FilePath string
+	Severity DiagnosticSeverity
 	// PreFormatted indicates that Message.Description already contains
 	// structured formatting (e.g. indented continuation lines from tsc diagnostics).
 	// The renderer will use a simple 2-space indent instead of the │ border style.

@@ -53,13 +53,14 @@ import {
  * to branch on `languageOptions.parserOptions.ecmaFeatures.jsx`,
  * `parserOptions.sourceType`, or `languageOptions.globals`.
  *
- * Field set matches what the wire payload from Go's
- * `linter.CompatLanguageOptions` carries; out-of-band fields the
- * runner doesn't reproduce (custom `parser`, `parserOptions.project`,
- * `parserOptions.tsconfigRootDir`) are intentionally absent. This is
- * the contract the linter package and the plugin runtime share — any
- * change here must update both `ecma-language-plugin.ts:LintFileRequest`
- * and `internal/linter/types.go:CompatLanguageOptions`.
+ * Field set matches what the wire payload from Go carries in each file's
+ * `languageOptions` (computed by Go via `GetConfigForFile`); out-of-band
+ * fields the runner doesn't reproduce (custom `parser`,
+ * `parserOptions.project`, `parserOptions.tsconfigRootDir`) are
+ * intentionally absent. This is the contract the linter package and the
+ * plugin runtime share — any change here must update both
+ * `ecma-language-plugin.ts:LintFileRequest` and Go's
+ * `EslintPluginLintFile.LanguageOptions`.
  */
 export interface LanguageOptions {
   /**

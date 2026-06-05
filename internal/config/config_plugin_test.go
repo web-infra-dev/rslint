@@ -1,9 +1,38 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
+
+// TestEslintPluginDeclNameAliases_PinnedForJSGuard pins the set of
+// `eslint-plugin-*` declaration names so the JS collision guard
+// (define-config.ts NATIVE_PLUGIN_DECL_ALIASES), a hand-maintained mirror of
+// this set, cannot silently drift. If a newly-ported plugin adds such an alias,
+// this fails — a prompt to mirror it on the JS side, else the gate would
+// silently drop community plugins mounted under that key.
+func TestEslintPluginDeclNameAliases_PinnedForJSGuard(t *testing.T) {
+	want := map[string]struct{}{
+		"eslint-plugin-import":      {},
+		"eslint-plugin-jest":        {},
+		"eslint-plugin-jsx-a11y":    {},
+		"eslint-plugin-promise":     {},
+		"eslint-plugin-react-hooks": {},
+		"eslint-plugin-unicorn":     {},
+	}
+	got := map[string]struct{}{}
+	for _, p := range KnownPlugins {
+		for _, dn := range p.DeclNames {
+			if strings.HasPrefix(dn, "eslint-plugin-") {
+				got[dn] = struct{}{}
+			}
+		}
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("eslint-plugin-* DeclNames drifted:\n got  = %v\n want = %v\nMirror them in packages/rslint/src/define-config.ts NATIVE_PLUGIN_DECL_ALIASES.", got, want)
+	}
+}
 
 func TestNormalizePluginName(t *testing.T) {
 	tests := []struct {
