@@ -27,8 +27,7 @@ func getIncludesCalleeName(callee *ast.Node) (receiver *ast.Node, ok bool) {
 	switch callee.Kind {
 	case ast.KindPropertyAccessExpression:
 		prop := callee.AsPropertyAccessExpression()
-		name := prop.Name()
-		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "includes" {
+		if !jestUtils.IsNamedMember(prop.Name(), "includes") {
 			return nil, false
 		}
 
@@ -39,39 +38,13 @@ func getIncludesCalleeName(callee *ast.Node) (receiver *ast.Node, ok bool) {
 		if arg == nil {
 			return nil, false
 		}
-
-		switch arg.Kind {
-		case ast.KindStringLiteral:
-			if arg.AsStringLiteral().Text != "includes" {
-				return nil, false
-			}
-		case ast.KindNoSubstitutionTemplateLiteral:
-			if arg.AsNoSubstitutionTemplateLiteral().Text != "includes" {
-				return nil, false
-			}
-		default:
+		if !jestUtils.IsNamedMember(arg, "includes") {
 			return nil, false
 		}
 		return el.Expression, true
 	}
 
 	return nil, false
-}
-
-func receiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
-	if matcherCall == nil || matcherCall.Kind != ast.KindCallExpression {
-		return nil
-	}
-
-	expr := matcherCall.AsCallExpression().Expression
-	switch expr.Kind {
-	case ast.KindPropertyAccessExpression:
-		return expr.AsPropertyAccessExpression().Expression
-	case ast.KindElementAccessExpression:
-		return expr.AsElementAccessExpression().Expression
-	}
-
-	return nil
 }
 
 var PreferToContainRule = rule.Rule{
@@ -141,7 +114,7 @@ var PreferToContainRule = rule.Rule{
 
 				hasNotModifier := slices.Contains(jestFnCall.Modifiers, "not")
 				shouldNegate := isTrueLiteral == hasNotModifier
-				if receiverBeforeInvocation(node) == nil {
+				if jestUtils.ReceiverBeforeInvocation(node) == nil {
 					return
 				}
 

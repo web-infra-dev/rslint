@@ -21,6 +21,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_contain"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_been_called"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_been_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_length"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
@@ -50,6 +51,7 @@ func GetAllRules() []rule.Rule {
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,
+		prefer_to_have_been_called_times.PreferToHaveBeenCalledTimesRule,
 		prefer_to_have_been_called.PreferToHaveBeenCalledRule,
 		prefer_to_have_length.PreferToHaveLengthRule,
 		prefer_todo.PreferTodoRule,

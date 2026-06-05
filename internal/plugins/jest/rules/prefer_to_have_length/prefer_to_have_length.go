@@ -26,24 +26,6 @@ func checkIsEqualityMethod(members []string) bool {
 	return false
 }
 
-func isLengthPropertyName(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindIdentifier:
-		return node.AsIdentifier().Text == "length"
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text == "length"
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text == "length"
-	case ast.KindPrivateIdentifier:
-		return node.AsPrivateIdentifier().Text == "length"
-	default:
-		return false
-	}
-}
-
 func unwrapLengthAccessProperty(arg *ast.Node) *ast.Node {
 	if arg == nil {
 		return nil
@@ -55,7 +37,7 @@ func unwrapLengthAccessProperty(arg *ast.Node) *ast.Node {
 			return nil
 		}
 		el := arg.AsElementAccessExpression()
-		if !isLengthPropertyName(ast.SkipParentheses(el.ArgumentExpression)) {
+		if !jestUtils.IsNamedMember(ast.SkipParentheses(el.ArgumentExpression), "length") {
 			return nil
 		}
 		return el.Expression
@@ -64,26 +46,10 @@ func unwrapLengthAccessProperty(arg *ast.Node) *ast.Node {
 			return nil
 		}
 		pa := arg.AsPropertyAccessExpression()
-		if !isLengthPropertyName(pa.Name()) {
+		if !jestUtils.IsNamedMember(pa.Name(), "length") {
 			return nil
 		}
 		return pa.Expression
-	default:
-		return nil
-	}
-}
-
-// receiverBeforeInvocation returns the expression before .m() or ["m"]() on a call (e.g. expect(x).not before .toBe).
-func receiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
-	if matcherCall == nil || matcherCall.Kind != ast.KindCallExpression {
-		return nil
-	}
-	expr := matcherCall.AsCallExpression().Expression
-	switch expr.Kind {
-	case ast.KindPropertyAccessExpression:
-		return expr.AsPropertyAccessExpression().Expression
-	case ast.KindElementAccessExpression:
-		return expr.AsElementAccessExpression().Expression
 	default:
 		return nil
 	}
@@ -133,7 +99,7 @@ var PreferToHaveLengthRule = rule.Rule{
 					return
 				}
 
-				beforeMatcher := receiverBeforeInvocation(node)
+				beforeMatcher := jestUtils.ReceiverBeforeInvocation(node)
 				if beforeMatcher == nil {
 					return
 				}

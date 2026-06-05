@@ -445,6 +445,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-to-have-been-called-times.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-been-called.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
