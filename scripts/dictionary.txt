@@ -53,6 +53,7 @@ bref
 brefs
 Buttom
 cachedvfs
+callbackify
 callees
 callsite
 callsites

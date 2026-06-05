@@ -1,6 +1,7 @@
 package promise_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_callback_in_promise"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_wrap"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/param_names"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -8,6 +9,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		no_callback_in_promise.NoCallbackInPromiseRule,
 		no_return_wrap.NoReturnWrapRule,
 		param_names.ParamNamesRule,
 	}
