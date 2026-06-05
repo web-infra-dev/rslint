@@ -20,10 +20,14 @@ type pathState struct {
 }
 
 // ruleCtx holds shared analysis context.
+// In TS mode (TypeChecker available), resolverSymbols is populated and used for
+// scope-accurate resolver detection. In JS mode, resolverSymbols is nil and
+// resolverNames provides a string-based fallback.
 type ruleCtx struct {
-	resolverNames map[string]bool
-	ctx           rule.RuleContext
-	reported      map[*ast.Node]bool
+	resolverNames   map[string]bool      // always populated; used as JS fallback + empty check
+	resolverSymbols map[*ast.Symbol]bool // non-nil in TS mode only
+	ctx             rule.RuleContext
+	reported        map[*ast.Node]bool
 }
 
 func buildAlreadyResolvedMessage(line int) rule.RuleMessage {
@@ -84,6 +88,21 @@ func onResolverCall(callExpr *ast.Node, state pathState, rCtx *ruleCtx) pathStat
 	return pathState{firstCall: callExpr, certain: true}
 }
 
+// isResolverIdent reports whether ident refers to a tracked resolver parameter.
+// In TS mode uses TypeChecker symbol comparison (handles shadowing / re-declarations
+// correctly). Falls back to name matching when TypeChecker is unavailable or when
+// symbol resolution returns nil.
+func isResolverIdent(ident *ast.Node, rCtx *ruleCtx) bool {
+	if rCtx.resolverSymbols != nil {
+		sym := rCtx.ctx.TypeChecker.GetSymbolAtLocation(ident)
+		if sym != nil {
+			return rCtx.resolverSymbols[sym]
+		}
+		// TypeChecker couldn't resolve (shouldn't happen in valid code); fall back.
+	}
+	return rCtx.resolverNames[ident.AsIdentifier().Text]
+}
+
 // isDirectResolverCall returns the CallExpression if expr is a direct call to a resolver.
 func isDirectResolverCall(expr *ast.Node, rCtx *ruleCtx) *ast.Node {
 	if expr == nil || !ast.IsCallExpression(expr) {
@@ -93,27 +112,37 @@ func isDirectResolverCall(expr *ast.Node, rCtx *ruleCtx) *ast.Node {
 	if callee == nil || !ast.IsIdentifier(callee) {
 		return nil
 	}
-	if rCtx.resolverNames[callee.AsIdentifier().Text] {
+	if isResolverIdent(callee, rCtx) {
 		return expr
 	}
 	return nil
 }
 
-// walkNestedFunctions finds nested function expressions and analyzes each independently.
-// It does NOT update the caller's pathState (nested functions have separate control flows).
+// walkNestedFunctions finds nested function expressions and analyzes each in the
+// context of the outer resolver set. Nested functions that rebind a resolver name
+// as a parameter are handled differently per mode:
+//   - TS mode: pass the same rCtx — symbol identity distinguishes the inner parameter
+//     from the outer resolver automatically, so no manual shadowing is needed.
+//   - JS mode: build an inner rCtx with parameter-shadowed names removed.
 func walkNestedFunctions(node *ast.Node, rCtx *ruleCtx) {
 	if node == nil {
 		return
 	}
 	switch node.Kind {
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		innerNames := shadowedResolverNames(rCtx.resolverNames, node)
-		innerCtx := &ruleCtx{
-			resolverNames: innerNames,
-			ctx:           rCtx.ctx,
-			reported:      rCtx.reported,
+		if rCtx.resolverSymbols != nil {
+			// TS mode: symbol comparison handles shadowing; reuse same rCtx.
+			analyzeFunctionBody(node, rCtx)
+		} else {
+			// JS mode: strip any names re-declared as parameters.
+			innerNames := shadowedResolverNames(rCtx.resolverNames, node)
+			innerCtx := &ruleCtx{
+				resolverNames: innerNames,
+				ctx:           rCtx.ctx,
+				reported:      rCtx.reported,
+			}
+			analyzeFunctionBody(node, innerCtx)
 		}
-		analyzeFunctionBody(node, innerCtx)
 		return
 	}
 	node.ForEachChild(func(child *ast.Node) bool {
@@ -391,7 +420,7 @@ func walkThrowables(node *ast.Node, rCtx *ruleCtx, onThrowable func(isResolver b
 			return false
 		})
 		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
-		isResolver := callee != nil && ast.IsIdentifier(callee) && rCtx.resolverNames[callee.AsIdentifier().Text]
+		isResolver := callee != nil && ast.IsIdentifier(callee) && isResolverIdent(callee, rCtx)
 		onThrowable(isResolver)
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression, ast.KindNewExpression,
@@ -530,8 +559,12 @@ var NoMultipleResolvedRule = rule.Rule{
 					return
 				}
 
-				// Collect resolver parameter names (resolve and reject)
+				// Collect resolver parameter names (always) and symbols (TS mode only).
 				resolverNames := make(map[string]bool)
+				var resolverSymbols map[*ast.Symbol]bool
+				if ctx.TypeChecker != nil {
+					resolverSymbols = make(map[*ast.Symbol]bool)
+				}
 				for _, param := range executor.Parameters() {
 					if param == nil || !ast.IsParameterDeclaration(param) {
 						continue
@@ -543,6 +576,11 @@ var NoMultipleResolvedRule = rule.Rule{
 					nameNode := param.AsParameterDeclaration().Name()
 					if nameNode != nil && ast.IsIdentifier(nameNode) {
 						resolverNames[nameNode.AsIdentifier().Text] = true
+						if resolverSymbols != nil {
+							if sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode); sym != nil {
+								resolverSymbols[sym] = true
+							}
+						}
 					}
 				}
 				if len(resolverNames) == 0 {
@@ -550,9 +588,10 @@ var NoMultipleResolvedRule = rule.Rule{
 				}
 
 				rCtx := &ruleCtx{
-					resolverNames: resolverNames,
-					ctx:           ctx,
-					reported:      reported,
+					resolverNames:   resolverNames,
+					resolverSymbols: resolverSymbols,
+					ctx:             ctx,
+					reported:        reported,
 				}
 				analyzeFunctionBody(executor, rCtx)
 			},
