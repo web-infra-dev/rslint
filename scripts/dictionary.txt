@@ -325,6 +325,8 @@ preresolved
 Prettier
 prioritises
 progressbar
+promisify
+promisifying
 promiseutil
 propertyassignment
 proptypes
