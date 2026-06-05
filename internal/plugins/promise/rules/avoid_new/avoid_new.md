@@ -27,4 +27,4 @@ new Promise.resolve();
 
 ## Original Documentation
 
-https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/avoid-new.md
+- [eslint-plugin-promise: avoid-new](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/avoid-new.md)
