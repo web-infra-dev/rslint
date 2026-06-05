@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime"
 	"sort"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"golang.org/x/sync/errgroup"
 )
 
 // ─── wire types — mirror packages/rslint/src/eslint-plugin/plugin/plugin-lint-protocol.ts ───
@@ -154,16 +156,77 @@ func BuildEslintPluginFileInput(filePath, configKey string, rules []ConfiguredRu
 // configKey miss) that must surface.
 const eslintPluginShutdownSentinel = "shutdown"
 
-// DispatchEslintPluginRules groups files by their rule-config signature,
-// sends each homogeneous batch to the Node host, and feeds the rebuilt
-// diagnostics through onDiagnostic — the SAME sink as native rules, so they
-// merge into the unified output / --fix pipeline. Intended to be called
-// from a goroutine running in parallel with native linting; a panic is
-// trapped and returned as an error so it can't crash the process.
+// DispatchEslintPluginRules groups files by their rule-config signature and
+// dispatches each homogeneous batch to the Node host as an independent reverse
+// IPC request, feeding the rebuilt diagnostics through onDiagnostic — the SAME
+// sink as native rules, so they merge into the unified output / --fix pipeline.
+// Intended to be called from a goroutine running in parallel with native
+// linting.
+//
+// Batches are dispatched CONCURRENTLY (bounded by dispatchConcurrency). A serial
+// loop leaves the Node worker pool idle between batches whenever the file set
+// fragments into many small batches (monorepo multi-config / per-rule option
+// splits) — it only saturates the pool within a single batch. Dispatching
+// batches concurrently lets every batch's files share the one pool, keeping it
+// saturated across batches. `dispatch` is therefore invoked from multiple
+// goroutines and MUST be safe for concurrent use (the CLI IPC channel and the
+// LSP reverse-request sender both are; LSP also only ever has one batch).
+// Per-batch diagnostics are collected into index-keyed slots and emitted in
+// batch order AFTER all batches finish, so onDiagnostic stays single-threaded
+// (callers keep their lock-free collectors) and output ordering is
+// deterministic. A batch failure no longer aborts the others; the first error
+// in batch order is returned, preserving the previous serial error semantics
+// for callers.
 func DispatchEslintPluginRules(
 	ctx context.Context,
 	dispatch EslintPluginDispatcher,
 	files []EslintPluginFileInput,
+	fix bool,
+	suggestionsMode string,
+	onDiagnostic DiagnosticHandler,
+) error {
+	if len(files) == 0 || dispatch == nil {
+		return nil
+	}
+
+	batches := groupEslintPluginFiles(files)
+	batchDiags := make([][]rule.RuleDiagnostic, len(batches))
+	batchErrs := make([]error, len(batches))
+
+	var g errgroup.Group
+	g.SetLimit(dispatchConcurrency())
+	for i, batch := range batches {
+		g.Go(func() error {
+			// Each batch writes only its own slot, so concurrent batches share
+			// no state; diagnostics are emitted serially after Wait.
+			batchErrs[i] = dispatchOneBatch(ctx, dispatch, batch, fix, suggestionsMode,
+				func(d rule.RuleDiagnostic) { batchDiags[i] = append(batchDiags[i], d) })
+			return nil
+		})
+	}
+	_ = g.Wait()
+
+	for _, diags := range batchDiags {
+		for _, d := range diags {
+			onDiagnostic(d)
+		}
+	}
+	for _, batchErr := range batchErrs {
+		if batchErr != nil {
+			return batchErr
+		}
+	}
+	return nil
+}
+
+// dispatchOneBatch sends one batch's reverse request and rebuilds its
+// diagnostics through onDiagnostic. A panic is trapped and returned as an error
+// so a worker-side failure can't crash the driver process (each batch runs in
+// its own goroutine, so a panic must be trapped here rather than escaping).
+func dispatchOneBatch(
+	ctx context.Context,
+	dispatch EslintPluginDispatcher,
+	batch []EslintPluginFileInput,
 	fix bool,
 	suggestionsMode string,
 	onDiagnostic DiagnosticHandler,
@@ -173,33 +236,43 @@ func DispatchEslintPluginRules(
 			err = fmt.Errorf("eslint-plugin dispatch panicked: %v", r)
 		}
 	}()
-
-	if len(files) == 0 || dispatch == nil {
+	req := buildEslintPluginRequest(batch, fix, suggestionsMode)
+	res, dispatchErr := dispatch(ctx, req)
+	if dispatchErr != nil {
+		return dispatchErr
+	}
+	if res == nil {
 		return nil
 	}
+	return applyEslintPluginResults(batch, res, onDiagnostic)
+}
 
-	for _, batch := range groupEslintPluginFiles(files) {
-		req := buildEslintPluginRequest(batch, fix, suggestionsMode)
-		res, dispatchErr := dispatch(ctx, req)
-		if dispatchErr != nil {
-			return dispatchErr
-		}
-		if res == nil {
-			continue
-		}
-		if applyErr := applyEslintPluginResults(batch, res, onDiagnostic); applyErr != nil {
-			return applyErr
-		}
+// dispatchConcurrency bounds how many plugin-lint batches are dispatched
+// concurrently. The Node worker pool has up to 8 workers (capped at the core
+// count; see worker-pool.ts), so to keep it saturated the in-flight batch count
+// must at least match that worker count; a small buffer on top lets a freed
+// worker pick up the next batch's tasks from the shared queue without idling
+// during the Go↔Node round trip between batches. Capping it keeps a heavily
+// fragmented file set from dispatching every batch's reverse request at once —
+// note this bounds concurrent batches, NOT the tasks inside one batch (a single
+// huge batch still enqueues all its tasks together, bounded by the batch itself).
+func dispatchConcurrency() int {
+	const poolWorkers = 8 // mirrors the Node worker pool cap (worker-pool.ts)
+	const roundTripBuffer = 2
+	n := runtime.NumCPU()
+	if n > poolWorkers {
+		n = poolWorkers
 	}
-	return nil
+	return n + roundTripBuffer
 }
 
 // groupEslintPluginFiles buckets files by (configKey + rule-config
-// signature). A batch shares a single `rules` map on the wire, so every
-// file in it must agree on the configured rules — including each rule's
-// options AND severity (severity is reattached from the matching rule, so
-// two files configuring the same rule at different severities must not
-// share a batch).
+// signature). A batch shares a single `rules` map on the wire, so every file
+// in it must agree on the configured rules' names AND options. Severity is
+// deliberately NOT part of the key: it never travels on the wire (only options
+// do) and is reattached per-file in applyEslintPluginResults, so two files
+// configuring the same rule at different severities produce a byte-identical
+// request and SHOULD share a batch rather than needlessly fragment the pool.
 func groupEslintPluginFiles(files []EslintPluginFileInput) [][]EslintPluginFileInput {
 	order := []string{}
 	groups := map[string][]EslintPluginFileInput{}
@@ -219,13 +292,12 @@ func groupEslintPluginFiles(files []EslintPluginFileInput) [][]EslintPluginFileI
 
 func eslintPluginBatchKey(f EslintPluginFileInput) string {
 	type sigRule struct {
-		Name     string `json:"name"`
-		Options  any    `json:"options"`
-		Severity int    `json:"severity"`
+		Name    string `json:"name"`
+		Options any    `json:"options"`
 	}
 	sig := make([]sigRule, 0, len(f.Rules))
 	for _, r := range f.Rules {
-		sig = append(sig, sigRule{Name: r.Name, Options: r.Options, Severity: r.Severity.Int()})
+		sig = append(sig, sigRule{Name: r.Name, Options: r.Options})
 	}
 	sort.Slice(sig, func(i, j int) bool { return sig[i].Name < sig[j].Name })
 	b, err := json.Marshal(struct {

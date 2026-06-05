@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/core"
@@ -39,9 +41,16 @@ func TestDispatchEslintPlugin_GroupsBySignature(t *testing.T) {
 		{Path: "/c.ts", ConfigKey: "/cfg", Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o2"}, rule.SeverityError)}},
 		{Path: "/d.ts", ConfigKey: "/other", Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
 	}
-	var batches []EslintPluginLintRequest
+	var (
+		mu      sync.Mutex
+		batches []EslintPluginLintRequest
+	)
 	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		// dispatch is now invoked concurrently (one goroutine per batch), so the
+		// shared slice needs a lock.
+		mu.Lock()
 		batches = append(batches, req)
+		mu.Unlock()
 		results := make([]EslintPluginFileResult, 0, len(req.Files))
 		for _, f := range req.Files {
 			results = append(results, EslintPluginFileResult{FilePath: f.Path})
@@ -65,6 +74,179 @@ func TestDispatchEslintPlugin_GroupsBySignature(t *testing.T) {
 	}
 	if twoFileBatches != 1 {
 		t.Errorf("expected exactly one 2-file batch (A+B), got %d", twoFileBatches)
+	}
+}
+
+func TestDispatchEslintPlugin_SeverityDoesNotFragmentBatches(t *testing.T) {
+	// Same configKey + rule + options, differing ONLY in severity. Severity is
+	// not part of the batch key (it never goes on the wire, reattached per-file),
+	// so these must share exactly ONE batch — yet each file keeps its severity.
+	ta, tb := "a\n", "b\n"
+	files := []EslintPluginFileInput{
+		{Path: "/a.ts", ConfigKey: "/cfg", Text: &ta, Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityError)}},
+		{Path: "/b.ts", ConfigKey: "/cfg", Text: &tb, Rules: []ConfiguredRule{pluginRule("uc/x", []any{"o1"}, rule.SeverityWarning)}},
+	}
+	var (
+		mu         sync.Mutex
+		batchCount int
+	)
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		mu.Lock()
+		batchCount++
+		mu.Unlock()
+		results := make([]EslintPluginFileResult, 0, len(req.Files))
+		for _, f := range req.Files {
+			results = append(results, EslintPluginFileResult{
+				FilePath:    f.Path,
+				Diagnostics: []EslintPluginDiagnostic{{RuleName: "uc/x", Message: "m", StartPos: 0, EndPos: 1}},
+			})
+		}
+		return &EslintPluginLintResult{Results: results}, nil
+	}
+	sevByPath := map[string]rule.DiagnosticSeverity{}
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+		sevByPath[d.FilePath] = d.Severity
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if batchCount != 1 {
+		t.Fatalf("severity must not fragment batches: expected 1 batch, got %d", batchCount)
+	}
+	if sevByPath["/a.ts"] != rule.SeverityError {
+		t.Errorf("/a.ts severity = %v, want Error", sevByPath["/a.ts"])
+	}
+	if sevByPath["/b.ts"] != rule.SeverityWarning {
+		t.Errorf("/b.ts severity = %v, want Warning", sevByPath["/b.ts"])
+	}
+}
+
+func TestDispatchEslintPlugin_ConcurrentBatchesAllEmitted(t *testing.T) {
+	// Many distinct batches (each a different option → its own batch) are
+	// dispatched concurrently. Every batch's diagnostic must be emitted exactly
+	// once. The `seen` map is written from onDiagnostic WITHOUT a lock on purpose:
+	// onDiagnostic must stay single-threaded (emitted after Wait), so -race would
+	// catch a regression that emits concurrently.
+	const n = 20
+	files := make([]EslintPluginFileInput, n)
+	texts := make([]string, n)
+	for i := range files {
+		texts[i] = "x\n"
+		files[i] = EslintPluginFileInput{
+			Path:      fmt.Sprintf("/f%d.ts", i),
+			ConfigKey: "/cfg",
+			Text:      &texts[i],
+			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct options → distinct batch
+		}
+	}
+	var (
+		mu    sync.Mutex
+		calls int
+	)
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		results := make([]EslintPluginFileResult, 0, len(req.Files))
+		for _, f := range req.Files {
+			results = append(results, EslintPluginFileResult{
+				FilePath:    f.Path,
+				Diagnostics: []EslintPluginDiagnostic{{RuleName: "uc/x", Message: "m", StartPos: 0, EndPos: 1}},
+			})
+		}
+		return &EslintPluginLintResult{Results: results}, nil
+	}
+	seen := map[string]int{}
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+		seen[d.FilePath]++
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if calls != n {
+		t.Fatalf("expected %d batches dispatched, got %d", n, calls)
+	}
+	if len(seen) != n {
+		t.Fatalf("expected diagnostics for all %d files, got %d distinct", n, len(seen))
+	}
+	for p, c := range seen {
+		if c != 1 {
+			t.Errorf("%s emitted %d times, want exactly 1", p, c)
+		}
+	}
+}
+
+func TestDispatchEslintPlugin_BatchFailureDoesNotAbortOthers(t *testing.T) {
+	// One batch's dispatch fails; the others must still run and emit their
+	// diagnostics (concurrent dispatch no longer aborts on the first failure),
+	// and the error must still surface to the caller.
+	const n = 10
+	const failOn = "/f3.ts"
+	files := make([]EslintPluginFileInput, n)
+	texts := make([]string, n)
+	for i := range files {
+		texts[i] = "x\n"
+		files[i] = EslintPluginFileInput{
+			Path:      fmt.Sprintf("/f%d.ts", i),
+			ConfigKey: "/cfg",
+			Text:      &texts[i],
+			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)},
+		}
+	}
+	wantErr := errors.New("boom")
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if req.Files[0].Path == failOn {
+			return nil, wantErr
+		}
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath:    req.Files[0].Path,
+			Diagnostics: []EslintPluginDiagnostic{{RuleName: "uc/x", Message: "m", StartPos: 0, EndPos: 1}},
+		}}}, nil
+	}
+	seen := map[string]int{}
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+		seen[d.FilePath]++
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected the failing batch's error to surface, got %v", err)
+	}
+	if len(seen) != n-1 {
+		t.Errorf("expected all %d non-failing files emitted, got %d", n-1, len(seen))
+	}
+	if _, ok := seen[failOn]; ok {
+		t.Errorf("failing file %s must have no diagnostic", failOn)
+	}
+}
+
+func TestDispatchEslintPlugin_FirstBatchErrorWins(t *testing.T) {
+	// Multiple batches fail; the returned error must be the first in batch order
+	// (groupEslintPluginFiles keeps first-seen order), matching the previous
+	// serial "stop at the first failure" error semantics regardless of which
+	// batch's goroutine finished first.
+	errEarly := errors.New("early")
+	errLate := errors.New("late")
+	texts := make([]string, 6)
+	files := make([]EslintPluginFileInput, 6)
+	for i := range files {
+		texts[i] = "x\n"
+		files[i] = EslintPluginFileInput{
+			Path:      fmt.Sprintf("/f%d.ts", i),
+			ConfigKey: "/cfg",
+			Text:      &texts[i],
+			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct options → own batch, order f0..f5
+		}
+	}
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		switch req.Files[0].Path {
+		case "/f2.ts":
+			return nil, errEarly
+		case "/f4.ts":
+			return nil, errLate
+		default:
+			return &EslintPluginLintResult{Results: []EslintPluginFileResult{{FilePath: req.Files[0].Path}}}, nil
+		}
+	}
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(rule.RuleDiagnostic) {})
+	if !errors.Is(err, errEarly) {
+		t.Fatalf("expected the first-in-batch-order error (f2's), got %v", err)
 	}
 }
 
