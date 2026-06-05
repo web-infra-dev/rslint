@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_in_finally"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_wrap"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/param_names"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/prefer_catch"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/valid_params"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -27,6 +28,7 @@ func GetAllRules() []rule.Rule {
 		no_return_in_finally.NoReturnInFinallyRule,
 		no_return_wrap.NoReturnWrapRule,
 		param_names.ParamNamesRule,
+		prefer_catch.PreferCatchRule,
 		valid_params.ValidParamsRule,
 	}
 }
