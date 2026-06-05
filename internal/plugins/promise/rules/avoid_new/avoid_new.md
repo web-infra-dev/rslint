@@ -1,4 +1,4 @@
-# promise/avoid-new
+# avoid-new
 
 Disallow creating `new` promises outside of utility libs (use `util.promisify` instead).
 
