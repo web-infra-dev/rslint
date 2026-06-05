@@ -1,10 +1,12 @@
-# promise/no-multiple-resolved
+# no-multiple-resolved
+
+Disallow creating new promises where the executor can settle the promise more than once.
 
 ## Rule Details
 
-Disallows creating new promises with paths that resolve multiple times.
-
-A Promise executor that calls both `resolve` and `reject` (or calls either one twice) on the same execution path settles the promise twice. The second settlement has no effect, but it indicates a logic error and can mask real bugs.
+A Promise executor that calls both `resolve` and `reject` (or calls either one twice) on the same
+execution path settles the promise twice. The second settlement has no effect, but it indicates a
+logic error and can mask real bugs.
 
 Examples of **incorrect** code for this rule:
 
@@ -15,16 +17,12 @@ new Promise((resolve, reject) => {
   }
   resolve(value) // may execute after reject
 })
-```
 
-```javascript
 new Promise((resolve, reject) => {
   reject(error)
   resolve(value) // always executes after reject
 })
-```
 
-```javascript
 new Promise(async (resolve, reject) => {
   try {
     const r = await foo()
@@ -46,9 +44,7 @@ new Promise((resolve, reject) => {
     resolve(value)
   }
 })
-```
 
-```javascript
 new Promise((resolve, reject) => {
   if (error) {
     reject(error)
@@ -56,19 +52,24 @@ new Promise((resolve, reject) => {
   }
   resolve(value)
 })
-```
 
-```javascript
 new Promise(async (resolve, reject) => {
   try {
     const r = await foo()
-    resolve(r) // last throwable expression → catch cannot run after this
+    resolve(r) // last throwable expression — catch cannot run after this
   } catch (error) {
     reject(error)
   }
 })
 ```
 
+## Differences from ESLint
+
+Correlated conditions across separate `if` statements (e.g. `if (err) { reject(err) }` followed
+by `if (!err) { resolve(val) }`) are not recognized as mutually exclusive. This rule reports them
+as potential double-resolution. Full ESLint code-path analysis handles these; our simplified
+state-based analysis does not.
+
 ## Original Documentation
 
-https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-multiple-resolved.md
+- [eslint-plugin-promise: no-multiple-resolved](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-multiple-resolved.md)
