@@ -30,117 +30,55 @@ func isPromiseCallback(node *ast.Node) bool {
 	return isThenOrCatchCall(parent)
 }
 
-// collectScopeBindings collects into names all binding identifiers introduced by fn:
-// parameters and locally declared variables at any nesting depth (stopping at nested
-// function boundaries). This mirrors ESLint's scope.variables for the callback's scope.
-func collectScopeBindings(fn *ast.Node, names map[string]bool) {
-	var params *ast.NodeList
-	switch fn.Kind {
-	case ast.KindFunctionExpression:
-		if fe := fn.AsFunctionExpression(); fe != nil {
-			params = fe.Parameters
-		}
-	case ast.KindArrowFunction:
-		if af := fn.AsArrowFunction(); af != nil {
-			params = af.Parameters
-		}
-	}
-	if params != nil {
-		for _, param := range params.Nodes {
-			if param.Kind == ast.KindParameter {
-				if pd := param.AsParameterDeclaration(); pd != nil {
-					utils.CollectBindingNames(pd.Name(), func(_ *ast.Node, name string) {
-						names[name] = true
-					})
-				}
-			}
-		}
-	}
-
-	body := fn.Body()
-	if body != nil && body.Kind == ast.KindBlock {
-		collectDeclsInBlock(body, names)
-	}
-}
-
-func collectDeclsInBlock(block *ast.Node, names map[string]bool) {
-	stmts := block.AsBlock().Statements
-	if stmts == nil {
-		return
-	}
-	for _, stmt := range stmts.Nodes {
-		collectDeclsInStmt(stmt, names)
-	}
-}
-
-func collectDeclsInStmt(node *ast.Node, names map[string]bool) {
-	if node == nil || ast.IsFunctionLike(node) {
-		return
-	}
-	switch node.Kind {
-	case ast.KindVariableStatement:
-		collectVarDeclListNames(node.AsVariableStatement().DeclarationList, names)
-	case ast.KindVariableDeclarationList:
-		// Reached when a for/for-in/for-of initializer is a declaration list.
-		collectVarDeclListNames(node, names)
-	default:
-		// Recurse into all other nodes (if/for/while/try/block/etc.).
-		node.ForEachChild(func(child *ast.Node) bool {
-			collectDeclsInStmt(child, names)
-			return false
-		})
-	}
-}
-
-func collectVarDeclListNames(listNode *ast.Node, names map[string]bool) {
-	if listNode == nil {
-		return
-	}
-	dl := listNode.AsVariableDeclarationList()
-	if dl == nil || dl.Declarations == nil {
-		return
-	}
-	for _, decl := range dl.Declarations.Nodes {
-		if vd := decl.AsVariableDeclaration(); vd != nil {
-			utils.CollectBindingNames(vd.Name(), func(_ *ast.Node, name string) {
-				names[name] = true
-			})
-		}
-	}
-}
-
-// argsContainRef reports whether any identifier anywhere in the call's argument list
-// has a name present in names. This mirrors the upstream's position-based reference
-// check (ESLint scope references are checked against argument ranges).
-func argsContainRef(callNode *ast.Node, names map[string]bool) bool {
-	args := callNode.AsCallExpression().Arguments
-	if args == nil {
-		return false
-	}
-	for _, arg := range args.Nodes {
-		if identInNames(arg, names) {
-			return true
-		}
-	}
-	return false
-}
-
-func identInNames(node *ast.Node, names map[string]bool) bool {
+// walkIdentifiers calls fn for each identifier name found anywhere in node's
+// subtree, stopping early across the whole traversal if fn returns true.
+func walkIdentifiers(node *ast.Node, fn func(name string) bool) bool {
 	if node == nil {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier {
-		return names[node.AsIdentifier().Text]
+		return fn(node.AsIdentifier().Text)
 	}
 	found := false
 	node.ForEachChild(func(child *ast.Node) bool {
-		if identInNames(child, names) {
+		if walkIdentifiers(child, fn) {
 			found = true
 			return true
 		}
 		return false
 	})
 	return found
+}
+
+// argsContainRef reports whether any identifier anywhere in the call's argument
+// list has a name that is bound in fn's parameter list or local variable
+// declarations. Uses utils.HasShadowingParameter for params and
+// utils.HasShadowingDeclaration / utils.HasHoistedVarDeclaration for body
+// declarations, mirroring the upstream's scope-reference check.
+func argsContainRef(callNode *ast.Node, fn *ast.Node) bool {
+	args := callNode.AsCallExpression().Arguments
+	if args == nil {
+		return false
+	}
+	body := fn.Body()
+	for _, arg := range args.Nodes {
+		found := false
+		walkIdentifiers(arg, func(name string) bool {
+			if utils.HasShadowingParameter(fn, name) {
+				found = true
+				return true
+			}
+			if body != nil && (utils.HasShadowingDeclaration(body, name) || utils.HasHoistedVarDeclaration(body, name)) {
+				found = true
+				return true
+			}
+			return false
+		})
+		if found {
+			return true
+		}
+	}
+	return false
 }
 
 func buildAvoidNestingMessage() rule.RuleMessage {
@@ -178,9 +116,7 @@ var NoNestingRule = rule.Rule{
 					return
 				}
 				closestCallback := callbackStack[len(callbackStack)-1]
-				names := make(map[string]bool)
-				collectScopeBindings(closestCallback, names)
-				if argsContainRef(node, names) {
+				if argsContainRef(node, closestCallback) {
 					return
 				}
 				callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
