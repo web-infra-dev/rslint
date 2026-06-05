@@ -120,9 +120,9 @@ func TestCatchOrReturnExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}},
 			},
 
-			// ---- Branch lock-in: isAllowedPromiseTermination allowThen branch ----
-			// Locks in: allowThen=true, name="then", args.length=2, allowThen && !allowThenStrict → true.
-			// (Covered by upstream; this is a branch-reader lock-in with explicit comment.)
+			// ---- Branch lock-in: allowThen=true but args.length=1 → allowThen branch NOT entered ----
+			// Locks in: allowThen=true, name="then", args.length=1 (not 2) → the 2-arg guard
+			// prevents entering the allowThen / allowThenStrict block → falls through → reported.
 			{
 				Code:    `frank().then(go)`,
 				Options: map[string]interface{}{"allowThen": true},
