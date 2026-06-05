@@ -495,3 +495,131 @@ func TestLintPluginRulesSync_ExpiredCtxReturnsNil(t *testing.T) {
 		t.Errorf("expired ctx should return promptly, took %v", elapsed)
 	}
 }
+
+// ======== codeAction coexistence (native fix + plugin fix/suggestion) ========
+
+func codeActionsByTitle(resp lsproto.CodeActionResponse) map[string]*lsproto.CodeAction {
+	out := map[string]*lsproto.CodeAction{}
+	if resp.CommandOrCodeActionArray == nil {
+		return out
+	}
+	for _, ca := range *resp.CommandOrCodeActionArray {
+		if ca.CodeAction != nil {
+			out[ca.CodeAction.Title] = ca.CodeAction
+		}
+	}
+	return out
+}
+
+// TestHandleCodeAction_NativeAndPluginFixesCoexistOnSameRange pins the dominant
+// per-line lightbulb path: a native diagnostic and a community-plugin
+// diagnostic overlap the SAME range, both fixable. The quickfix-assembly body
+// (run elsewhere only against an empty diagnostics map) must produce a "Fix:"
+// action for EACH origin.
+func TestHandleCodeAction_NativeAndPluginFixesCoexistOnSameRange(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	text := "const bar = 1;"
+	s.documents[uri] = text
+	s.diagnostics[uri] = []rule.RuleDiagnostic{
+		{
+			RuleName:   "native/x",
+			Range:      core.NewTextRange(6, 9),
+			Message:    rule.RuleMessage{Description: "native msg"},
+			SourceFile: textOnlySourceFile{text: text},
+			FixesPtr:   &[]rule.RuleFix{{Range: core.NewTextRange(6, 9), Text: "NAT"}},
+		},
+		{
+			RuleName:   "plug/y",
+			Range:      core.NewTextRange(6, 9),
+			Message:    rule.RuleMessage{Description: "plugin msg"},
+			SourceFile: textOnlySourceFile{text: text},
+			FixesPtr:   &[]rule.RuleFix{{Range: core.NewTextRange(6, 9), Text: "PLG"}},
+		},
+	}
+
+	resp, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: 0, Character: 6},
+			End:   lsproto.Position{Line: 0, Character: 9},
+		},
+		Context: &lsproto.CodeActionContext{},
+	})
+	if err != nil {
+		t.Fatalf("handleCodeAction: %v", err)
+	}
+	byTitle := codeActionsByTitle(resp)
+	if byTitle["Fix: native msg"] == nil {
+		t.Errorf("missing native fix action; got titles %v", titleSet(byTitle))
+	}
+	if byTitle["Fix: plugin msg"] == nil {
+		t.Errorf("missing plugin fix action; got titles %v", titleSet(byTitle))
+	}
+}
+
+// TestHandleCodeAction_NativeFixAndPluginSuggestionCoexist pins that a native
+// autofix and a plugin suggestion on the same file surface as distinct code
+// actions, distinguished by preference: the native fix is IsPreferred, the
+// plugin suggestion is not. createCodeActionFromSuggestion is otherwise
+// uncovered.
+func TestHandleCodeAction_NativeFixAndPluginSuggestionCoexist(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	text := "const bar = 1;"
+	s.documents[uri] = text
+	s.diagnostics[uri] = []rule.RuleDiagnostic{
+		{
+			RuleName:   "native/x",
+			Range:      core.NewTextRange(12, 13),
+			Message:    rule.RuleMessage{Description: "native msg"},
+			SourceFile: textOnlySourceFile{text: text},
+			FixesPtr:   &[]rule.RuleFix{{Range: core.NewTextRange(12, 13), Text: "2"}},
+		},
+		{
+			RuleName:   "plug/y",
+			Range:      core.NewTextRange(6, 9),
+			Message:    rule.RuleMessage{Description: "plugin msg"},
+			SourceFile: textOnlySourceFile{text: text},
+			Suggestions: &[]rule.RuleSuggestion{{
+				Message:  rule.RuleMessage{Description: "use baz"},
+				FixesArr: []rule.RuleFix{{Range: core.NewTextRange(6, 9), Text: "baz"}},
+			}},
+		},
+	}
+
+	resp, err := s.handleCodeAction(context.Background(), &lsproto.CodeActionParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: 0, Character: 0},
+			End:   lsproto.Position{Line: 0, Character: 14},
+		},
+		Context: &lsproto.CodeActionContext{},
+	})
+	if err != nil {
+		t.Fatalf("handleCodeAction: %v", err)
+	}
+	byTitle := codeActionsByTitle(resp)
+	nat := byTitle["Fix: native msg"]
+	if nat == nil {
+		t.Fatalf("missing native fix action; got titles %v", titleSet(byTitle))
+	}
+	if nat.IsPreferred == nil || !*nat.IsPreferred {
+		t.Error("native autofix must be IsPreferred=true")
+	}
+	sug := byTitle["Suggestion: use baz"]
+	if sug == nil {
+		t.Fatalf("missing plugin suggestion action; got titles %v", titleSet(byTitle))
+	}
+	if sug.IsPreferred == nil || *sug.IsPreferred {
+		t.Error("plugin suggestion must be IsPreferred=false")
+	}
+}
+
+func titleSet(m map[string]*lsproto.CodeAction) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}

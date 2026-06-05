@@ -206,6 +206,24 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     expect(entry.eslintPlugins).toBeUndefined();
   });
 
+  test('multiple object-form plugin prefixes in one entry', () => {
+    // The normal object-form usage mounts more than one community plugin; each
+    // prefix's ruleNames + the prefix gate must be collected independently.
+    const pluginB = { meta: { name: 'b' }, rules: { 'no-baz': {} } };
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { local: mockPlugin, other: pluginB },
+        rules: { 'local/no-foo': 'error', 'other/no-baz': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toEqual({
+      local: { ruleNames: ['no-bar', 'no-foo'] },
+      other: { ruleNames: ['no-baz'] },
+    });
+    expect(entry.plugins).toEqual(['local', 'other']);
+  });
+
   test('throws when a mounted plugin has no rules object', () => {
     expect(() =>
       normalizeConfig([

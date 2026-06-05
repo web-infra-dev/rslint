@@ -748,6 +748,45 @@ func TestHandleConfigUpdate_MultipleConfigs(t *testing.T) {
 	}
 }
 
+// TestHandleConfigUpdate_RegistersEslintPlugins pins the ONLY path that
+// registers object-form community plugins in the editor: the configUpdate
+// reverse notification carries the {prefix, ruleNames} metadata aggregate, and
+// handleConfigUpdate must route it through RegisterEslintPluginRules so that
+// `<prefix>/<rule>` becomes resolvable (IsEslintPluginRule placeholder).
+func TestHandleConfigUpdate_RegistersEslintPlugins(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{
+						"files":   []string{"**/*.ts"},
+						"plugins": []string{"testplugLSPreg"},
+						"rules":   map[string]any{"testplugLSPreg/no-foo": "error"},
+					},
+				},
+			},
+		},
+		"eslintPlugins": []any{
+			map[string]any{"prefix": "testplugLSPreg", "ruleNames": []string{"no-foo"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	r, ok := config.GlobalRuleRegistry.GetRule("testplugLSPreg/no-foo")
+	if !ok {
+		t.Fatal("expected testplugLSPreg/no-foo to be registered as a placeholder after configUpdate")
+	}
+	if !r.IsEslintPluginRule {
+		t.Error("expected IsEslintPluginRule=true on the registered placeholder")
+	}
+}
+
 func TestHandleConfigUpdate_EmptyConfigs(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()

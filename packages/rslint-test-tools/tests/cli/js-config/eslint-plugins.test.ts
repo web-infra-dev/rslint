@@ -170,6 +170,69 @@ export default [
     }
   });
 
+  test('mixed native + plugin: exit code reflects a violation from either origin', async () => {
+    // Exit code is the signal CI gates on. Native and plugin diagnostics merge
+    // into one origin-agnostic error count — a regression dropping plugin diags
+    // from the exit code would pass every presence-only (toContain) assertion.
+    const MIXED = `import local from './local-plugin.mjs';
+export default [
+  {
+    files: ['**/*.ts'],
+    languageOptions: { parserOptions: { projectService: false, project: ['./tsconfig.json'] } },
+    plugins: ['@typescript-eslint'],
+    rules: { '@typescript-eslint/no-explicit-any': 'error' },
+  },
+  {
+    files: ['**/*.ts'],
+    plugins: { local },
+    rules: { 'local/no-null': 'error' },
+  },
+];
+`;
+    const base = {
+      'local-plugin.mjs': LOCAL_PLUGIN,
+      'rslint.config.mjs': MIXED,
+      'tsconfig.json': TSCONFIG,
+    };
+
+    // (A) plugin-only violation (null, no any) → exit 1.
+    const a = await lint({ ...base, 'c.ts': 'const y = null;\n' });
+    try {
+      expect(a.exitCode).toBe(1);
+      expect(a.diags.some((d) => d.ruleName === 'local/no-null')).toBe(true);
+      expect(
+        a.diags.some(
+          (d) => d.ruleName === '@typescript-eslint/no-explicit-any',
+        ),
+      ).toBe(false);
+    } finally {
+      await cleanupTempDir(a.dir);
+    }
+
+    // (B) native-only violation (any, no null) → exit 1.
+    const b = await lint({ ...base, 'c.ts': 'const y: any = 1;\n' });
+    try {
+      expect(b.exitCode).toBe(1);
+      expect(
+        b.diags.some(
+          (d) => d.ruleName === '@typescript-eslint/no-explicit-any',
+        ),
+      ).toBe(true);
+      expect(b.diags.some((d) => d.ruleName === 'local/no-null')).toBe(false);
+    } finally {
+      await cleanupTempDir(b.dir);
+    }
+
+    // (C) clean → exit 0, no diagnostics.
+    const c = await lint({ ...base, 'c.ts': 'const y = 1;\n' });
+    try {
+      expect(c.exitCode).toBe(0);
+      expect(c.diags).toHaveLength(0);
+    } finally {
+      await cleanupTempDir(c.dir);
+    }
+  });
+
   test('a plugin with no rules object fails fast (non-zero exit)', async () => {
     const dir = await createTempDir({
       'rslint.config.mjs': `export default [{ files: ['**/*.ts'], plugins: { bad: { meta: {} } }, rules: { 'bad/x': 'error' } }];\n`,

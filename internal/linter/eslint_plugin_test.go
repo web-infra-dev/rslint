@@ -646,3 +646,144 @@ func TestEslintPluginWire_RoundTrip(t *testing.T) {
 		t.Errorf("ruleErrors decode wrong: %+v", fr.RuleErrors)
 	}
 }
+
+// TestDispatchEslintPlugin_MultipleRulesPerFile pins the normal object-form
+// usage: one file enables SEVERAL rules of one plugin. buildEslintPluginRequest
+// must carry ALL of the file's rules in the request rules map, and severity must
+// reattach per rule (each diagnostic keeps its own rule's level).
+func TestDispatchEslintPlugin_MultipleRulesPerFile(t *testing.T) {
+	text := "x\n"
+	files := []EslintPluginFileInput{{
+		Path: "/a.ts", ConfigKey: "/cfg", Text: &text,
+		Rules: []ConfiguredRule{
+			pluginRule("uc/a", []any{"o"}, rule.SeverityError),
+			pluginRule("uc/b", nil, rule.SeverityWarning),
+		},
+	}}
+	var captured EslintPluginLintRequest
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		captured = req
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath: "/a.ts",
+			Diagnostics: []EslintPluginDiagnostic{
+				{RuleName: "uc/a", Message: "ma", StartPos: 0, EndPos: 1},
+				{RuleName: "uc/b", Message: "mb", StartPos: 0, EndPos: 1},
+			},
+		}}}, nil
+	}
+	sevByRule := map[string]rule.DiagnosticSeverity{}
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+		sevByRule[d.RuleName] = d.Severity
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(captured.Rules) != 2 {
+		t.Fatalf("request rules map must carry both rules, got %d: %v", len(captured.Rules), captured.Rules)
+	}
+	if _, ok := captured.Rules["uc/a"]; !ok {
+		t.Error("uc/a missing from the request rules map")
+	}
+	if _, ok := captured.Rules["uc/b"]; !ok {
+		t.Error("uc/b missing from the request rules map")
+	}
+	if sevByRule["uc/a"] != rule.SeverityError {
+		t.Errorf("uc/a severity = %v, want Error", sevByRule["uc/a"])
+	}
+	if sevByRule["uc/b"] != rule.SeverityWarning {
+		t.Errorf("uc/b severity = %v, want Warning", sevByRule["uc/b"])
+	}
+}
+
+// TestDispatchEslintPlugin_DeadlineExceededSurfaces pins that when a batch's
+// dispatch fails with context.DeadlineExceeded (the LSP fixAll timeout firing),
+// DispatchEslintPluginRules surfaces an error for which errors.Is(err,
+// context.DeadlineExceeded) holds — so lintPluginRulesSync's timeout branch
+// recognizes it — while the other (completed) batches still emit their
+// diagnostics. (No mutex on the emitted map on purpose: onDiagnostic stays
+// single-threaded, so -race catches a regression that emits concurrently.)
+func TestDispatchEslintPlugin_DeadlineExceededSurfaces(t *testing.T) {
+	const n = 6
+	const failOn = "/f3.ts"
+	files := make([]EslintPluginFileInput, n)
+	texts := make([]string, n)
+	for i := range files {
+		texts[i] = "x\n"
+		files[i] = EslintPluginFileInput{
+			Path:      fmt.Sprintf("/f%d.ts", i),
+			ConfigKey: "/cfg",
+			Text:      &texts[i],
+			Rules:     []ConfiguredRule{pluginRule("uc/x", []any{i}, rule.SeverityError)}, // distinct option → distinct batch
+		}
+	}
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		if req.Files[0].Path == failOn {
+			return nil, context.DeadlineExceeded
+		}
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath:    req.Files[0].Path,
+			Diagnostics: []EslintPluginDiagnostic{{RuleName: "uc/x", Message: "m", StartPos: 0, EndPos: 1}},
+		}}}, nil
+	}
+	emitted := map[string]bool{}
+	err := DispatchEslintPluginRules(context.Background(), dispatch, files, false, "off", func(d rule.RuleDiagnostic) {
+		emitted[d.FilePath] = true
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected the surfaced error to wrap context.DeadlineExceeded, got %v", err)
+	}
+	if len(emitted) != n-1 {
+		t.Errorf("expected the %d non-failing batches to still emit, got %d", n-1, len(emitted))
+	}
+	if emitted[failOn] {
+		t.Errorf("the timed-out batch (%s) must not emit a diagnostic", failOn)
+	}
+}
+
+// TestDispatchEslintPlugin_FixAndSuggestionsRebuilt pins the full
+// rebuild+clamp+emit chain for a plugin rule that returns BOTH a fix and a
+// suggestion. Elsewhere only the raw json.Unmarshal touches these fields; here
+// the emitted RuleDiagnostic must carry the rebuilt fix and the rebuilt
+// suggestion (message + range-clamped fix).
+func TestDispatchEslintPlugin_FixAndSuggestionsRebuilt(t *testing.T) {
+	text := "const x = 1;\n"
+	files := []EslintPluginFileInput{{
+		Path: "/a.ts", ConfigKey: "/cfg", Text: &text,
+		Rules: []ConfiguredRule{pluginRule("uc/x", nil, rule.SeverityError)},
+	}}
+	dispatch := func(ctx context.Context, req EslintPluginLintRequest) (*EslintPluginLintResult, error) {
+		return &EslintPluginLintResult{Results: []EslintPluginFileResult{{
+			FilePath: "/a.ts",
+			Diagnostics: []EslintPluginDiagnostic{{
+				RuleName: "uc/x", Message: "m", StartPos: 6, EndPos: 7,
+				Fixes:       []EslintPluginFix{{Range: [2]int{6, 7}, Text: "y"}},
+				Suggestions: []EslintPluginSuggestion{{MessageId: "sid", Desc: "use z", Fixes: []EslintPluginFix{{Range: [2]int{6, 7}, Text: "z"}}}},
+			}},
+		}}}, nil
+	}
+	var got rule.RuleDiagnostic
+	gotN := 0
+	if err := DispatchEslintPluginRules(context.Background(), dispatch, files, true, "eager", func(d rule.RuleDiagnostic) {
+		got = d
+		gotN++
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotN != 1 {
+		t.Fatalf("expected exactly 1 diagnostic, got %d", gotN)
+	}
+	fixes := got.Fixes()
+	if len(fixes) != 1 || fixes[0].Text != "y" || fixes[0].Range.Pos() != 6 || fixes[0].Range.End() != 7 {
+		t.Errorf("fix not rebuilt correctly: %+v", fixes)
+	}
+	if got.Suggestions == nil || len(*got.Suggestions) != 1 {
+		t.Fatalf("expected exactly 1 rebuilt suggestion, got %v", got.Suggestions)
+	}
+	sg := (*got.Suggestions)[0]
+	if sg.Message.Id != "sid" || sg.Message.Description != "use z" {
+		t.Errorf("suggestion message wrong: %+v", sg.Message)
+	}
+	sgFixes := sg.Fixes()
+	if len(sgFixes) != 1 || sgFixes[0].Text != "z" || sgFixes[0].Range.Pos() != 6 || sgFixes[0].Range.End() != 7 {
+		t.Errorf("suggestion fix not rebuilt correctly: %+v", sgFixes)
+	}
+}

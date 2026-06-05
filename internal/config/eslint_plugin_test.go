@@ -122,6 +122,135 @@ func TestGetEnabledRules_PluginGateAndResolution(t *testing.T) {
 	}
 }
 
+// TestGetEnabledRules_SplitEntryNativeAndCommunity pins the documented combine
+// workflow: native plugins in one (array-form) entry and community plugins in a
+// separate entry. For a file matching both, GetEnabledRules must return BOTH
+// rules, each carrying the correct IsEslintPluginRule routing flag (native runs
+// in Go, community routes to the worker).
+func TestGetEnabledRules_SplitEntryNativeAndCommunity(t *testing.T) {
+	RegisterAllRules()
+	RegisterEslintPluginRules([]EslintPluginEntry{
+		{Prefix: "testplugSplit", RuleNames: []string{"no-foo"}},
+	})
+	cfg := RslintConfig{
+		{
+			Plugins: []string{"@typescript-eslint"},
+			Rules:   Rules{"@typescript-eslint/no-explicit-any": "error"},
+		},
+		{
+			Plugins: []string{"testplugSplit"},
+			Rules:   Rules{"testplugSplit/no-foo": "error"},
+		},
+	}
+	rules, _ := GlobalRuleRegistry.GetEnabledRules(cfg, "/proj/a.ts", "/proj", true)
+
+	routing := map[string]bool{} // rule name -> IsEslintPluginRule
+	for _, r := range rules {
+		routing[r.Name] = r.IsEslintPluginRule
+	}
+
+	native, hasNative := routing["@typescript-eslint/no-explicit-any"]
+	if !hasNative {
+		t.Fatalf("native rule @typescript-eslint/no-explicit-any missing from %v", routing)
+	}
+	if native {
+		t.Error("native rule must have IsEslintPluginRule=false (runs in Go)")
+	}
+
+	community, hasCommunity := routing["testplugSplit/no-foo"]
+	if !hasCommunity {
+		t.Fatalf("community rule testplugSplit/no-foo missing from %v", routing)
+	}
+	if !community {
+		t.Error("community rule must have IsEslintPluginRule=true (routes to the worker)")
+	}
+}
+
+// TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative pins the
+// single most common coexistence combo: a TS preset (type-aware native rules) +
+// one community plugin, on a standalone script that is NOT in any
+// tsconfig.project (a "gap" file). The type-aware native rule is filtered out
+// (no type info available) while the community rule survives and still routes to
+// the worker (IsEslintPluginRule stays true). On a covered file both run.
+func TestGetActiveRulesForFile_GapFile_KeepsCommunityDropsTypeAwareNative(t *testing.T) {
+	RegisterAllRules()
+	RegisterEslintPluginRules([]EslintPluginEntry{
+		{Prefix: "unicornGap", RuleNames: []string{"no-null"}},
+	})
+	cfg := RslintConfig{
+		{
+			Plugins:         []string{"@typescript-eslint"},
+			LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: []string{"./tsconfig.json"}}},
+			Rules:           Rules{"@typescript-eslint/require-await": "error"},
+		},
+		{
+			Plugins: []string{"unicornGap"},
+			Rules:   Rules{"unicornGap/no-null": "error"},
+		},
+	}
+	typeInfoFiles := map[string]struct{}{"/proj/covered.ts": {}}
+
+	// Gap file: not in typeInfoFiles → type-aware native rule filtered out.
+	gap := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "/proj/gap.ts", "/proj", true, typeInfoFiles)
+	gapRouting := map[string]bool{}
+	for _, r := range gap {
+		gapRouting[r.Name] = r.IsEslintPluginRule
+	}
+	if _, hasNative := gapRouting["@typescript-eslint/require-await"]; hasNative {
+		t.Error("type-aware native rule must be dropped on a gap file (not in tsconfig.project)")
+	}
+	community, hasCommunity := gapRouting["unicornGap/no-null"]
+	if !hasCommunity {
+		t.Fatalf("community rule must survive on a gap file; got %v", gapRouting)
+	}
+	if !community {
+		t.Error("the surviving community rule must keep IsEslintPluginRule=true (routes to the worker)")
+	}
+
+	// Covered file: the type-aware native rule is kept alongside the community one.
+	covered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "/proj/covered.ts", "/proj", true, typeInfoFiles)
+	coveredNames := map[string]bool{}
+	for _, r := range covered {
+		coveredNames[r.Name] = true
+	}
+	if !coveredNames["@typescript-eslint/require-await"] {
+		t.Error("type-aware native rule must be kept on a covered file")
+	}
+	if !coveredNames["unicornGap/no-null"] {
+		t.Error("community rule must be present on a covered file too")
+	}
+}
+
+// TestGetConfigForFile_SplitEntry_ProjectFromNativeEntrySurvives pins that in
+// the split-entry combine workflow, parserOptions.project declared only on the
+// native (array-form) entry survives the merge — so the type-aware native rule
+// still gets type info even though the community (object-form) entry carries no
+// languageOptions.
+func TestGetConfigForFile_SplitEntry_ProjectFromNativeEntrySurvives(t *testing.T) {
+	cfg := RslintConfig{
+		{
+			Plugins:         []string{"@typescript-eslint"},
+			LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{Project: []string{"./tsconfig.json"}}},
+			Rules:           Rules{"@typescript-eslint/require-await": "error"},
+		},
+		{
+			Plugins: []string{"unicornProj"},
+			Rules:   Rules{"unicornProj/no-null": "error"},
+		},
+	}
+	merged := cfg.GetConfigForFile("/proj/a.ts", "/proj")
+	if merged == nil {
+		t.Fatal("merged config should not be nil")
+	}
+	if merged.LanguageOptions == nil || merged.LanguageOptions.ParserOptions == nil {
+		t.Fatal("merged languageOptions/parserOptions must survive from the native entry")
+	}
+	if len(merged.LanguageOptions.ParserOptions.Project) != 1 ||
+		merged.LanguageOptions.ParserOptions.Project[0] != "./tsconfig.json" {
+		t.Errorf("project must survive the merge, got %v", merged.LanguageOptions.ParserOptions.Project)
+	}
+}
+
 // TestPluginMergedMaps pins the three branches the plugin dispatch relies on:
 // nil merged → both nil; nil LanguageOptions → languageOptions nil but settings
 // forwarded; both present → both forwarded.
