@@ -82,7 +82,7 @@ func TestPreferToHaveBeenCalledTimesRule(t *testing.T) {
 			{
 				Code: `expect((method.mock.calls)).toHaveLength(1);`,
 				Output: []string{
-					`expect(method).toHaveBeenCalledTimes(1);`,
+					`expect((method)).toHaveBeenCalledTimes(1);`,
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferMatcher", Line: 1, Column: 29},

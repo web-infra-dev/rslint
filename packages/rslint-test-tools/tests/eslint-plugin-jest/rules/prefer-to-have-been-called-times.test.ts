@@ -69,7 +69,7 @@ ruleTester.run('prefer-to-have-been-called-times', {} as never, {
     },
     {
       code: 'expect((method.mock.calls)).toHaveLength(1);',
-      output: 'expect(method).toHaveBeenCalledTimes(1);',
+      output: 'expect((method)).toHaveBeenCalledTimes(1);',
       errors: [
         {
           messageId: 'preferMatcher',

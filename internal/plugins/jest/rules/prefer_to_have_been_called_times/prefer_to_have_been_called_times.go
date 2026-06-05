@@ -5,13 +5,12 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildPreferMatcherMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "preferMatcher",
-		Description: "Use `toHaveBeenCalledTimes()`",
+		Description: "Prefer `toHaveBeenCalledTimes`",
 	}
 }
 
@@ -97,23 +96,14 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 					return
 				}
 
-				inner := unwrapMockCallsAccessProperty(args[0])
+				unwrappedArg := ast.SkipParentheses(args[0])
+				inner := unwrapMockCallsAccessProperty(unwrappedArg)
 				if inner == nil {
-					return
-				}
-
-				matcherCall := node.AsCallExpression()
-				if matcherCall == nil || matcherCall.Arguments == nil {
 					return
 				}
 
 				matcherReceiver, matcherParent := jestUtils.GetAccessorReceiverAndParent(jestFnCall.MatcherEntry)
 				if matcherReceiver == nil || matcherParent == nil {
-					return
-				}
-
-				sourceFile := ast.GetSourceFileOfNode(node)
-				if sourceFile == nil {
 					return
 				}
 
@@ -125,10 +115,7 @@ var PreferToHaveBeenCalledTimesRule = rule.Rule{
 				ctx.ReportNodeWithFixes(
 					reportNode,
 					buildPreferMatcherMessage(),
-					rule.RuleFixReplaceRange(
-						rslintUtils.TrimNodeTextRange(sourceFile, args[0]),
-						rslintUtils.TrimmedNodeText(sourceFile, inner),
-					),
+					rule.RuleFixRemoveRange(core.NewTextRange(inner.End(), unwrappedArg.End())),
 					rule.RuleFixReplaceRange(
 						core.NewTextRange(matcherReceiver.End(), matcherParent.End()),
 						".toHaveBeenCalledTimes",
