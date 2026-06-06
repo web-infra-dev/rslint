@@ -3,7 +3,7 @@ import { RuleTester } from '../rule-tester';
 const ruleTester = new RuleTester();
 
 const expectSuggestions = (output: (equalityMatcher: string) => string) =>
-  ['toBe', 'toEqual', 'toStrictEqual'].map(equalityMatcher => ({
+  ['toBe', 'toEqual', 'toStrictEqual'].map((equalityMatcher) => ({
     messageId: 'suggestEqualityMatcher',
     data: { equalityMatcher },
     output: output(equalityMatcher),
@@ -31,7 +31,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).${equalityMatcher}(b);`,
           ),
           column: 17,
           line: 1,
@@ -44,7 +44,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a,).${equalityMatcher}(b,);`,
+            (equalityMatcher) => `expect(a,).${equalityMatcher}(b,);`,
           ),
           column: 18,
           line: 1,
@@ -57,7 +57,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).not.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).not.${equalityMatcher}(b);`,
           ),
           column: 17,
           line: 1,
@@ -70,7 +70,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).resolves.${equalityMatcher}(b);`,
           ),
           column: 26,
           line: 1,
@@ -83,7 +83,8 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.not.${equalityMatcher}(b);`,
+            (equalityMatcher) =>
+              `expect(a).resolves.not.${equalityMatcher}(b);`,
           ),
           column: 26,
           line: 1,
@@ -96,7 +97,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).not.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).not.${equalityMatcher}(b);`,
           ),
           column: 21,
           line: 1,
@@ -109,7 +110,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).${equalityMatcher}(b);`,
           ),
           column: 21,
           line: 1,
@@ -122,7 +123,8 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.not.${equalityMatcher}(b);`,
+            (equalityMatcher) =>
+              `expect(a).resolves.not.${equalityMatcher}(b);`,
           ),
           column: 30,
           line: 1,
@@ -135,7 +137,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).resolves.${equalityMatcher}(b);`,
           ),
           column: 30,
           line: 1,
@@ -148,7 +150,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).resolves.${equalityMatcher}(b);`,
           ),
           column: 33,
           line: 1,
@@ -161,7 +163,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).resolves.${equalityMatcher}(b);`,
           ),
           column: 36,
           line: 1,
@@ -175,7 +177,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).not.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).not.${equalityMatcher}(b);`,
           ),
           column: 17,
           line: 1,
@@ -188,7 +190,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).${equalityMatcher}(b);`,
           ),
           column: 17,
           line: 1,
@@ -201,7 +203,8 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.not.${equalityMatcher}(b);`,
+            (equalityMatcher) =>
+              `expect(a).resolves.not.${equalityMatcher}(b);`,
           ),
           column: 26,
           line: 1,
@@ -214,7 +217,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).resolves.${equalityMatcher}(b);`,
           ),
           column: 26,
           line: 1,
@@ -227,7 +230,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).${equalityMatcher}(b);`,
           ),
           column: 21,
           line: 1,
@@ -240,7 +243,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).not.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).not.${equalityMatcher}(b);`,
           ),
           column: 21,
           line: 1,
@@ -253,7 +256,7 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.${equalityMatcher}(b);`,
+            (equalityMatcher) => `expect(a).resolves.${equalityMatcher}(b);`,
           ),
           column: 30,
           line: 1,
@@ -266,7 +269,8 @@ ruleTester.run('prefer-equality-matcher', {} as never, {
         {
           messageId: 'useEqualityMatcher',
           suggestions: expectSuggestions(
-            equalityMatcher => `expect(a).resolves.not.${equalityMatcher}(b);`,
+            (equalityMatcher) =>
+              `expect(a).resolves.not.${equalityMatcher}(b);`,
           ),
           column: 30,
           line: 1,
