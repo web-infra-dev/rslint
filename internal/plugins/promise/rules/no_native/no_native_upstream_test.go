@@ -30,13 +30,6 @@ func TestNoNativeUpstream(t *testing.T) {
 				Code:   `Promise.resolve()`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 1, EndLine: 1, EndColumn: 8}},
 			},
-			// Upstream also reports these with browser/node/es6 env or Promise globals.
-			// rslint's Go RuleTester does not model ESLint env/globals, but TypeScript's
-			// default lib Promise exercises the same native/global path.
-			{
-				Code:   `Promise.resolve()`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 1, EndLine: 1, EndColumn: 8}},
-			},
 		},
 	)
 }
