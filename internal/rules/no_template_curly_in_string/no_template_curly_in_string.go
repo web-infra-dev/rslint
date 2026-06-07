@@ -8,7 +8,7 @@ import (
 )
 
 // https://eslint.org/docs/latest/rules/no-template-curly-in-string
-var NoTemplateCurlyInString = rule.Rule{
+var NoTemplateCurlyInStringRule = rule.Rule{
 	Name: "no-template-curly-in-string",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		regex := regexp.MustCompile(`\$\{[^}]+\}`)

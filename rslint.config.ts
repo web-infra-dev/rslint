@@ -1,29 +1,28 @@
-import { defineConfig, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, ts } from '@rslint/core';
 
 export default defineConfig([
-  {
-    ignores: [
-      'node_modules/**',
-      '**/dist/**',
-      'typescript-go/**',
+  globalIgnores([
+    'node_modules/**',
+    '**/dist/**',
+    'typescript-go/**',
 
-      // Test fixtures — not real source code
-      '**/fixtures/**',
-      'packages/rslint-test-tools/tests/**',
+    // Test fixtures — not real source code
+    '**/fixtures/**',
+    'packages/rslint-test-tools/tests/**',
+    'packages/rslint/tests/eslint-plugin/**',
 
-      // VSCode extension test artifacts
-      'packages/vscode-extension/__tests__/**',
-      'packages/vscode-extension/.vscode-test/**',
+    // VSCode extension test artifacts
+    'packages/vscode-extension/__tests__/**',
+    'packages/vscode-extension/.vscode-test/**',
 
-      // Generated / build artifacts
-      'website/doc_build/**',
-      'website/generated/**',
+    // Generated / build artifacts
+    'website/doc_build/**',
+    'website/generated/**',
 
-      // Files that need special handling
-      'packages/rslint-wasm/src/worker.ts',
-      'packages/rule-tester/src/index.ts',
-    ],
-  },
+    // Files that need special handling
+    'packages/rslint-wasm/src/worker.ts',
+    'packages/rule-tester/src/index.ts',
+  ]),
   // Start from recommended preset, then override rules and parserOptions
   ts.configs.recommended,
   {

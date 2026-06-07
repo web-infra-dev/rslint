@@ -38,19 +38,28 @@ A quick reference for common commands, file locations, and checklists when porti
 
 ## Rule Registration
 
-Location: `internal/config/config.go`
+Each rule lives in a per-group `all.go` that exports a `GetAllRules() []rule.Rule` slice. Append your rule there; `config.go` iterates each slice automatically — **do not edit `config.go`**.
 
-| Rule Type            | Registration Function                      | Name Format                            |
-| -------------------- | ------------------------------------------ | -------------------------------------- |
-| ESLint Core          | `registerAllCoreEslintRules()`             | `"no-debugger"`                        |
-| @typescript-eslint   | `registerAllTypeScriptEslintPluginRules()` | `"@typescript-eslint/no-explicit-any"` |
-| eslint-plugin-import | `registerAllEslintImportPluginRules()`     | `"import/no-self-import"`              |
+| Rule Type                                                                    | File to edit                         | Final registered key                                 |
+| ---------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------- |
+| ESLint Core                                                                  | `internal/rules/all.go`              | `"no-debugger"`                                      |
+| `@typescript-eslint`                                                         | `internal/plugins/typescript/all.go` | `"@typescript-eslint/no-explicit-any"`               |
+| Other plugins (react, jest, import, jsx-a11y, promise, react-hooks, unicorn) | `internal/plugins/<plugin>/all.go`   | `"<plugin>/<rule>"` (e.g. `"import/no-self-import"`) |
 
-**Registration Format**:
+**How to add a rule**: in the relevant `all.go`, add the import path and append the rule var to the `GetAllRules()` return slice:
 
 ```go
-GlobalRuleRegistry.Register("rule-name", package.RuleNameRule)
+import "github.com/web-infra-dev/rslint/internal/.../my_rule"
+
+func GetAllRules() []rule.Rule {
+    return []rule.Rule{
+        // …existing entries…
+        my_rule.MyRuleRule,
+    }
+}
 ```
+
+The registration key comes from `rule.Name`. Core rules use `rule.Rule{Name: "…"}` (bare). `@typescript-eslint` rules use `rule.CreateRule(rule.Rule{Name: "…"})` which auto-prefixes `@typescript-eslint/`; **never** use `rule.CreateRule` outside `@typescript-eslint/` — it silently mis-registers the key.
 
 ---
 
@@ -106,7 +115,7 @@ import (
 - [ ] Spell check passes (`pnpm -w run check-spell`)
 - [ ] Format check passes (`pnpm format:check`)
 - [ ] Go lint check passes (`pnpm lint:go`)
-- [ ] Rule registered (`internal/config/config.go`)
+- [ ] Rule registered (in the appropriate `all.go`: `internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise)
 - [ ] Test file registered (`packages/rslint-test-tools/rstest.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
 

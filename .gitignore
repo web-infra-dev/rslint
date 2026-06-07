@@ -151,10 +151,22 @@ npm/*/rslint
 npm/*/rslint.exe
 npm/tsgo/*/local
 
+# napi-generated entry files (index.js loader + index.d.ts) ARE committed: the
+# website deploy env has no Rust toolchain, so `build:js` can't regenerate them
+# and instead consumes the checked-in index.d.ts. Only the per-platform .node
+# binaries stay ignored (built by CI, published to @rslint/native-<platform>).
+crates/rslint-native/*.node
+# per-platform binaries (napi .node + Go CLI) land in the subpackages at
+# publish time via move-artifacts; never committed
+npm/rslint/*/*.node
+npm/rslint/*/rslint
+npm/rslint/*/rslint.exe
+
 .idea
 
 ## vscode settings
 .vscode/settings.json
+**/.vscode/settings.json
 
 
 # go cache

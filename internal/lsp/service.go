@@ -33,7 +33,7 @@ const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.r
 
 // ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
 // source file's line map for position encoding.
-func ruleFixToTextEdit(sourceFile *ast.SourceFile, fix rule.RuleFix) *lsproto.TextEdit {
+func ruleFixToTextEdit(sourceFile ast.SourceFileLike, fix rule.RuleFix) *lsproto.TextEdit {
 	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.Pos())
 	endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.End())
 	return &lsproto.TextEdit{
@@ -120,8 +120,8 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		ParseCache: s.parseCache,
 	})
 
-	// Register all rules before loading config so that normalizeJSONConfig
-	// can inject default core/plugin rules into the registry.
+	// Populate the global rule registry once per process; the LSP request path
+	// resolves rule names against it after config merging.
 	config.RegisterAllRules()
 
 	// Try to load JSON config as fallback.
@@ -166,6 +166,13 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 			ConfigDirectory string              `json:"configDirectory"`
 			Entries         config.RslintConfig `json:"entries"`
 		} `json:"configs"`
+		// EslintPlugins carries the {prefix, ruleNames} metadata for every
+		// ESLint plugin mounted across all configs, aggregated by the VS Code
+		// extension (same shape the CLI sends as initPayload.EslintPlugins).
+		// The live plugin objects stay in Node (the worker re-imports the
+		// config); Go only needs the names to register placeholder rules that
+		// make `<prefix>/<rule>` resolvable and route to the worker.
+		EslintPlugins []config.EslintPluginEntry `json:"eslintPlugins,omitempty"`
 	}
 	if err := stdjson.Unmarshal(data, &payload); err != nil {
 		return fmt.Errorf("failed to parse config update: %w", err)
@@ -190,6 +197,13 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	// does not silently overwrite the JS/TS configs.
 	s.rslintConfigPath = ""
 	log.Printf("[rslint] Config updated from JS/TS configs (%d config files)", len(payload.Configs))
+
+	// Register placeholder rules for mounted ESLint plugins so their rule
+	// names resolve (and route to the Node worker via IsEslintPluginRule)
+	// instead of being silently dropped. Idempotent across config updates;
+	// a same-named native rule always wins (RegisterEslintPluginRules skips it).
+	// RegisterAllRules already ran in handleInitialized, so native rules exist.
+	config.RegisterEslintPluginRules(payload.EslintPlugins)
 
 	s.rebuildTsConfigPaths()
 
@@ -403,6 +417,14 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 	delete(s.documents, uri)
 	delete(s.diagnostics, uri)
 	delete(s.pendingLintURIs, uri)
+	// Bump (do NOT delete) the generation on close so any in-flight plugin
+	// result for this URI is stale. Keeping the counter monotonic — rather
+	// than resetting it to 0 on a later reopen — prevents a generation collision
+	// where a pre-close worker result could match a freshly reopened document.
+	s.docGeneration[uri]++
+	// Cancel an in-flight plugin dispatch for the closed doc so its Node worker
+	// stops instead of running to completion — no superseding keystroke will.
+	s.cancelInflightPluginDispatch(uri)
 
 	if s.session != nil {
 		// Push empty diagnostics to clear the client's display before closing
@@ -520,32 +542,8 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
 	tsConfigPaths := s.tsConfigPathsForURI(uri)
 	originalContent := s.documents[uri]
-	currentContent := originalContent
 
-	for pass := range maxFixPasses {
-		// For passes after the first, update the session overlay so that
-		// runLintWithSession sees the fixed content from the previous pass.
-		if pass > 0 {
-			s.session.DidChangeFile(ctx, uri, int32(pass), []lsproto.TextDocumentContentChangePartialOrWholeDocument{
-				{WholeDocument: &lsproto.TextDocumentContentChangeWholeDocument{Text: currentContent}},
-			})
-		}
-
-		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
-		if err != nil {
-			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
-			break
-		}
-
-		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
-		if !wasFixed {
-			break
-		}
-		currentContent = fixedContent
-		if currentContent == originalContent {
-			break // cycle detected — fixes reverted to original content
-		}
-	}
+	currentContent := s.computeFixAllContent(ctx, uri, originalContent, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
 
 	if currentContent == originalContent {
 		return empty, nil
@@ -579,6 +577,78 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 			{CodeAction: codeAction},
 		},
 	}, nil
+}
+
+// computeFixAllContent runs the multi-pass lint→fix loop and returns the final
+// fixed content (== originalContent when nothing changed). Each pass folds
+// eslint-plugin fixes into the native fixes so source.fixAll applies both, on
+// the SAME content (so their byte offsets align with ApplyRuleFixes's input).
+// The per-pass native lint goes through s.fixAllNativeLint, which tests override
+// to drive the fold loop without a real TS session.
+func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentUri, originalContent string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) string {
+	nativeLint := s.fixAllNativeLint
+	if nativeLint == nil {
+		nativeLint = s.defaultFixAllNativeLint
+	}
+
+	// Bound the eslint-plugin reverse requests across the WHOLE fixAll, not per
+	// pass: source.fixAll runs inline on the dispatch loop, so a wedged or
+	// mid-rebuild client that never answers rslint/pluginLint must not
+	// freeze editor interaction — nor multiply the stall by maxFixPasses. Only
+	// the plugin pass gets this deadline; the native pass keeps the original ctx
+	// (it is in-process and does not depend on a client reply). Once the budget
+	// expires lintPluginRulesSync returns nil and the remaining passes fold
+	// native-only fixes.
+	pluginTimeout := s.pluginReverseTimeout
+	if pluginTimeout <= 0 {
+		pluginTimeout = defaultPluginReverseTimeout
+	}
+	pluginCtx, cancelPlugin := context.WithTimeout(ctx, pluginTimeout)
+	defer cancelPlugin()
+
+	currentContent := originalContent
+	for pass := range maxFixPasses {
+		ruleDiags, err := nativeLint(ctx, uri, pass, currentContent, rslintConfig, configCwd, isJSConfig, tsConfigPaths)
+		if err != nil {
+			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
+			break
+		}
+
+		// Fold in eslint-plugin fixes so source.fixAll applies plugin rule fixes
+		// too, not just native. The plugin pass lints the SAME currentContent, so
+		// its fix byte offsets align with ApplyRuleFixes's input; suggestionsMode
+		// is "off" because fixAll applies only autofixes.
+		// Skip the plugin pass once the budget is spent: lintPluginRulesSync on an
+		// already-expired pluginCtx would still enqueue a (wasted) reverse request
+		// to the client before returning nil.
+		if pluginCtx.Err() == nil {
+			if pluginDiags := s.lintPluginRulesSync(pluginCtx, uri, currentContent, true, linter.SuggestionsModeOff); len(pluginDiags) > 0 {
+				ruleDiags = append(ruleDiags, pluginDiags...)
+			}
+		}
+
+		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
+		if !wasFixed {
+			break
+		}
+		currentContent = fixedContent
+		if currentContent == originalContent {
+			break // cycle detected — fixes reverted to original content
+		}
+	}
+	return currentContent
+}
+
+// defaultFixAllNativeLint is the production per-pass native lint: for passes
+// after the first it updates the session overlay so the language service sees
+// the previous pass's fixed content, then runs the native lint pass.
+func (s *Server) defaultFixAllNativeLint(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) ([]rule.RuleDiagnostic, error) {
+	if pass > 0 {
+		s.session.DidChangeFile(ctx, uri, int32(pass), []lsproto.TextDocumentContentChangePartialOrWholeDocument{
+			{WholeDocument: &lsproto.TextDocumentContentChangeWholeDocument{Text: content}},
+		})
+	}
+	return runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
 }
 
 // computeEndPosition returns the line and UTF-16 character offset of the end
@@ -979,6 +1049,13 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
+	// Bump this URI's generation BEFORE linting. Native diagnostics are
+	// published synchronously below; the eslint-plugin pass runs in a
+	// goroutine and stamps its result with this value so the main loop can
+	// drop it if a newer keystroke relints in the meantime.
+	s.docGeneration[uri]++
+	generation := s.docGeneration[uri]
+
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
 	tsConfigPaths := s.tsConfigPathsForURI(uri)
 	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, tsConfigPaths, s.fs)
@@ -1001,4 +1078,10 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	}); err != nil {
 		log.Printf("Error publishing diagnostics: %v", err)
 	}
+
+	// Dispatch eslint-plugin rules off the main loop. The reverse request
+	// MUST NOT run synchronously here — it would block the dispatch loop (and
+	// thus all editor interaction) until the Node worker replies. Results merge
+	// back via pluginResultCh on the main loop (s.diagnostics is lock-free).
+	s.dispatchPluginLint(uri, generation)
 }

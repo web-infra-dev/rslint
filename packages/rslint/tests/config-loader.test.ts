@@ -1,375 +1,364 @@
 import { describe, test, expect } from '@rstest/core';
 import {
-  findJSConfig,
-  findJSConfigUp,
-  findJSConfigsInDir,
-  JS_CONFIG_FILES,
-} from '../src/utils/config-discovery.js';
+  loadConfigFile,
+  normalizeConfig,
+  collectPluginMeta,
+} from '../src/config-loader.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
 function createTempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-test-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'rslint-config-loader-test-'));
 }
 
 function cleanup(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true });
 }
 
-describe('findJSConfig', () => {
-  test('finds rslint.config.js in cwd', () => {
+describe('loadConfigFile', () => {
+  test('loads a .js config file with default export', async () => {
     const tmp = createTempDir();
     try {
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfig(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.js'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('returns null when no config exists', () => {
-    const tmp = createTempDir();
-    try {
-      const result = findJSConfig(tmp);
-      expect(result).toBe(null);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('prefers js over mjs over ts over mts', () => {
-    const tmp = createTempDir();
-    try {
-      // Create all four config files
-      for (const name of JS_CONFIG_FILES) {
-        fs.writeFileSync(path.join(tmp, name), 'export default []');
-      }
-      const result = findJSConfig(tmp);
-      // Should find rslint.config.js (first in priority order)
-      expect(result).toBe(path.join(tmp, 'rslint.config.js'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds mjs when js does not exist', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(
-        path.join(tmp, 'rslint.config.mjs'),
-        'export default []',
-      );
-      const result = findJSConfig(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.mjs'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds .ts config when js and mjs do not exist', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(path.join(tmp, 'rslint.config.ts'), 'export default []');
-      const result = findJSConfig(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.ts'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds .mts config when no other config exists', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(
-        path.join(tmp, 'rslint.config.mts'),
-        'export default []',
-      );
-      const result = findJSConfig(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.mts'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('returns null for non-existent directory', () => {
-    const result = findJSConfig('/tmp/definitely-does-not-exist-99999');
-    expect(result).toBe(null);
-  });
-});
-
-describe('findJSConfigUp', () => {
-  test('finds config in current directory', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigUp(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.js'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds config in parent directory', () => {
-    const tmp = createTempDir();
-    const child = path.join(tmp, 'child');
-    try {
-      fs.mkdirSync(child);
-      fs.writeFileSync(path.join(tmp, 'rslint.config.ts'), 'export default []');
-      const result = findJSConfigUp(child);
-      expect(result).toBe(path.join(tmp, 'rslint.config.ts'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds config in grandparent directory', () => {
-    const tmp = createTempDir();
-    const deep = path.join(tmp, 'a', 'b', 'c');
-    try {
-      fs.mkdirSync(deep, { recursive: true });
-      fs.writeFileSync(
-        path.join(tmp, 'rslint.config.mjs'),
-        'export default []',
-      );
-      const result = findJSConfigUp(deep);
-      expect(result).toBe(path.join(tmp, 'rslint.config.mjs'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('stops at nearest config (does not walk further)', () => {
-    const tmp = createTempDir();
-    const child = path.join(tmp, 'child');
-    try {
-      fs.mkdirSync(child);
-      // Config in both parent and child
       fs.writeFileSync(
         path.join(tmp, 'rslint.config.js'),
-        'export default ["parent"]',
+        'export default [{ files: ["**/*.ts"], rules: { "no-console": "error" } }];',
       );
-      fs.writeFileSync(
-        path.join(child, 'rslint.config.js'),
-        'export default ["child"]',
-      );
-      const result = findJSConfigUp(child);
-      // Should find child's config (nearest)
-      expect(result).toBe(path.join(child, 'rslint.config.js'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('returns null when no config found up to root', () => {
-    const tmp = createTempDir();
-    const deep = path.join(tmp, 'a', 'b');
-    try {
-      fs.mkdirSync(deep, { recursive: true });
-      // No config files anywhere in tmp
-      const result = findJSConfigUp(deep);
-      // Should return null (eventually hits filesystem root with no config)
-      expect(result).toBe(null);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('works with resolved absolute paths', () => {
-    const tmp = createTempDir();
-    const child = path.join(tmp, 'src');
-    try {
-      fs.mkdirSync(child);
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      // Pass a relative-looking path (resolve should handle it)
-      const result = findJSConfigUp(child);
-      expect(result).toBe(path.join(tmp, 'rslint.config.js'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('handles non-existent startDir gracefully', () => {
-    // Non-existent directory — path.resolve works, findJSConfig returns null
-    // for each level, eventually terminates at root
-    const result = findJSConfigUp(
-      '/tmp/definitely-does-not-exist-12345/deep/path',
-    );
-    expect(result).toBe(null);
-  });
-
-  test('terminates at root without infinite loop', () => {
-    // Starting from root directory should terminate immediately
-    const result = findJSConfigUp('/');
-    expect(result).toBe(null);
-  });
-
-  test('child config priority over parent with different extensions', () => {
-    const tmp = createTempDir();
-    const child = path.join(tmp, 'child');
-    try {
-      fs.mkdirSync(child);
-      // Parent has .js, child has .mts — child should win (nearest)
-      fs.writeFileSync(
-        path.join(tmp, 'rslint.config.js'),
-        'export default ["parent"]',
-      );
-      fs.writeFileSync(
-        path.join(child, 'rslint.config.mts'),
-        'export default ["child"]',
-      );
-      const result = findJSConfigUp(child);
-      expect(result).toBe(path.join(child, 'rslint.config.mts'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds .ts config via upward traversal', () => {
-    const tmp = createTempDir();
-    const child = path.join(tmp, 'packages', 'foo');
-    try {
-      fs.mkdirSync(child, { recursive: true });
-      fs.writeFileSync(path.join(tmp, 'rslint.config.ts'), 'export default []');
-      const result = findJSConfigUp(child);
-      expect(result).toBe(path.join(tmp, 'rslint.config.ts'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-});
-
-describe('findJSConfigsInDir', () => {
-  test('finds config in root directory', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigsInDir(tmp);
-      expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds configs in nested directories', () => {
-    const tmp = createTempDir();
-    try {
-      fs.mkdirSync(path.join(tmp, 'packages', 'foo'), { recursive: true });
-      fs.mkdirSync(path.join(tmp, 'packages', 'bar'), { recursive: true });
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      fs.writeFileSync(
-        path.join(tmp, 'packages', 'foo', 'rslint.config.ts'),
-        'export default []',
-      );
-      fs.writeFileSync(
-        path.join(tmp, 'packages', 'bar', 'rslint.config.mjs'),
-        'export default []',
-      );
-      const result = findJSConfigsInDir(tmp).sort();
-      expect(result).toEqual(
-        [
-          path.join(tmp, 'rslint.config.js'),
-          path.join(tmp, 'packages', 'foo', 'rslint.config.ts'),
-          path.join(tmp, 'packages', 'bar', 'rslint.config.mjs'),
-        ].sort(),
-      );
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('skips node_modules', () => {
-    const tmp = createTempDir();
-    try {
-      fs.mkdirSync(path.join(tmp, 'node_modules', 'pkg'), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmp, 'node_modules', 'pkg', 'rslint.config.js'),
-        'export default []',
-      );
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigsInDir(tmp);
-      expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('skips .git directory', () => {
-    const tmp = createTempDir();
-    try {
-      fs.mkdirSync(path.join(tmp, '.git', 'hooks'), { recursive: true });
-      fs.writeFileSync(
-        path.join(tmp, '.git', 'rslint.config.js'),
-        'export default []',
-      );
-      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigsInDir(tmp);
-      expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('returns empty array when no configs found', () => {
-    const tmp = createTempDir();
-    try {
-      fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
-      fs.writeFileSync(path.join(tmp, 'src', 'index.ts'), 'const x = 1;');
-      const result = findJSConfigsInDir(tmp);
-      expect(result).toEqual([]);
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('handles non-existent directory gracefully', () => {
-    const result = findJSConfigsInDir('/tmp/does-not-exist-99999');
-    expect(result).toEqual([]);
-  });
-
-  test('does not traverse into nested node_modules', () => {
-    const tmp = createTempDir();
-    try {
-      fs.mkdirSync(path.join(tmp, 'packages', 'foo', 'node_modules', 'dep'), {
-        recursive: true,
+      const result = await loadConfigFile(path.join(tmp, 'rslint.config.js'));
+      expect(Array.isArray(result)).toBe(true);
+      expect((result as Array<{ rules: unknown }>)[0].rules).toEqual({
+        'no-console': 'error',
       });
-      fs.writeFileSync(
-        path.join(
-          tmp,
-          'packages',
-          'foo',
-          'node_modules',
-          'dep',
-          'rslint.config.js',
-        ),
-        'export default []',
-      );
-      fs.writeFileSync(
-        path.join(tmp, 'packages', 'foo', 'rslint.config.js'),
-        'export default []',
-      );
-      const result = findJSConfigsInDir(tmp);
-      expect(result).toEqual([
-        path.join(tmp, 'packages', 'foo', 'rslint.config.js'),
-      ]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('finds all config file types', () => {
+  test('loads a .mjs config file', async () => {
     const tmp = createTempDir();
     try {
-      for (const name of JS_CONFIG_FILES) {
-        fs.writeFileSync(path.join(tmp, name), 'export default []');
-      }
-      const result = findJSConfigsInDir(tmp).sort();
-      expect(result).toEqual(
-        JS_CONFIG_FILES.map((name) => path.join(tmp, name)).sort(),
+      fs.writeFileSync(
+        path.join(tmp, 'rslint.config.mjs'),
+        'export default [{ files: ["**/*.js"], rules: {} }];',
       );
+      const result = await loadConfigFile(path.join(tmp, 'rslint.config.mjs'));
+      expect(Array.isArray(result)).toBe(true);
     } finally {
       cleanup(tmp);
     }
+  });
+
+  test('resolves a thenable (Promise) default export', async () => {
+    const tmp = createTempDir();
+    try {
+      fs.writeFileSync(
+        path.join(tmp, 'rslint.config.js'),
+        'export default Promise.resolve([{ files: ["**/*.ts"], rules: { "no-console": "error" } }]);',
+      );
+      const result = await loadConfigFile(path.join(tmp, 'rslint.config.js'));
+      expect(Array.isArray(result)).toBe(true);
+      expect((result as Array<{ rules: unknown }>)[0].rules).toEqual({
+        'no-console': 'error',
+      });
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
+  test('throws for an unsupported extension', async () => {
+    const tmp = createTempDir();
+    try {
+      fs.writeFileSync(path.join(tmp, 'rslint.config.yaml'), 'rules: {}');
+      await expect(
+        loadConfigFile(path.join(tmp, 'rslint.config.yaml')),
+      ).rejects.toThrow('Unsupported config file extension');
+    } finally {
+      cleanup(tmp);
+    }
+  });
+});
+
+describe('normalizeConfig', () => {
+  test('accepts a valid flat config array', () => {
+    const result = normalizeConfig([
+      { files: ['**/*.ts'], rules: { 'no-console': 'error' } },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].files).toEqual(['**/*.ts']);
+    expect(result[0].rules).toEqual({ 'no-console': 'error' });
+  });
+
+  test('throws when config is not an array', () => {
+    expect(() => normalizeConfig({ rules: {} })).toThrow(
+      'rslint config must export an array',
+    );
+  });
+
+  test('strips unknown fields', () => {
+    const result = normalizeConfig([
+      {
+        name: 'my-config',
+        files: ['**/*.ts'],
+        rules: {},
+        unknownField: 123,
+      },
+    ]);
+    expect(result[0]).not.toHaveProperty('name');
+    expect(result[0]).not.toHaveProperty('unknownField');
+  });
+
+  test('preserves all known fields', () => {
+    const result = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        ignores: ['dist/**'],
+        languageOptions: {
+          parserOptions: { project: ['./tsconfig.json'] },
+        },
+        rules: { 'no-console': 'error' },
+        plugins: ['@typescript-eslint'],
+        settings: { key: 'value' },
+      },
+    ]);
+    const entry = result[0];
+    expect(entry.files).toEqual(['**/*.ts']);
+    expect(entry.ignores).toEqual(['dist/**']);
+    expect(entry.rules).toEqual({ 'no-console': 'error' });
+    expect(entry.plugins).toEqual(['@typescript-eslint']);
+    expect(entry.settings).toEqual({ key: 'value' });
+  });
+
+  test('handles empty array', () => {
+    expect(normalizeConfig([])).toEqual([]);
+  });
+
+  test('skips null and non-object entries', () => {
+    const result = normalizeConfig([
+      { files: ['**/*.ts'], rules: { 'no-console': 'error' } },
+      null,
+      undefined,
+      42,
+      'string',
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].rules).toEqual({ 'no-console': 'error' });
+  });
+
+  test('throws when files is a string instead of array', () => {
+    expect(() => normalizeConfig([{ files: '**/*.ts', rules: {} }])).toThrow(
+      '"files" must be an array',
+    );
+  });
+
+  test('throws when ignores is a string instead of array', () => {
+    expect(() => normalizeConfig([{ ignores: 'dist/**', rules: {} }])).toThrow(
+      '"ignores" must be an array',
+    );
+  });
+
+  test('allows omitted files and ignores', () => {
+    const result = normalizeConfig([{ rules: { 'no-console': 'error' } }]);
+    expect(result).toHaveLength(1);
+    expect(result[0].files).toBeUndefined();
+    expect(result[0].ignores).toBeUndefined();
+  });
+});
+
+describe('normalizeConfig — community plugins (object-form)', () => {
+  type NormalizedPluginEntry = {
+    eslintPlugins?: Record<string, { ruleNames: string[] }>;
+    plugins?: string[];
+  };
+  const mockPlugin = {
+    meta: { name: 'p' },
+    rules: { 'no-foo': {}, 'no-bar': {} },
+  };
+
+  test('object-form plugins: strips live objects, emits sorted {ruleNames} meta', () => {
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { local: mockPlugin },
+        rules: { 'local/no-foo': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toEqual({
+      local: { ruleNames: ['no-bar', 'no-foo'] },
+    });
+    // The prefix is merged into the string `plugins` set Go's gate keys off.
+    expect(entry.plugins).toContain('local');
+    // The live plugin object (carrying `meta`/`create`) must not leak into
+    // the serializable payload sent to Go.
+    expect(JSON.stringify(entry)).not.toContain('meta');
+  });
+
+  test('array-form plugins: native names pass through as the string[] gate, no carrier', () => {
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: ['@typescript-eslint', 'import'],
+        rules: {},
+      },
+    ]) as NormalizedPluginEntry[];
+    // Array form is the native-name whitelist: it reaches Go as the plugins
+    // string[] and emits NO community-plugin carrier (no live objects).
+    expect(entry.plugins).toEqual(['@typescript-eslint', 'import']);
+    expect(entry.eslintPlugins).toBeUndefined();
+  });
+
+  test('multiple object-form plugin prefixes in one entry', () => {
+    // The normal object-form usage mounts more than one community plugin; each
+    // prefix's ruleNames + the prefix gate must be collected independently.
+    const pluginB = { meta: { name: 'b' }, rules: { 'no-baz': {} } };
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { local: mockPlugin, other: pluginB },
+        rules: { 'local/no-foo': 'error', 'other/no-baz': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toEqual({
+      local: { ruleNames: ['no-bar', 'no-foo'] },
+      other: { ruleNames: ['no-baz'] },
+    });
+    expect(entry.plugins).toEqual(['local', 'other']);
+  });
+
+  test('throws when a mounted plugin has no rules object', () => {
+    expect(() =>
+      normalizeConfig([
+        { files: ['**/*.ts'], plugins: { bad: { meta: {} } }, rules: {} },
+      ]),
+    ).toThrow(/must expose a "rules" object/);
+  });
+
+  test('throws when an object-form prefix collides with a native plugin name', () => {
+    // Asymmetry: a native NAME is legal in the array form (previous test) but
+    // illegal as an object-form KEY — native rules always win, so mounting a
+    // community plugin under a native prefix would silently shadow it.
+    expect(() =>
+      normalizeConfig([
+        {
+          files: ['**/*.ts'],
+          plugins: { '@typescript-eslint': mockPlugin },
+          rules: {},
+        },
+      ]),
+    ).toThrow(/collides with the built-in plugin/);
+  });
+
+  const RESERVED_DECL_ALIASES = [
+    'eslint-plugin-import',
+    'eslint-plugin-jest',
+    'eslint-plugin-jsx-a11y',
+    'eslint-plugin-promise',
+    'eslint-plugin-react-hooks',
+    'eslint-plugin-unicorn',
+  ];
+  for (const alias of RESERVED_DECL_ALIASES) {
+    test(`throws when an object-form prefix is the native decl-name ${alias}`, () => {
+      // Each `eslint-plugin-*` alias normalizes to a native prefix in Go, so a
+      // community plugin mounted under it would otherwise pass the JS guard but
+      // be silently dropped by the Go gate. Reject it loudly.
+      expect(() =>
+        normalizeConfig([
+          { files: ['**/*.ts'], plugins: { [alias]: mockPlugin }, rules: {} },
+        ]),
+      ).toThrow(/collides with the built-in plugin/);
+    });
+  }
+
+  test('accepts an eslint-plugin-* key that is NOT a native decl-name', () => {
+    // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
+    // so reserving it would wrongly false-reject a legitimate community mount.
+    // The asymmetry must be exact: only the 6 aliased names are reserved.
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { 'eslint-plugin-react': mockPlugin },
+        rules: { 'eslint-plugin-react/no-foo': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.plugins).toContain('eslint-plugin-react');
+    expect(entry.eslintPlugins).toEqual({
+      'eslint-plugin-react': { ruleNames: ['no-bar', 'no-foo'] },
+    });
+  });
+
+  test('entries with no plugins carry no community-plugin field', () => {
+    const [entry] = normalizeConfig([
+      { files: ['**/*.ts'], rules: {} },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toBeUndefined();
+    expect(entry.plugins).toEqual([]);
+  });
+
+  test('empty object-form plugins {} is a no-op (no carrier, empty gate)', () => {
+    const [entry] = normalizeConfig([
+      { files: ['**/*.ts'], plugins: {}, rules: {} },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toBeUndefined();
+    expect(entry.plugins).toEqual([]);
+  });
+});
+
+describe('collectPluginMeta', () => {
+  const mockPlugin = {
+    meta: { name: 'p' },
+    rules: { 'no-foo': {}, 'no-bar': {} },
+  };
+
+  test('aggregates entries + descriptors, only for plugin-mounting configs', () => {
+    const { eslintPluginEntries, pluginConfigs } = collectPluginMeta([
+      {
+        configPath: '/proj/rslint.config.mjs',
+        configDirectory: '/proj',
+        entries: normalizeConfig([
+          {
+            files: ['**/*.ts'],
+            plugins: { local: mockPlugin },
+            rules: {},
+          },
+        ]),
+      },
+      {
+        configPath: '/proj/sub/rslint.config.mjs',
+        configDirectory: '/proj/sub',
+        entries: normalizeConfig([{ files: ['**/*.ts'], rules: {} }]),
+      },
+    ]);
+    expect(eslintPluginEntries).toEqual([
+      { prefix: 'local', ruleNames: ['no-bar', 'no-foo'] },
+    ]);
+    // Only the plugin-mounting config gets a worker-pool descriptor; the plain
+    // config stays zero-overhead (no worker spun up for it).
+    expect(pluginConfigs).toEqual([
+      { configPath: '/proj/rslint.config.mjs', configDirectory: '/proj' },
+    ]);
+  });
+
+  test('ruleNames are merged across configs sharing a prefix (per-config-unique rules still register)', () => {
+    // Go registers ONE global placeholder set per prefix but the worker routes
+    // per-config; a rule mounted only by /b's `local` (zzz) must still register,
+    // or Go never dispatches it for files under /b (silent false-green).
+    const { eslintPluginEntries } = collectPluginMeta([
+      {
+        configPath: '/a/rslint.config.mjs',
+        configDirectory: '/a',
+        entries: normalizeConfig([
+          { plugins: { local: mockPlugin }, rules: {} },
+        ]),
+      },
+      {
+        configPath: '/b/rslint.config.mjs',
+        configDirectory: '/b',
+        entries: normalizeConfig([
+          { plugins: { local: { rules: { zzz: {} } } }, rules: {} },
+        ]),
+      },
+    ]);
+    expect(eslintPluginEntries).toEqual([
+      { prefix: 'local', ruleNames: ['no-bar', 'no-foo', 'zzz'] },
+    ]);
   });
 });

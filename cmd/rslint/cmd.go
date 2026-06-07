@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -34,6 +35,36 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
+
+// lintArgs is the parsed CLI flag set, decoupled from the global flag
+// package so each entry point can build it: parseLintFlags from argv, and
+// runCLI additionally from the IPC init-handshake payload.
+type lintArgs struct {
+	Init           bool
+	Config         string
+	ConfigStdin    bool // true → executeLintPipeline reads stdin as a config payload
+	Fix            bool
+	TypeCheck      bool
+	TypeCheckOnly  bool
+	TraceOut       string
+	CpuprofOut     string
+	SingleThreaded bool
+	Format         string
+	NoColor        bool
+	ForceColor     bool
+	Quiet          bool
+	MaxWarnings    int
+	StartTimeMs    int64
+	RuleFlags      []string
+	// Positional args resolved into existing-dir vs file paths.
+	AllowFiles []string
+	AllowDirs  []string
+	// EslintPlugins carries the {prefix, ruleNames} metadata for ESLint
+	// plugins mounted via the config's object-form `plugins`. Used to register
+	// placeholder rules so plugin rule names resolve; the live plugins run
+	// in the Node worker.
+	EslintPlugins []rslintconfig.EslintPluginEntry
+}
 
 // ColorScheme contains all the color functions for different UI elements
 type ColorScheme struct {
@@ -99,6 +130,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 		diag := rule.RuleDiagnostic{
 			RuleName:   fmt.Sprintf("TypeScript(TS%d)", d.Code()),
 			SourceFile: d.File(),
+			FilePath:   d.File().FileName(),
 			Range:      d.Loc(),
 			Message:    rule.RuleMessage{Description: d.String()},
 			Severity:   rule.SeverityError,
@@ -141,7 +173,7 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
 	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
-	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
 	output := fmt.Sprintf(
 		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
 		severity,
@@ -209,7 +241,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	diagnostic := Diagnostic{
 		RuleName: d.RuleName,
 		Message:  d.Message.Description,
-		FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+		FilePath: tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
 		Range: Range{
 			Start: Location{
 				Line:   startLine + 1, // Convert to 1-based indexing
@@ -301,7 +333,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString("\n  ")
 	w.WriteString(colors.BorderText("╭─┴──────────("))
 	w.WriteByte(' ')
-	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
 	location := fmt.Sprintf("%s:%d:%d", filePath, diagnosticStartLine+1, diagnosticStartColumn+1)
 	w.WriteString(colors.FileName("%s", location))
 	w.WriteByte(' ')
@@ -317,14 +349,19 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineStarts := make([]int, numLines)
 	lineEnds := make([]int, numLines)
 
-	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
-	// but track byte positions for string slicing
+	// Iterate by runes to correctly handle multi-byte UTF-8 characters.
+	// Use utf8.DecodeRuneInString to get the true byte width of each rune
+	// (including invalid UTF-8 bytes, which decode as RuneError with size=1).
+	// `for _, char := range str` plus `utf8.RuneLen(char)` is unsafe here
+	// because invalid bytes yield RuneError (U+FFFD) and RuneLen returns 3
+	// (the encoded length of U+FFFD), throwing off the byte counter and
+	// eventually slicing past len(text).
 	codeboxText := text[codeboxStart:codeboxEnd]
-	bytePos := codeboxStart
-	for _, char := range codeboxText {
-		charBytes := utf8.RuneLen(char)
-		current, next := bytePos, bytePos+charBytes
-		bytePos = next
+	for i := 0; i < len(codeboxText); {
+		char, size := utf8.DecodeRuneInString(codeboxText[i:])
+		current := codeboxStart + i
+		next := current + size
+		i += size
 
 		if char == '\n' {
 			if line != codeboxEndLine {
@@ -348,6 +385,14 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	if line == codeboxEndLine {
 		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+	}
+	// If no non-space content was seen anywhere in the codebox,
+	// `indentSize` was never updated from the math.MaxInt sentinel.
+	// Clamping to 0 prevents `lineMap[line] + indentSize` from overflowing
+	// int in the render loop below (which would wrap to a large negative
+	// number and slice out of bounds).
+	if indentSize == math.MaxInt {
+		indentSize = 0
 	}
 
 	diagnosticHighlightActive := false
@@ -420,7 +465,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 // repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
 type repeatedFlag []string
 
-func (f *repeatedFlag) String() string   { return strings.Join(*f, ", ") }
+func (f *repeatedFlag) String() string     { return strings.Join(*f, ", ") }
 func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
 
 const usage = `🚀 Rslint - Rocket Speed Linter
@@ -447,7 +492,7 @@ Options:
 func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
 	m := make(map[string][]rule.RuleDiagnostic)
 	for _, d := range diags {
-		f := d.SourceFile.FileName()
+		f := d.FilePath
 		m[f] = append(m[f], d)
 	}
 	return m
@@ -630,70 +675,62 @@ func resolveStartTime(startTimeMs int64) time.Time {
 	return time.Now()
 }
 
-func runCMD() int {
-	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+// parseLintFlags parses the lint CLI flags out of argv into a lintArgs.
+// It uses a fresh FlagSet (not the global flag.CommandLine) so it is
+// callable more than once per process, and ContinueOnError so a bad flag
+// returns a fatal exit code instead of os.Exit-ing past caller cleanup.
+// A non-zero fatalExitCode means the caller should return it immediately
+// (the diagnostic was already printed to stderr).
+func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int) {
+	fs := flag.NewFlagSet("rslint", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
-	var (
-		init        bool
-		help        bool
-		config      string
-		configStdin bool
-		fix           bool
-		typeCheck     bool
-		typeCheckOnly bool
+	var ruleFlags repeatedFlag
 
-		traceOut       string
-		cpuprofOut     string
-		singleThreaded bool
-		format         string
-		noColor        bool
-		forceColor     bool
-		quiet          bool
-		maxWarnings    int
-		startTimeMs    int64
-		ruleFlags      repeatedFlag
-	)
-	flag.StringVar(&format, "format", "default", "output format")
-	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
-	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
-	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
-	flag.BoolVar(&typeCheck, "type-check", false, "enable TypeScript type checking")
-	flag.BoolVar(&typeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
-	flag.BoolVar(&help, "help", false, "show help")
-	flag.BoolVar(&help, "h", false, "show help")
-	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
-	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
-	flag.BoolVar(&quiet, "quiet", false, "report errors only")
-	flag.IntVar(&maxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
+	fs.StringVar(&args.Format, "format", "default", "output format")
+	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
+	fs.BoolVar(&args.ConfigStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
+	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
+	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")
+	fs.BoolVar(&args.TypeCheck, "type-check", false, "enable TypeScript type checking")
+	fs.BoolVar(&args.TypeCheckOnly, "type-check-only", false, "run only TypeScript type checking (skip all lint rules)")
+	fs.BoolVar(&help, "help", false, "show help")
+	fs.BoolVar(&help, "h", false, "show help")
+	fs.BoolVar(&args.NoColor, "no-color", false, "disable colored output")
+	fs.BoolVar(&args.ForceColor, "force-color", false, "force colored output")
+	fs.BoolVar(&args.Quiet, "quiet", false, "report errors only")
+	fs.IntVar(&args.MaxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
-	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
-	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
-	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
-	flag.Int64Var(&startTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
-	flag.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
+	fs.StringVar(&args.TraceOut, "trace", "", "file to put trace to")
+	fs.StringVar(&args.CpuprofOut, "cpuprof", "", "file to put cpu profiling to")
+	fs.BoolVar(&args.SingleThreaded, "singleThreaded", false, "run in single threaded mode")
+	fs.Int64Var(&args.StartTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
+	fs.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 
-	flag.Parse()
+	if err := fs.Parse(argv); err != nil {
+		// ContinueOnError: fs already printed the diagnostic to stderr.
+		return args, help, 2
+	}
+	args.RuleFlags = []string(ruleFlags)
 
 	// --type-check-only implies --type-check and skips all lint rules.
 	// Reject incompatible flag combinations before doing any work.
-	if code, msg := validateTypeCheckOnlyFlags(typeCheckOnly, fix, []string(ruleFlags)); code != 0 {
+	if code, msg := validateTypeCheckOnlyFlags(args.TypeCheckOnly, args.Fix, args.RuleFlags); code != 0 {
 		fmt.Fprintln(os.Stderr, msg)
-		return code
+		return args, help, code
 	}
-	if typeCheckOnly {
-		typeCheck = true
+	if args.TypeCheckOnly {
+		args.TypeCheck = true
 	}
 
 	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
-	var allowFiles []string
-	var allowDirs []string
-	if args := flag.Args(); len(args) > 0 {
-		for _, arg := range args {
+	if positional := fs.Args(); len(positional) > 0 {
+		for _, arg := range positional {
 			absPath, err := filepath.Abs(arg)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
-				return 1
+				return lintArgs{}, help, 1
 			}
 			// NOTE: we intentionally do NOT call filepath.EvalSymlinks here.
 			// EvalSymlinks resolves symlinks (macOS /tmp → /private/tmp) and
@@ -708,17 +745,41 @@ func runCMD() int {
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {
-				allowDirs = append(allowDirs, normalized)
+				args.AllowDirs = append(args.AllowDirs, normalized)
 			} else {
-				allowFiles = append(allowFiles, normalized)
+				args.AllowFiles = append(args.AllowFiles, normalized)
 			}
 		}
 	}
 
-	if help {
-		flag.Usage()
-		return 0
-	}
+	return args, help, 0
+}
+
+// executeLintPipeline runs the full lint flow (config load → program build
+// → gap-file fallback → lint → optional --fix loop → report) and returns
+// the process exit code. Shared by the IPC entry (runCLI) and the wasm
+// native fallback.
+func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
+	// Unpack into locals so the pipeline body below stays verbatim — only the
+	// flag-parse front matter lives in parseLintFlags.
+	init := args.Init
+	config := args.Config
+	configStdin := args.ConfigStdin
+	fix := args.Fix
+	typeCheck := args.TypeCheck
+	typeCheckOnly := args.TypeCheckOnly
+	traceOut := args.TraceOut
+	cpuprofOut := args.CpuprofOut
+	singleThreaded := args.SingleThreaded
+	format := args.Format
+	noColor := args.NoColor
+	forceColor := args.ForceColor
+	quiet := args.Quiet
+	maxWarnings := args.MaxWarnings
+	startTimeMs := args.StartTimeMs
+	ruleFlags := args.RuleFlags
+	allowFiles := args.AllowFiles
+	allowDirs := args.AllowDirs
 
 	// Override color detection based on flags
 	if noColor {
@@ -775,11 +836,20 @@ func runCMD() int {
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
+	// Register placeholder rules for mounted ESLint plugins so their rule
+	// names resolve (and route to the Node worker) instead of being dropped.
+	rslintconfig.RegisterEslintPluginRules(args.EslintPlugins)
 	var rslintConfig rslintconfig.RslintConfig
 
 	// configMap holds per-directory configs for multi-config (monorepo) support.
 	// Only populated in the configStdin path; nil otherwise (single-config mode).
 	var configMap map[string]rslintconfig.RslintConfig
+
+	// originalConfigDir maps each normalized configMap key back to the raw
+	// configDirectory the JS host sent, so the eslint-plugin wire configKey
+	// round-trips raw (byte-matching the worker's plugin map key). nil outside
+	// multi-config mode (single-config / JSON configs never mount plugins).
+	var originalConfigDir map[string]string
 
 	programs := []*compiler.Program{}
 	// programConfigDirs tracks which configDir each program belongs to (parallel to programs).
@@ -809,6 +879,7 @@ func runCMD() int {
 		if payload.IsMultiConfig {
 			// Multi-config format
 			configMap = payload.ConfigMap
+			originalConfigDir = payload.OriginalConfigDir
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
@@ -1126,7 +1197,7 @@ func runCMD() int {
 		rulesForFile = getRulesForFile
 	}
 
-	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1138,7 +1209,27 @@ func runCMD() int {
 		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
-	})
+	}
+	// Dispatch eslint-plugin rules to the Node worker in parallel with the
+	// native lint pass; results are awaited + merged before output / --fix.
+	// ONLY when plugins are actually configured — otherwise the whole reverse-
+	// dispatch (including buildPluginFileInputs' extra per-file rule resolution
+	// over every file) is skipped so the native-only path pays nothing for the
+	// feature.
+	hasEslintPlugins := len(args.EslintPlugins) > 0
+	pluginResolver := pluginConfigResolver{
+		configMap:         configMap,
+		originalConfigDir: originalConfigDir,
+		rslintConfig:      rslintConfig,
+		currentDirectory:  currentDirectory,
+	}
+	var pluginCh <-chan []rule.RuleDiagnostic
+	if hasEslintPlugins {
+		pluginInputs := buildPluginFileInputs(runOpts, pluginResolver)
+		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix))
+	}
+
+	lintResult, err := linter.RunLinter(runOpts)
 
 	close(diagnosticsChan)
 	if err != nil {
@@ -1149,6 +1240,11 @@ func runCMD() int {
 	lintedfileCount := lintResult.LintedFileCount
 
 	wg.Wait()
+	// Merge eslint-plugin diagnostics (dispatched in parallel) now that the
+	// native diagnostics goroutine has drained.
+	if pluginCh != nil {
+		allDiags = append(allDiags, (<-pluginCh)...)
+	}
 
 	// Emit per-file warnings for CLI-specified files that won't be linted.
 	// Distinguishes "not found in project" vs "ignored by pattern", aligned
@@ -1188,7 +1284,7 @@ func runCMD() int {
 			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
 			fixSkipMask := buildTypeCheckSkipMask(len(newPrograms), newFallbackIdx)
 			var passDiags []rule.RuleDiagnostic
-			passResult, _ := linter.RunLinter(linter.RunLinterOptions{
+			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1202,11 +1298,25 @@ func runCMD() int {
 					passDiags = append(passDiags, d)
 					diagsMu.Unlock()
 				},
-			})
+			}
+			// Re-dispatch plugin rules each pass (only when configured): the
+			// worker re-reads the post-fix file content, and merging here keeps
+			// plugin diagnostics from being lost when allDiags is replaced.
+			var fixPluginCh <-chan []rule.RuleDiagnostic
+			if hasEslintPlugins {
+				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginResolver)
+				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
+			}
+			passResult, _ := linter.RunLinter(fixRunOpts)
 			if passResult != nil {
 				for name := range passResult.ExecutedRules {
 					lintResult.ExecutedRules[name] = struct{}{}
 				}
+			}
+			// Merge this pass's plugin diagnostics before applying fixes so
+			// plugin fixes participate and plugin diagnostics survive.
+			if fixPluginCh != nil {
+				passDiags = append(passDiags, (<-fixPluginCh)...)
 			}
 
 			// Replace allDiags with latest post-fix diagnostics.

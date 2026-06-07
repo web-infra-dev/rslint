@@ -418,9 +418,22 @@ func needToEscapeForJSX(raw string, parentIsAttribute bool) bool {
 	return false
 }
 
-var JsxCurlyBracePresenceRule = rule.Rule{
-	Name: "react/jsx-curly-brace-presence",
-	Run: func(ctx rule.RuleContext, raw any) rule.RuleListeners {
+// JsxCurlyBracePresenceRule is the eslint-plugin-react variant
+// (react/jsx-curly-brace-presence).
+var JsxCurlyBracePresenceRule = BuildRule("react/jsx-curly-brace-presence")
+
+// BuildRule constructs jsx-curly-brace-presence under the given registration
+// name. The unnecessary-curly check always reports, and the fix preserves the
+// original quoting when the inner text holds a double quote.
+func BuildRule(name string) rule.Rule {
+	return rule.Rule{
+		Name: name,
+		Run:  makeRun(),
+	}
+}
+
+func makeRun() func(rule.RuleContext, any) rule.RuleListeners {
+	return func(ctx rule.RuleContext, raw any) rule.RuleListeners {
 		opts := parseOptions(raw)
 		text := ctx.SourceFile.Text()
 
@@ -470,6 +483,8 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 				case ast.KindStringLiteral:
 					rawWithQuotes := stringLiteralRawText(text, expr)
 					inner := trimQuotes(rawWithQuotes)
+					// Preserve the original quoting when the inner text holds a
+					// double quote; otherwise re-wrap in double quotes.
 					if strings.Contains(inner, `"`) {
 						replacement = rawWithQuotes
 					} else {
@@ -753,5 +768,5 @@ var JsxCurlyBracePresenceRule = rule.Rule{
 				}
 			},
 		}
-	},
+	}
 }

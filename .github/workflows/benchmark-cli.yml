@@ -14,7 +14,7 @@ jobs:
       GOMAXPROCS: 8
     steps:
       - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           submodules: true
           fetch-depth: 1
@@ -28,8 +28,19 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
+
+      # build:js is now one rslib build covering the library surface AND the
+      # eslint-plugin worker; the worker imports @rslint/native, whose
+      # index.d.ts comes from `napi build`. So build napi first even though the
+      # CLI benchmarks only exercise the Go binary.
+      - name: Build napi parser
+        run: pnpm --filter @rslint/native run build
       - name: Build JS package
-        run: pnpm --filter @rslint/core run build
+        run: pnpm --filter @rslint/core run build:bin && pnpm --filter @rslint/core run build:js
 
       - name: Run CLI benchmarks
         uses: CodSpeedHQ/action@d872884a306dd4853acf0f584f4b706cf0cc72a2

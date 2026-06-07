@@ -18,6 +18,7 @@
   "exclude": [
     "${configDir}/src/**/*.spec.ts",
     "${configDir}/src/**/*.test.ts",
-    "${configDir}/**/fixtures/**"
+    "${configDir}/**/fixtures/**",
+    "${configDir}/src/eslint-plugin/**"
   ]
 }

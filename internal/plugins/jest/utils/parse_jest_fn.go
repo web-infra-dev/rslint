@@ -16,6 +16,8 @@ type ParsedJestFnCall struct {
 	MemberEntries   []ParsedJestFnMemberEntry
 	Modifiers       []string
 	ModifierEntries []ParsedJestFnMemberEntry
+	Matcher         string
+	MatcherEntry    *ParsedJestFnMemberEntry
 	Head            ParsedJestFnCallHead
 }
 
@@ -29,6 +31,12 @@ type ParsedJestFnCallHeadEntry struct {
 	Value string
 	Node  *ast.Node
 }
+
+const (
+	ExpectParseReasonNone            = ""
+	ExpectParseReasonMatcherNotFound = "matcher-not-found"
+	ExpectParseReasonModifierUnknown = "modifier-unknown"
+)
 
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
 	parsed := ParseJestFnCall(node, ctx)
@@ -56,15 +64,12 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	callExpr := node.AsCallExpression()
-	if isEachFactoryCall(callExpr, members) {
-		return nil
-	}
-	if isInvalidTaggedTemplateCall(callExpr, members) {
+	if isEachFactoryCall(callExpr, members) || isInvalidTaggedTemplateCall(callExpr, members) || isInnerExpectCall(node, localName, members, ctx.Settings) {
 		return nil
 	}
 
 	localNode := resolveHeadLocalNode(callExpr)
-	name, originalNode, headType := resolveOriginalName(node, localName, localNode, ctx)
+	name, originalNode, headType := ResolveJestFunctionReference(node, localName, localNode, ctx)
 	if name == "" {
 		return nil
 	}
@@ -82,14 +87,11 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	parsed := &ParsedJestFnCall{
-		Name:      name,
-		LocalName: localName,
-		Kind:      kind,
-		Members:   members,
-		MemberEntries: append(
-			[]ParsedJestFnMemberEntry(nil),
-			memberEntries[1:]...,
-		),
+		Name:          name,
+		LocalName:     localName,
+		Kind:          kind,
+		Members:       members,
+		MemberEntries: memberEntries[1:],
 		Head: ParsedJestFnCallHead{
 			Type: headType,
 			Local: ParsedJestFnCallHeadEntry{
@@ -104,15 +106,127 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	if kind == JestFnTypeExpect {
-		modifiers, modifierEntries := pickExpectModifiersAndEntries(parsed.MemberEntries)
-		parsed.Modifiers = modifiers
-		parsed.ModifierEntries = modifierEntries
+		if !applyParsedExpectCall(parsed) {
+			return nil
+		}
 	}
 
 	return parsed
 }
 
-func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
+// FindTopMostCallExpression walks up member/call chains to the outermost CallExpression,
+// matching eslint-plugin-jest's findTopMostCallExpression.
+func FindTopMostCallExpression(node *ast.Node) *ast.Node {
+	if node == nil || node.Kind != ast.KindCallExpression {
+		return node
+	}
+
+	top := node
+	parent := node.Parent
+	for parent != nil {
+		if parent.Kind == ast.KindCallExpression {
+			top = parent
+			parent = parent.Parent
+			continue
+		}
+		if parent.Kind != ast.KindPropertyAccessExpression &&
+			parent.Kind != ast.KindElementAccessExpression {
+			break
+		}
+		parent = parent.Parent
+	}
+
+	return top
+}
+
+func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
+	current := node
+	for current != nil {
+		switch current.Kind {
+		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
+			return current.AsImportDeclaration()
+		}
+		current = current.Parent
+	}
+	return nil
+}
+
+func applyParsedExpectCall(parsed *ParsedJestFnCall) bool {
+	modifierEntries, matcher, err := FindExpectModifiersAndMatcher(parsed.MemberEntries)
+	if err != "" {
+		return false
+	}
+
+	parsed.ModifierEntries = modifierEntries
+	parsed.Matcher = matcher.Name
+	parsed.MatcherEntry = matcher
+	if len(modifierEntries) > 0 {
+		parsed.Modifiers = make([]string, len(modifierEntries))
+		for i, entry := range modifierEntries {
+			parsed.Modifiers[i] = entry.Name
+		}
+	}
+	return true
+}
+
+// isInnerExpectCall detects expect() calls embedded in a matcher chain
+// (e.g. expect(1) in expect(1).toBe(2)) before running type-checker resolution.
+func isInnerExpectCall(node *ast.Node, localName string, members []string, settings map[string]interface{}) bool {
+	if len(members) > 0 || !IsMemberAccessNode(node.Parent) {
+		return false
+	}
+	if FindTopMostCallExpression(node) == node {
+		return false
+	}
+	name := ApplyGlobalJestAlias(localName, settings)
+	return GetJestKind(name) == JestFnTypeExpect
+}
+
+func FindExpectModifiersAndMatcher(entries []ParsedJestFnMemberEntry) (
+	[]ParsedJestFnMemberEntry,
+	*ParsedJestFnMemberEntry,
+	string,
+) {
+	if len(entries) == 0 {
+		return nil, nil, ExpectParseReasonMatcherNotFound
+	}
+
+	modifiers := make([]ParsedJestFnMemberEntry, 0, len(entries))
+	for _, member := range entries {
+		parent := member.Node.Parent
+		if parent == nil {
+			return nil, nil, ExpectParseReasonModifierUnknown
+		}
+
+		grandparent := parent.Parent
+		if grandparent != nil && grandparent.Kind == ast.KindCallExpression {
+			return modifiers, &member, ExpectParseReasonNone
+		}
+
+		switch len(modifiers) {
+		case 0:
+			if !EXPECT_MODIFIER_NAMES[member.Name] {
+				return nil, nil, ExpectParseReasonModifierUnknown
+			}
+		case 1:
+			if member.Name != "not" {
+				return nil, nil, ExpectParseReasonModifierUnknown
+			}
+			first := modifiers[0].Name
+			if first != "rejects" && first != "resolves" {
+				return nil, nil, ExpectParseReasonModifierUnknown
+			}
+		default:
+			return nil, nil, ExpectParseReasonModifierUnknown
+		}
+
+		modifiers = append(modifiers, member)
+	}
+
+	return nil, nil, ExpectParseReasonMatcherNotFound
+}
+
+func ResolveJestFunctionReference(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
 	if ctx.TypeChecker == nil {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -123,7 +237,7 @@ func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, 
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
-	ident := resolveFirstIdentifier(callExpr.Expression)
+	ident := ResolveFirstIdentifier(callExpr.Expression)
 	if ident == nil || ident.Kind != ast.KindIdentifier {
 		return localName, localNode, JEST_GLOBAL_MODE
 	}
@@ -174,10 +288,12 @@ func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
 	if callExpr == nil {
 		return nil
 	}
-	return resolveFirstIdentifier(callExpr.Expression)
+	return ResolveFirstIdentifier(callExpr.Expression)
 }
 
-func resolveFirstIdentifier(node *ast.Node) *ast.Node {
+// ResolveFirstIdentifier walks the left side of a call/member chain and returns
+// the first identifier it finds, if any.
+func ResolveFirstIdentifier(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
@@ -186,27 +302,15 @@ func resolveFirstIdentifier(node *ast.Node) *ast.Node {
 	case ast.KindIdentifier:
 		return node
 	case ast.KindCallExpression:
-		return resolveFirstIdentifier(node.AsCallExpression().Expression)
+		return ResolveFirstIdentifier(node.AsCallExpression().Expression)
 	case ast.KindPropertyAccessExpression:
-		return resolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
+		return ResolveFirstIdentifier(node.AsPropertyAccessExpression().Expression)
 	case ast.KindElementAccessExpression:
-		return resolveFirstIdentifier(node.AsElementAccessExpression().Expression)
+		return ResolveFirstIdentifier(node.AsElementAccessExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
-		return resolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
+		return ResolveFirstIdentifier(node.AsTaggedTemplateExpression().Tag)
 	}
 
-	return nil
-}
-
-func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
-	current := node
-	for current != nil {
-		switch current.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			return current.AsImportDeclaration()
-		}
-		current = current.Parent
-	}
 	return nil
 }
 
@@ -248,27 +352,91 @@ func isValidJestCall(name string, members []string) bool {
 	return ok
 }
 
-func pickExpectModifiersAndEntries(entries []ParsedJestFnMemberEntry) ([]string, []ParsedJestFnMemberEntry) {
-	if len(entries) == 0 {
-		return nil, nil
-	}
-
-	modifierEntries := make([]ParsedJestFnMemberEntry, 0, len(entries))
-	for _, entry := range entries {
-		if !EXPECT_MODIFIER_NAMES[entry.Name] {
-			break
+func UnwrapBasicTypeAssertions(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			node = node.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			node = node.AsTypeAssertion().Expression
+		default:
+			return node
 		}
-		modifierEntries = append(modifierEntries, entry)
 	}
+	return node
+}
 
-	if len(modifierEntries) == 0 {
+func UnwrapTypeAssertions(node *ast.Node) *ast.Node {
+	for node != nil {
+		switch node.Kind {
+		case ast.KindParenthesizedExpression:
+			node = node.AsParenthesizedExpression().Expression
+		case ast.KindAsExpression:
+			node = node.AsAsExpression().Expression
+		case ast.KindTypeAssertionExpression:
+			node = node.AsTypeAssertion().Expression
+		case ast.KindNonNullExpression:
+			node = node.AsNonNullExpression().Expression
+		case ast.KindSatisfiesExpression:
+			node = node.AsSatisfiesExpression().Expression
+		default:
+			return node
+		}
+	}
+	return node
+}
+
+func GetAccessorReceiverAndParent(entry *ParsedJestFnMemberEntry) (*ast.Node, *ast.Node) {
+	if entry == nil || entry.Node == nil || entry.Node.Parent == nil {
 		return nil, nil
 	}
 
-	modifiers := make([]string, 0, len(modifierEntries))
-	for _, entry := range modifierEntries {
-		modifiers = append(modifiers, entry.Name)
+	parent := entry.Node.Parent
+	switch parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		return parent.AsPropertyAccessExpression().Expression, parent
+	case ast.KindElementAccessExpression:
+		return parent.AsElementAccessExpression().Expression, parent
+	default:
+		return nil, nil
+	}
+}
+
+func IsNamedMember(node *ast.Node, name string) bool {
+	if node == nil {
+		return false
 	}
 
-	return modifiers, modifierEntries
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return node.AsIdentifier().Text == name
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text == name
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text == name
+	case ast.KindPrivateIdentifier:
+		return node.AsPrivateIdentifier().Text == name
+	default:
+		return false
+	}
+}
+
+// ReceiverBeforeInvocation returns the expression before .m() or ["m"]() on a
+// call, such as `expect(x).not` before `.toBe()`.
+func ReceiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
+	if matcherCall == nil || matcherCall.Kind != ast.KindCallExpression {
+		return nil
+	}
+
+	expr := matcherCall.AsCallExpression().Expression
+	switch expr.Kind {
+	case ast.KindPropertyAccessExpression:
+		return expr.AsPropertyAccessExpression().Expression
+	case ast.KindElementAccessExpression:
+		return expr.AsElementAccessExpression().Expression
+	default:
+		return nil
+	}
 }

@@ -185,6 +185,7 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 	diagnostic := rule.RuleDiagnostic{
 		RuleName:   "test-rule",
 		SourceFile: sourceFile,
+		FilePath:   sourceFile.FileName(),
 		Range:      core.NewTextRange(startOffset, endOffset),
 		Message:    rule.RuleMessage{Id: "test", Description: "Test diagnostic"},
 		Severity:   rule.SeverityError,
@@ -408,6 +409,53 @@ func TestPrintDiagnosticEdgeCases(t *testing.T) {
 		// All codebox lines should be visible (no folding)
 		if !strings.Contains(output, "line1") || !strings.Contains(output, "line4") {
 			t.Errorf("4-line codebox should show all lines.\nOutput:\n%s", output)
+		}
+	})
+
+	t.Run("source contains invalid UTF-8 bytes", func(t *testing.T) {
+		// Regression: the codebox renderer iterated `for _, char := range
+		// codeboxText` and advanced a manual byte counter by
+		// `utf8.RuneLen(char)`. Go's range yields utf8.RuneError (U+FFFD)
+		// for each invalid UTF-8 byte but only advances 1 byte — yet
+		// utf8.RuneLen(RuneError) is 3 (the encoded length of U+FFFD).
+		// The manual counter fell out of sync and downstream sliced the
+		// source text past its length, panicking with
+		// `slice bounds out of range [:17] with length 7`.
+		//
+		// Source: `//` + 5 invalid UTF-8 first bytes (0xFF 0xFE 0xFD
+		// 0xFC 0xFB) — mirrors a real swc-loader fixture in rspack that
+		// triggered this in production.
+		source := "//\xff\xfe\xfd\xfc\xfb"
+		d, opts := createTestDiagnostic(t, source, len(source), len(source))
+		output := renderDiagnostic(t, d, opts)
+
+		// The render must complete without panic and produce a non-empty
+		// codebox containing the leading `//`.
+		if !strings.Contains(output, "//") {
+			t.Errorf("Should render the `//` prefix without panicking.\nOutput:\n%s", output)
+		}
+		if !strings.Contains(output, "╰") {
+			t.Errorf("Should have closing border.\nOutput:\n%s", output)
+		}
+	})
+
+	t.Run("codebox contains only whitespace", func(t *testing.T) {
+		// Regression: indentSize was initialized to math.MaxInt and only
+		// updated inside `if !lineIndentCalculated && !unicode.IsSpace`.
+		// When every codebox line was whitespace-only (e.g. a 1-byte
+		// `"\n"` source), indentSize stayed MaxInt, and
+		// `lineMap[line] + indentSize` overflowed int — wrapping to a
+		// large negative number that then sliced out of bounds.
+		//
+		// Source: single LF — the simplest shape that produces a
+		// whitespace-only codebox. The diagnostic covers the LF itself
+		// (mirrors what eol-last 'never' emits on a 1-byte file).
+		source := "\n"
+		d, opts := createTestDiagnostic(t, source, 0, 1)
+		output := renderDiagnostic(t, d, opts)
+
+		if !strings.Contains(output, "╰") {
+			t.Errorf("Should have closing border.\nOutput:\n%s", output)
 		}
 	})
 }

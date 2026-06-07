@@ -44,13 +44,13 @@ Three principles follow — internalize them before writing a single test case:
 
 3. **Green tests are necessary, not sufficient.** Before claiming alignment, the rule must additionally pass the Contract Alignment Checklist (Phase 4 Step 6) and — for any rule with non-trivial branching — a differential validation against the reference implementation on a real codebase (Phase 4 Step 8). Any divergence the differential run surfaces feeds back into layer 2 or 3 as a new locked-in test. A green Go suite alone proves only that the rule handles the inputs _you thought of_.
 
-**Coverage bar.** For non-trivial rules, `<rule>_extras_test.go` is comparable to or larger than `<rule>_upstream_test.go` in case count (i.e. layers 2 + 3 ≥ layer 1). A near-empty `_extras_test.go` — or worse, no `_extras_test.go` at all — almost certainly means Phase 1 Steps 4 and 5 were skipped. Re-walk them before submitting. Phase 4 Step 6 has an explicit checkbox to enforce this.
+**Coverage bar.** The point of layers 2 + 3 is to prove the Go/tsgo port stays aligned where it structurally diverges from upstream's ESTree implementation — so the bar is _what they cover_, not how many cases they add up to. There is no case-count target. Concretely: every applicable Dimension 4 edge shape and ≥2 real-user shapes from the issue tracker (Phase 1 Step 4), plus every reachable branch locked in (Phase 1 Step 5). A near-empty `_extras_test.go` — or worse, none at all — is a reliable smell that Phase 1 Steps 4 and 5 were skipped: re-walk them before submitting. Phase 4 Step 6's per-layer checkboxes are what enforce this.
 
 **JS tests are not a coverage layer — do not split them.** The three-layer model and the `_upstream_*` / `_extras_*` file split apply to **Go tests only**. The JS file `packages/rslint-test-tools/tests/.../<rule>.test.ts` exists for a different purpose: it spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape end-to-end. That contract is input-independent — running it against more cases doesn't verify it any better. So:
 
 - **JS mirrors Layer 1 only** (upstream `valid` / `invalid` cases). Layers 2 and 3 stay in Go.
 - A JS file far smaller than the Go suite — sometimes by 10× or more, depending on whether upstream uses fixture files — is the **expected** state, not "JS is under-tested." The semantic check is "every JS-asserted behavior also has a Go-upstream case"; literal case-count parity is **not** required (see Phase 4 Step 5).
-- See Phase 3 Step 6 for what goes in the JS file and Phase 4 Step 5 for the alignment-direction check (JS ⊆ Go upstream, semantic).
+- See Phase 3 Step 2 for what goes in the JS file and Phase 4 Step 5 for the alignment-direction check (JS ⊆ Go upstream, semantic).
 
 ---
 
@@ -70,12 +70,12 @@ Before starting, familiarize yourself with these key source locations:
 
 ### Core Infrastructure
 
-| File/Directory                        | Description                                                                                                              |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `internal/rule/rule.go`               | **Core rule interface** - `Rule`, `RuleContext`, `RuleListeners`, `RuleMessage`, `RuleFix`, `RuleSuggestion` definitions |
-| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                  |
-| `internal/config/config.go`           | Rule registration and config loading                                                                                     |
-| `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                  |
+| File/Directory                        | Description                                                                                                                                                |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `internal/rule/rule.go`               | **Core rule interface** - `Rule`, `RuleContext`, `RuleListeners`, `RuleMessage`, `RuleFix`, `RuleSuggestion` definitions                                   |
+| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                                                    |
+| `internal/config/config.go`           | Registration orchestration and config loading. Per-rule registration data lives in each group's `all.go` — see Phase 3 Step 4 for where to add a new rule. |
+| `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                                                    |
 
 ### AST & Type System
 
@@ -160,7 +160,7 @@ Before starting, familiarize yourself with these key source locations:
 
 3. **Collect Test Cases — Layer 1 (baseline migration)**:
 
-   This step is the planning input for `<rule>_upstream_test.go` (Layer 1) — the _floor_ of the rule's overall test coverage. The augmentation in Steps 4 and 5 (which is the planning input for `<rule>_extras_test.go`, Layers 2 + 3) is what actually verifies alignment. See the [Testing Philosophy](#testing-philosophy) for why migration alone is insufficient.
+   This step is the planning input for `<rule>_upstream_test.go` (Layer 1) — the _floor_ of the rule's overall test coverage. The augmentation in Phase 1 Steps 4 and 5 (which is the planning input for `<rule>_extras_test.go`, Layers 2 + 3) is what actually verifies alignment. See the [Testing Philosophy](#testing-philosophy) for why migration alone is insufficient.
 
    > **Phase 1 is planning, not writing.** Test files are physically created in Phase 2 Step 1 and populated in Phase 2 Step 4. In this phase you collect, organize, and annotate the cases — don't start a `_test.go` file yet.
    - Extract **ALL** `valid` and `invalid` cases from the official documentation.
@@ -168,7 +168,7 @@ Before starting, familiarize yourself with these key source locations:
    - **Skip with explanation**: If a case exercises an option or syntax we intentionally don't support, keep it in the file as a `Skip: true` test with a `// SKIP: <reason>` comment — don't drop it silently.
    - **Ensure Coverage**: Ensure Line and Column numbers are tested in invalid cases.
 
-   **Do NOT stop here.** The migrated suite is a baseline; proceed to Step 4 (edge-shape augmentation) and Step 5 (branch lock-ins) — without them the port can pass every upstream test and silently diverge on real-user inputs.
+   **Do NOT stop here.** The migrated suite is a baseline; proceed to Phase 1 Step 4 (edge-shape augmentation) and Phase 1 Step 5 (branch lock-ins) — without them the port can pass every upstream test and silently diverge on real-user inputs.
 
 4. **Identify Edge Cases — Layer 2 (edge-shape & real-user augmentation)**:
 
@@ -405,7 +405,7 @@ func parseOptions(options any) Options {
 }
 ```
 
-**Why this matters — the shape the CLI sends is different from Go tests.** `internal/config/config.go:414-420` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+**Why this matters — the shape the CLI sends is different from Go tests.** `parseArrayRuleConfig` in `internal/config/config.go` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
 
 **Anti-pattern — do not write this:**
 
@@ -510,7 +510,7 @@ Examples of **incorrect** code for this rule with `{ "someOption": true }`:
 | 2. Edge-shape & real-user augmentation | `<rule>_extras_test.go`   | `Test<Rule>Extras`                                                               | `// ---- <description> ----` on each case (free-form descriptive text, as used by existing jsx-a11y rules). For new rules, prefer the prefix-tagged forms `// ---- Dimension 4: <what> ----` and `// ---- Real-user: <issue# or scenario> ----` because they let `grep` find a category quickly; both styles are accepted. `// N/A: <reason>` for rows that genuinely don't apply |
 | 3. Branch lock-ins                     | `<rule>_extras_test.go`   | `Test<Rule>Extras` (or a separate `Test<Rule>ExtrasBranches` if extras is split) | `// Locks in upstream <fn>() arm <N>: <what>` on each case                                                                                                                                                                                                                                                                                                                        |
 
-For non-trivial rules, `<rule>_extras_test.go` is comparable to or larger than `<rule>_upstream_test.go` in case count. A near-empty `_extras` file means Phase 1 Steps 4 and 5 were skipped (Phase 4 Step 6 has an explicit checkbox for this).
+Layers 2 + 3 — not case count — are the real alignment work; there is no numeric target. A near-empty `_extras` file is a smell that Phase 1 Steps 4 and 5 were skipped (Phase 4 Step 6's per-layer checkboxes enforce this).
 
 **File-header docstring** — open each test file with a top-of-file comment that names what the file is for and points at its sibling:
 
@@ -574,7 +574,7 @@ rule_tester.InvalidTestCase{
 
 ## Phase 3: Integration (JS)
 
-### Step 5: Check & Setup Test Environment
+### Step 1: Check & Setup Test Environment
 
 **Goal**: Ensure the test directory and necessary configuration files exist.
 
@@ -591,7 +591,7 @@ rule_tester.InvalidTestCase{
      - **Plugin Rules**: `plugins: ['<short-name>']` (e.g. `'jsx-a11y'`, `'jest'`, `'react'`, `'promise'`)
    - **Warning**: When copying `rule-tester.ts`, remove any hardcoded rule prefixes (e.g., `ruleName = 'jsx-a11y/' + ruleName;`).
 
-### Step 6: Add JS Tests
+### Step 2: Add JS Tests
 
 **Purpose & scope.** The JS suite is **not** a duplicate of the Go suite. It spawns the compiled binary over IPC and verifies registration + wire protocol + ESLint-compatible diagnostic shape — a contract that is input-independent. So the JS file **mirrors Layer 1 only** (the upstream `valid` / `invalid` cases). Layer 2 (edge-shape & real-user augmentation) and Layer 3 (branch lock-ins) live exclusively in `<rule>_extras_test.go` on the Go side and **must not** be copied into the JS file. See [Testing Philosophy](#testing-philosophy) for the rationale.
 
@@ -611,23 +611,31 @@ rule_tester.InvalidTestCase{
 
 **Options Format**: JS tests use array format: `options: [{ allow: ['warn'] }]`
 
-### Step 7: Register Test File
+### Step 3: Register Test File
 
 **File**: `packages/rslint-test-tools/rstest.config.mts`
 
 Add the new test file path to the `include` array.
 
-### Step 8: Register Rule in Config
+### Step 4: Register Rule
 
-**File**: `internal/config/config.go`
+**Where to add depends on rule type** (determined by Phase 1 Step 2):
 
-1. Import your new package
-2. Register in the appropriate function (determined by Phase 1 Step 2):
-   - **Core ESLint rules** (including deprecated typescript-eslint rules): `registerAllCoreEslintRules()` with `rule.Rule{}`
-   - **typescript-eslint rules** (active): `registerAllTypeScriptEslintPluginRules()` with `rule.CreateRule()`
-   - **Import plugin rules**: `registerAllEslintImportPluginRules()`
-3. Format: `GlobalRuleRegistry.Register("rule-name", package.RuleNameRule)`
-4. **Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status
+| Rule type                                              | File to edit                         | What to add                                                                |
+| ------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------- |
+| Core ESLint (incl. deprecated typescript-eslint rules) | `internal/rules/all.go`              | Import the rule package; append `package.RuleNameRule` to `GetAllRules()`. |
+| typescript-eslint (active)                             | `internal/plugins/typescript/all.go` | Same — append to that plugin's `GetAllRules()`.                            |
+| Other plugins (react, jest, import, jsx-a11y, …)       | `internal/plugins/<plugin>/all.go`   | Same.                                                                      |
+
+Each `all.go` exports a `GetAllRules() []rule.Rule` slice. `RegisterAllRules()` in `internal/config/config.go` iterates each slice and calls `GlobalRuleRegistry.Register(rule.Name, rule)` — **do not edit `config.go` for a new rule**.
+
+**Registration key vs `rule.Name` must match** — the registrar uses `rule.Name` as the key. How that key is produced depends on the rule wrapper:
+
+- **Core rule** — `rule.Rule{Name: "no-debugger", ...}` registers as `"no-debugger"`.
+- **typescript-eslint rule** — `rule.CreateRule(rule.Rule{Name: "no-shadow", ...})` registers as `"@typescript-eslint/no-shadow"`. The factory auto-prefixes; **only** use it for `@typescript-eslint/` rules — using it on a core or other-plugin rule will silently mis-register the rule key.
+- **Other plugins** — `rule.Rule{Name: "react/jsx-key", ...}` — the prefix is part of the literal `Name`, no factory.
+
+**Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status.
 
 ---
 
@@ -683,7 +691,7 @@ Follow this **strict order** — each step depends on the previous one:
 
 5. **Verify Go ↔ JS Alignment** (asymmetric — JS is a Layer-1 semantic subset of Go):
 
-   The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 6):
+   The two suites have asymmetric roles (see [Testing Philosophy](#testing-philosophy) and Phase 3 Step 2):
    - **JS suite** = Layer 1 mirror only. It exists to verify the binary, registration, and wire protocol — not rule logic.
    - **Go suite** = Layer 1 + Layer 2 + Layer 3 (full coverage). It is the source of truth for rule behavior.
 
@@ -693,7 +701,7 @@ Follow this **strict order** — each step depends on the previous one:
 
    > **Do not use literal case-count equality as the alignment check.** It only happens to match when both sides are written from the same inline-case template (e.g. `lang` is 19=19, `anchor-ambiguous-text` 39=39, `aria-role` 38=38). For the majority of jsx-a11y rules the counts legitimately differ — `no_static_element_interactions` is 644 (Go upstream) vs 135 (JS), `aria_props` is 12 vs 99 — because upstream uses fixture files that one side expands and the other folds. Both are correct as long as the semantic-subset check above holds.
 
-   Layer 2 and Layer 3 cases stay in Go only. Do **not** add them to the JS file even if "for completeness" feels tempting — see Phase 3 Step 6 Purpose & scope for why.
+   Layer 2 and Layer 3 cases stay in Go only. Do **not** add them to the JS file even if "for completeness" feels tempting — see Phase 3 Step 2 Purpose & scope for why.
 
    **Go vs JS test differences**:
 
@@ -706,7 +714,7 @@ Follow this **strict order** — each step depends on the previous one:
 
 6. **Contract Alignment Checklist (Go ↔ ESLint)**:
 
-   Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 6.B); contract differences are not.
+   Phase 4 Step 5 verifies our two test suites agree with each other. This step verifies the **public contract** of the rule agrees with ESLint. The oracle is ESLint's diagnostic output (`messageId` + message text + report position) and its options schema — **not** ESLint's internal implementation. Language-level implementation differences are acceptable (see Phase 1 Step 6.B); contract differences are not.
 
    Before claiming the port is aligned, confirm every row. Missing any row means the claim is premature.
 
@@ -720,14 +728,14 @@ Follow this **strict order** — each step depends on the previous one:
    - [ ] **Layer 2 — Edge-shape augmentation present** (in `_extras_test.go`): Phase 1 Step 4 Dimension 4 walked row-by-row; every applicable row has ≥1 dedicated Go test marked `// ---- Dimension 4: <what> ----`; N/A rows carry an explicit `// N/A: <reason>` marker so the walk is auditable.
    - [ ] **Layer 2 — Real-user shapes present** (in `_extras_test.go`): ≥2 cases pulled from the upstream rule's GitHub issue tracker (closed regressions / FP / FN reports), marked `// ---- Real-user: <issue# or scenario> ----`.
    - [ ] **Layer 3 — Branch lock-ins present** (in `_extras_test.go`): every reachable branch in the upstream source has a minimum-input Go test marked `// Locks in upstream <fn>() arm <N>: <what>`, including branches upstream itself never tests.
-   - [ ] **Coverage bar met**: `_extras_test.go` (or all `_extras_*` files combined) is comparable to or larger than `_upstream_test.go` in case count for non-trivial rules. A near-empty `_extras_*` means Phase 1 Steps 4 and 5 were skipped — re-walk them, do not submit.
+   - [ ] **Extras aren't a token gesture**: with the layers 2 + 3 boxes above checked, step back and confirm `_extras_*` substantively exercises the rule's divergence surface — not one perfunctory case per layer. There is no case-count target; a near-empty `_extras_*` is a smell to re-walk Phase 1 Steps 4 and 5, not a number to hit.
 
    **Diagnostic contract** (each invalid output is exactly what ESLint emits):
    - [ ] **Message text assertions**: each `messageId` has ≥1 test using the `InvalidTestCaseError.Message` field (exact string match), covering every modifier combination the rule can emit (`static`, `private`, `async`, computed-no-name, etc.).
    - [ ] **Position assertions per container**: for each container the rule emits into (object literal / class / type / descriptor / …), ≥2 cases assert `Line` + `Column` + `EndLine` + `EndColumn`, including one multi-line case.
 
    **Options contract**:
-   - [ ] **Schema match**: option names, types, and **defaults** match ESLint's schema byte-for-byte. Assert every default by running a case with no options vs. `[{}]` options and confirming identical output.
+   - [ ] **Schema match**: option names, types, and **defaults** match ESLint's schema exactly. Assert every default by running a case with no options vs. `[{}]` options and confirming identical output.
    - [ ] **Combination matrix**: for every boolean option, include ≥1 test where it is `true` and ≥1 where it is `false`. Triggering combinations (rule behaves differently when two options are both on) get dedicated cases.
 
    **Equivalence classes** (when applicable):
@@ -843,7 +851,7 @@ This step is executed **once**, after all rules are committed (or after the sing
 
 2. **Create PR**:
 
-   **Important**: Use the repository's PR template at `.github/PULL_REQUEST_TEMPLATE.md`.
+   **Note**: The `--body` templates below follow the repo's PR template (`.github/PULL_REQUEST_TEMPLATE.md`). `gh` only auto-fills that template when `--body` is omitted, so the explicit bodies here take its place.
 
    **Single rule**:
 
@@ -939,7 +947,7 @@ For complex rules (rules involving scope tracking, autofix, or many configuratio
 If JS tests fail with 0 diagnostics found:
 
 1. **Did you rebuild the binary?** Run `cd packages/rslint && pnpm run build:bin`
-2. **Is the rule registered?** Check `internal/config/config.go`
+2. **Is the rule registered?** Check the appropriate `all.go` (`internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise) — confirm both the package import and the entry in `GetAllRules()` are present.
 3. **Are test files included?** Check `rstest.config.mts`
 4. **Is the test-dir `rslint.config.mjs` configured?** Ensure the plugin is listed and the rule is enabled
 5. **Debug Mode**: Use `fmt.Fprintf(os.Stderr, "DEBUG: ...")` in Go code

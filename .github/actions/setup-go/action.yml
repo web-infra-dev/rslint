@@ -17,13 +17,13 @@ runs:
   steps:
     - name: Install Go
       id: install-go
-      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
       with:
         go-version: ${{ inputs.go-version }}
         cache: false
 
     - name: Go cache
-      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       if: runner.environment == 'github-hosted'
       with:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}

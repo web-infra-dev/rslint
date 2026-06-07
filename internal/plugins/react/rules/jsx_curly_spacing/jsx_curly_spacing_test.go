@@ -425,6 +425,17 @@ func TestJsxCurlySpacingRule(t *testing.T) {
 		// `always` mode with surrounding spaces and non-ASCII content — valid.
 		{Code: `<App foo={ 中文 } />`, Tsx: true, Options: []interface{}{"always"}},
 		{Code: `<App foo={ "🚀" } />`, Tsx: true, Options: []interface{}{"always"}},
+
+		// ===== Unicode WhiteSpace + LineTerminator (ECMAScript §12.2/§12.3) =====
+		// NBSP (U+00A0) counts as ECMAScript WhiteSpace → satisfies `always`,
+		// triggers `never` extra. Parity with ESLint verified via local probe.
+		{Code: "<App foo={\u00A0bar\u00A0} />", Tsx: true, Options: []interface{}{"always"}},
+		// LS (U+2028) / PS (U+2029) count as LineTerminator → cross-line
+		// short-circuit on that side. Both modes valid when the OTHER side
+		// hugs the brace.
+		{Code: "<App foo={bar\u2028} />", Tsx: true, Options: []interface{}{"never"}},
+		{Code: "<App foo={\u2028bar} />", Tsx: true, Options: []interface{}{"never"}},
+		{Code: "<App foo={bar\u2029} />", Tsx: true, Options: []interface{}{"never"}},
 		// Template literal with `${ … }` substitutions — earlier impl using
 		// the bare tsgo Scanner without parser context mis-tokenized the
 		// closing `}` of a substitution as a real `}` token, corrupting
@@ -2390,6 +2401,20 @@ func TestJsxCurlySpacingRule(t *testing.T) {
 			Output:  []string{"<App>{foo /* c */}</App>"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noNewlineBefore", Line: 2, Column: 1},
+			},
+		},
+
+		// A per-side empty `spacing: {}` keeps INHERITING the top-level
+		// `objectLiterals: 'always'`, so a flush object literal is reported as
+		// needing surrounding space.
+		{
+			Code:    `<App foo={{a: 1}} />`,
+			Tsx:     true,
+			Options: []interface{}{opts{"spacing": spc{"objectLiterals": "always"}, "attributes": opts{"when": "never", "spacing": spc{}}}},
+			Output:  []string{`<App foo={ {a: 1} } />`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "spaceNeededAfter", Line: 1, Column: 10},
+				{MessageId: "spaceNeededBefore", Line: 1, Column: 17},
 			},
 		},
 	})

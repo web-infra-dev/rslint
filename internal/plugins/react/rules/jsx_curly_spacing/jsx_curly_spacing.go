@@ -2,6 +2,7 @@ package jsx_curly_spacing
 
 import (
 	"regexp"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -56,6 +57,10 @@ func nestedMap(m map[string]interface{}, key string) map[string]interface{} {
 // allowMultiline / spacing.objectLiterals from a config object (or treats
 // `true` as "use defaults"), then on lastPass falls back objectLiteralSpaces
 // to `when` when neither config nor defaults specify it.
+//
+// objectLiteralSpaces starts from the default (top-level spacing.objectLiterals)
+// and is only overridden when the per-side spacing carries an explicit
+// `objectLiterals` key.
 func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideConfig {
 	cfg, _ := configOrTrue.(map[string]interface{})
 	when := d.when
@@ -69,8 +74,7 @@ func normalizeConfig(configOrTrue interface{}, d defaults, lastPass bool) sideCo
 		}
 	}
 	objectLiteralSpaces := d.objectLiteralSpaces
-	spacing := nestedMap(cfg, "spacing")
-	if spacing != nil {
+	if spacing := nestedMap(cfg, "spacing"); spacing != nil {
 		if v, ok := spacing["objectLiterals"]; ok {
 			objectLiteralSpaces = stringValue(v, objectLiteralSpaces)
 		}
@@ -245,27 +249,27 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	}
 
 	// secondPos: skip leading whitespace only.
-	p := low
-	for p < high && isWhitespaceByte(text[p]) {
-		p++
-	}
-	res.secondPos = p
+	res.secondPos = utils.SkipLeadingWhitespace(text, low, high)
 
 	// penultimateEnd: skip trailing whitespace only.
-	p = high
-	for p > low && isWhitespaceByte(text[p-1]) {
-		p--
-	}
-	res.penultimateEnd = p
+	res.penultimateEnd = utils.SkipTrailingWhitespace(text, low, high)
 
 	// nextRealStart: skip whitespace + leading-edge comments. The leading
 	// edge cannot contain string/template literals (those would BE the
 	// first token), so naive byte-level comment scanning is sufficient.
-	p = low
+	p := low
 	for p < high {
-		if isWhitespaceByte(text[p]) {
-			p++
-			continue
+		if text[p] < 0x80 {
+			if utils.IsTriviaWhitespaceByte(text[p]) {
+				p++
+				continue
+			}
+		} else {
+			r, size := utf8.DecodeRuneInString(text[p:])
+			if size > 0 && r != utf8.RuneError && utils.IsTriviaWhitespaceRune(r) {
+				p += size
+				continue
+			}
 		}
 		if p+1 < high && text[p] == '/' && text[p+1] == '*' {
 			p += 2
@@ -298,9 +302,17 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	// text. Aligned with upstream ESLint, which has the same gap.
 	p = high
 	for p > low {
-		if isWhitespaceByte(text[p-1]) {
-			p--
-			continue
+		if text[p-1] < 0x80 {
+			if utils.IsTriviaWhitespaceByte(text[p-1]) {
+				p--
+				continue
+			}
+		} else {
+			r, size := utf8.DecodeLastRuneInString(text[:p])
+			if size > 0 && r != utf8.RuneError && utils.IsTriviaWhitespaceRune(r) {
+				p -= size
+				continue
+			}
 		}
 		if p-2 >= low && text[p-2] == '*' && text[p-1] == '/' {
 			p -= 2
@@ -319,29 +331,6 @@ func scanBraceBody(text string, low, high int) bodyScan {
 	res.prevRealEnd = p
 
 	return res
-}
-
-func isWhitespaceByte(b byte) bool {
-	switch b {
-	case ' ', '\t', '\n', '\r', '\f', '\v':
-		return true
-	}
-	return false
-}
-
-func containsNewline(text string, from, to int) bool {
-	if from < 0 {
-		from = 0
-	}
-	if to > len(text) {
-		to = len(text)
-	}
-	for i := from; i < to; i++ {
-		if text[i] == '\n' || text[i] == '\r' {
-			return true
-		}
-	}
-	return false
 }
 
 var (
@@ -373,204 +362,210 @@ func fixByTrimmingWhitespace(text string, from, to int, mode, spacing string) ru
 	}
 }
 
-// JsxCurlySpacingRule enforces or disallows whitespace inside JSX braces in
-// attribute and child positions. Listens for `JsxExpression` (covers the
-// `JSXExpressionContainer` use-cases — both attribute initializers and
-// element children) and `JsxSpreadAttribute` (attribute spread).
-var JsxCurlySpacingRule = rule.Rule{
-	Name: "react/jsx-curly-spacing",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		attrsConfig, childrenConfig := parseOptions(options)
+// JsxCurlySpacingRule is the eslint-plugin-react variant of jsx-curly-spacing.
+var JsxCurlySpacingRule = BuildRule("react/jsx-curly-spacing")
 
-		text := ctx.SourceFile.Text()
+// BuildRule constructs the jsx-curly-spacing rule registered under name. The
+// rule enforces or disallows whitespace inside JSX braces in attribute and
+// child positions; it listens for `JsxExpression` (covers ESTree's
+// JSXExpressionContainer — both attribute initializers and element children)
+// and `JsxSpreadAttribute` (attribute spread).
+func BuildRule(name string) rule.Rule {
+	return rule.Rule{
+		Name: name,
+		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+			attrsConfig, childrenConfig := parseOptions(options)
 
-		validate := func(node *ast.Node) {
-			parent := node.Parent
-			if parent == nil {
-				return
-			}
+			text := ctx.SourceFile.Text()
 
-			var cfg *sideConfig
-			switch node.Kind {
-			case ast.KindJsxExpression:
-				// Children spread `<App>{...arr}</App>` is a JSXSpreadChild
-				// node in ESTree — upstream's rule registers a listener for
-				// JSXExpressionContainer only, so spread children are not
-				// covered. tsgo collapses both shapes into a single
-				// JsxExpression kind (distinguished by DotDotDotToken), so
-				// skip the spread variant here to keep behavior 1:1 with
-				// upstream.
-				if je := node.AsJsxExpression(); je != nil && je.DotDotDotToken != nil {
+			validate := func(node *ast.Node) {
+				parent := node.Parent
+				if parent == nil {
 					return
 				}
-				switch parent.Kind {
-				case ast.KindJsxAttribute:
+
+				var cfg *sideConfig
+				switch node.Kind {
+				case ast.KindJsxExpression:
+					// Children spread `<App>{...arr}</App>` is a JSXSpreadChild
+					// node in ESTree — upstream's rule registers a listener for
+					// JSXExpressionContainer only, so spread children are not
+					// covered. tsgo collapses both shapes into a single
+					// JsxExpression kind (distinguished by DotDotDotToken), so
+					// skip the spread variant here to keep behavior 1:1 with
+					// upstream.
+					if je := node.AsJsxExpression(); je != nil && je.DotDotDotToken != nil {
+						return
+					}
+					switch parent.Kind {
+					case ast.KindJsxAttribute:
+						cfg = attrsConfig
+					case ast.KindJsxElement, ast.KindJsxFragment:
+						cfg = childrenConfig
+					default:
+						return
+					}
+				case ast.KindJsxSpreadAttribute:
 					cfg = attrsConfig
-				case ast.KindJsxElement, ast.KindJsxFragment:
-					cfg = childrenConfig
 				default:
 					return
 				}
-			case ast.KindJsxSpreadAttribute:
-				cfg = attrsConfig
-			default:
-				return
-			}
-			if cfg == nil {
-				return
-			}
-
-			trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
-			start := trimmed.Pos()
-			end := trimmed.End()
-			if start >= end || text[start] != '{' || text[end-1] != '}' {
-				return
-			}
-			openPos := start
-			closePos := end - 1
-			innerLow := openPos + 1
-			innerHigh := closePos
-
-			scan := scanBraceBody(text, innerLow, innerHigh)
-
-			// Emit position for `{` and `}` reports — anchor at the brace token.
-			openRange := core.NewTextRange(openPos, openPos+1)
-			closeRange := core.NewTextRange(closePos, closePos+1)
-
-			// `isObjectLiteral` mirrors upstream's `first.value === second.value`
-			// — the next inner token is itself a `{`. For empty `{}` (no inner
-			// content), `secondPos == innerHigh`, so the next character is `}`,
-			// and `isObjectLiteral` is correctly false. For TS wrappers like
-			// `(`/`<`/`...`/`!`/`as`/`satisfies`, the first inner character is
-			// not `{`, so they correctly use `cfg.when`.
-			isObjectLiteral := scan.secondPos < innerHigh && text[scan.secondPos] == '{'
-			spacing := cfg.when
-			if isObjectLiteral {
-				spacing = cfg.objectLiteralSpaces
-			}
-
-			hasSpaceAfterOpen := scan.secondPos > innerLow
-			hasSpaceBeforeClose := scan.penultimateEnd < innerHigh
-			multilineAfterOpen := containsNewline(text, innerLow, scan.secondPos)
-			multilineBeforeClose := containsNewline(text, scan.penultimateEnd, innerHigh)
-
-			reportNoBeginningSpace := func() {
-				toLoc := scan.nextRealStart
-				if scan.secondPos < scan.nextRealStart {
-					// secondPos is the start of a leading comment;
-					// upstream trims only up to min(realToken, comment).
-					toLoc = scan.secondPos
+				if cfg == nil {
+					return
 				}
-				ctx.ReportRangeWithFixes(
-					openRange,
-					rule.RuleMessage{
-						Id:          "noSpaceAfter",
-						Description: "There should be no space after '{'",
-					},
-					fixByTrimmingWhitespace(text, innerLow, toLoc, "start", ""),
-				)
-			}
 
-			reportNoEndingSpace := func() {
-				fromLoc := scan.prevRealEnd
-				if scan.penultimateEnd > scan.prevRealEnd {
-					// penultimateEnd is the end of a trailing comment;
-					// upstream trims only from max(realToken, comment).
-					fromLoc = scan.penultimateEnd
+				trimmed := utils.TrimNodeTextRange(ctx.SourceFile, node)
+				start := trimmed.Pos()
+				end := trimmed.End()
+				if start >= end || text[start] != '{' || text[end-1] != '}' {
+					return
 				}
-				ctx.ReportRangeWithFixes(
-					closeRange,
-					rule.RuleMessage{
-						Id:          "noSpaceBefore",
-						Description: "There should be no space before '}'",
-					},
-					fixByTrimmingWhitespace(text, fromLoc, innerHigh, "end", ""),
-				)
-			}
+				openPos := start
+				closePos := end - 1
+				innerLow := openPos + 1
+				innerHigh := closePos
 
-			reportNoBeginningNewline := func() {
-				ctx.ReportRangeWithFixes(
-					openRange,
-					rule.RuleMessage{
-						Id:          "noNewlineAfter",
-						Description: "There should be no newline after '{'",
-					},
-					fixByTrimmingWhitespace(text, innerLow, scan.nextRealStart, "start", spacing),
-				)
-			}
+				scan := scanBraceBody(text, innerLow, innerHigh)
 
-			reportNoEndingNewline := func() {
-				ctx.ReportRangeWithFixes(
-					closeRange,
-					rule.RuleMessage{
-						Id:          "noNewlineBefore",
-						Description: "There should be no newline before '}'",
-					},
-					fixByTrimmingWhitespace(text, scan.prevRealEnd, innerHigh, "end", spacing),
-				)
-			}
+				// Emit position for `{` and `}` reports — anchor at the brace token.
+				openRange := core.NewTextRange(openPos, openPos+1)
+				closeRange := core.NewTextRange(closePos, closePos+1)
 
-			reportRequiredBeginningSpace := func() {
-				ctx.ReportRangeWithFixes(
-					openRange,
-					rule.RuleMessage{
-						Id:          "spaceNeededAfter",
-						Description: "A space is required after '{'",
-					},
-					rule.RuleFix{
-						Text:  " ",
-						Range: core.NewTextRange(openPos+1, openPos+1),
-					},
-				)
-			}
-
-			reportRequiredEndingSpace := func() {
-				ctx.ReportRangeWithFixes(
-					closeRange,
-					rule.RuleMessage{
-						Id:          "spaceNeededBefore",
-						Description: "A space is required before '}'",
-					},
-					rule.RuleFix{
-						Text:  " ",
-						Range: core.NewTextRange(closePos, closePos),
-					},
-				)
-			}
-
-			switch spacing {
-			case spacingAlways:
-				if !hasSpaceAfterOpen {
-					reportRequiredBeginningSpace()
-				} else if !cfg.allowMultiline && multilineAfterOpen {
-					reportNoBeginningNewline()
+				// `isObjectLiteral` mirrors upstream's `first.value === second.value`
+				// — the next inner token is itself a `{`. For empty `{}` (no inner
+				// content), `secondPos == innerHigh`, so the next character is `}`,
+				// and `isObjectLiteral` is correctly false. For TS wrappers like
+				// `(`/`<`/`...`/`!`/`as`/`satisfies`, the first inner character is
+				// not `{`, so they correctly use `cfg.when`.
+				isObjectLiteral := scan.secondPos < innerHigh && text[scan.secondPos] == '{'
+				spacing := cfg.when
+				if isObjectLiteral {
+					spacing = cfg.objectLiteralSpaces
 				}
-				if !hasSpaceBeforeClose {
-					reportRequiredEndingSpace()
-				} else if !cfg.allowMultiline && multilineBeforeClose {
-					reportNoEndingNewline()
+
+				hasSpaceAfterOpen := scan.secondPos > innerLow
+				hasSpaceBeforeClose := scan.penultimateEnd < innerHigh
+				multilineAfterOpen := utils.ContainsLineTerminator(text, innerLow, scan.secondPos)
+				multilineBeforeClose := utils.ContainsLineTerminator(text, scan.penultimateEnd, innerHigh)
+
+				reportNoBeginningSpace := func() {
+					toLoc := scan.nextRealStart
+					if scan.secondPos < scan.nextRealStart {
+						// secondPos is the start of a leading comment;
+						// upstream trims only up to min(realToken, comment).
+						toLoc = scan.secondPos
+					}
+					ctx.ReportRangeWithFixes(
+						openRange,
+						rule.RuleMessage{
+							Id:          "noSpaceAfter",
+							Description: "There should be no space after '{'",
+						},
+						fixByTrimmingWhitespace(text, innerLow, toLoc, "start", ""),
+					)
 				}
-			case spacingNever:
-				if multilineAfterOpen {
-					if !cfg.allowMultiline {
+
+				reportNoEndingSpace := func() {
+					fromLoc := scan.prevRealEnd
+					if scan.penultimateEnd > scan.prevRealEnd {
+						// penultimateEnd is the end of a trailing comment;
+						// upstream trims only from max(realToken, comment).
+						fromLoc = scan.penultimateEnd
+					}
+					ctx.ReportRangeWithFixes(
+						closeRange,
+						rule.RuleMessage{
+							Id:          "noSpaceBefore",
+							Description: "There should be no space before '}'",
+						},
+						fixByTrimmingWhitespace(text, fromLoc, innerHigh, "end", ""),
+					)
+				}
+
+				reportNoBeginningNewline := func() {
+					ctx.ReportRangeWithFixes(
+						openRange,
+						rule.RuleMessage{
+							Id:          "noNewlineAfter",
+							Description: "There should be no newline after '{'",
+						},
+						fixByTrimmingWhitespace(text, innerLow, scan.nextRealStart, "start", spacing),
+					)
+				}
+
+				reportNoEndingNewline := func() {
+					ctx.ReportRangeWithFixes(
+						closeRange,
+						rule.RuleMessage{
+							Id:          "noNewlineBefore",
+							Description: "There should be no newline before '}'",
+						},
+						fixByTrimmingWhitespace(text, scan.prevRealEnd, innerHigh, "end", spacing),
+					)
+				}
+
+				reportRequiredBeginningSpace := func() {
+					ctx.ReportRangeWithFixes(
+						openRange,
+						rule.RuleMessage{
+							Id:          "spaceNeededAfter",
+							Description: "A space is required after '{'",
+						},
+						rule.RuleFix{
+							Text:  " ",
+							Range: core.NewTextRange(openPos+1, openPos+1),
+						},
+					)
+				}
+
+				reportRequiredEndingSpace := func() {
+					ctx.ReportRangeWithFixes(
+						closeRange,
+						rule.RuleMessage{
+							Id:          "spaceNeededBefore",
+							Description: "A space is required before '}'",
+						},
+						rule.RuleFix{
+							Text:  " ",
+							Range: core.NewTextRange(closePos, closePos),
+						},
+					)
+				}
+
+				switch spacing {
+				case spacingAlways:
+					if !hasSpaceAfterOpen {
+						reportRequiredBeginningSpace()
+					} else if !cfg.allowMultiline && multilineAfterOpen {
 						reportNoBeginningNewline()
 					}
-				} else if hasSpaceAfterOpen {
-					reportNoBeginningSpace()
-				}
-				if multilineBeforeClose {
-					if !cfg.allowMultiline {
+					if !hasSpaceBeforeClose {
+						reportRequiredEndingSpace()
+					} else if !cfg.allowMultiline && multilineBeforeClose {
 						reportNoEndingNewline()
 					}
-				} else if hasSpaceBeforeClose {
-					reportNoEndingSpace()
+				case spacingNever:
+					if multilineAfterOpen {
+						if !cfg.allowMultiline {
+							reportNoBeginningNewline()
+						}
+					} else if hasSpaceAfterOpen {
+						reportNoBeginningSpace()
+					}
+					if multilineBeforeClose {
+						if !cfg.allowMultiline {
+							reportNoEndingNewline()
+						}
+					} else if hasSpaceBeforeClose {
+						reportNoEndingSpace()
+					}
 				}
 			}
-		}
 
-		return rule.RuleListeners{
-			ast.KindJsxExpression:      validate,
-			ast.KindJsxSpreadAttribute: validate,
-		}
-	},
+			return rule.RuleListeners{
+				ast.KindJsxExpression:      validate,
+				ast.KindJsxSpreadAttribute: validate,
+			}
+		},
+	}
 }

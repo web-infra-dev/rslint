@@ -20,6 +20,29 @@ Glob patterns for files to exclude. An entry with **only** `ignores` (no other f
 }
 ```
 
+### The `globalIgnores` helper
+
+Writing an entry with only `ignores` is common enough that `@rslint/core` exports a `globalIgnores` helper, mirroring ESLint v10. It returns a config entry containing just the given patterns, so the global-ignore intent is explicit:
+
+```ts
+import { defineConfig, globalIgnores } from '@rslint/core';
+
+export default defineConfig([
+  globalIgnores(['**/dist/**', '**/fixtures/**']),
+  // ... other entries
+]);
+```
+
+This is exactly equivalent to writing the entry by hand:
+
+```ts
+{
+  ignores: ['**/dist/**', '**/fixtures/**'],
+}
+```
+
+`globalIgnores` throws a `TypeError` if it receives a non-array or an empty array.
+
 ### Pattern types in global ignores
 
 Global ignore patterns affect both file matching and directory traversal (including config discovery in monorepos):

@@ -602,11 +602,22 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
         }
       `, Tsx: true},
 
-		// ---- TS-as wrapper around createElement callee — pragma still
-		// recognized after unwrap ----
+		// ---- TS-as wrapper on a createElement callee is NOT unwrapped, matching
+		// upstream eslint-plugin-react (differential-verified: 0 reports). The
+		// receiver `(React as any)` isn't an Identifier named `React`, so the call
+		// isn't recognized as createElement — neither function below is treated as
+		// a JSX-returning component, so nothing is flagged. ----
 		{Code: `
         function ParentComponent() {
           return ((React as any).createElement)("div", null);
+        }
+      `, Tsx: true},
+		{Code: `
+        function ParentComponent() {
+          function UnstableNestedComponent() {
+            return (React as any).createElement("div", null);
+          }
+          return <UnstableNestedComponent />;
         }
       `, Tsx: true},
 
@@ -1511,23 +1522,6 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
 		// tsgo-specific edge cases beyond the upstream test suite
 		// ============================================================
 
-		// ---- TS wrapper: `(X as any)` callee on createElement should still
-		// classify the inner arrow as JSX-returning ----
-		{
-			Code: `
-        function ParentComponent() {
-          function UnstableNestedComponent() {
-            return (React as any).createElement("div", null);
-          }
-          return <UnstableNestedComponent />;
-        }
-      `,
-			Tsx: true,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{Message: errorMessage, Line: 3, Column: 11},
-			},
-		},
-
 		// ---- TS wrapper: `<div/> satisfies JSX.Element` return ----
 		{
 			Code: `
@@ -2023,7 +2017,7 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					Message: errorMessage,
-					Line: 3, Column: 11, EndLine: 9, EndColumn: 12,
+					Line:    3, Column: 11, EndLine: 9, EndColumn: 12,
 				},
 			},
 		},
@@ -2048,7 +2042,7 @@ func TestNoUnstableNestedComponentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					Message: errorMessage,
-					Line: 3, Column: 11, EndLine: 11, EndColumn: 12,
+					Line:    3, Column: 11, EndLine: 11, EndColumn: 12,
 				},
 			},
 		},

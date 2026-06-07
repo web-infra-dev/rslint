@@ -47,7 +47,7 @@ jobs:
   publish-npm:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
-    needs: [build]
+    needs: [build, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     permissions:
@@ -67,14 +67,14 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
       # Update npm to the latest version to enable OIDC
@@ -96,6 +96,19 @@ jobs:
 
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
+      # @rslint/native ships index.js (the napi loader) + index.d.ts. Both are
+      # checked in (the website deploy env has no Rust to regenerate them), but
+      # `napi build` below regenerates them so the published package always
+      # matches the current source. core's build:js dts bundle also needs
+      # index.d.ts. The per-platform .node binaries ship in the
+      # @rslint/native-{tuple} subpackages, populated from the napi-build
+      # artifacts by move-artifacts above.
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
+      - name: Build napi parser (index.js + index.d.ts)
+        run: pnpm --filter @rslint/native build
       - name: Build @rslint/core dist
         run: pnpm --filter @rslint/core build:js
       - name: Publish npm packages
@@ -116,7 +129,7 @@ jobs:
     environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
@@ -161,7 +174,7 @@ jobs:
     environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
@@ -210,14 +223,14 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
 
@@ -243,6 +256,15 @@ jobs:
 
       - name: Format code
         run: pnpm format:check
+
+      # napi build produces index.d.ts (core build:js dts) + host .node
+      # (runner tests at the Test step run the worker, which loads it).
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native build
 
       - name: Build
         run: pnpm run build
@@ -297,14 +319,14 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '24'
 
@@ -315,12 +337,7 @@ jobs:
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # stable
-
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
-        with:
-          cache-on-failure: true
+        uses: ./.github/actions/setup-rust
 
       - name: Install pnpm
         run: corepack enable
@@ -361,3 +378,87 @@ jobs:
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-built
           path: typescript-go/built
+
+  # napi `.node` parser binaries, one per target → the @rslint/native-{tuple}
+  # subpackages. Separate matrix from the Go build job (which is ubuntu-only):
+  # napi win32-msvc/darwin need native runners since zig and
+  # @napi-rs/cross-toolchain can't target windows-msvc. Each leg uploads a
+  # uniquely-named artifact (`native-{tuple}` — upload-artifact@v4 rejects
+  # dupes); move-artifacts matches the `rslint.` filename prefix. gnu cross
+  # legs use --use-napi-cross (@napi-rs/cross-toolchain, gnu-only); musl uses
+  # -x (cargo-zigbuild) since cross-toolchain has no musl sysroot.
+  napi-build:
+    name: Build napi (${{ matrix.settings.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            artifact: native-darwin-arm64
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            artifact: native-darwin-x64
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: native-win32-x64-msvc
+          - host: windows-latest
+            target: aarch64-pc-windows-msvc
+            artifact: native-win32-arm64-msvc
+          - host: rspack-ubuntu-22.04-large
+            target: x86_64-unknown-linux-gnu
+            artifact: native-linux-x64-gnu
+          - host: rspack-ubuntu-22.04-large
+            target: aarch64-unknown-linux-gnu
+            artifact: native-linux-arm64-gnu
+            cross: '--use-napi-cross'
+          - host: rspack-ubuntu-22.04-large
+            target: x86_64-unknown-linux-musl
+            artifact: native-linux-x64-musl
+            cross: '-x'
+          - host: rspack-ubuntu-22.04-large
+            target: aarch64-unknown-linux-musl
+            artifact: native-linux-arm64-musl
+            cross: '-x'
+    runs-on: ${{ matrix.settings.host }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '24'
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          targets: ${{ matrix.settings.target }}
+          cache-key: ${{ matrix.settings.target }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # musl legs cross-compile via cargo-zigbuild (napi -x); zig must be on
+      # PATH (@napi-rs/cli auto-installs cargo-zigbuild when missing, but not
+      # zig itself).
+      - name: Setup zig (musl cross-compile)
+        if: ${{ contains(matrix.settings.target, 'musl') }}
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+
+      - name: Build napi
+        run: pnpm --filter @rslint/native exec napi build --platform --release --target ${{ matrix.settings.target }} ${{ matrix.settings.cross || '' }}
+
+      - name: Upload napi artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.settings.artifact }}
+          path: crates/rslint-native/rslint.*.node
+          if-no-files-found: error

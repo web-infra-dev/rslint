@@ -1,0 +1,50 @@
+{
+  "name": "@rslint/native",
+  "version": "0.5.3",
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "description": "Native bindings for rslint",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "napi": {
+    "binaryName": "rslint",
+    "targets": [
+      "aarch64-apple-darwin",
+      "x86_64-apple-darwin",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-unknown-linux-gnu",
+      "aarch64-unknown-linux-musl",
+      "x86_64-unknown-linux-musl",
+      "aarch64-pc-windows-msvc",
+      "x86_64-pc-windows-msvc"
+    ]
+  },
+  "files": [
+    "index.js",
+    "index.d.ts"
+  ],
+  "scripts": {
+    "build": "napi build --platform --release",
+    "build:debug": "napi build --platform"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@rslint/native-darwin-arm64": "workspace:*",
+    "@rslint/native-darwin-x64": "workspace:*",
+    "@rslint/native-linux-arm64-gnu": "workspace:*",
+    "@rslint/native-linux-x64-gnu": "workspace:*",
+    "@rslint/native-linux-arm64-musl": "workspace:*",
+    "@rslint/native-linux-x64-musl": "workspace:*",
+    "@rslint/native-win32-arm64-msvc": "workspace:*",
+    "@rslint/native-win32-x64-msvc": "workspace:*"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "3.7.0"
+  }
+}

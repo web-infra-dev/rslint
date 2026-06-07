@@ -5,6 +5,9 @@
 **/.vs
 **/.rslib
 
+# Skills
+.agents/skills/create-draft-release-notes
+
 .yarn/plugins
 .yarn/releases
 
@@ -24,3 +27,5 @@ internal/rules/**/*.md
 website/docs/en/rules/_meta.json
 website/docs/en/rules/*/
 packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/
+crates/rslint-native/index.js
+crates/rslint-native/index.d.ts

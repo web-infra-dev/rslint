@@ -208,6 +208,19 @@ describe('parseArgs positionals', () => {
     expect(result.positionals).toEqual(['--not-a-flag']);
   });
 
+  test('--singleThreaded is detected and still forwarded to Go', () => {
+    const result = parseArgs(['--singleThreaded', 'src/a.ts']);
+    expect(result.singleThreaded).toBe(true);
+    // Still forwarded to Go via `rest` (the native pass honors it
+    // independently) — guards against accidentally adding it to the skip list.
+    expect(result.rest).toContain('--singleThreaded');
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('singleThreaded defaults to false when absent', () => {
+    expect(parseArgs(['src/a.ts']).singleThreaded).toBe(false);
+  });
+
   test('rest includes all non-config non-init args', () => {
     const result = parseArgs([
       '--format',

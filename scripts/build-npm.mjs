@@ -19,13 +19,25 @@ const platforms = [
   { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
 ];
 
+// The rslint Go binary ships inside each napi-tuple subpackage (next to the
+// parser `.node`). One row per subpackage dir; linux gnu/musl reuse the same
+// GOOS/GOARCH (Go is statically linked) and rely on the Go build cache.
+const rslintTargets = [
+  { goos: 'darwin', goarch: 'amd64', dir: 'darwin-x64' },
+  { goos: 'darwin', goarch: 'arm64', dir: 'darwin-arm64' },
+  { goos: 'linux', goarch: 'amd64', dir: 'linux-x64-gnu' },
+  { goos: 'linux', goarch: 'amd64', dir: 'linux-x64-musl' },
+  { goos: 'linux', goarch: 'arm64', dir: 'linux-arm64-gnu' },
+  { goos: 'linux', goarch: 'arm64', dir: 'linux-arm64-musl' },
+  { goos: 'windows', goarch: 'amd64', dir: 'win32-x64-msvc' },
+  { goos: 'windows', goarch: 'arm64', dir: 'win32-arm64-msvc' },
+];
+
 async function build_rslint() {
-  for (const platform of platforms) {
-    const nodeOs = platform['node-os'] || platform.os;
-    const nodeArch = platform['node-arch'];
-    const outputDir = `npm/rslint/${nodeOs}-${nodeArch}`;
-    const ext = platform.os === 'windows' ? '.exe' : '';
-    await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o ${outputDir}/rslint${ext} ./cmd/rslint`;
+  for (const { goos, goarch, dir } of rslintTargets) {
+    const ext = goos === 'windows' ? '.exe' : '';
+    fs.mkdirSync(`npm/rslint/${dir}`, { recursive: true });
+    await $`GOOS=${goos} GOARCH=${goarch} go build -o npm/rslint/${dir}/rslint${ext} ./cmd/rslint`;
   }
 }
 
