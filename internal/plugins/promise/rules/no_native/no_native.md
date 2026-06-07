@@ -35,6 +35,6 @@ The rule still treats the TypeScript default-library `Promise` symbol as native
 and reports it, matching eslint-plugin-promise's behavior for ES6/native/global
 Promise.
 
-## References
+## Original Documentation
 
 - [eslint-plugin-promise: no-native](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/no-native.md)
