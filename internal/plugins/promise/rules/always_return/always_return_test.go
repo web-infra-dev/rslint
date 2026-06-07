@@ -109,6 +109,8 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `hey.then(function(x) { while (true) { if (x) return 1; } })`},
 			{Code: `hey.then(function() { while (true) { x++; } })`},
 			{Code: `hey.then(function() { do {} while (true) })`},
+			{Code: `hey.then(function() { while (1) { return 1; } })`},
+			{Code: `hey.then(function() { while ('truthy') { return 1; } })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ESLint upstream invalid cases ----

@@ -222,13 +222,13 @@ func StatementCompletion(stmt *ast.Node) Completion {
 		return CompletionFallsThrough
 	case ast.KindWhileStatement:
 		whileStmt := stmt.AsWhileStatement()
-		if whileStmt != nil && isLiteralTrue(whileStmt.Expression) && !containsBreakExitingLoop(stmt, whileStmt.Statement) {
+		if whileStmt != nil && isTruthyLiteral(whileStmt.Expression) && !containsBreakExitingLoop(stmt, whileStmt.Statement) {
 			return CompletionTerminates
 		}
 		return CompletionFallsThrough
 	case ast.KindForStatement:
 		forStmt := stmt.AsForStatement()
-		if forStmt != nil && (forStmt.Condition == nil || isLiteralTrue(forStmt.Condition)) && !containsBreakExitingLoop(stmt, forStmt.Statement) {
+		if forStmt != nil && (forStmt.Condition == nil || isTruthyLiteral(forStmt.Condition)) && !containsBreakExitingLoop(stmt, forStmt.Statement) {
 			return CompletionTerminates
 		}
 		return CompletionFallsThrough
@@ -237,7 +237,7 @@ func StatementCompletion(stmt *ast.Node) Completion {
 		if doStmt == nil {
 			return CompletionFallsThrough
 		}
-		if isLiteralTrue(doStmt.Expression) {
+		if isTruthyLiteral(doStmt.Expression) {
 			if !containsBreakExitingLoop(stmt, doStmt.Statement) {
 				return CompletionTerminates
 			}
@@ -306,9 +306,23 @@ func clausesTerminateFrom(clauses []*ast.Node, start int) bool {
 	return false
 }
 
-func isLiteralTrue(expr *ast.Node) bool {
+func isTruthyLiteral(expr *ast.Node) bool {
 	expr = ast.SkipOuterExpressions(expr, skipOEKParentheses)
-	return expr != nil && expr.Kind == ast.KindTrueKeyword
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindTrueKeyword:
+		return true
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(expr.AsNumericLiteral().Text) != "0"
+	case ast.KindStringLiteral:
+		return expr.AsStringLiteral().Text != ""
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return expr.AsNoSubstitutionTemplateLiteral().Text != ""
+	default:
+		return false
+	}
 }
 
 func loopBodyTerminates(loop *ast.Node, body *ast.Node) bool {

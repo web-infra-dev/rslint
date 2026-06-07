@@ -133,6 +133,8 @@ ruleTester.run('always-return', {} as never, {
     { code: 'hey.then(function(x) { while (true) { if (x) return 1; } })' },
     { code: 'hey.then(function() { while (true) { x++; } })' },
     { code: 'hey.then(function() { do {} while (true) })' },
+    { code: 'hey.then(function() { while (1) { return 1; } })' },
+    { code: "hey.then(function() { while ('truthy') { return 1; } })" },
   ],
 
   invalid: [
