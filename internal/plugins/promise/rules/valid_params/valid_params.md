@@ -45,8 +45,14 @@ promise.finally(onFinally)
 
 An array of method names to skip. For example, projects using Bluebird-style filtered catches can exclude `catch`:
 
-```js
-{
-  "promise/valid-params": ["warn", { "exclude": ["catch"] }]
-}
-```
+    {
+      "promise/valid-params": ["warn", { "exclude": ["catch"] }]
+    }
+
+## Differences from ESLint
+
+None known.
+
+## Original Documentation
+
+- [eslint-plugin-promise: valid-params](https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/valid-params.md)
