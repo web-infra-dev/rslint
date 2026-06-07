@@ -1,8 +1,6 @@
----
-title: promise/valid-params
----
+# valid-params
 
-# Enforces the proper number of arguments are passed to Promise functions (`promise/valid-params`)
+Enforce the proper number of arguments passed to Promise functions (`promise/valid-params`).
 
 Calling a Promise function with the incorrect number of arguments can lead to unexpected behavior or hard to spot bugs.
 
