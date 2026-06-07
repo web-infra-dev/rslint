@@ -222,19 +222,28 @@ func StatementCompletion(stmt *ast.Node) Completion {
 		return CompletionFallsThrough
 	case ast.KindWhileStatement:
 		whileStmt := stmt.AsWhileStatement()
-		if whileStmt != nil && isLiteralTrue(whileStmt.Expression) && loopBodyTerminates(stmt, whileStmt.Statement) {
+		if whileStmt != nil && isLiteralTrue(whileStmt.Expression) && !containsBreakExitingLoop(stmt, whileStmt.Statement) {
 			return CompletionTerminates
 		}
 		return CompletionFallsThrough
 	case ast.KindForStatement:
 		forStmt := stmt.AsForStatement()
-		if forStmt != nil && (forStmt.Condition == nil || isLiteralTrue(forStmt.Condition)) && loopBodyTerminates(stmt, forStmt.Statement) {
+		if forStmt != nil && (forStmt.Condition == nil || isLiteralTrue(forStmt.Condition)) && !containsBreakExitingLoop(stmt, forStmt.Statement) {
 			return CompletionTerminates
 		}
 		return CompletionFallsThrough
 	case ast.KindDoStatement:
 		doStmt := stmt.AsDoStatement()
-		if doStmt != nil && loopBodyTerminates(stmt, doStmt.Statement) {
+		if doStmt == nil {
+			return CompletionFallsThrough
+		}
+		if isLiteralTrue(doStmt.Expression) {
+			if !containsBreakExitingLoop(stmt, doStmt.Statement) {
+				return CompletionTerminates
+			}
+			return CompletionFallsThrough
+		}
+		if loopBodyTerminates(stmt, doStmt.Statement) {
 			return CompletionTerminates
 		}
 		return CompletionFallsThrough

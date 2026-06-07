@@ -127,6 +127,12 @@ ruleTester.run('always-return', {} as never, {
     { code: 'hey.then(ok, x => { console.log(x) })' },
     { code: 'hey.then((function() { return 1; }))' },
     { code: 'hey.then(x => void console.log(x))' },
+
+    // Infinite loops without an exiting break should be terminal even when the body falls through.
+    { code: 'hey.then(function() { while (true) {} })' },
+    { code: 'hey.then(function(x) { while (true) { if (x) return 1; } })' },
+    { code: 'hey.then(function() { while (true) { x++; } })' },
+    { code: 'hey.then(function() { do {} while (true) })' },
   ],
 
   invalid: [

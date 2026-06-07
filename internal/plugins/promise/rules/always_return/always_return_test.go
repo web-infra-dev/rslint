@@ -102,6 +102,13 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `hey.then(function(x) { switch (x) { case 1: case 2: return 'a'; default: return 'b'; } })`},
 			// switch where every case throws
 			{Code: `hey.then(function(x) { switch (x) { case 1: throw new Error(); default: throw new Error(); } })`},
+
+			// ---- infinite loop — false-positive regression (review feedback) ----
+			// Infinite loops without an exiting break should be terminal even when the body falls through.
+			{Code: `hey.then(function() { while (true) {} })`},
+			{Code: `hey.then(function(x) { while (true) { if (x) return 1; } })`},
+			{Code: `hey.then(function() { while (true) { x++; } })`},
+			{Code: `hey.then(function() { do {} while (true) })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ESLint upstream invalid cases ----
