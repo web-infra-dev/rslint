@@ -135,6 +135,43 @@ ruleTester.run('always-return', {} as never, {
     { code: 'hey.then(function() { do {} while (true) })' },
     { code: 'hey.then(function() { while (1) { return 1; } })' },
     { code: "hey.then(function() { while ('truthy') { return 1; } })" },
+
+    // coverage gaps surfaced in review: for / labeled / do-while(false)
+    { code: 'hey.then(function() { for (;;) { return 1; } })' },
+    { code: 'hey.then(function() { outer: { return 1; } })' },
+    { code: 'hey.then(function() { do { return 1; } while (false) })' },
+
+    // switch: a conditional break must not be masked, yet these still terminate
+    {
+      code: 'hey.then(function(x) { switch (x) { case 1: { return 1; } default: return 2; } })',
+    },
+    {
+      code: 'hey.then(function(x) { switch (x) { case 1: if (y) return 1; else return 2; default: return 3; } })',
+    },
+    {
+      code: 'hey.then(function(x) { switch (x) { case 1: if (y) return 1; default: return 2; } })',
+    },
+    {
+      code: 'hey.then(function(x) { switch (x) { case 1: while (true) { break; } return "a"; default: return "b"; } })',
+    },
+
+    // ignoreAssignmentVariable: compound assignment to an ignored var (default globalThis)
+    { code: 'hey.then(x => { globalThis.a += x })' },
+    { code: 'hey.then(x => { globalThis.a ||= x })' },
+    { code: 'hey.then(x => { globalThis.a ??= x })' },
+    {
+      code: 'hey.then(x => { window.a += x })',
+      options: [{ ignoreAssignmentVariable: ['window'] }],
+    },
+
+    // try/catch: catch unreachable because the try block cannot throw
+    { code: 'hey.then(function() { try { return 1 } catch (e) { log(e) } })' },
+    {
+      code: 'hey.then(function() { try { return {a: 1} } catch (e) { log(e) } })',
+    },
+    {
+      code: 'hey.then(function() { try { return 1; foo() } catch (e) { log(e) } })',
+    },
   ],
 
   invalid: [
@@ -268,6 +305,28 @@ ruleTester.run('always-return', {} as never, {
     },
     {
       code: 'hey.then(x => { process.exitCode = 1 })',
+      errors: [{ message }],
+    },
+
+    // switch where a case conditionally breaks out before its return (review fix)
+    {
+      code: 'hey.then(function(x) { switch (x) { case 1: if (y) break; return "a"; default: return "b"; } })',
+      errors: [{ message }],
+    },
+    {
+      code: 'hey.then(function(x) { switch (x) { case 1: { if (y) break; } return "a"; default: return "b"; } })',
+      errors: [{ message }],
+    },
+    // compound assignment to a non-ignored variable is still reported
+    { code: 'hey.then(x => { notGlobal.a += x })', errors: [{ message }] },
+
+    // try/catch: catch reachable because the try block may throw
+    {
+      code: 'hey.then(function() { try { return foo() } catch (e) { log(e) } })',
+      errors: [{ message }],
+    },
+    {
+      code: 'hey.then(function() { try { foo(); return 1 } catch (e) { log(e) } })',
       errors: [{ message }],
     },
   ],
