@@ -17,6 +17,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_resolves"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_contain"
@@ -48,6 +49,7 @@ func GetAllRules() []rule.Rule {
 		no_test_prefixes.NoTestPrefixesRule,
 		prefer_called_with.PreferCalledWithRule,
 		prefer_each.PreferEachRule,
+		prefer_expect_resolves.PreferExpectResolvesRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,
