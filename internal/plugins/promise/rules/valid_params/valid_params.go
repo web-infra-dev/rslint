@@ -2,6 +2,7 @@ package valid_params
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
@@ -42,7 +43,7 @@ func buildRequireOneOptionalArgumentMessage(name string, numArgs int) rule.RuleM
 		Description: fmt.Sprintf("Promise.%s() requires 0 or 1 arguments, but received %d", name, numArgs),
 		Data: map[string]string{
 			"name":    name,
-			"numArgs": fmt.Sprint(numArgs),
+			"numArgs": strconv.Itoa(numArgs),
 		},
 	}
 }
@@ -53,7 +54,7 @@ func buildRequireOneArgumentMessage(name string, numArgs int) rule.RuleMessage {
 		Description: fmt.Sprintf("Promise.%s() requires 1 argument, but received %d", name, numArgs),
 		Data: map[string]string{
 			"name":    name,
-			"numArgs": fmt.Sprint(numArgs),
+			"numArgs": strconv.Itoa(numArgs),
 		},
 	}
 }
@@ -64,7 +65,7 @@ func buildRequireTwoOptionalArgumentsMessage(name string, numArgs int) rule.Rule
 		Description: fmt.Sprintf("Promise.%s() requires 1 or 2 arguments, but received %d", name, numArgs),
 		Data: map[string]string{
 			"name":    name,
-			"numArgs": fmt.Sprint(numArgs),
+			"numArgs": strconv.Itoa(numArgs),
 		},
 	}
 }
