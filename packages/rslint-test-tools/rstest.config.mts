@@ -432,6 +432,7 @@ export default defineConfig({
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/max-nested-describe.test.ts',
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-commented-out-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
@@ -448,6 +449,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-called-with.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-each.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-equality-matcher.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-expect-resolves.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',

@@ -189,7 +189,7 @@ func runMain() int {
 		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName())
 		sourceFile := file.AsSourceFile()
 
-		encodedSourceFile, err := encoder.EncodeSourceFile(sourceFile)
+		encodedSourceFile, _, err := encoder.EncodeSourceFile(sourceFile)
 		if err != nil {
 			log.Printf("error encoding source file %v: %v", file.Path(), err)
 			return 1
