@@ -432,6 +432,7 @@ export default defineConfig({
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/max-nested-describe.test.ts',
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-commented-out-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
