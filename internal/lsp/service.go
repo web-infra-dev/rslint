@@ -685,7 +685,7 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnosti
 		},
 		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
 		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
+		Message:  lsproto.StringOrMarkupContent{String: ptrTo(fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description))},
 	}
 }
 
