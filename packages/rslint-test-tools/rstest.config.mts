@@ -20,6 +20,11 @@ export default defineConfig({
     './tests/cli/js-config/ignore-negation.test.ts',
     './tests/cli/js-config/files-driven-lint.test.ts',
     './tests/cli/js-config/files-driven-monorepo.test.ts',
+    './tests/cli/js-config/eslint-plugins.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/unicorn.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/sonarjs.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/promise.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/stylistic.test.ts',
     './tests/cli/js-config/gitignore-integration.test.ts',
     './tests/cli/entry-point.test.ts',
     './tests/cli/type-check/type-check.test.ts',
@@ -248,7 +253,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-base-to-string.test.ts',
     './tests/typescript-eslint/rules/no-confusing-non-null-assertion.test.ts',
     './tests/typescript-eslint/rules/no-confusing-void-expression.test.ts',
-    // './tests/typescript-eslint/rules/no-deprecated.test.ts',
+    './tests/typescript-eslint/rules/no-deprecated.test.ts',
     './tests/typescript-eslint/rules/no-dupe-class-members.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-enum-values.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
@@ -445,6 +450,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-to-have-been-called-times.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-been-called.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
@@ -454,6 +460,7 @@ export default defineConfig({
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
+    './tests/eslint-plugin-promise/rules/catch-or-return.test.ts',
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
 

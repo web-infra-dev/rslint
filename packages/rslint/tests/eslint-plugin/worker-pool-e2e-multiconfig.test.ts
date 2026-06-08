@@ -312,7 +312,7 @@ describe.skipIf(process.platform === 'win32')(
       await fs.writeFile(
         cfgPath,
         `import p from './_r4-bad-fix-plugin.mjs';
-export default [{ eslintPlugins: { r4: p } }];
+export default [{ plugins: { r4: p } }];
 `,
         'utf8',
       );

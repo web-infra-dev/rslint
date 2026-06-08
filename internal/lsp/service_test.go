@@ -15,12 +15,15 @@ import (
 // Session is nil so session calls are safely skipped via nil guards.
 func newTestServer() *Server {
 	return &Server{
-		jsConfigs:       make(map[string]config.RslintConfig),
-		documents:       make(map[lsproto.DocumentUri]string),
-		diagnostics:     make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
-		refreshCh:       make(chan struct{}, 1),
-		debounceCh:      make(chan struct{}, 1),
-		pendingLintURIs: make(map[lsproto.DocumentUri]struct{}),
+		jsConfigs:              make(map[string]config.RslintConfig),
+		documents:              make(map[lsproto.DocumentUri]string),
+		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		refreshCh:              make(chan struct{}, 1),
+		debounceCh:             make(chan struct{}, 1),
+		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:         make(chan pluginLintResult, 16),
+		docGeneration:          make(map[lsproto.DocumentUri]uint64),
+		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}
 }
 
@@ -387,14 +390,17 @@ func TestRapidChanges_VersionTracking(t *testing.T) {
 func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 	queue := make(chan *lsproto.Message, 10)
 	return &Server{
-		jsConfigs:       make(map[string]config.RslintConfig),
-		documents:       make(map[lsproto.DocumentUri]string),
-		diagnostics:     make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
-		outgoingQueue:   queue,
-		backgroundCtx:   context.Background(),
-		refreshCh:       make(chan struct{}, 1),
-		debounceCh:      make(chan struct{}, 1),
-		pendingLintURIs: make(map[lsproto.DocumentUri]struct{}),
+		jsConfigs:              make(map[string]config.RslintConfig),
+		documents:              make(map[lsproto.DocumentUri]string),
+		diagnostics:            make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		outgoingQueue:          queue,
+		backgroundCtx:          context.Background(),
+		refreshCh:              make(chan struct{}, 1),
+		debounceCh:             make(chan struct{}, 1),
+		pendingLintURIs:        make(map[lsproto.DocumentUri]struct{}),
+		pluginResultCh:         make(chan pluginLintResult, 16),
+		docGeneration:          make(map[lsproto.DocumentUri]uint64),
+		inflightPluginDispatch: make(map[lsproto.DocumentUri]*pluginDispatchHandle),
 	}, queue
 }
 
@@ -741,6 +747,45 @@ func TestHandleConfigUpdate_MultipleConfigs(t *testing.T) {
 	fooCfg := s.jsConfigs["file:///project/packages/foo"]
 	if len(fooCfg) != 1 {
 		t.Errorf("foo config should have 1 entry, got %d", len(fooCfg))
+	}
+}
+
+// TestHandleConfigUpdate_RegistersEslintPlugins pins the ONLY path that
+// registers object-form community plugins in the editor: the configUpdate
+// reverse notification carries the {prefix, ruleNames} metadata aggregate, and
+// handleConfigUpdate must route it through RegisterEslintPluginRules so that
+// `<prefix>/<rule>` becomes resolvable (IsEslintPluginRule placeholder).
+func TestHandleConfigUpdate_RegistersEslintPlugins(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{
+						"files":   []string{"**/*.ts"},
+						"plugins": []string{"testplugLSPreg"},
+						"rules":   map[string]any{"testplugLSPreg/no-foo": "error"},
+					},
+				},
+			},
+		},
+		"eslintPlugins": []any{
+			map[string]any{"prefix": "testplugLSPreg", "ruleNames": []string{"no-foo"}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	r, ok := config.GlobalRuleRegistry.GetRule("testplugLSPreg/no-foo")
+	if !ok {
+		t.Fatal("expected testplugLSPreg/no-foo to be registered as a placeholder after configUpdate")
+	}
+	if !r.IsEslintPluginRule {
+		t.Error("expected IsEslintPluginRule=true on the registered placeholder")
 	}
 }
 
@@ -1292,7 +1337,6 @@ func TestCloseAndReopen(t *testing.T) {
 		t.Error("stale diagnostics should not reappear after reopen")
 	}
 }
-
 
 // ======== tsConfigPaths lifecycle tests ========
 

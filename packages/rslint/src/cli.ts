@@ -1,6 +1,10 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { loadConfigFile, normalizeConfig } from './config-loader.js';
+import {
+  loadConfigFile,
+  normalizeConfig,
+  collectPluginMeta,
+} from './config-loader.js';
 import { parseArgs, classifyArgs, isJSConfigFile } from './utils/args.js';
 import {
   discoverConfigs,
@@ -18,8 +22,10 @@ async function runWithJSConfigs(
   configs: Map<string, string>,
   goArgs: string[],
   cwd: string,
+  singleThreaded: boolean,
 ): Promise<number> {
   const configEntries: ConfigEntry[] = [];
+  const dirToPath = new Map<string, string>();
   const isSingleConfig = configs.size === 1;
 
   for (const [configPath, configDir] of configs) {
@@ -54,6 +60,7 @@ async function runWithJSConfigs(
     }
 
     configEntries.push({ configDirectory: configDir, entries });
+    dirToPath.set(configDir, configPath);
   }
 
   // Lazy import — keeps engine.ts (and its node:child_process dependency) out
@@ -70,7 +77,22 @@ async function runWithJSConfigs(
   // global ignores (ESLint v10 alignment). Then hand the configs to Go in the
   // IPC `init` payload (no more `--config-stdin` stdin pipe).
   const filteredEntries = filterConfigsByParentIgnores(configEntries);
-  return runEngine({ binPath, goArgs, configs: filteredEntries, cwd });
+  const { eslintPluginEntries, pluginConfigs } = collectPluginMeta(
+    filteredEntries.map((ce) => ({
+      configPath: dirToPath.get(ce.configDirectory) ?? '',
+      configDirectory: ce.configDirectory,
+      entries: ce.entries,
+    })),
+  );
+  return runEngine({
+    binPath,
+    goArgs,
+    configs: filteredEntries,
+    cwd,
+    eslintPluginEntries,
+    pluginConfigs,
+    runtime: { singleThreaded },
+  });
 }
 
 export async function run(
@@ -120,7 +142,13 @@ export async function run(
   }
 
   if (jsConfigs.size > 0) {
-    return runWithJSConfigs(binPath, jsConfigs, goArgs, cwd);
+    return runWithJSConfigs(
+      binPath,
+      jsConfigs,
+      goArgs,
+      cwd,
+      args.singleThreaded,
+    );
   }
 
   // Fall back to Go binary (handles JSON config + deprecation warning); no

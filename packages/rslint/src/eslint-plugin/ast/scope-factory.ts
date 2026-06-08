@@ -15,16 +15,19 @@
  * for the TS-only constructs.
  *
  * Selection is by file extension; languageOptions can override globals
- * (the only ESLint-compat sub-field forwarded; see the
- * `CompatLanguageOptions` shape in `internal/linter/types.go`).
+ * (forwarded per-file in the wire request's `languageOptions`, which Go
+ * computes via `GetConfigForFile`).
  */
 
 import type { ScopeManager as EslintScopeManager } from 'eslint-scope';
 // CJS-only scope analyzers, imported statically so rslib bundles them into the
 // worker (consumers of @rslint/core don't need them at runtime). They run in
 // the synchronous scope-analysis path, so a dynamic `import()` (async) isn't
-// usable here.
-import tsScopeManagerPkg from '@typescript-eslint/scope-manager';
+// usable here. BOTH must use the namespace form (`import * as`): under rslib's
+// CJS interop a DEFAULT import of these bundles to `undefined`, which crashed
+// scope analysis on every .ts/.tsx file ("Cannot read properties of undefined
+// (reading 'analyze')") while .js (eslint-scope) silently kept working.
+import * as tsScopeManagerPkg from '@typescript-eslint/scope-manager';
 import * as eslintScopePkg from 'eslint-scope';
 
 import { VISITOR_KEYS } from './visitor-keys.js';

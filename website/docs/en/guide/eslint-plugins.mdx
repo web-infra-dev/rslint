@@ -1,0 +1,56 @@
+# ESLint plugin compatibility
+
+rslint can run community ESLint plugins' rules alongside its own native rules.
+Plugin diagnostics merge into the same report, and it works the same way in the
+CLI and the VS Code extension.
+
+## Usage
+
+Import the plugin, register it in `plugins` under a prefix of your choice, and
+enable its rules under `'<prefix>/<rule>'`:
+
+```js
+import examplePlugin from 'eslint-plugin-example';
+
+export default [
+  {
+    files: ['**/*.ts'],
+    plugins: { example: examplePlugin },
+    rules: {
+      'example/some-rule': 'error',
+    },
+  },
+];
+```
+
+A few things to know:
+
+- **Built-in vs. community.** Built-in (native) plugins are named in an array —
+  `plugins: ['@typescript-eslint']`. A community plugin is mounted as an object —
+  `plugins: { example: examplePlugin }`. One entry uses one form; to use both,
+  add a second config entry.
+- **JS/TS config only.** A community plugin is a live object, so it can't live in
+  a JSON config — use a `.js` / `.mjs` / `.ts` / `.mts` config.
+- **Pick any prefix** that doesn't clash with a
+  [built-in plugin prefix](/config/rules-and-presets#plugins); rslint reports a
+  clear error if it does.
+- **Fixes work.** A plugin rule's autofixes and suggestions apply through `--fix`
+  and the editor's `source.fixAll`.
+
+## Unsupported ESLint APIs
+
+A plugin rule's `create(context)` gets the standard ESLint v10 surface:
+`context.report` (with `messageId` / `data` / `fix` / `suggest`),
+`context.options`, `context.settings`, `context.languageOptions`, AST and
+esquery visitors, and `sourceCode` (tokens, comments, and scope analysis such as
+`getScope` and `getDeclaredVariables`).
+
+These ESLint APIs are **not** available to plugin rules — a rule that relies on
+one loads without error but never reports:
+
+| ESLint API                                                                                                                                                                                  | Where you'd use it                                                    |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `sourceCode.parserServices` — `program`, `getTypeChecker()`, `esTreeNodeToTSNodeMap`                                                                                                        | type-aware rules (enabled by `languageOptions.parserOptions.project`) |
+| `languageOptions.parser`                                                                                                                                                                    | a custom parser in the config                                         |
+| `processor`                                                                                                                                                                                 | a config's processor                                                  |
+| `onCodePathStart` / `onCodePathEnd` / `onCodePathSegmentStart` / `onCodePathSegmentEnd` / `onCodePathSegmentLoop` / `onUnreachableCodePathSegmentStart` / `onUnreachableCodePathSegmentEnd` | code-path (control-flow) analysis                                     |

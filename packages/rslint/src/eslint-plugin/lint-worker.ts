@@ -197,7 +197,7 @@ parentPort.on('message', (msg: InboundMessage) => {
     // Pick the right `LoadedPlugins` from the per-config map via
     // `request.configKey`. The CLI host / LSP host produce tasks
     // with `configKey` set to the file's owning configDirectory — the
-    // same string Go writes into `CompatLintFile.ConfigKey`. A miss
+    // same string Go writes into `EslintPluginLintFile.ConfigKey`. A miss
     // is an internal-invariant violation (the host contract guarantees
     // every configKey on the wire was declared in this worker's
     // `data.configs[]`); silently lint-ing the file with empty rules

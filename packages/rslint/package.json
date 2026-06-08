@@ -18,6 +18,10 @@
       "@typescript/source": "./src/config-loader.ts",
       "default": "./dist/config-loader.js"
     },
+    "./eslint-plugin": {
+      "@typescript/source": "./src/eslint-plugin/index.ts",
+      "default": "./dist/eslint-plugin/index.js"
+    },
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },

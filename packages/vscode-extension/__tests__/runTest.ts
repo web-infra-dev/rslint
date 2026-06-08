@@ -131,6 +131,28 @@ async function main() {
     failed = true;
   }
 
+  // --- eslintPlugins reverse-dispatch tests ---
+  const eslintPluginsWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-eslint-plugins',
+  );
+  const eslintPluginsTestsPath = path.resolve(
+    __dirname,
+    './suite-eslint-plugins',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: eslintPluginsTestsPath,
+      launchArgs: ['--disable-extensions', eslintPluginsWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('eslintPlugins tests failed:', err);
+    failed = true;
+  }
+
   if (failed) {
     console.error('Some test suites failed');
     process.exit(1);

@@ -7,7 +7,7 @@ import pluginX from './plugin-x.mjs';
 
 export default [
   {
-    eslintPlugins: {
+    plugins: {
       px: pluginX,
     },
   },

@@ -27,7 +27,7 @@
  *   - **Parse / normalize fails for one file**
  *       result.parseError set; lintBatch continues with other files.
  *   - **Per-task timeout (default 30s)**
- *       terminate the worker, respawn, mark only that task as compat-failed.
+ *       terminate the worker, respawn, mark only that task as plugin-lint-failed.
  *   - **Worker thread crashes**
  *       all in-flight tasks on that worker are rejected with
  *       {parseError: 'worker_crashed'}; pool respawns up to retryCap.
@@ -1102,7 +1102,7 @@ export class WorkerPool {
         source: 'runner',
         text: `task ${taskId} on worker ${slot.id} timed out after ${this.opts.taskTimeoutMs}ms; terminating worker`,
       });
-      // Reject this task with a "compat-failed"-shaped result.
+      // Reject this task with a "plugin-lint-failed"-shaped result.
       resolveOk({
         filePath: task.filePath,
         diagnostics: [],
@@ -1122,7 +1122,7 @@ export class WorkerPool {
       reject: (err, kind = 'crash') => {
         // Unify rejection shape with timeout: prefer a result-shaped
         // failure over a thrown error so the caller (internal/linter)
-        // marks this file as compat-failed instead of letting one
+        // marks this file as plugin-lint-failed instead of letting one
         // file's crash abort the whole batch.
         //
         // `parseError` prefix encodes the kind so consumers can

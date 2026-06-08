@@ -45,16 +45,19 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 // Application-level IPC message kinds for the CLI ⇆ Node engine protocol.
 // The transport (ipc.Channel) owns only response/error/handshake/exit; the
 // kinds below are declared here and travel through the same opaque envelope.
 const (
-	kindInit     ipc.MessageKind = "init"     // Node → Go: handshake payload
-	kindShutdown ipc.MessageKind = "shutdown" // Go → Node: lint done
-	kindOutput   ipc.MessageKind = "output"   // Go → Node: forwarded stdout text
+	kindInit       ipc.MessageKind = "init"       // Node → Go: handshake payload
+	kindShutdown   ipc.MessageKind = "shutdown"   // Go → Node: lint done
+	kindOutput     ipc.MessageKind = "output"     // Go → Node: forwarded stdout text
+	kindPluginLint ipc.MessageKind = "pluginLint" // Go → Node: run ESLint-plugin rules in a worker
 )
 
 // initPayload mirrors the IPC `init` message sent by engine.ts. Field shape
@@ -78,6 +81,11 @@ type initPayload struct {
 	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	Format           string   `json:"format,omitempty"`
 	FixMode          bool     `json:"fixMode,omitempty"`
+
+	// EslintPlugins: per-mounted-plugin {prefix, ruleNames} metadata so Go
+	// can register placeholder rules for plugin rule names. The live plugin
+	// objects stay in Node (the worker re-imports the config to load them).
+	EslintPlugins []rslintconfig.EslintPluginEntry `json:"eslintPlugins,omitempty"`
 }
 
 // runtimePayload is the IPC-bound subset of runtime knobs that don't have (or
@@ -224,6 +232,7 @@ func runCLI(args []string) int {
 	// ConfigStdin reflects whether the peer supplied configs (JS/TS path) or
 	// expects the binary to load JSON config from disk (ConfigStdin=false).
 	baseArgs.ConfigStdin = len(payload.Configs) > 0
+	baseArgs.EslintPlugins = payload.EslintPlugins
 
 	// ── stdout redirect (mandatory for every intent) ──────────────────────
 	// The peer holds the real stdout for IPC frames, so any plain-text write
@@ -291,7 +300,22 @@ func runCLI(args []string) int {
 		}()
 	}
 
-	exitCode := executeLintPipeline(baseArgs)
+	// Reverse dispatcher: send each plugin-lint batch back to the Node host
+	// over the IPC channel and decode its result. Runs concurrently with the
+	// native lint pass (executeLintPipeline awaits it before output / --fix).
+	dispatch := func(reqCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		msg, sendErr := ch.SendRequest(reqCtx, kindPluginLint, req)
+		if sendErr != nil {
+			return nil, sendErr
+		}
+		var res linter.EslintPluginLintResult
+		if err := msg.Decode(&res); err != nil {
+			return nil, fmt.Errorf("decode pluginLint result: %w", err)
+		}
+		return &res, nil
+	}
+
+	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
 	shutdownPeer(ch, state)
