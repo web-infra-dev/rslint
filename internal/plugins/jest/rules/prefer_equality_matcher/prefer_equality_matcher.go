@@ -91,7 +91,7 @@ var PreferEqualityMatcherRule = rule.Rule{
 					return
 				}
 
-				left, right, negated, ok := parseStrictEqualityComparison(expectArgs[0])
+				left, right, negated, ok := parseStrictEqualityComparison(utils.UnwrapBasicTypeAssertions(expectArgs[0]))
 				if !ok {
 					return
 				}
@@ -101,7 +101,7 @@ var PreferEqualityMatcherRule = rule.Rule{
 					return
 				}
 
-				matcherValue, ok := isBooleanLiteral(matcherArgs[0])
+				matcherValue, ok := isBooleanLiteral(utils.UnwrapBasicTypeAssertions(matcherArgs[0]))
 				if !ok {
 					return
 				}
