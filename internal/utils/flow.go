@@ -121,3 +121,299 @@ func BlockEndsWithTerminal(block *ast.Node) bool {
 	}
 	return false
 }
+
+// skipOEKParentheses strips only parentheses when walking outer expressions.
+const skipOEKParentheses = ast.OEKParentheses
+
+// IsFunctionLikeContainer reports whether node introduces a new function scope.
+// Covers function declarations/expressions, arrow functions, methods, getters,
+// setters, and constructors. Use this to stop traversals at function boundaries.
+func IsFunctionLikeContainer(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		return true
+	}
+	return false
+}
+
+// Completion represents the control-flow completion kind of a statement.
+type Completion int
+
+const (
+	CompletionFallsThrough Completion = iota // execution continues normally to the next statement
+	CompletionTerminates                     // return / throw / process.exit terminates the function
+	CompletionStops                          // break / continue exits the current loop or switch arm
+)
+
+// StatementListCompletion returns the completion of executing a sequence of
+// statements in order. It stops at the first non-FallsThrough statement.
+func StatementListCompletion(statements []*ast.Node) Completion {
+	for _, stmt := range statements {
+		switch StatementCompletion(stmt) {
+		case CompletionTerminates:
+			return CompletionTerminates
+		case CompletionStops:
+			return CompletionStops
+		}
+	}
+	return CompletionFallsThrough
+}
+
+// StatementCompletion returns the control-flow completion of a single statement,
+// recursively analyzing compound statements (if/try/switch/loops/labels).
+// process.exit() and process.abort() are treated as CompletionTerminates.
+func StatementCompletion(stmt *ast.Node) Completion {
+	if stmt == nil {
+		return CompletionFallsThrough
+	}
+	switch stmt.Kind {
+	case ast.KindReturnStatement, ast.KindThrowStatement:
+		return CompletionTerminates
+	case ast.KindBreakStatement, ast.KindContinueStatement:
+		return CompletionStops
+	case ast.KindExpressionStatement:
+		if isProcessExitOrAbortCall(stmt.AsExpressionStatement().Expression) {
+			return CompletionTerminates
+		}
+		return CompletionFallsThrough
+	case ast.KindBlock:
+		return StatementListCompletion(stmt.Statements())
+	case ast.KindIfStatement:
+		ifStmt := stmt.AsIfStatement()
+		if ifStmt == nil || ifStmt.ElseStatement == nil {
+			return CompletionFallsThrough
+		}
+		thenC := StatementCompletion(ifStmt.ThenStatement)
+		elseC := StatementCompletion(ifStmt.ElseStatement)
+		if thenC == CompletionTerminates && elseC == CompletionTerminates {
+			return CompletionTerminates
+		}
+		if thenC == CompletionStops || elseC == CompletionStops {
+			return CompletionStops
+		}
+		return CompletionFallsThrough
+	case ast.KindTryStatement:
+		tryStmt := stmt.AsTryStatement()
+		if tryStmt == nil {
+			return CompletionFallsThrough
+		}
+		if tryStmt.FinallyBlock != nil && StatementListCompletion(tryStmt.FinallyBlock.Statements()) == CompletionTerminates {
+			return CompletionTerminates
+		}
+		if tryStmt.TryBlock == nil || StatementListCompletion(tryStmt.TryBlock.Statements()) != CompletionTerminates {
+			return CompletionFallsThrough
+		}
+		if tryStmt.CatchClause == nil {
+			return CompletionTerminates
+		}
+		catchBlock := tryStmt.CatchClause.AsCatchClause().Block
+		if catchBlock != nil && StatementListCompletion(catchBlock.Statements()) == CompletionTerminates {
+			return CompletionTerminates
+		}
+		return CompletionFallsThrough
+	case ast.KindSwitchStatement:
+		if switchTerminatesAll(stmt) {
+			return CompletionTerminates
+		}
+		return CompletionFallsThrough
+	case ast.KindWhileStatement:
+		whileStmt := stmt.AsWhileStatement()
+		if whileStmt != nil && isTruthyLiteral(whileStmt.Expression) && !containsBreakExitingLoop(stmt, whileStmt.Statement) {
+			return CompletionTerminates
+		}
+		return CompletionFallsThrough
+	case ast.KindForStatement:
+		forStmt := stmt.AsForStatement()
+		if forStmt != nil && (forStmt.Condition == nil || isTruthyLiteral(forStmt.Condition)) && !containsBreakExitingLoop(stmt, forStmt.Statement) {
+			return CompletionTerminates
+		}
+		return CompletionFallsThrough
+	case ast.KindDoStatement:
+		doStmt := stmt.AsDoStatement()
+		if doStmt == nil {
+			return CompletionFallsThrough
+		}
+		if isTruthyLiteral(doStmt.Expression) {
+			if !containsBreakExitingLoop(stmt, doStmt.Statement) {
+				return CompletionTerminates
+			}
+			return CompletionFallsThrough
+		}
+		if loopBodyTerminates(stmt, doStmt.Statement) {
+			return CompletionTerminates
+		}
+		return CompletionFallsThrough
+	case ast.KindLabeledStatement:
+		labeledStmt := stmt.AsLabeledStatement()
+		if labeledStmt == nil {
+			return CompletionFallsThrough
+		}
+		return StatementCompletion(labeledStmt.Statement)
+	default:
+		return CompletionFallsThrough
+	}
+}
+
+func switchTerminatesAll(stmt *ast.Node) bool {
+	switchStmt := stmt.AsSwitchStatement()
+	if switchStmt == nil || switchStmt.CaseBlock == nil {
+		return false
+	}
+	caseBlock := switchStmt.CaseBlock.AsCaseBlock()
+	if caseBlock == nil || caseBlock.Clauses == nil || len(caseBlock.Clauses.Nodes) == 0 {
+		return false
+	}
+	clauses := caseBlock.Clauses.Nodes
+	hasDefault := false
+	for _, clause := range clauses {
+		if clause != nil && clause.Kind == ast.KindDefaultClause {
+			hasDefault = true
+			break
+		}
+	}
+	if !hasDefault {
+		return false
+	}
+	for i := range clauses {
+		if !clausesTerminateFrom(clauses, i) {
+			return false
+		}
+	}
+	return true
+}
+
+func clausesTerminateFrom(clauses []*ast.Node, start int) bool {
+	for i := start; i < len(clauses); i++ {
+		clause := clauses[i]
+		if clause == nil {
+			continue
+		}
+		caseOrDefault := clause.AsCaseOrDefaultClause()
+		if caseOrDefault == nil || caseOrDefault.Statements == nil {
+			continue
+		}
+		switch StatementListCompletion(caseOrDefault.Statements.Nodes) {
+		case CompletionTerminates:
+			return true
+		case CompletionStops:
+			return false
+		}
+	}
+	return false
+}
+
+func isTruthyLiteral(expr *ast.Node) bool {
+	expr = ast.SkipOuterExpressions(expr, skipOEKParentheses)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindTrueKeyword:
+		return true
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(expr.AsNumericLiteral().Text) != "0"
+	case ast.KindStringLiteral:
+		return expr.AsStringLiteral().Text != ""
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return expr.AsNoSubstitutionTemplateLiteral().Text != ""
+	default:
+		return false
+	}
+}
+
+func loopBodyTerminates(loop *ast.Node, body *ast.Node) bool {
+	return StatementCompletion(body) == CompletionTerminates && !containsBreakExitingLoop(loop, body)
+}
+
+func containsBreakExitingLoop(loop *ast.Node, body *ast.Node) bool {
+	if loop == nil || body == nil {
+		return false
+	}
+	found := false
+	var visit func(*ast.Node) bool
+	visit = func(node *ast.Node) bool {
+		if node == nil || found {
+			return found
+		}
+		if node != body && IsFunctionLikeContainer(node) {
+			return false
+		}
+		if node.Kind == ast.KindBreakStatement && breakExitsLoop(node, loop) {
+			found = true
+			return true
+		}
+		node.ForEachChild(visit)
+		return found
+	}
+	visit(body)
+	return found
+}
+
+func breakExitsLoop(breakStmt *ast.Node, loop *ast.Node) bool {
+	stmt := breakStmt.AsBreakStatement()
+	if stmt == nil {
+		return false
+	}
+	if stmt.Label == nil {
+		return nearestUnlabeledBreakTarget(breakStmt) == loop
+	}
+	labelName := stmt.Label.Text()
+	for parent := breakStmt.Parent; parent != nil; parent = parent.Parent {
+		if IsFunctionLikeContainer(parent) {
+			return false
+		}
+		if parent.Kind != ast.KindLabeledStatement {
+			continue
+		}
+		labeledStmt := parent.AsLabeledStatement()
+		if labeledStmt != nil && labeledStmt.Label != nil && labeledStmt.Label.Text() == labelName {
+			return isAncestorOrSelf(parent, loop)
+		}
+	}
+	return false
+}
+
+func nearestUnlabeledBreakTarget(node *ast.Node) *ast.Node {
+	for parent := node.Parent; parent != nil; parent = parent.Parent {
+		switch parent.Kind {
+		case ast.KindSwitchStatement, ast.KindWhileStatement, ast.KindDoStatement,
+			ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
+			return parent
+		}
+		if IsFunctionLikeContainer(parent) {
+			return nil
+		}
+	}
+	return nil
+}
+
+func isAncestorOrSelf(ancestor *ast.Node, node *ast.Node) bool {
+	for current := node; current != nil; current = current.Parent {
+		if current == ancestor {
+			return true
+		}
+	}
+	return false
+}
+
+func isProcessExitOrAbortCall(expr *ast.Node) bool {
+	expr = ast.SkipOuterExpressions(expr, skipOEKParentheses)
+	if expr == nil || !ast.IsCallExpression(expr) {
+		return false
+	}
+	callee := ast.SkipOuterExpressions(expr.AsCallExpression().Expression, skipOEKParentheses)
+	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+		return false
+	}
+	prop := callee.AsPropertyAccessExpression()
+	name := prop.Name()
+	if name == nil || !ast.IsIdentifier(name) || (name.AsIdentifier().Text != "exit" && name.AsIdentifier().Text != "abort") {
+		return false
+	}
+	object := ast.SkipOuterExpressions(prop.Expression, skipOEKParentheses)
+	return object != nil && ast.IsIdentifier(object) && object.AsIdentifier().Text == "process"
+}
