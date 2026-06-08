@@ -40,10 +40,52 @@ async function publish_all() {
 
     await $`chmod +x ./packages/vscode-extension/dist/${targetFilename}`;
 
+    // napi parser `.node` for the eslint-plugin worker. `build.js` already
+    // staged the publish-runner's host `.node` as a fixed `rslint.node`;
+    // overwrite it with THIS platform's `.node` so the worker's
+    // `@rslint/native` shim loads the matching ABI. Source artifact comes from
+    // the `napi-build` job (`native-<tuple>`, downloaded to `binaries/`); the
+    // shim requires a constant `./rslint.node`, so one filename is overwritten
+    // per iteration — no wrong-arch leak is possible. Linux ships gnu only
+    // (musl is not a vsce target).
+    const napiTuple =
+      os === 'win32'
+        ? `win32-${arch}-msvc`
+        : os === 'linux'
+          ? `linux-${arch}-gnu`
+          : `${os}-${arch}`; // darwin-x64 / darwin-arm64
+    const nativeDir =
+      './packages/vscode-extension/dist/eslint-plugin/node_modules/@rslint/native';
+    await $`rm -f ${nativeDir}/rslint.node`;
+    await $`cp binaries/native-${napiTuple}/rslint.${napiTuple}.node ${nativeDir}/rslint.node`;
+
     await $`ls -lR ./packages/vscode-extension/dist`;
     const prereleaseFlag = prerelease ? ['--pre-release'] : [];
 
     await $`cd packages/vscode-extension && pnpm vsce package --target ${os}-${arch} ${prereleaseFlag}`;
+
+    // Smoke-check the produced vsix: the eslint-plugin worker payload + its
+    // nested native shim/.node must be present, or the packaged extension's
+    // plugin host silently dies (the dev-only blind spot this whole change
+    // fixes). `vsce ls` is unusable here (its npm dep walk breaks under pnpm),
+    // so inspect the zip directly. Cross-build arch correctness is guaranteed
+    // upstream by the `cp` from `native-${napiTuple}` (it errors if absent).
+    const vsix = `packages/vscode-extension/rslint-${os}-${arch}-${version}.vsix`;
+    const listing = (await $`unzip -Z1 ${vsix}`).stdout;
+    const requiredEntries = [
+      'extension/dist/eslint-plugin/index.js',
+      'extension/dist/eslint-plugin/lint-worker.js',
+      'extension/dist/eslint-plugin/package.json',
+      'extension/dist/eslint-plugin/node_modules/@rslint/native/index.js',
+      'extension/dist/eslint-plugin/node_modules/@rslint/native/rslint.node',
+    ];
+    const missing = requiredEntries.filter((e) => !listing.includes(e));
+    if (missing.length > 0) {
+      throw new Error(
+        `vsix smoke check failed for ${os}-${arch}: missing ${missing.join(', ')}`,
+      );
+    }
+    console.log(`vsix worker-payload smoke check passed for ${os}-${arch}`);
 
     // supports dry-run
     if (process.argv.includes('--dry-run')) {
