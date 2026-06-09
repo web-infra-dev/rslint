@@ -171,7 +171,7 @@ func isIgnoredAssignment(stmt *ast.Node, ignoredVars []string) bool {
 		return false
 	}
 	bin := expr.AsBinaryExpression()
-	if bin == nil || bin.OperatorToken == nil || bin.OperatorToken.Kind != ast.KindEqualsToken {
+	if bin == nil || bin.OperatorToken == nil || !ast.IsAssignmentOperator(bin.OperatorToken.Kind) {
 		return false
 	}
 	rootName := rootObjectName(bin.Left)

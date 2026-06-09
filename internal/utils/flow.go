@@ -214,6 +214,9 @@ func StatementCompletion(stmt *ast.Node) Completion {
 		if catchBlock != nil && StatementListCompletion(catchBlock.Statements()) == CompletionTerminates {
 			return CompletionTerminates
 		}
+		if tryBlockCannotReachCatch(tryStmt.TryBlock) {
+			return CompletionTerminates
+		}
 		return CompletionFallsThrough
 	case ast.KindSwitchStatement:
 		if switchTerminatesAll(stmt) {
@@ -279,14 +282,14 @@ func switchTerminatesAll(stmt *ast.Node) bool {
 		return false
 	}
 	for i := range clauses {
-		if !clausesTerminateFrom(clauses, i) {
+		if !clausesTerminateFrom(clauses, i, stmt) {
 			return false
 		}
 	}
 	return true
 }
 
-func clausesTerminateFrom(clauses []*ast.Node, start int) bool {
+func clausesTerminateFrom(clauses []*ast.Node, start int, switchNode *ast.Node) bool {
 	for i := start; i < len(clauses); i++ {
 		clause := clauses[i]
 		if clause == nil {
@@ -296,7 +299,7 @@ func clausesTerminateFrom(clauses []*ast.Node, start int) bool {
 		if caseOrDefault == nil || caseOrDefault.Statements == nil {
 			continue
 		}
-		switch StatementListCompletion(caseOrDefault.Statements.Nodes) {
+		switch caseClauseCompletion(caseOrDefault.Statements.Nodes, switchNode) {
 		case CompletionTerminates:
 			return true
 		case CompletionStops:
@@ -304,6 +307,68 @@ func clausesTerminateFrom(clauses []*ast.Node, start int) bool {
 		}
 	}
 	return false
+}
+
+// caseClauseCompletion is StatementListCompletion specialized for switch clause
+// bodies: a break that exits switchNode along a reachable path counts as
+// CompletionStops (the clause leaves the switch rather than terminating the
+// function). This catches a conditional break such as `if (c) break;` that a
+// later `return` would otherwise mask.
+func caseClauseCompletion(statements []*ast.Node, switchNode *ast.Node) Completion {
+	for _, stmt := range statements {
+		if stmtCanBreakOutOfSwitch(stmt, switchNode) {
+			return CompletionStops
+		}
+		switch StatementCompletion(stmt) {
+		case CompletionTerminates:
+			return CompletionTerminates
+		case CompletionStops:
+			return CompletionStops
+		}
+	}
+	return CompletionFallsThrough
+}
+
+// stmtCanBreakOutOfSwitch reports whether executing stmt can reach a break that
+// exits switchNode without first terminating. It descends into blocks and if
+// branches (tracking reachability) but not into nested loops/switches, whose
+// unlabeled breaks target themselves.
+func stmtCanBreakOutOfSwitch(stmt *ast.Node, switchNode *ast.Node) bool {
+	if stmt == nil {
+		return false
+	}
+	switch stmt.Kind {
+	case ast.KindBreakStatement:
+		return breakExitsTarget(stmt, switchNode)
+	case ast.KindBlock:
+		for _, s := range stmt.Statements() {
+			if stmtCanBreakOutOfSwitch(s, switchNode) {
+				return true
+			}
+			switch StatementCompletion(s) {
+			case CompletionTerminates, CompletionStops:
+				return false
+			}
+		}
+		return false
+	case ast.KindIfStatement:
+		ifStmt := stmt.AsIfStatement()
+		if ifStmt == nil {
+			return false
+		}
+		if stmtCanBreakOutOfSwitch(ifStmt.ThenStatement, switchNode) {
+			return true
+		}
+		return ifStmt.ElseStatement != nil && stmtCanBreakOutOfSwitch(ifStmt.ElseStatement, switchNode)
+	case ast.KindLabeledStatement:
+		labeledStmt := stmt.AsLabeledStatement()
+		if labeledStmt == nil {
+			return false
+		}
+		return stmtCanBreakOutOfSwitch(labeledStmt.Statement, switchNode)
+	default:
+		return false
+	}
 }
 
 func isTruthyLiteral(expr *ast.Node) bool {
@@ -342,7 +407,7 @@ func containsBreakExitingLoop(loop *ast.Node, body *ast.Node) bool {
 		if node != body && IsFunctionLikeContainer(node) {
 			return false
 		}
-		if node.Kind == ast.KindBreakStatement && breakExitsLoop(node, loop) {
+		if node.Kind == ast.KindBreakStatement && breakExitsTarget(node, loop) {
 			found = true
 			return true
 		}
@@ -353,13 +418,15 @@ func containsBreakExitingLoop(loop *ast.Node, body *ast.Node) bool {
 	return found
 }
 
-func breakExitsLoop(breakStmt *ast.Node, loop *ast.Node) bool {
+// breakExitsTarget reports whether breakStmt exits target, which may be a loop
+// or a switch statement.
+func breakExitsTarget(breakStmt *ast.Node, target *ast.Node) bool {
 	stmt := breakStmt.AsBreakStatement()
 	if stmt == nil {
 		return false
 	}
 	if stmt.Label == nil {
-		return nearestUnlabeledBreakTarget(breakStmt) == loop
+		return nearestUnlabeledBreakTarget(breakStmt) == target
 	}
 	labelName := stmt.Label.Text()
 	for parent := breakStmt.Parent; parent != nil; parent = parent.Parent {
@@ -371,7 +438,7 @@ func breakExitsLoop(breakStmt *ast.Node, loop *ast.Node) bool {
 		}
 		labeledStmt := parent.AsLabeledStatement()
 		if labeledStmt != nil && labeledStmt.Label != nil && labeledStmt.Label.Text() == labelName {
-			return isAncestorOrSelf(parent, loop)
+			return isAncestorOrSelf(parent, target)
 		}
 	}
 	return false
@@ -416,4 +483,124 @@ func isProcessExitOrAbortCall(expr *ast.Node) bool {
 	}
 	object := ast.SkipOuterExpressions(prop.Expression, skipOEKParentheses)
 	return object != nil && ast.IsIdentifier(object) && object.AsIdentifier().Text == "process"
+}
+
+// tryBlockCannotReachCatch reports whether the try block reaches a return whose
+// argument cannot throw, with every preceding statement also unable to throw, so
+// the catch clause is unreachable. In that case a non-terminating catch does not
+// stop the function from always returning. Mirrors ESLint's code-path analysis,
+// which only routes to catch when a statement may throw.
+func tryBlockCannotReachCatch(tryBlock *ast.Node) bool {
+	if tryBlock == nil {
+		return false
+	}
+	for _, s := range tryBlock.Statements() {
+		if s == nil {
+			return false
+		}
+		switch s.Kind {
+		case ast.KindReturnStatement:
+			arg := s.AsReturnStatement().Expression
+			return arg == nil || expressionCannotThrow(arg)
+		case ast.KindThrowStatement:
+			return false
+		default:
+			if !statementCannotThrow(s) {
+				return false
+			}
+		}
+	}
+	return false
+}
+
+// statementCannotThrow reports whether a non-terminating statement preceding a
+// return in a try block cannot throw. Only simple side-effect-free forms qualify;
+// anything else is treated conservatively as possibly throwing.
+func statementCannotThrow(stmt *ast.Node) bool {
+	switch stmt.Kind {
+	case ast.KindEmptyStatement:
+		return true
+	case ast.KindExpressionStatement:
+		return expressionCannotThrow(stmt.AsExpressionStatement().Expression)
+	case ast.KindVariableStatement:
+		list := stmt.AsVariableStatement().DeclarationList
+		if list == nil {
+			return false
+		}
+		for _, d := range list.AsVariableDeclarationList().Declarations.Nodes {
+			if d == nil {
+				return false
+			}
+			decl := d.AsVariableDeclaration()
+			if name := decl.Name(); name == nil || !ast.IsIdentifier(name) {
+				return false
+			}
+			if decl.Initializer != nil && !expressionCannotThrow(decl.Initializer) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+// expressionCannotThrow reports whether evaluating expr cannot throw. It is a
+// conservative whitelist mirroring ESLint: literals and operations whose
+// operands all cannot throw. Anything that dereferences a binding (identifier,
+// member access, call, new, spread, computed key, or a template/expression with
+// a variable) may throw and returns false.
+func expressionCannotThrow(expr *ast.Node) bool {
+	expr = ast.SkipOuterExpressions(expr, skipOEKParentheses)
+	if expr == nil {
+		return false
+	}
+	switch expr.Kind {
+	case ast.KindNumericLiteral, ast.KindStringLiteral, ast.KindBigIntLiteral,
+		ast.KindRegularExpressionLiteral, ast.KindNoSubstitutionTemplateLiteral,
+		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		return true
+	case ast.KindPrefixUnaryExpression:
+		return expressionCannotThrow(expr.AsPrefixUnaryExpression().Operand)
+	case ast.KindVoidExpression:
+		return expressionCannotThrow(expr.AsVoidExpression().Expression)
+	case ast.KindBinaryExpression:
+		bin := expr.AsBinaryExpression()
+		return expressionCannotThrow(bin.Left) && expressionCannotThrow(bin.Right)
+	case ast.KindConditionalExpression:
+		cond := expr.AsConditionalExpression()
+		return expressionCannotThrow(cond.Condition) &&
+			expressionCannotThrow(cond.WhenTrue) &&
+			expressionCannotThrow(cond.WhenFalse)
+	case ast.KindObjectLiteralExpression:
+		for _, prop := range expr.AsObjectLiteralExpression().Properties.Nodes {
+			if prop == nil || prop.Kind != ast.KindPropertyAssignment {
+				return false
+			}
+			pa := prop.AsPropertyAssignment()
+			if name := pa.Name(); name != nil && ast.IsComputedPropertyName(name) {
+				return false
+			}
+			if !expressionCannotThrow(pa.Initializer) {
+				return false
+			}
+		}
+		return true
+	case ast.KindArrayLiteralExpression:
+		for _, el := range expr.AsArrayLiteralExpression().Elements.Nodes {
+			if el == nil || el.Kind == ast.KindSpreadElement || !expressionCannotThrow(el) {
+				return false
+			}
+		}
+		return true
+	case ast.KindTemplateExpression:
+		for _, span := range expr.AsTemplateExpression().TemplateSpans.Nodes {
+			if span == nil || !expressionCannotThrow(span.AsTemplateSpan().Expression) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
 }

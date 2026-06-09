@@ -111,6 +111,45 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `hey.then(function() { do {} while (true) })`},
 			{Code: `hey.then(function() { while (1) { return 1; } })`},
 			{Code: `hey.then(function() { while ('truthy') { return 1; } })`},
+
+			// ---- coverage gaps surfaced in review: for / labeled / do-while(false) ----
+			{Code: `hey.then(function() { for (;;) { return 1; } })`},
+			{Code: `hey.then(function() { outer: { return 1; } })`},
+			{Code: `hey.then(function() { do { return 1; } while (false) })`},
+
+			// ---- switch: a conditional break must not be masked, yet these still terminate ----
+			{Code: `hey.then(function(x) { switch (x) { case 1: { return 1; } default: return 2; } })`},
+			{Code: `hey.then(function(x) { switch (x) { case 1: if (y) return 1; else return 2; default: return 3; } })`},
+			{Code: `hey.then(function(x) { switch (x) { case 1: if (y) return 1; default: return 2; } })`},
+			{Code: `hey.then(function(x) { switch (x) { case 1: while (true) { break; } return 'a'; default: return 'b'; } })`},
+
+			// ---- ignoreAssignmentVariable: compound assignment to an ignored var (default globalThis) ----
+			{Code: `hey.then(x => { globalThis.a += x })`},
+			{Code: `hey.then(x => { globalThis.a ||= x })`},
+			{Code: `hey.then(x => { globalThis.a ??= x })`},
+			{Code: `hey.then(x => { globalThis[x] -= 1 })`},
+			{Code: `hey.then(x => { window.a += x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}},
+
+			// ---- try/catch: catch unreachable because the try block cannot throw ----
+			{Code: `hey.then(function() { try { return 1 } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return -1 } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return {a: 1} } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return [1, 2] } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return true ? 1 : 2 } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return 1; foo() } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { let a = 1; return 1 } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return "x" } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return void 0 } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { return 1 + 2 } catch (e) { log(e) } })`},
+			{Code: "hey.then(function() { try { return `a${1}` } catch (e) { log(e) } })"},
+			{Code: `hey.then(function() { try { ; return 1 } catch (e) { log(e) } })`},
+			{Code: `hey.then(function() { try { 1; return 2 } catch (e) { log(e) } })`},
+
+			// ---- switch: break reachability inside a clause ----
+			{Code: `hey.then(function(x) { switch (x) { case 1: { return 1; break; } default: return 2; } })`},
+			{Code: `hey.then(function(x) { switch (x) { case 1: ; return 1; default: return 2; } })`},
+			{Code: `hey.then(function() { try { return 'a' in {} } catch (e) { log(e) } })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- ESLint upstream invalid cases ----
@@ -177,6 +216,31 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `hey.then(function(x) { switch (x) { case 1: return 'a'; case 2: break; default: return 'c'; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			// switch where default case body doesn't terminate
 			{Code: `hey.then(function(x) { switch (x) { case 1: return 'a'; default: console.log('nope'); } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			// switch where a case conditionally breaks out before its return (review fix)
+			{Code: `hey.then(function(x) { switch (x) { case 1: if (y) break; return 'a'; default: return 'b'; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			// same, with the conditional break nested inside a block
+			{Code: `hey.then(function(x) { switch (x) { case 1: { if (y) break; } return 'a'; default: return 'b'; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			// compound assignment to a non-ignored variable is still reported
+			{Code: `hey.then(x => { notGlobal.a += x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+
+			// ---- try/catch: catch reachable because the try block may throw ----
+			{Code: `hey.then(function() { try { return foo() } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { return x } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { return {[k]: 1} } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { foo(); return 1 } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { return x.y } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { return [...x] } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { return {...x} } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: "hey.then(function() { try { return `a${x}` } catch (e) { log(e) } })", Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { let a = foo(); return 1 } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { let {a} = x; return 1 } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+
+			// ---- switch: break (else-branch / labeled) exits the switch, not terminal ----
+			{Code: `hey.then(function(x) { switch (x) { case 1: if (y) return 1; else break; default: return 2; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function(x) { outer: switch (x) { case 1: if (y) break outer; return 1; default: return 2; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function(x) { switch (x) { case 1: lbl: if (y) break; return 1; default: return 2; } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { return x instanceof Object } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(function() { try { throw new Error() } catch (e) { log(e) } })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 		},
 	)
 }
