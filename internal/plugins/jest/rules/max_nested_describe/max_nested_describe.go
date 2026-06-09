@@ -42,7 +42,7 @@ func parseOptions(raw any) options {
 		opts.Max = int(v)
 	}
 
-	if opts.Max < 1 {
+	if opts.Max < 0 {
 		return options{Max: defaultMax}
 	}
 
