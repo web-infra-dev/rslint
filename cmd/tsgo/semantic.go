@@ -67,8 +67,14 @@ func CollectSemantic(program *compiler.Program) Semantic {
 	tc, done := program.GetTypeChecker(context.Background())
 	defer done()
 
-	for id, sourceFile := range program.GetSourceFiles() {
-		CollectSemanticInFile(tc, sourceFile, &semantic, id)
+	sourceFiles := program.GetSourceFiles()
+	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
+	for id, sourceFile := range sourceFiles {
+		sourceFileIds[sourceFile] = SourceFileId(id)
+	}
+
+	for id, sourceFile := range sourceFiles {
+		CollectSemanticInFile(tc, sourceFile, &semantic, id, sourceFileIds)
 	}
 	return semantic
 }
@@ -137,7 +143,7 @@ func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
 		Never:     tc.GetNeverType().Id(),
 	}
 }
-func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int) {
+func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int, sourceFileIds map[*ast.SourceFile]SourceFileId) {
 	if tc == nil || file == nil {
 		return
 	}
@@ -147,6 +153,19 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 	positionMap := file.GetPositionMap()
 	utf16 := func(pos int) int {
 		return positionMap.UTF8ToUTF16(pos)
+	}
+	nodeReference := func(node *ast.Node) *NodeReference {
+		if node == nil || node.Pos() < 0 || node.End() < 0 {
+			return nil
+		}
+
+		nodeSourceFile := ast.GetSourceFileOfNode(node)
+		nodePositionMap := nodeSourceFile.GetPositionMap()
+		return &NodeReference{
+			SourceFileId: sourceFileIds[nodeSourceFile],
+			Start:        nodePositionMap.UTF8ToUTF16(node.Pos()),
+			End:          nodePositionMap.UTF8ToUTF16(node.End()),
+		}
 	}
 
 	recordType := func(ty *checker.Type) checker.TypeId {
@@ -208,15 +227,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
 
-					// Get declaration position if available
-					var declRef *NodeReference
-					if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Pos() >= 0 && symbol.ValueDeclaration.End() >= 0 {
-						declRef = &NodeReference{
-							SourceFileId: sourceFileId,
-							Start:        utf16(symbol.ValueDeclaration.Pos()),
-							End:          utf16(symbol.ValueDeclaration.End()),
-						}
-					}
+					declRef := nodeReference(symbol.ValueDeclaration)
 
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
@@ -253,15 +264,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
 
-						// Get declaration position if available
-						var declRef *NodeReference
-						if valueSymbol.ValueDeclaration != nil && valueSymbol.ValueDeclaration.Pos() >= 0 && valueSymbol.ValueDeclaration.End() >= 0 {
-							declRef = &NodeReference{
-								SourceFileId: sourceFileId,
-								Start:        utf16(valueSymbol.ValueDeclaration.Pos()),
-								End:          utf16(valueSymbol.ValueDeclaration.End()),
-							}
-						}
+						declRef := nodeReference(valueSymbol.ValueDeclaration)
 
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,

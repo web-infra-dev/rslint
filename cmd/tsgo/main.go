@@ -184,7 +184,12 @@ func runMain() int {
 
 	initPrimitiveTypes(tc, &checkResult.Semantic)
 	fileMap := make(map[string]int32)
-	for sourcefileId, file := range program.GetSourceFiles() {
+	sourceFiles := program.GetSourceFiles()
+	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
+	for sourcefileId, file := range sourceFiles {
+		sourceFileIds[file] = SourceFileId(sourcefileId)
+	}
+	for sourcefileId, file := range sourceFiles {
 		fileMap[file.FileName()] = int32(sourcefileId)
 		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName())
 		sourceFile := file.AsSourceFile()
@@ -200,7 +205,7 @@ func runMain() int {
 		})
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
 
-		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId)
+		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId, sourceFileIds)
 	}
 	checkResult.Diagnostics = getDiagnostics(diagnostics, &fileMap)
 
