@@ -49,13 +49,13 @@ func parseOptions(raw any) options {
 	return opts
 }
 
-func buildExceededMaxAssertionMessage(count, max int) rule.RuleMessage {
+func buildExceededMaxAssertionMessage(count, maxAllowed int) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "exceededMaxAssertion",
-		Description: fmt.Sprintf("Too many assertion calls (%d) - maximum allowed is %d", count, max),
+		Description: fmt.Sprintf("Too many assertion calls (%d) - maximum allowed is %d", count, maxAllowed),
 		Data: map[string]string{
 			"count": strconv.Itoa(count),
-			"max":   strconv.Itoa(max),
+			"max":   strconv.Itoa(maxAllowed),
 		},
 	}
 }
