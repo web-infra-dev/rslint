@@ -8,6 +8,7 @@ import {
   localConfigs,
   task,
 } from './worker-pool-e2e-helpers.js';
+import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 
 /**
  * WorkerPool end-to-end — queue model: tasks wait in `pendingQueue`
@@ -19,12 +20,9 @@ import {
  * batches as parseError:'pool_degraded' instead of hanging.
  */
 
-// Skipped on windows: tearing down a worker that has oxc (a napi addon)
-// loaded aborts below the JS layer there (nodejs/node#34567) and crashes
-// the rstest worker running this file. These e2e tests spawn real
-// workers and tear them down, so they are windows-skipped; they still
-// run on linux/macOS.
-describe.skipIf(process.platform === 'win32')(
+// win32 teardown is gated by SKIP_WIN32_NAPI_TEARDOWN (see that file for the
+// nodejs/node#34567 rationale); the flag is false so these run on win32 too.
+describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
     // R1 (re-purposed for the queue model): the original R1 finding
