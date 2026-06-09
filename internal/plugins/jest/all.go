@@ -2,6 +2,7 @@ package jest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/expect_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_nested_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
@@ -35,6 +36,7 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		expect_expect.ExpectExpectRule,
+		max_expect.MaxExpectRule,
 		max_nested_describe.MaxNestedDescribeRule,
 		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,

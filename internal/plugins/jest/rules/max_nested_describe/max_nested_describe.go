@@ -33,11 +33,17 @@ func parseOptions(raw any) options {
 
 	switch v := optsMap["max"].(type) {
 	case float64:
-		opts.Max = int(v)
+		if v == float64(int(v)) {
+			opts.Max = int(v)
+		}
 	case int:
 		opts.Max = v
 	case int64:
 		opts.Max = int(v)
+	}
+
+	if opts.Max < 1 {
+		return options{Max: defaultMax}
 	}
 
 	return opts
