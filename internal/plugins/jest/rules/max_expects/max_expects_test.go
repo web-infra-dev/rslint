@@ -1,19 +1,19 @@
-package max_expect_test
+package max_expects_test
 
 import (
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/fixtures"
-	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_expects"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestMaxExpectRule(t *testing.T) {
+func TestMaxExpectsRule(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
 		t,
-		&max_expect.MaxExpectRule,
+		&max_expects.MaxExpectsRule,
 		[]rule_tester.ValidTestCase{
 			{Code: `test('should pass')`},
 			{Code: `test('should pass', () => {})`},

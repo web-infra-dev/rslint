@@ -1,4 +1,4 @@
-package max_expect
+package max_expects
 
 import (
 	"fmt"
@@ -81,7 +81,7 @@ func shouldCountExpectCall(jestFnCall *utils.ParsedJestFnCall) bool {
 	return true
 }
 
-var MaxExpectRule = rule.Rule{
+var MaxExpectsRule = rule.Rule{
 	Name: "jest/max-expects",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
