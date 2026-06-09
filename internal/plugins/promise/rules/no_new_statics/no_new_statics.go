@@ -62,7 +62,7 @@ var NoNewStaticsRule = rule.Rule{
 				//   new Promise.resolve()    → Promise.resolve()
 				//   new  Promise.resolve()   → Promise.resolve()
 				//   new/*c*/Promise.resolve() → /*c*/Promise.resolve()
-				start := int(utils.TrimNodeTextRange(ctx.SourceFile, node).Pos())
+				start := utils.TrimNodeTextRange(ctx.SourceFile, node).Pos()
 				end := start + 3 // len("new") == 3
 				src := ctx.SourceFile.Text()
 				for end < len(src) && (src[end] == ' ' || src[end] == '\t' || src[end] == '\r' || src[end] == '\n') {
