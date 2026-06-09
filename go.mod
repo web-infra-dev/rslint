@@ -52,8 +52,8 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/vfsmatch v0.0.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
-	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.45.0
+	golang.org/x/sync v0.21.0
+	golang.org/x/sys v0.46.0
 	golang.org/x/tools v0.45.0
 	gotest.tools/v3 v3.5.2
 )
@@ -72,7 +72,7 @@ require (
 require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
-	github.com/go-json-experiment/json v0.0.0-20260520185125-572e7c383686
-	github.com/microsoft/typescript-go v0.0.0-20260607205414-254e9a5331fe // indirect
-	golang.org/x/text v0.37.0
+	github.com/go-json-experiment/json v0.0.0-20260601182631-00ed12fed2a6
+	github.com/microsoft/typescript-go v0.0.0-20260608212454-69b0d53976ef // indirect
+	golang.org/x/text v0.38.0
 )
