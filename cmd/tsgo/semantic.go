@@ -160,12 +160,21 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		}
 
 		nodeSourceFile := ast.GetSourceFileOfNode(node)
+		if nodeSourceFile == nil {
+			return nil
+		}
+		nodeSourceFileId, ok := sourceFileIds[nodeSourceFile]
+		if !ok {
+			return nil
+		}
+
 		nodePositionMap := nodeSourceFile.GetPositionMap()
 		return &NodeReference{
-			SourceFileId: sourceFileIds[nodeSourceFile],
+			SourceFileId: nodeSourceFileId,
 			Start:        nodePositionMap.UTF8ToUTF16(node.Pos()),
 			End:          nodePositionMap.UTF8ToUTF16(node.End()),
 		}
+	}
 	}
 
 	recordType := func(ty *checker.Type) checker.TypeId {
