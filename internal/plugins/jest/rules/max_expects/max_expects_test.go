@@ -559,6 +559,23 @@ func TestMaxExpectsRule(t *testing.T) {
 					{MessageId: "exceededMaxAssertion", Line: 4, Column: 11},
 				},
 			},
+			{
+				Code: `
+        test('x', () => {
+          expect(1).toBe(1);
+          expect(1).toBe(1);
+          expect(1).toBe(1);
+          run((() => {
+            expect(1).toBe(1);
+            expect(1).toBe(1);
+            expect(1).toBe(1);
+          }));
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxAssertion", Line: 9, Column: 13},
+				},
+			},
 		},
 	)
 }

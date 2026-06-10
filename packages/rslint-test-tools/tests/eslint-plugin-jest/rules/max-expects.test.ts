@@ -630,5 +630,26 @@ ruleTester.run('max-expects', {} as never, {
         },
       ],
     },
+    {
+      code: `
+        test('x', () => {
+          expect(1).toBe(1);
+          expect(1).toBe(1);
+          expect(1).toBe(1);
+          run((() => {
+            expect(1).toBe(1);
+            expect(1).toBe(1);
+            expect(1).toBe(1);
+          }));
+        });
+      `,
+      errors: [
+        {
+          messageId: 'exceededMaxAssertion',
+          line: 8,
+          column: 5,
+        },
+      ],
+    },
   ],
 });

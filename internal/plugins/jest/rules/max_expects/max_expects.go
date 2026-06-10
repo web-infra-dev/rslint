@@ -62,6 +62,9 @@ func buildExceededMaxAssertionMessage(count, maxAllowed int) rule.RuleMessage {
 
 func isTestCallbackFunction(fn *ast.Node, ctx rule.RuleContext) bool {
 	parent := fn.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return true
 	}
