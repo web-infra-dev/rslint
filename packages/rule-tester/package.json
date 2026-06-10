@@ -1,6 +1,6 @@
 {
   "name": "@typescript-eslint/rule-tester",
-  "version": "0.5.3",
+  "version": "0.5.4-canary.1781059600",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

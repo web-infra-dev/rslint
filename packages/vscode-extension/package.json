@@ -2,7 +2,7 @@
   "name": "rslint",
   "displayName": "Rslint",
   "description": "Language support for Rslint",
-  "version": "0.5.3",
+  "version": "0.5.4-canary.1781059600",
   "icon": "images/icon.png",
   "private": true,
   "publisher": "rstack",

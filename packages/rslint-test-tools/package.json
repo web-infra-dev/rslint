@@ -1,6 +1,6 @@
 {
   "name": "@rslint/test-tools",
-  "version": "0.5.3",
+  "version": "0.5.4-canary.1781059600",
   "type": "module",
   "main": "src/index.ts",
   "private": true,

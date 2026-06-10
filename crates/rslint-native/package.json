@@ -1,6 +1,6 @@
 {
   "name": "@rslint/native",
-  "version": "0.5.3",
+  "version": "0.5.4-canary.1781059600",
   "type": "commonjs",
   "main": "index.js",
   "types": "index.d.ts",
