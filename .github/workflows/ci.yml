@@ -86,7 +86,7 @@ jobs:
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
-              go test -p 128 -count=1 $batch
+              go test -p 64 -count=1 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               $batch = @()
             }
@@ -95,7 +95,7 @@ jobs:
           # Run remaining packages
           if ($batch.Count -gt 0) {
             Write-Host "Running final batch of $($batch.Count) packages..."
-            go test -p 128 -count=1 $batch
+            go test -p 64 -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
