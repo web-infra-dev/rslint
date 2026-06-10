@@ -187,7 +187,7 @@ func runMain() int {
 	sourceFiles := program.GetSourceFiles()
 	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
 	for sourcefileId, file := range sourceFiles {
-		sourceFileIds[file] = SourceFileId(sourcefileId)
+		sourceFileIds[file] = sourcefileId
 	}
 	for sourcefileId, file := range sourceFiles {
 		fileMap[file.FileName()] = int32(sourcefileId)

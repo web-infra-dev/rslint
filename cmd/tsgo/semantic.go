@@ -70,7 +70,7 @@ func CollectSemantic(program *compiler.Program) Semantic {
 	sourceFiles := program.GetSourceFiles()
 	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
 	for id, sourceFile := range sourceFiles {
-		sourceFileIds[sourceFile] = SourceFileId(id)
+		sourceFileIds[sourceFile] = id
 	}
 
 	for id, sourceFile := range sourceFiles {
