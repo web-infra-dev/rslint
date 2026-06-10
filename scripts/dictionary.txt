@@ -573,3 +573,5 @@ SIGSEGV
 zigbuild
 lockfiles
 smajobber
+errrr
+supa
