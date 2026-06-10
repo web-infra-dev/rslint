@@ -13,7 +13,7 @@ const recommended: RslintConfigEntry = {
     // 'promise/no-nesting': 'warn', // not implemented
     // 'promise/no-promise-in-callback': 'warn', // not implemented
     // 'promise/no-callback-in-promise': 'warn', // not implemented
-    // 'promise/avoid-new': 'off', // not implemented
+    'promise/avoid-new': 'off',
     // 'promise/no-new-statics': 'error', // not implemented
     // 'promise/no-return-in-finally': 'warn', // not implemented
     // 'promise/valid-params': 'warn', // not implemented
