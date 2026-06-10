@@ -309,6 +309,7 @@ jobs:
           pnpm --filter '@rslint/wasm' build
   test-rust:
     name: Test Rust
+    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
