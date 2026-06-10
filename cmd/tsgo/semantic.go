@@ -175,7 +175,6 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			End:          nodePositionMap.UTF8ToUTF16(node.End()),
 		}
 	}
-	}
 
 	recordType := func(ty *checker.Type) checker.TypeId {
 		if ty == nil {
