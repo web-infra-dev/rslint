@@ -78,7 +78,7 @@ jobs:
           go build ./internal/...
 
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 128
+          $batchSize = 32
           $batch = @()
 
           foreach ($pkg in $packages) {
