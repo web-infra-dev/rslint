@@ -91,7 +91,8 @@ var PreferEqualityMatcherRule = rule.Rule{
 					return
 				}
 
-				left, right, negated, ok := parseStrictEqualityComparison(utils.UnwrapBasicTypeAssertions(expectArgs[0]))
+				comparison := ast.SkipParentheses(expectArgs[0])
+				left, right, negated, ok := parseStrictEqualityComparison(comparison)
 				if !ok {
 					return
 				}
@@ -101,7 +102,8 @@ var PreferEqualityMatcherRule = rule.Rule{
 					return
 				}
 
-				matcherValue, ok := isBooleanLiteral(utils.UnwrapBasicTypeAssertions(matcherArgs[0]))
+				matcherArg := utils.UnwrapBasicTypeAssertions(matcherArgs[0])
+				matcherValue, ok := isBooleanLiteral(matcherArg)
 				if !ok {
 					return
 				}
@@ -114,10 +116,10 @@ var PreferEqualityMatcherRule = rule.Rule{
 				hasNot := slices.Contains(jestFnCall.Modifiers, "not")
 				modifierText := buildModifierText(jestFnCall, (negated != matcherValue) == hasNot)
 
-				leftText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, left, false)
-				rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, right, false)
-				replaceComparison := rule.RuleFixReplace(ctx.SourceFile, expectArgs[0], leftText)
-				replaceMatcherArg := rule.RuleFixReplace(ctx.SourceFile, matcherArgs[0], rightText)
+				leftText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(left), false)
+				rightText := scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, ast.SkipParentheses(right), false)
+				replaceComparison := rule.RuleFixReplace(ctx.SourceFile, comparison, leftText)
+				replaceMatcherArg := rule.RuleFixReplace(ctx.SourceFile, matcherArg, rightText)
 				modifierRange := core.NewTextRange(expectCall.End(), matcherEntry.Node.Parent.End())
 
 				suggestions := make([]rule.RuleSuggestion, len(suggestedEqualityMatchers))
