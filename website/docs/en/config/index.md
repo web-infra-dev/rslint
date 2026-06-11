@@ -125,7 +125,7 @@ For rule severity levels, option format, and plugin configuration, see [Rules & 
 
 Plugins enabled for this entry, in one of two forms.
 
-**Array of names** — built-in (natively-ported) plugins. A name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside `rules`.
+**Array of names** — built-in (native) plugins. A name declares a rule namespace; its rules become available under the `<plugin>/<rule>` prefix inside `rules`.
 
 Built-in plugin names: `@typescript-eslint`, `import`, `jest`, `jsx-a11y`, `promise`, `react`, `react-hooks`, `unicorn`.
 
