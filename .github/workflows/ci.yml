@@ -23,7 +23,6 @@ concurrency:
 jobs:
   test-go:
     name: Test Go
-    if: false
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -78,7 +77,7 @@ jobs:
           go build ./internal/...
 
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 32
+          $batchSize = 64
           $batch = @()
 
           foreach ($pkg in $packages) {
@@ -101,7 +100,6 @@ jobs:
 
   build-rslint-windows:
     name: Build rslint.exe (Windows)
-    if: false
     runs-on: rspack-windows-2022-large
     steps:
       - name: Checkout code
@@ -130,7 +128,6 @@ jobs:
 
   test-node-windows:
     name: Test npm packages (windows-latest)
-    if: false
     runs-on: windows-latest
     needs: build-rslint-windows
     steps:
@@ -175,7 +172,6 @@ jobs:
         run: pnpm run test
 
   lint:
-    if: false
     name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -210,7 +206,6 @@ jobs:
 
   test-node:
     name: Test npm packages
-    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -277,7 +272,6 @@ jobs:
         run: pnpm run test
 
   test-wasm:
-    if: false
     name: Test WASM
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -309,7 +303,6 @@ jobs:
           pnpm --filter '@rslint/wasm' build
   test-rust:
     name: Test Rust
-    if: false
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
