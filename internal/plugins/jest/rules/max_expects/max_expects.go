@@ -84,6 +84,15 @@ func shouldCountExpectCall(jestFnCall *utils.ParsedJestFnCall) bool {
 	return true
 }
 
+func maybeResetCountForFunctionLike(node *ast.Node, ctx rule.RuleContext, count *int) {
+	if node.Body() == nil {
+		return
+	}
+	if isTestCallbackFunction(node, ctx) {
+		*count = 0
+	}
+}
+
 var MaxExpectsRule = rule.Rule{
 	Name: "jest/max-expects",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -91,9 +100,7 @@ var MaxExpectsRule = rule.Rule{
 		count := 0
 
 		maybeResetCount := func(node *ast.Node) {
-			if isTestCallbackFunction(node, ctx) {
-				count = 0
-			}
+			maybeResetCountForFunctionLike(node, ctx, &count)
 		}
 
 		return rule.RuleListeners{
@@ -101,6 +108,14 @@ var MaxExpectsRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindFunctionExpression): maybeResetCount,
 			ast.KindArrowFunction:                           maybeResetCount,
 			rule.ListenerOnExit(ast.KindArrowFunction):      maybeResetCount,
+			ast.KindMethodDeclaration:                       maybeResetCount,
+			rule.ListenerOnExit(ast.KindMethodDeclaration):  maybeResetCount,
+			ast.KindGetAccessor:                             maybeResetCount,
+			rule.ListenerOnExit(ast.KindGetAccessor):        maybeResetCount,
+			ast.KindSetAccessor:                             maybeResetCount,
+			rule.ListenerOnExit(ast.KindSetAccessor):        maybeResetCount,
+			ast.KindConstructor:                             maybeResetCount,
+			rule.ListenerOnExit(ast.KindConstructor):        maybeResetCount,
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := utils.ParseJestFnCall(node, ctx)
 				if jestFnCall == nil {

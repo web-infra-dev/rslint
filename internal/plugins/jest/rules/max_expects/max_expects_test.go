@@ -220,6 +220,49 @@ func TestMaxExpectsRule(t *testing.T) {
         expect(true).toBeDefined();
       };
     `},
+			{Code: `
+      test('ignores expects inside object methods', () => {
+        const helper = {
+          check() {
+            expect(true).toBeDefined();
+            expect(true).toBeDefined();
+            expect(true).toBeDefined();
+          },
+        };
+
+        expect(true).toBeDefined();
+        expect(true).toBeDefined();
+        expect(true).toBeDefined();
+      });
+    `},
+			{Code: `
+      test('ignores expects inside class members', () => {
+        class Helper {
+          constructor() {
+            expect(true).toBeDefined();
+            expect(true).toBeDefined();
+          }
+
+          get value() {
+            expect(true).toBeDefined();
+            return true;
+          }
+
+          set value(next) {
+            expect(next).toBeDefined();
+          }
+
+          check() {
+            expect(true).toBeDefined();
+            expect(true).toBeDefined();
+          }
+        }
+
+        expect(true).toBeDefined();
+        expect(true).toBeDefined();
+        expect(true).toBeDefined();
+      });
+    `},
 			{
 				Code: `
         test('should pass', () => {
