@@ -2,6 +2,7 @@ package no_callback_in_promise
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -87,23 +88,8 @@ func getMemberCallName(node *ast.Node) string {
 	return ""
 }
 
-// isPromiseMemberCall returns true if node is a call expression whose callee is a
-// property-access expression with the given name — i.e. a.then(...) or a.catch(...).
-// This mirrors upstream's hasPromiseCallback which requires callee.type === 'MemberExpression'.
 func isPromiseMemberCall(node *ast.Node) bool {
-	if !ast.IsCallExpression(node) {
-		return false
-	}
-	callee := node.AsCallExpression().Expression
-	if !ast.IsPropertyAccessExpression(callee) {
-		return false
-	}
-	propName := callee.AsPropertyAccessExpression().Name()
-	if propName == nil || !ast.IsIdentifier(propName) {
-		return false
-	}
-	name := propName.AsIdentifier().Text
-	return name == "then" || name == "catch"
+	return promiseutil.IsMemberCall(node, "then") || promiseutil.IsMemberCall(node, "catch")
 }
 
 // isFunctionLike returns true for FunctionExpression and ArrowFunction nodes.
