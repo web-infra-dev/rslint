@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 
 import { runTests } from '@vscode/test-electron';
 
@@ -6,156 +7,100 @@ function resolveFixture(name: string): string {
   return path.resolve(require.resolve('@rslint/core'), '../..', name);
 }
 
+interface TestSuite {
+  name: string;
+  workspace: string;
+  testsPath: string;
+}
+
 async function main() {
   const extensionDevelopmentPath = path.resolve(__dirname, '..');
+  const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
+
+  const suites: TestSuite[] = [
+    {
+      name: 'json-config',
+      workspace: resolveFixture('fixtures'),
+      testsPath: path.resolve(__dirname, './suite'),
+    },
+    {
+      name: 'js-config',
+      workspace: path.resolve(testsSourceDir, 'fixtures-jsconfig'),
+      testsPath: path.resolve(__dirname, './suite-jsconfig'),
+    },
+    {
+      name: 'monorepo',
+      workspace: path.resolve(testsSourceDir, 'fixtures-monorepo'),
+      testsPath: path.resolve(__dirname, './suite-monorepo'),
+    },
+    {
+      name: 'noconfig',
+      workspace: path.resolve(testsSourceDir, 'fixtures-noconfig'),
+      testsPath: path.resolve(__dirname, './suite-noconfig'),
+    },
+    {
+      name: 'type-aware-scope',
+      workspace: path.resolve(testsSourceDir, 'fixtures-type-aware-scope'),
+      testsPath: path.resolve(__dirname, './suite-type-aware-scope'),
+    },
+    {
+      name: 'project-service-scope',
+      workspace: path.resolve(testsSourceDir, 'fixtures-project-service-scope'),
+      testsPath: path.resolve(__dirname, './suite-project-service-scope'),
+    },
+    {
+      name: 'eslint-plugins',
+      workspace: path.resolve(testsSourceDir, 'fixtures-eslint-plugins'),
+      testsPath: path.resolve(__dirname, './suite-eslint-plugins'),
+    },
+  ];
+
+  console.log(`Starting ${suites.length} test suites in parallel...`);
+
   let failed = false;
 
-  // --- Existing tests (JSON config workspace) ---
-  const testWorkspace = resolveFixture('fixtures');
-  const extensionTestsPath = path.resolve(__dirname, './suite');
+  await Promise.allSettled(
+    suites.map(async (suite) => {
+      // Create isolated user-data and extensions directories for each suite to prevent conflicts
+      const tmpBase = path.resolve(
+        extensionDevelopmentPath,
+        `.vscode-test-out/tmp-${suite.name}`,
+      );
+      const userDataDir = path.join(tmpBase, 'user-data');
+      const extensionsDir = path.join(tmpBase, 'extensions');
 
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('JSON config tests (stable) failed:', err);
-    failed = true;
-  }
-
-  // try {
-  //   await runTests({
-  //     extensionDevelopmentPath,
-  //     extensionTestsPath,
-  //     launchArgs: ['--disable-extensions', testWorkspace],
-  //     version: '1.106.3',
-  //   });
-  // } catch (err) {
-  //   console.error('JSON config tests (1.106.3) failed:', err);
-  //   failed = true;
-  // }
-
-  // --- JS config tests ---
-  const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
-  const jsConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-jsconfig');
-  const jsConfigTestsPath = path.resolve(__dirname, './suite-jsconfig');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: jsConfigTestsPath,
-      launchArgs: ['--disable-extensions', jsConfigWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('JS config tests failed:', err);
-    failed = true;
-  }
-
-  // --- Monorepo multi-config tests ---
-  const monorepoWorkspace = path.resolve(testsSourceDir, 'fixtures-monorepo');
-  const monorepoTestsPath = path.resolve(__dirname, './suite-monorepo');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: monorepoTestsPath,
-      launchArgs: ['--disable-extensions', monorepoWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('Monorepo config tests failed:', err);
-    failed = true;
-  }
-
-  // --- No config fallback tests ---
-  const noConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-noconfig');
-  const noConfigTestsPath = path.resolve(__dirname, './suite-noconfig');
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: noConfigTestsPath,
-      launchArgs: ['--disable-extensions', noConfigWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('No config tests failed:', err);
-    failed = true;
-  }
-
-  // --- Type-aware rule scope tests ---
-  const typeAwareScopeWorkspace = path.resolve(
-    testsSourceDir,
-    'fixtures-type-aware-scope',
+      try {
+        await runTests({
+          extensionDevelopmentPath,
+          extensionTestsPath: suite.testsPath,
+          launchArgs: [
+            '--disable-extensions',
+            `--user-data-dir=${userDataDir}`,
+            `--extensions-dir=${extensionsDir}`,
+            suite.workspace,
+          ],
+          version: 'stable',
+        });
+        console.log(`Suite "${suite.name}" passed.`);
+      } catch (err) {
+        console.error(`Suite "${suite.name}" failed:`, err);
+        failed = true;
+      } finally {
+        // Clean up temp directories
+        try {
+          fs.rmSync(tmpBase, { recursive: true, force: true });
+        } catch (cleanupErr) {
+          // Ignore cleanup errors
+        }
+      }
+    }),
   );
-  const typeAwareScopeTestsPath = path.resolve(
-    __dirname,
-    './suite-type-aware-scope',
-  );
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: typeAwareScopeTestsPath,
-      launchArgs: ['--disable-extensions', typeAwareScopeWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('Type-aware scope tests failed:', err);
-    failed = true;
-  }
-
-  // --- projectService type-aware scope tests ---
-  const projectServiceScopeWorkspace = path.resolve(
-    testsSourceDir,
-    'fixtures-project-service-scope',
-  );
-  const projectServiceScopeTestsPath = path.resolve(
-    __dirname,
-    './suite-project-service-scope',
-  );
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: projectServiceScopeTestsPath,
-      launchArgs: ['--disable-extensions', projectServiceScopeWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('projectService scope tests failed:', err);
-    failed = true;
-  }
-
-  // --- eslintPlugins reverse-dispatch tests ---
-  const eslintPluginsWorkspace = path.resolve(
-    testsSourceDir,
-    'fixtures-eslint-plugins',
-  );
-  const eslintPluginsTestsPath = path.resolve(
-    __dirname,
-    './suite-eslint-plugins',
-  );
-
-  try {
-    await runTests({
-      extensionDevelopmentPath,
-      extensionTestsPath: eslintPluginsTestsPath,
-      launchArgs: ['--disable-extensions', eslintPluginsWorkspace],
-      version: 'stable',
-    });
-  } catch (err) {
-    console.error('eslintPlugins tests failed:', err);
-    failed = true;
-  }
 
   if (failed) {
     console.error('Some test suites failed');
     process.exit(1);
+  } else {
+    console.log('All test suites passed successfully!');
   }
 }
 
