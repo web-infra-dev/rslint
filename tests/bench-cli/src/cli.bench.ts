@@ -21,9 +21,9 @@ const cliEntrypoint = path.join(repoRoot, 'packages/rslint/bin/rslint.cjs');
 const vscodeRepoDir = path.join(os.tmpdir(), 'rslint-bench', 'vscode');
 const benchmarkTaskName = 'cli@vscode';
 const preBinaryBenchmarkName = 'cli@vscode_before_go_exec';
-const execFileSyncPreloadPath = path.resolve(
+const spawnStampPreloadPath = path.resolve(
   import.meta.dirname,
-  '../scripts/exec-file-sync-preload.cjs',
+  '../scripts/spawn-stamp-preload.cjs',
 );
 
 const cliArgs = ['--format', 'jsonline', '--quiet', '.'] as const;
@@ -38,7 +38,7 @@ const bench = createCodspeedCompatibleBench();
  * Timing model used here:
  * - `startedAtMs` is captured in the parent process right before `spawnSync`.
  * - `completedAtMs` is captured right after the CLI process finishes in parent.
- * - preload writes `interceptedAtMs` when child process first calls `execFileSync`.
+ * - preload writes `interceptedAtMs` when the child first spawns the Go binary.
  * - total latency ns: `(completedAtMs - startedAtMs) * 1e6`.
  * - before-go latency ns: `readPreBinaryLatencyNs()` => `(interceptedAtMs - startedAtMs) * 1e6`.
  *
@@ -51,7 +51,7 @@ async function runCLI(): Promise<{ totalNs: number; beforeGoNs: number }> {
   // lint execution instead of output buffering costs.
   const result = spawnSync(
     process.execPath,
-    ['--require', execFileSyncPreloadPath, cliEntrypoint, ...cliArgs],
+    ['--require', spawnStampPreloadPath, cliEntrypoint, ...cliArgs],
     {
       cwd: vscodeRepoDir,
       env: {
@@ -94,7 +94,7 @@ function toOverriddenDuration(ns: number): BenchTaskDurationOverride {
 await Promise.all([
   assertExists(cliEntrypoint),
   assertExists(vscodeRepoDir),
-  assertExists(execFileSyncPreloadPath),
+  assertExists(spawnStampPreloadPath),
 ]);
 
 addCodspeedCompatibleTask(bench, benchmarkTaskName, async () => {

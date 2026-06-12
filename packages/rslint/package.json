@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "exports": {
     ".": {
       "@typescript/source": "./src/index.ts",

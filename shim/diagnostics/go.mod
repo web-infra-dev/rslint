@@ -2,10 +2,10 @@ module github.com/microsoft/typescript-go/shim/diagnostics
 
 go 1.26
 
-require github.com/microsoft/typescript-go v0.0.0-20260521185404-d99f6b2a5ff8
+require github.com/microsoft/typescript-go v0.0.0-20260610233630-cda7baffa96f
 
 require (
-	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433 // indirect
-	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/text v0.36.0 // indirect
+	github.com/go-json-experiment/json v0.0.0-20260601182631-00ed12fed2a6 // indirect
+	golang.org/x/sync v0.21.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 )

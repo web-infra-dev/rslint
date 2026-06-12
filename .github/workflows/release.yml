@@ -124,7 +124,10 @@ jobs:
   publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
-    needs: [build]
+    # napi-build supplies the per-platform parser `.node` (downloaded into
+    # `binaries/native-<tuple>/`) that publish-marketplace.mjs stages into the
+    # eslint-plugin worker payload; without it the packaged plugin host can't load.
+    needs: [build, napi-build]
     runs-on: rspack-ubuntu-22.04-large
     environment: release
     steps:
@@ -137,6 +140,13 @@ jobs:
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
+
+      # publish:vsce regenerates @rslint/native's index.d.ts from the current
+      # Rust source (napi build) so the worker's build:js types are never stale.
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
 
       - name: Download Artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
@@ -169,7 +179,8 @@ jobs:
   publish-extension-open-vsx:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
-    needs: [build]
+    # Same as publish-extension-vscode: needs the per-platform parser `.node`.
+    needs: [build, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     steps:
@@ -182,6 +193,13 @@ jobs:
 
       - name: Setup Node
         uses: ./.github/actions/setup-node
+
+      # publish:ovsx regenerates @rslint/native's index.d.ts from the current
+      # Rust source (napi build) so the worker's build:js types are never stale.
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          cache: 'false'
 
       - name: Download Artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0

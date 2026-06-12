@@ -13,6 +13,10 @@ vsc-extension-quickstart.md
 **/.eslintrc.json
 **/*.map
 **/*.ts
+**/*.tsbuildinfo
+# Root-anchored on purpose: the eslint-plugin worker's nested
+# dist/eslint-plugin/node_modules/@rslint/native (loader + .node) MUST ship.
+# Do NOT rewrite to **/node_modules/** — that would strip the worker payload.
 node_modules/**
 !node_modules/vscode-languageclient/**
 !node_modules/vscode-languageserver-protocol/**

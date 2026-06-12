@@ -325,6 +325,8 @@ preresolved
 Prettier
 prioritises
 progressbar
+promisify
+promisifying
 promiseutil
 propertyassignment
 proptypes
@@ -573,3 +575,4 @@ SIGSEGV
 zigbuild
 lockfiles
 smajobber
+isatty

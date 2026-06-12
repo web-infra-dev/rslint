@@ -1,6 +1,8 @@
 package promise_plugin
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/always_return"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/avoid_new"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/catch_or_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_in_finally"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_wrap"
@@ -10,6 +12,8 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		always_return.AlwaysReturnRule,
+		avoid_new.AvoidNewRule,
 		catch_or_return.CatchOrReturnRule,
 		no_return_in_finally.NoReturnInFinallyRule,
 		no_return_wrap.NoReturnWrapRule,

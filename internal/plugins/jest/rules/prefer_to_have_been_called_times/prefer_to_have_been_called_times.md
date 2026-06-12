@@ -9,7 +9,7 @@ This rule triggers a warning if `toHaveLength` is used to assert the number of
 times a mock has been called.
 
 This rule is often used together with
-[`prefer-to-have-length`](./prefer_to_have_length.md).
+[`prefer-to-have-length`](./prefer-to-have-length.md).
 
 Examples of **incorrect** code for this rule:
 

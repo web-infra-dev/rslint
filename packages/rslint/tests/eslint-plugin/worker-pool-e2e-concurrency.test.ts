@@ -4,6 +4,7 @@ import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
 
 import { localConfigs, task } from './worker-pool-e2e-helpers.js';
+import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 
 /**
  * WorkerPool end-to-end — concurrent lintBatch (the #1050 runtime shape).
@@ -14,7 +15,8 @@ import { localConfigs, task } from './worker-pool-e2e-helpers.js';
  * partitioned to its own caller and rule — a cross-batch bleed (a result routed
  * to the wrong promise, or a doubled dispatch) would surface here.
  */
-describe.skipIf(process.platform === 'win32')(
+// win32 teardown gated by SKIP_WIN32_NAPI_TEARDOWN (flag false → runs on win32).
+describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool concurrent lintBatch (#1050 runtime shape)',
   () => {
     test('two batches in flight partition results to their own caller + rule', async () => {
