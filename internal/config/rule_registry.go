@@ -1,6 +1,9 @@
 package config
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -75,6 +78,14 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 			}
 		}
 	}
+
+	// mergedConfig.Rules is a map, so the collection order above is random
+	// per process. Sort by rule name to make listener registration — and
+	// with it the emission order of same-position diagnostics from
+	// different rules — deterministic across runs.
+	slices.SortFunc(enabledRules, func(a, b linter.ConfiguredRule) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return enabledRules, mergedConfig
 }

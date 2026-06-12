@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -162,10 +164,22 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				})
 			}
 		}
+		// GetAllRules iterates a map, so sort by name for a deterministic
+		// rule order — same policy as GetEnabledRules, which the
+		// RuleOptions-less path below goes through.
+		slices.SortFunc(rulesWithOptions, func(a, b RuleWithOption) int {
+			return strings.Compare(a.rule.Name, b.rule.Name)
+		})
 	}
 
-	// Create compiler host
-	host := utils.CreateCompilerHost(configDirectory, fs)
+	// Create compiler host with a request-scoped parse cache: the tsconfig
+	// loop below builds one Program per tsconfig on this host, and shared
+	// dependencies (lib/node_modules d.ts, cross-package sources) parse once.
+	// The cache dies with this request — no RetainOnly sweep here, and none
+	// may be added inside the tsConfigs loop (a mid-build eviction boundary
+	// buys nothing per I7 and complicates reasoning).
+	parseCache := utils.NewParseCache()
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDirectory, fs), parseCache)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),

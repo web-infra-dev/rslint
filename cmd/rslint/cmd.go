@@ -850,6 +850,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
+	// Run-scoped parse cache shared by every Program built in this pipeline
+	// (initial build, gap fallback, --fix rebuilds). Created here and passed
+	// down explicitly — see utils.WithParseCache (I5: no package singleton).
+	parseCache := utils.NewParseCache()
+
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
 	// Register placeholder rules for mounted ESLint plugins so their rule
@@ -963,7 +968,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			seenTsConfigs := make(map[string]struct{})
 
 			for configDir, entries := range configMap {
-				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs)
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs, parseCache)
 				if exitCode != 0 {
 					return exitCode
 				}
@@ -1000,7 +1005,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				exitCode int
 			)
 			rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, singleThreaded, nil,
+				rslintConfig, currentDirectory, fs, singleThreaded, nil, parseCache,
 			)
 			if exitCode != 0 {
 				return exitCode
@@ -1018,7 +1023,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			exitCode int
 		)
 		rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
-			rslintConfig, currentDirectory, fs, singleThreaded, nil,
+			rslintConfig, currentDirectory, fs, singleThreaded, nil, parseCache,
 		)
 		if exitCode != 0 {
 			return exitCode
@@ -1119,7 +1124,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			capturedGapFiles = gapFiles
 
 			if len(gapFiles) > 0 {
-				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs)
+				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs, parseCache)
 				if fallback != nil {
 					programs = append(programs, fallback)
 					fallbackProgramIndex = len(programs) - 1
@@ -1127,6 +1132,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 		}
 	}
+
+	// Initial build (including the gap fallback) is complete: evict cache
+	// entries for files that ended up in no program — build-time dedup
+	// losers, parsed-then-dropped duplicates. Deletion-only, see
+	// ParseCache.RetainOnly (I7).
+	parseCache.RetainOnly(programs)
 
 	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
 	// Returns the program slice and the index of the fallback gap-file program
@@ -1136,14 +1147,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if configMap != nil {
 			seen := make(map[string]struct{})
 			for configDir, entries := range configMap {
-				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen)
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen, parseCache)
 				if exitCode != 0 {
 					return nil, -1, fmt.Errorf("failed to create programs for %s", configDir)
 				}
 				baseProgs = append(baseProgs, progs...)
 			}
 		} else {
-			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 			if exitCode != 0 {
 				return nil, -1, errors.New("failed to create programs")
 			}
@@ -1153,7 +1164,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// Rebuild fallback Program for gap files (content may have changed after fixes).
 		fallbackIdx := -1
 		if len(capturedGapFiles) > 0 {
-			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs)
+			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs, parseCache)
 			if fallback != nil {
 				baseProgs = append(baseProgs, fallback)
 				fallbackIdx = len(baseProgs) - 1
@@ -1294,6 +1305,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			if err != nil || len(newPrograms) == 0 {
 				break
 			}
+
+			// Evict cache entries no longer referenced by any live program:
+			// previous-round ASTs of rewritten files and this round's dedup
+			// losers. The live set is the union of this round's programs and
+			// the initial ones — the initial slice stays referenced until the
+			// end of this function, so its objects are alive regardless and
+			// keeping their entries costs nothing (deletion-only, I7).
+			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint: collect remaining diagnostics.
 			// Rebuild file filters for the new programs (ownership + ignores).
