@@ -104,6 +104,9 @@ func TestNoNestingExtras(t *testing.T) {
 			{Code: `doThing().then(function(x) {
   return { get val() { return a.then(x) } };
 })`},
+
+			// ---- Dimension 4: implicit arguments binding in non-arrow callback ----
+			{Code: `doThing().then(function() { return foo.then(() => use(arguments)) })`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized callback — still reports inner .then ----
@@ -195,6 +198,30 @@ func TestNoNestingExtras(t *testing.T) {
 			// ---- Real-user: .catch rejection handler contains nested .catch ----
 			{
 				Code:   `doThing().catch(function() { a.catch() })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidNesting", Line: 1}},
+			},
+
+			// ---- Dimension 4: property access name is not a reference to outer binding ----
+			{
+				Code:   `doThing().then(user => getProfile().then(p => p.user))`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidNesting", Line: 1}},
+			},
+
+			// ---- Dimension 4: object key is not a reference to outer binding ----
+			{
+				Code:   `doThing().then(user => getProfile().then(p => ({ user: 1 })))`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidNesting", Line: 1}},
+			},
+
+			// ---- Dimension 4: inner parameter shadowing the outer binding ----
+			{
+				Code:   `doThing().then(a => inner.then(a => use(a)))`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidNesting", Line: 1}},
+			},
+
+			// ---- Dimension 4: implicit arguments binding shadowed by nested non-arrow callback ----
+			{
+				Code:   `doThing().then(function() { return foo.then(function() { use(arguments) }) })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidNesting", Line: 1}},
 			},
 		},

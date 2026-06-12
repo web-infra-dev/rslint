@@ -30,14 +30,14 @@ func isPromiseCallback(node *ast.Node) bool {
 	return isThenOrCatchCall(parent)
 }
 
-// walkIdentifiers calls fn for each identifier name found anywhere in node's
+// walkIdentifiers calls fn for each identifier node found anywhere in node's
 // subtree, stopping early across the whole traversal if fn returns true.
-func walkIdentifiers(node *ast.Node, fn func(name string) bool) bool {
+func walkIdentifiers(node *ast.Node, fn func(identNode *ast.Node) bool) bool {
 	if node == nil {
 		return false
 	}
 	if node.Kind == ast.KindIdentifier {
-		return fn(node.AsIdentifier().Text)
+		return fn(node)
 	}
 	found := false
 	node.ForEachChild(func(child *ast.Node) bool {
@@ -61,18 +61,52 @@ func argsContainRef(callNode *ast.Node, fn *ast.Node) bool {
 		return false
 	}
 	body := fn.Body()
+	boundary := fn
+	if body != nil {
+		boundary = body
+	}
 	for _, arg := range args.Nodes {
 		found := false
-		walkIdentifiers(arg, func(name string) bool {
-			if utils.HasShadowingParameter(fn, name) {
-				found = true
-				return true
+		walkIdentifiers(arg, func(identNode *ast.Node) bool {
+			if utils.IsNonReferenceIdentifier(identNode) {
+				return false
 			}
-			if body != nil && (utils.HasShadowingDeclaration(body, name) || utils.HasHoistedVarDeclaration(body, name)) {
-				found = true
-				return true
+
+			name := identNode.AsIdentifier().Text
+
+			if name == "arguments" {
+				if utils.IsNameShadowedBetween(identNode, boundary, name) {
+					return false
+				}
+				isArgumentsShadowed := false
+				for curr := identNode.Parent; curr != nil && curr != fn; curr = curr.Parent {
+					if ast.IsFunctionLikeDeclaration(curr) && curr.Kind != ast.KindArrowFunction {
+						isArgumentsShadowed = true
+						break
+					}
+				}
+				if isArgumentsShadowed {
+					return false
+				}
+				if fn.Kind != ast.KindArrowFunction {
+					found = true
+					return true
+				}
+				return false
 			}
-			return false
+
+			hasParam := utils.HasShadowingParameter(fn, name)
+			hasDecl := body != nil && (utils.HasShadowingDeclaration(body, name) || utils.HasHoistedVarDeclaration(body, name))
+			if !hasParam && !hasDecl {
+				return false
+			}
+
+			if utils.IsNameShadowedBetween(identNode, boundary, name) {
+				return false
+			}
+
+			found = true
+			return true
 		})
 		if found {
 			return true

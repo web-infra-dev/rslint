@@ -10,7 +10,7 @@ const recommended: RslintConfigEntry = {
     'promise/param-names': 'error',
     'promise/catch-or-return': 'error',
     // 'promise/no-native': 'off', // not implemented
-    'promise/no-nesting': 'warn',
+    // 'promise/no-nesting': 'warn', // not implemented
     // 'promise/no-promise-in-callback': 'warn', // not implemented
     // 'promise/no-callback-in-promise': 'warn', // not implemented
     'promise/avoid-new': 'off',
