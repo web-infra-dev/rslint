@@ -1,7 +1,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
 
-import { runTests } from '@vscode/test-electron';
+import { runTests, downloadAndUnzipVSCode } from '@vscode/test-electron';
 
 function resolveFixture(name: string): string {
   return path.resolve(require.resolve('@rslint/core'), '../..', name);
@@ -59,18 +60,26 @@ async function main() {
 
   let failed = false;
 
+  let vscodeExecutablePath: string | undefined;
+  try {
+    console.log('Downloading and unzipping VS Code...');
+    vscodeExecutablePath = await downloadAndUnzipVSCode({ version: 'stable' });
+    console.log(`VS Code executable path resolved: ${vscodeExecutablePath}`);
+  } catch (err) {
+    console.error('Failed to download VS Code:', err);
+    process.exit(1);
+  }
+
   await Promise.allSettled(
-    suites.map(async (suite) => {
+    suites.map(async (suite, index) => {
       // Create isolated user-data and extensions directories for each suite to prevent conflicts
-      const tmpBase = path.resolve(
-        extensionDevelopmentPath,
-        `.vscode-test-out/tmp-${suite.name}`,
-      );
+      const tmpBase = path.join(os.tmpdir(), `rslint-test-${index}`);
       const userDataDir = path.join(tmpBase, 'user-data');
       const extensionsDir = path.join(tmpBase, 'extensions');
 
       try {
         await runTests({
+          vscodeExecutablePath,
           extensionDevelopmentPath,
           extensionTestsPath: suite.testsPath,
           launchArgs: [
