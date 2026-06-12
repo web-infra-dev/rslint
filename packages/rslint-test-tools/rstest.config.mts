@@ -7,6 +7,7 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/color-matrix.test.ts',
     './tests/cli/file-args.test.ts',
     './tests/cli/disable-comments.test.ts',
     './tests/cli/js-config/normalize-config.test.ts',
@@ -26,6 +27,11 @@ export default defineConfig({
     './tests/cli/js-config/eslint-plugin-conformance/promise.test.ts',
     './tests/cli/js-config/eslint-plugin-conformance/stylistic.test.ts',
     './tests/cli/js-config/gitignore-integration.test.ts',
+    './tests/cli/fix/cascade.test.ts',
+    './tests/cli/fix/edge-cases.test.ts',
+    './tests/cli/fix/exit-code.test.ts',
+    './tests/cli/fix/output.test.ts',
+    './tests/cli/rule-flag.test.ts',
     './tests/cli/entry-point.test.ts',
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',

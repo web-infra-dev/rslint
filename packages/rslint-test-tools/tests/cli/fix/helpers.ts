@@ -16,9 +16,14 @@ export async function runRslint(
   cwd?: string,
 ): Promise<CliTestResult> {
   return new Promise((resolve) => {
+    // Strip GITHUB_ACTIONS/FORCE_COLOR to prevent the binary from
+    // force-enabling ANSI colors, which would embed escape codes in stdout
+    // and break the substring assertions (same pattern as js-config/helpers).
+    const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
     const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...cleanEnv, NO_COLOR: '1' },
     });
 
     let stdout = '';
@@ -72,6 +77,7 @@ export function makeConfig(rules: Record<string, string>): string {
   return `export default [{
   files: ['**/*.ts'],
   languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
+  plugins: ['@typescript-eslint'],
   rules: {
 ${rulesStr}
   }
