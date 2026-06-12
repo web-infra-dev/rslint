@@ -6,6 +6,7 @@ import {
   RelativePattern,
   WorkspaceFolder,
   OutputChannel,
+  type CancellationToken,
 } from 'vscode';
 import {
   Executable,
@@ -19,8 +20,33 @@ import { Logger } from './logger';
 import type { Extension } from './Extension';
 import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
+import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { loadConfigFile, normalizeConfig } from '@rslint/core/config-loader';
+import {
+  loadConfigFile,
+  normalizeConfig,
+  collectPluginMeta,
+} from '@rslint/core/config-loader';
+import { PluginLintPool } from './PluginLintPool';
+import type { EslintPluginLintRequest } from '@rslint/core/eslint-plugin';
+
+/**
+ * Workspace-relative lockfiles whose mtime feeds the plugin-host
+ * fingerprint: a dependency install can swap a plugin's implementation
+ * without touching the config file, so the host must rebuild on it too.
+ */
+const LOCKFILE_NAMES = [
+  'package-lock.json',
+  'pnpm-lock.yaml',
+  'yarn.lock',
+] as const;
+
+/** A loaded + normalized config file with its source path. */
+interface LoadedConfig {
+  configPath: string;
+  configDirectory: string;
+  entries: Record<string, unknown>[];
+}
 
 export class Rslint implements Disposable {
   private client: LanguageClient | undefined;
@@ -31,6 +57,13 @@ export class Rslint implements Disposable {
   private readonly outputChannel: OutputChannel | undefined;
   private configWatcher: FileSystemWatcher | undefined;
   private configReloadTimer: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * Hosts the in-process WorkerPool that answers Go's reverse
+   * `rslint/pluginLint` requests for rules mounted via a config's
+   * object-form `plugins`. Lazily spins workers — stays a no-op no-worker
+   * host until a config actually mounts plugins.
+   */
+  private readonly pluginLintPool: PluginLintPool;
 
   constructor(
     extension: Extension,
@@ -43,6 +76,7 @@ export class Rslint implements Disposable {
     this.logger = new Logger('Rslint (workspace)').useDefaultLogLevel();
     this.lspOutputChannel = lspOutputChannel;
     this.outputChannel = outputChannel;
+    this.pluginLintPool = new PluginLintPool(this.logger);
   }
 
   public async start(): Promise<void> {
@@ -104,6 +138,20 @@ export class Rslint implements Disposable {
     try {
       await this.client.start();
 
+      // Answer Go's reverse `rslint/pluginLint` requests: Go lints
+      // natively but dispatches rules mounted via a config's object-form
+      // `plugins` back to us, where the JS WorkerPool runs them. The generic
+      // string-method overload of `onRequest` handles server-initiated custom
+      // requests. The handler's CancellationToken — fired when Go sends
+      // $/cancelRequest for a superseded keystroke / closed document — is
+      // threaded through to the pool, which bridges it to an AbortSignal and
+      // cancels the in-flight worker tasks.
+      this.client.onRequest(
+        'rslint/pluginLint',
+        async (params: EslintPluginLintRequest, token: CancellationToken) =>
+          this.pluginLintPool.lint(params, token),
+      );
+
       if (traceEnabled) {
         const traceLevel =
           traceServer === 'verbose' ? Trace.Verbose : Trace.Messages;
@@ -153,7 +201,9 @@ export class Rslint implements Disposable {
     this.logger.debug(`Found ${configFiles.length} JS config file(s)`);
 
     if (configFiles.length === 0) {
-      // No JS configs found — send empty configs to clear any previous state
+      // No JS configs found — send empty configs to clear any previous state,
+      // and tear down any plugin workers a prior config left running.
+      await this.pluginLintPool.ensure([], this.computeFingerprint([]));
       if (!this.client) return;
       await this.client.sendNotification('rslint/configUpdate', {
         configs: [],
@@ -166,13 +216,17 @@ export class Rslint implements Disposable {
         const rawConfig = await this.loadConfigFresh(uri.fsPath);
         const entries = normalizeConfig(rawConfig);
         return {
+          configPath: uri.fsPath,
+          // URI form, kept byte-identical to the per-file `configKey` Go
+          // returns (its `getConfigForURI` cwd) so the worker's per-config
+          // dispatch keys match. Also the key Go uses in `s.jsConfigs`.
           configDirectory: Uri.file(path.dirname(uri.fsPath)).toString(),
           entries,
         };
       }),
     );
 
-    const configs: { configDirectory: string; entries: unknown[] }[] = [];
+    const configs: LoadedConfig[] = [];
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === 'fulfilled') {
@@ -185,8 +239,33 @@ export class Rslint implements Disposable {
       }
     }
 
+    // Collect the ESLint-plugin metadata once: the worker-pool descriptors
+    // (one per config that actually mounts plugins — others stay zero-overhead)
+    // and the aggregated {prefix, ruleNames} entries Go registers as
+    // placeholder rules. Single pass so the two never disagree about which
+    // configs carry plugins.
+    const { pluginConfigs: descriptors, eslintPluginEntries } =
+      collectPluginMeta(configs);
+
+    // Spin up / refresh the host. Fingerprint over the config files + lockfiles
+    // so an edit or dependency install rebuilds the workers.
+    await this.pluginLintPool.ensure(
+      descriptors,
+      this.computeFingerprint(configs.map((c) => c.configPath)),
+    );
+
     if (!this.client) return;
-    await this.client.sendNotification('rslint/configUpdate', { configs });
+    // Wire shape Go's handleConfigUpdate parses: per-config {configDirectory,
+    // entries} plus the top-level `eslintPlugins` aggregate (same shape the CLI
+    // sends in its init payload). `configPath` is a host-local detail for the
+    // worker descriptors, not the wire.
+    await this.client.sendNotification('rslint/configUpdate', {
+      configs: configs.map((c) => ({
+        configDirectory: c.configDirectory,
+        entries: c.entries,
+      })),
+      eslintPlugins: eslintPluginEntries,
+    });
   }
 
   /**
@@ -214,7 +293,43 @@ export class Rslint implements Disposable {
     }
   }
 
+  /**
+   * Fingerprint the inputs that decide whether the plugin host must rebuild:
+   * each config file's {mtime,size} plus the newest workspace lockfile mtime.
+   * A change in either can swap a mounted plugin's behavior (edit) or its code
+   * (install) without otherwise signaling us, so both feed the key. Missing
+   * files contribute a stable marker (so deletion still moves the fingerprint).
+   */
+  private computeFingerprint(configPaths: string[]): string {
+    const parts: string[] = [];
+    for (const p of [...configPaths].sort()) {
+      try {
+        const st = fs.statSync(p);
+        parts.push(`${p}:${st.mtimeMs}:${st.size}`);
+      } catch {
+        parts.push(`${p}:absent`);
+      }
+    }
+    let newestLock = 0;
+    for (const name of LOCKFILE_NAMES) {
+      try {
+        const st = fs.statSync(
+          path.join(this.workspaceFolder.uri.fsPath, name),
+        );
+        if (st.mtimeMs > newestLock) newestLock = st.mtimeMs;
+      } catch {
+        // lockfile absent for this manager — ignore.
+      }
+    }
+    parts.push(`lock:${newestLock}`);
+    return parts.join('|');
+  }
+
   public async stop(): Promise<void> {
+    // Tear down the plugin worker pool regardless of client state so its
+    // threads never outlive the instance.
+    await this.pluginLintPool.dispose();
+
     if (!this.client) {
       this.logger.debug('Rslint client is not running');
       return;
@@ -248,6 +363,7 @@ export class Rslint implements Disposable {
 
   public dispose(): void {
     clearTimeout(this.configReloadTimer);
+    void this.pluginLintPool.dispose();
     if (this.client) {
       this.client.stop().catch((err: unknown) => {
         this.logger.error('Error disposing Rslint client', err);

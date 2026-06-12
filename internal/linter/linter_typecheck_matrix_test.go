@@ -71,7 +71,7 @@ func fingerprint(d rule.RuleDiagnostic) diagFingerprint {
 	if d.SourceFile != nil {
 		// 0-based from typescript-go → +1 to match user-visible line/col
 		line, char := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, d.Range.Pos())
-		fp.suffix = d.SourceFile.FileName()
+		fp.suffix = d.FilePath
 		fp.line = line + 1
 		fp.col = int(char) + 1
 	}
@@ -101,7 +101,7 @@ func assertOneDiag(t *testing.T, diags []rule.RuleDiagnostic, code, fileSuffix s
 func assertNoDiagInFile(t *testing.T, diags []rule.RuleDiagnostic, fileSuffix string) {
 	t.Helper()
 	for _, d := range diags {
-		if d.SourceFile != nil && strings.HasSuffix(d.SourceFile.FileName(), fileSuffix) {
+		if d.SourceFile != nil && strings.HasSuffix(d.FilePath, fileSuffix) {
 			t.Errorf("expected no diagnostic in %s, got %s at line %d. all diags: %s",
 				fileSuffix, d.RuleName, fingerprint(d).line, dumpDiags(diags))
 		}
@@ -671,7 +671,7 @@ func TestMatrix_NoEmitSemantics_SyntacticErrorStillShortCircuits(t *testing.T) {
 	// or similar) must be reported.
 	hasSyntactic := false
 	for _, d := range diags {
-		if strings.HasPrefix(d.RuleName, "TypeScript(TS1") && strings.HasSuffix(d.SourceFile.FileName(), "a.ts") {
+		if strings.HasPrefix(d.RuleName, "TypeScript(TS1") && strings.HasSuffix(d.FilePath, "a.ts") {
 			hasSyntactic = true
 			break
 		}

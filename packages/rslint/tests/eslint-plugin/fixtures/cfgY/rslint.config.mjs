@@ -4,7 +4,7 @@ import pluginY from './plugin-y.mjs';
 
 export default [
   {
-    eslintPlugins: {
+    plugins: {
       py: pluginY,
     },
   },

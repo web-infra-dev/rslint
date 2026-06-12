@@ -20,9 +20,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.ref_name != 'main' }}
 
-env:
-  GOMAXPROCS: 8
-
 jobs:
   test-go:
     name: Test Go
@@ -49,7 +46,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-go
       - name: Unit Test
-        run: go test -parallel 8 ./internal/...
+        run: go test -count=1 ./internal/...
 
   test-go-windows:
     name: Test Go (rspack-windows-2022-large)
@@ -80,7 +77,7 @@ jobs:
           go build ./internal/...
 
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 100
+          $batchSize = 64
           $batch = @()
 
           foreach ($pkg in $packages) {
@@ -88,7 +85,7 @@ jobs:
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
-              go test -parallel 4 $batch
+              go test -p 64 -count=1 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
               $batch = @()
             }
@@ -97,7 +94,7 @@ jobs:
           # Run remaining packages
           if ($batch.Count -gt 0) {
             Write-Host "Running final batch of $($batch.Count) packages..."
-            go test -parallel 4 $batch
+            go test -p 64 -count=1 $batch
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 

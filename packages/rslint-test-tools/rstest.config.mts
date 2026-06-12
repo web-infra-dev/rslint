@@ -7,6 +7,7 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/color-matrix.test.ts',
     './tests/cli/file-args.test.ts',
     './tests/cli/disable-comments.test.ts',
     './tests/cli/js-config/normalize-config.test.ts',
@@ -20,7 +21,17 @@ export default defineConfig({
     './tests/cli/js-config/ignore-negation.test.ts',
     './tests/cli/js-config/files-driven-lint.test.ts',
     './tests/cli/js-config/files-driven-monorepo.test.ts',
+    './tests/cli/js-config/eslint-plugins.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/unicorn.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/sonarjs.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/promise.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/stylistic.test.ts',
     './tests/cli/js-config/gitignore-integration.test.ts',
+    './tests/cli/fix/cascade.test.ts',
+    './tests/cli/fix/edge-cases.test.ts',
+    './tests/cli/fix/exit-code.test.ts',
+    './tests/cli/fix/output.test.ts',
+    './tests/cli/rule-flag.test.ts',
     './tests/cli/entry-point.test.ts',
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',
@@ -427,6 +438,8 @@ export default defineConfig({
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/expect-expect.test.ts',
+    './tests/eslint-plugin-jest/rules/max-expects.test.ts',
+    './tests/eslint-plugin-jest/rules/max-nested-describe.test.ts',
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-commented-out-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
@@ -442,9 +455,11 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-duplicate-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-called-with.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-each.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-expect-resolves.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-to-have-been-called-times.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-been-called.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-have-length.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-todo.test.ts',
@@ -453,6 +468,9 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
     // eslint-plugin-promise
+    './tests/eslint-plugin-promise/rules/always-return.test.ts',
+    './tests/eslint-plugin-promise/rules/avoid-new.test.ts',
+    './tests/eslint-plugin-promise/rules/catch-or-return.test.ts',
     './tests/eslint-plugin-promise/rules/no-callback-in-promise.test.ts',
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',

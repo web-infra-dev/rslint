@@ -44,17 +44,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 // Application-level IPC message kinds for the CLI ⇆ Node engine protocol.
 // The transport (ipc.Channel) owns only response/error/handshake/exit; the
 // kinds below are declared here and travel through the same opaque envelope.
 const (
-	kindInit     ipc.MessageKind = "init"     // Node → Go: handshake payload
-	kindShutdown ipc.MessageKind = "shutdown" // Go → Node: lint done
-	kindOutput   ipc.MessageKind = "output"   // Go → Node: forwarded stdout text
+	kindInit       ipc.MessageKind = "init"       // Node → Go: handshake payload
+	kindShutdown   ipc.MessageKind = "shutdown"   // Go → Node: lint done
+	kindOutput     ipc.MessageKind = "output"     // Go → Node: forwarded stdout text
+	kindPluginLint ipc.MessageKind = "pluginLint" // Go → Node: run ESLint-plugin rules in a worker
 )
 
 // initPayload mirrors the IPC `init` message sent by engine.ts. Field shape
@@ -78,12 +82,21 @@ type initPayload struct {
 	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	Format           string   `json:"format,omitempty"`
 	FixMode          bool     `json:"fixMode,omitempty"`
+
+	// EslintPlugins: per-mounted-plugin {prefix, ruleNames} metadata so Go
+	// can register placeholder rules for plugin rule names. The live plugin
+	// objects stay in Node (the worker re-imports the config to load them).
+	EslintPlugins []rslintconfig.EslintPluginEntry `json:"eslintPlugins,omitempty"`
 }
 
 // runtimePayload is the IPC-bound subset of runtime knobs that don't have (or
 // shouldn't duplicate) a 1:1 user flag. Adding a field is a wire change.
 type runtimePayload struct {
-	ForceColor     bool `json:"forceColor,omitempty"`
+	// StdoutIsTTY reports whether the peer's real stdout — the terminal the
+	// forwarded lint output lands on — is a TTY. The Go process cannot
+	// observe this itself (its own stdout is the IPC pipe). Absent (false)
+	// with an older peer, which degrades to colorless output.
+	StdoutIsTTY    bool `json:"stdoutIsTTY,omitempty"`
 	SingleThreaded bool `json:"singleThreaded,omitempty"`
 }
 
@@ -215,15 +228,14 @@ func runCLI(args []string) int {
 	if payload.FixMode {
 		baseArgs.Fix = true
 	}
-	if payload.Runtime.ForceColor {
-		baseArgs.ForceColor = true
-	}
+	baseArgs.StdoutIsTTY = payload.Runtime.StdoutIsTTY
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
 	// ConfigStdin reflects whether the peer supplied configs (JS/TS path) or
 	// expects the binary to load JSON config from disk (ConfigStdin=false).
 	baseArgs.ConfigStdin = len(payload.Configs) > 0
+	baseArgs.EslintPlugins = payload.EslintPlugins
 
 	// ── stdout redirect (mandatory for every intent) ──────────────────────
 	// The peer holds the real stdout for IPC frames, so any plain-text write
@@ -240,6 +252,12 @@ func runCLI(args []string) int {
 	stdoutDrainDone := make(chan struct{})
 	go drainStdoutToIPC(stdoutR, ch, stdoutDrainDone)
 	os.Stdout = stdoutW
+	// fatih/color captured its package-level Output at init, pointing at the
+	// real fd-1 — which in IPC mode is the frame stream. Re-aim it at the
+	// redirect pipe so a stray color.Print-family call degrades to ordinary
+	// forwarded text instead of corrupting the frame protocol. (color.Error
+	// already points at the inherited stderr; leave it.)
+	color.Output = stdoutW
 	// finalizeStdout flushes + restores stdout before the shutdown handshake.
 	finalizeStdout := func() {
 		os.Stdout = origStdout
@@ -291,7 +309,22 @@ func runCLI(args []string) int {
 		}()
 	}
 
-	exitCode := executeLintPipeline(baseArgs)
+	// Reverse dispatcher: send each plugin-lint batch back to the Node host
+	// over the IPC channel and decode its result. Runs concurrently with the
+	// native lint pass (executeLintPipeline awaits it before output / --fix).
+	dispatch := func(reqCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		msg, sendErr := ch.SendRequest(reqCtx, kindPluginLint, req)
+		if sendErr != nil {
+			return nil, sendErr
+		}
+		var res linter.EslintPluginLintResult
+		if err := msg.Decode(&res); err != nil {
+			return nil, fmt.Errorf("decode pluginLint result: %w", err)
+		}
+		return &res, nil
+	}
+
+	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
 
 	finalizeStdout()
 	shutdownPeer(ch, state)

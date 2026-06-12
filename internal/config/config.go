@@ -35,9 +35,34 @@ type ConfigEntry struct {
 // Settings represents shared settings accessible to rules
 type Settings map[string]interface{}
 
-// LanguageOptions contains language-specific configuration options
+// LanguageOptions contains language-specific configuration options.
 type LanguageOptions struct {
 	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+	// Raw retains the full languageOptions object as authored (sourceType,
+	// globals, parserOptions.ecmaFeatures, …) — fields the Go core does not
+	// model but the Node eslint-plugin worker needs. Go computes the
+	// per-file merged value via GetConfigForFile and forwards it on the
+	// wire; it is not (de)serialized through this struct's own field tags.
+	Raw map[string]any `json:"-"`
+}
+
+// UnmarshalJSON captures both the typed ParserOptions and the full raw
+// object (the latter for forwarding to the eslint-plugin worker).
+func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	type parserShape struct {
+		ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+	}
+	var ps parserShape
+	if err := json.Unmarshal(data, &ps); err != nil {
+		return err
+	}
+	lo.ParserOptions = ps.ParserOptions
+	lo.Raw = raw
+	return nil
 }
 
 // ProjectPaths represents project paths that can be either a single string or an array of strings
@@ -220,8 +245,18 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 	if len(ruleArray) > 1 {
 		remaining := ruleArray[1:]
 		if len(remaining) == 1 {
-			// Single option element: pass directly (string, map, etc.)
-			ruleConfig.Options = remaining[0]
+			if _, isArray := remaining[0].([]interface{}); isArray {
+				// A lone option that is itself an array (e.g. ["error",
+				// ["a","b"]]): keep the outer wrapper so it stays distinguishable
+				// from a multi-element option list and maps to context.options ==
+				// [["a","b"]]. Unwrapping would collapse it to ["a","b"],
+				// indistinguishable from ["error","a","b"] — and the eslint-plugin
+				// dispatch would then drop a nesting level.
+				ruleConfig.Options = remaining
+			} else {
+				// Single non-array option: pass the value directly (string, map).
+				ruleConfig.Options = remaining[0]
+			}
 		} else {
 			// Multiple option elements: pass as array (e.g. ["both", {blockScopedFunctions: "disallow"}])
 			ruleConfig.Options = remaining
@@ -629,6 +664,21 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			}
 			merged.ParserOptions = &po
 		}
+	}
+	// Shallow-merge the raw languageOptions map (override wins per key). This is
+	// intentionally shallow, NOT ESLint's recursive flat-config deepMerge of
+	// nested parserOptions/globals — matching that merge fidelity is a separate
+	// concern from wiring eslintPlugins and is out of scope here. merged is a
+	// shallow copy of base, so build a fresh map rather than mutating base.Raw.
+	if len(override.Raw) > 0 {
+		mergedRaw := make(map[string]any, len(base.Raw)+len(override.Raw))
+		for k, v := range base.Raw {
+			mergedRaw[k] = v
+		}
+		for k, v := range override.Raw {
+			mergedRaw[k] = v
+		}
+		merged.Raw = mergedRaw
 	}
 	return &merged
 }

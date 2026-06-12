@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -33,6 +34,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/term"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
@@ -51,13 +53,23 @@ type lintArgs struct {
 	Format         string
 	NoColor        bool
 	ForceColor     bool
-	Quiet          bool
-	MaxWarnings    int
-	StartTimeMs    int64
-	RuleFlags      []string
+	// StdoutIsTTY is the TTY fact for the real output destination, reported
+	// by the Node host via the IPC init payload (the Go process's own stdout
+	// is an IPC pipe and says nothing about the user's terminal). False when
+	// unknown (old peer, wasm build).
+	StdoutIsTTY bool
+	Quiet       bool
+	MaxWarnings int
+	StartTimeMs int64
+	RuleFlags   []string
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
+	// EslintPlugins carries the {prefix, ruleNames} metadata for ESLint
+	// plugins mounted via the config's object-form `plugins`. Used to register
+	// placeholder rules so plugin rule names resolve; the live plugins run
+	// in the Node worker.
+	EslintPlugins []rslintconfig.EslintPluginEntry
 }
 
 // ColorScheme contains all the color functions for different UI elements
@@ -70,42 +82,41 @@ type ColorScheme struct {
 	BoldText    func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
 	WarnText    func(format string, a ...interface{}) string
+	// Reset is the trailing SGR reset sequence the summary lines emit (empty
+	// when colors are off) — byte-identical to the inline
+	// color.New().SprintFunc()("") emitters it replaces.
+	Reset string
 }
 
-// setupColors initializes the color scheme based on environment and flags
+// newPinnedColor builds a color object pinned to the resolved decision.
+// color.New seeds a per-object noColor switch from the NO_COLOR env at
+// creation time, which would silently override the pipeline-entry decision
+// (e.g. NO_COLOR set but --force-color given) — Enable/DisableColor makes
+// the object follow color.NoColor unconditionally.
+func newPinnedColor(attrs ...color.Attribute) *color.Color {
+	c := color.New(attrs...)
+	if color.NoColor {
+		c.DisableColor()
+	} else {
+		c.EnableColor()
+	}
+	return c
+}
+
+// setupColors builds the SprintfFunc scheme used by the formatters. It is a
+// pure factory: the on/off decision is owned by term.ResolveColorEnabled,
+// applied once at pipeline entry and propagated here via color.NoColor.
 func setupColors() *ColorScheme {
-	// Handle color flags and environment variables
-	if os.Getenv("NO_COLOR") != "" {
-		color.NoColor = true
-	}
-	if os.Getenv("FORCE_COLOR") != "" {
-		color.NoColor = false
-	}
-
-	// GitHub Actions specific handling
-	if os.Getenv("GITHUB_ACTIONS") != "" {
-		color.NoColor = false // Enable colors in GitHub Actions
-	}
-
-	// Create color functions
-	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
-	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
-	errorTextColor := color.New(color.FgRed, color.Bold).SprintfFunc()
-	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
-	dimColor := color.New(color.Faint).SprintfFunc()
-	boldColor := color.New(color.Bold).SprintfFunc()
-	borderColor := color.New(color.Faint).SprintfFunc()
-	WarnColor := color.New(color.FgYellow).SprintfFunc()
-
 	return &ColorScheme{
-		RuleName:    ruleNameColor,
-		FileName:    fileNameColor,
-		ErrorText:   errorTextColor,
-		SuccessText: successColor,
-		DimText:     dimColor,
-		BoldText:    boldColor,
-		BorderText:  borderColor,
-		WarnText:    WarnColor,
+		RuleName:    newPinnedColor(color.FgHiGreen).SprintfFunc(),
+		FileName:    newPinnedColor(color.FgCyan, color.Italic).SprintfFunc(),
+		ErrorText:   newPinnedColor(color.FgRed, color.Bold).SprintfFunc(),
+		SuccessText: newPinnedColor(color.FgGreen, color.Bold).SprintfFunc(),
+		DimText:     newPinnedColor(color.Faint).SprintfFunc(),
+		BoldText:    newPinnedColor(color.Bold).SprintfFunc(),
+		BorderText:  newPinnedColor(color.Faint).SprintfFunc(),
+		WarnText:    newPinnedColor(color.FgYellow).SprintfFunc(),
+		Reset:       newPinnedColor().SprintFunc()(""),
 	}
 }
 
@@ -124,6 +135,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 		diag := rule.RuleDiagnostic{
 			RuleName:   fmt.Sprintf("TypeScript(TS%d)", d.Code()),
 			SourceFile: d.File(),
+			FilePath:   d.File().FileName(),
 			Range:      d.Loc(),
 			Message:    rule.RuleMessage{Description: d.String()},
 			Severity:   rule.SeverityError,
@@ -166,7 +178,7 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
 	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
-	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
 	output := fmt.Sprintf(
 		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
 		severity,
@@ -234,7 +246,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	diagnostic := Diagnostic{
 		RuleName: d.RuleName,
 		Message:  d.Message.Description,
-		FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+		FilePath: tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
 		Range: Range{
 			Start: Location{
 				Line:   startLine + 1, // Convert to 1-based indexing
@@ -326,7 +338,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString("\n  ")
 	w.WriteString(colors.BorderText("╭─┴──────────("))
 	w.WriteByte(' ')
-	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
 	location := fmt.Sprintf("%s:%d:%d", filePath, diagnosticStartLine+1, diagnosticStartColumn+1)
 	w.WriteString(colors.FileName("%s", location))
 	w.WriteByte(' ')
@@ -485,7 +497,7 @@ Options:
 func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
 	m := make(map[string][]rule.RuleDiagnostic)
 	for _, d := range diags {
-		f := d.SourceFile.FileName()
+		f := d.FilePath
 		m[f] = append(m[f], d)
 	}
 	return m
@@ -752,7 +764,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 // → gap-file fallback → lint → optional --fix loop → report) and returns
 // the process exit code. Shared by the IPC entry (runCLI) and the wasm
 // native fallback.
-func executeLintPipeline(args lintArgs) int {
+func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
 	// Unpack into locals so the pipeline body below stays verbatim — only the
 	// flag-parse front matter lives in parseLintFlags.
 	init := args.Init
@@ -765,8 +777,6 @@ func executeLintPipeline(args lintArgs) int {
 	cpuprofOut := args.CpuprofOut
 	singleThreaded := args.SingleThreaded
 	format := args.Format
-	noColor := args.NoColor
-	forceColor := args.ForceColor
 	quiet := args.Quiet
 	maxWarnings := args.MaxWarnings
 	startTimeMs := args.StartTimeMs
@@ -774,13 +784,24 @@ func executeLintPipeline(args lintArgs) int {
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
 
-	// Override color detection based on flags
-	if noColor {
-		color.NoColor = true
-	}
-	if forceColor {
-		color.NoColor = false
-	}
+	// The single color decision for the whole run. It unconditionally
+	// overwrites fatih/color's package-init value, whose isatty component
+	// keyed off the Go process's own stdout — an IPC pipe in every native
+	// lint run, never the user's terminal (its NO_COLOR/TERM components are
+	// re-derived in the tiers below). Nothing after this line mutates
+	// color.NoColor.
+	forceColorEnv, forceColorEnvSet := os.LookupEnv("FORCE_COLOR")
+	_, noColorEnvSet := os.LookupEnv("NO_COLOR")
+	color.NoColor = !term.ResolveColorEnabled(term.ColorInputs{
+		NoColorFlag:      args.NoColor,
+		ForceColorFlag:   args.ForceColor,
+		ForceColorEnv:    forceColorEnv,
+		ForceColorEnvSet: forceColorEnvSet,
+		NoColorEnvSet:    noColorEnvSet,
+		GithubActionsEnv: os.Getenv("GITHUB_ACTIONS"),
+		Term:             os.Getenv("TERM"),
+		StdoutIsTTY:      args.StdoutIsTTY,
+	})
 
 	enableVirtualTerminalProcessing()
 	timeBefore := resolveStartTime(startTimeMs)
@@ -829,11 +850,20 @@ func executeLintPipeline(args lintArgs) int {
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
+	// Register placeholder rules for mounted ESLint plugins so their rule
+	// names resolve (and route to the Node worker) instead of being dropped.
+	rslintconfig.RegisterEslintPluginRules(args.EslintPlugins)
 	var rslintConfig rslintconfig.RslintConfig
 
 	// configMap holds per-directory configs for multi-config (monorepo) support.
 	// Only populated in the configStdin path; nil otherwise (single-config mode).
 	var configMap map[string]rslintconfig.RslintConfig
+
+	// originalConfigDir maps each normalized configMap key back to the raw
+	// configDirectory the JS host sent, so the eslint-plugin wire configKey
+	// round-trips raw (byte-matching the worker's plugin map key). nil outside
+	// multi-config mode (single-config / JSON configs never mount plugins).
+	var originalConfigDir map[string]string
 
 	programs := []*compiler.Program{}
 	// programConfigDirs tracks which configDir each program belongs to (parallel to programs).
@@ -863,6 +893,7 @@ func executeLintPipeline(args lintArgs) int {
 		if payload.IsMultiConfig {
 			// Multi-config format
 			configMap = payload.ConfigMap
+			originalConfigDir = payload.OriginalConfigDir
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
@@ -1180,7 +1211,7 @@ func executeLintPipeline(args lintArgs) int {
 		rulesForFile = getRulesForFile
 	}
 
-	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+	runOpts := linter.RunLinterOptions{
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1192,7 +1223,27 @@ func executeLintPipeline(args lintArgs) int {
 		OnDiagnostic: func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
-	})
+	}
+	// Dispatch eslint-plugin rules to the Node worker in parallel with the
+	// native lint pass; results are awaited + merged before output / --fix.
+	// ONLY when plugins are actually configured — otherwise the whole reverse-
+	// dispatch (including buildPluginFileInputs' extra per-file rule resolution
+	// over every file) is skipped so the native-only path pays nothing for the
+	// feature.
+	hasEslintPlugins := len(args.EslintPlugins) > 0
+	pluginResolver := pluginConfigResolver{
+		configMap:         configMap,
+		originalConfigDir: originalConfigDir,
+		rslintConfig:      rslintConfig,
+		currentDirectory:  currentDirectory,
+	}
+	var pluginCh <-chan []rule.RuleDiagnostic
+	if hasEslintPlugins {
+		pluginInputs := buildPluginFileInputs(runOpts, pluginResolver)
+		pluginCh = dispatchPluginLintAsync(ctx, dispatch, pluginInputs, fix, pluginSuggestionsMode(fix))
+	}
+
+	lintResult, err := linter.RunLinter(runOpts)
 
 	close(diagnosticsChan)
 	if err != nil {
@@ -1203,6 +1254,11 @@ func executeLintPipeline(args lintArgs) int {
 	lintedfileCount := lintResult.LintedFileCount
 
 	wg.Wait()
+	// Merge eslint-plugin diagnostics (dispatched in parallel) now that the
+	// native diagnostics goroutine has drained.
+	if pluginCh != nil {
+		allDiags = append(allDiags, (<-pluginCh)...)
+	}
 
 	// Emit per-file warnings for CLI-specified files that won't be linted.
 	// Distinguishes "not found in project" vs "ignored by pattern", aligned
@@ -1242,7 +1298,7 @@ func executeLintPipeline(args lintArgs) int {
 			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
 			fixSkipMask := buildTypeCheckSkipMask(len(newPrograms), newFallbackIdx)
 			var passDiags []rule.RuleDiagnostic
-			passResult, _ := linter.RunLinter(linter.RunLinterOptions{
+			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
@@ -1256,11 +1312,25 @@ func executeLintPipeline(args lintArgs) int {
 					passDiags = append(passDiags, d)
 					diagsMu.Unlock()
 				},
-			})
+			}
+			// Re-dispatch plugin rules each pass (only when configured): the
+			// worker re-reads the post-fix file content, and merging here keeps
+			// plugin diagnostics from being lost when allDiags is replaced.
+			var fixPluginCh <-chan []rule.RuleDiagnostic
+			if hasEslintPlugins {
+				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginResolver)
+				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
+			}
+			passResult, _ := linter.RunLinter(fixRunOpts)
 			if passResult != nil {
 				for name := range passResult.ExecutedRules {
 					lintResult.ExecutedRules[name] = struct{}{}
 				}
+			}
+			// Merge this pass's plugin diagnostics before applying fixes so
+			// plugin fixes participate and plugin diagnostics survive.
+			if fixPluginCh != nil {
+				passDiags = append(passDiags, (<-fixPluginCh)...)
 			}
 
 			// Replace allDiags with latest post-fix diagnostics.
@@ -1381,7 +1451,7 @@ func executeLintPipeline(args lintArgs) int {
 				pluralize(typeCheckedFileCount, "file", "files"),
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
-				color.New().SprintFunc()(""),
+				colors.Reset,
 			)
 		} else if fix && fixedCount > 0 {
 			fixText := pluralize(fixedCount, "issue", "issues")
@@ -1400,7 +1470,7 @@ func executeLintPipeline(args lintArgs) int {
 				colors.BoldText("%d", threadsCount),
 				colors.SuccessText("%d", fixedCount),
 				fixText,
-				color.New().SprintFunc()(""), // Reset
+				colors.Reset,
 			)
 		} else {
 			fmt.Fprintf(
@@ -1416,7 +1486,7 @@ func executeLintPipeline(args lintArgs) int {
 				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
-				color.New().SprintFunc()(""), // Reset
+				colors.Reset,
 			)
 		}
 	}

@@ -9,6 +9,7 @@ import {
   localConfigs,
   task,
 } from './worker-pool-e2e-helpers.js';
+import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 
 /**
  * WorkerPool end-to-end — lifecycle: init + lintBatch + shutdown happy
@@ -18,16 +19,13 @@ import {
  * Exercises the full happy path inside the runner package (WorkerPool
  * → worker_threads loading the user's rslint config → round-robin
  * lintBatch → oxc-parser → normalize → scope → context → listeners →
- * CompatFileResult-shaped data). The plugin here is the local fixture
+ * plugin-lint-result-shaped data). The plugin here is the local fixture
  * plugin (`fixtures/local-plugin.mjs`), not an external dependency.
  */
 
-// Skipped on windows: tearing down a worker that has oxc (a napi addon)
-// loaded aborts below the JS layer there (nodejs/node#34567) and crashes
-// the rstest worker running this file. These e2e tests spawn real
-// workers and tear them down, so they are windows-skipped; they still
-// run on linux/macOS.
-describe.skipIf(process.platform === 'win32')(
+// win32 teardown is gated by SKIP_WIN32_NAPI_TEARDOWN (see that file for the
+// nodejs/node#34567 rationale); the flag is false so these run on win32 too.
+describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
     test('init + lintBatch + shutdown happy path', async () => {
@@ -226,7 +224,7 @@ describe.skipIf(process.platform === 'win32')(
       // In-flight tasks resolve with a sentinel parseError instead of
       // hanging the caller forever. worker-pool.ts:539-548 maps the
       // shutdown-kind rejection back to a result-shaped failure so
-      // callers (internal/linter) see one file as compat-failed rather
+      // callers (internal/linter) see one file as plugin-lint-failed rather
       // than the whole batch throwing.
       const wedgeResults = await wedgeP;
       expect(wedgeResults).toHaveLength(1);
@@ -329,7 +327,7 @@ export default {
           fs.writeFile(
             cfgPath,
             `import plugin from './_u11-plugin.mjs';
-export default [{ eslintPlugins: { u11: plugin } }];
+export default [{ plugins: { u11: plugin } }];
 `,
             'utf8',
           ),

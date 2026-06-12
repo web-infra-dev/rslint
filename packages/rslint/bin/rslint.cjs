@@ -42,10 +42,14 @@ async function main() {
     pathToFileURL(path.resolve(__dirname, '../dist/cli.js')).href
   );
   const exitCode = await run(binPath, process.argv.slice(2), startTime);
-  process.exit(exitCode);
+  // process.exit() would tear down before async-buffered stdout writes (pipes,
+  // Windows TTYs) flush, truncating the lint tail. Setting exitCode lets the
+  // event loop drain naturally; run()'s cleanup guarantees nothing keeps it
+  // alive.
+  process.exitCode = exitCode;
 }
 
 main().catch((err) => {
   process.stderr.write(`rslint: ${err}\n`);
-  process.exit(1);
+  process.exitCode = 1;
 });

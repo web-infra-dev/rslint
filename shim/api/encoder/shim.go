@@ -7,14 +7,16 @@ import "github.com/microsoft/typescript-go/internal/api/encoder"
 import "github.com/microsoft/typescript-go/internal/ast"
 import _ "unsafe"
 
+//go:linkname BuildNodeIndexTable github.com/microsoft/typescript-go/internal/api/encoder.BuildNodeIndexTable
+func BuildNodeIndexTable(sourceFile *ast.SourceFile) *encoder.NodeIndexTable
 //go:linkname DecodeNodes github.com/microsoft/typescript-go/internal/api/encoder.DecodeNodes
 func DecodeNodes(data []byte) (*ast.Node, error)
 //go:linkname DecodeSourceFile github.com/microsoft/typescript-go/internal/api/encoder.DecodeSourceFile
 func DecodeSourceFile(data []byte) (*ast.SourceFile, error)
 //go:linkname EncodeNode github.com/microsoft/typescript-go/internal/api/encoder.EncodeNode
-func EncodeNode(node *ast.Node, sourceFile *ast.SourceFile) ([]byte, error)
+func EncodeNode(node *ast.Node, sourceFile *ast.SourceFile) ([]byte, *encoder.NodeIndexTable, error)
 //go:linkname EncodeSourceFile github.com/microsoft/typescript-go/internal/api/encoder.EncodeSourceFile
-func EncodeSourceFile(sourceFile *ast.SourceFile) ([]byte, error)
+func EncodeSourceFile(sourceFile *ast.SourceFile) ([]byte, *encoder.NodeIndexTable, error)
 const HeaderOffsetExtendedData = encoder.HeaderOffsetExtendedData
 const HeaderOffsetHashHi0 = encoder.HeaderOffsetHashHi0
 const HeaderOffsetHashHi1 = encoder.HeaderOffsetHashHi1
@@ -33,6 +35,7 @@ const NodeDataTypeChildren = encoder.NodeDataTypeChildren
 const NodeDataTypeExtendedData = encoder.NodeDataTypeExtendedData
 const NodeDataTypeMask = encoder.NodeDataTypeMask
 const NodeDataTypeString = encoder.NodeDataTypeString
+type NodeIndexTable = encoder.NodeIndexTable
 const NodeOffsetData = encoder.NodeOffsetData
 const NodeOffsetEnd = encoder.NodeOffsetEnd
 const NodeOffsetFlags = encoder.NodeOffsetFlags

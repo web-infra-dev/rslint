@@ -37,7 +37,10 @@ type GetNonNullableTypeParams = api.GetNonNullableTypeParams
 type GetParameterTypeParams = api.GetParameterTypeParams
 type GetParentOfSymbolParams = api.GetParentOfSymbolParams
 type GetProjectDiagnosticsParams = api.GetProjectDiagnosticsParams
+type GetReferencedSymbolsForNodeParams = api.GetReferencedSymbolsForNodeParams
+type GetReferencesToSymbolInFileParams = api.GetReferencesToSymbolInFileParams
 type GetResolvedSignatureParams = api.GetResolvedSignatureParams
+type GetSignatureUsagesParams = api.GetSignatureUsagesParams
 type GetSignaturesOfTypeParams = api.GetSignaturesOfTypeParams
 type GetSourceFileParams = api.GetSourceFileParams
 type GetSymbolAtLocationParams = api.GetSymbolAtLocationParams
@@ -55,11 +58,11 @@ type GetTypePropertyParams = api.GetTypePropertyParams
 type GetTypesAtPositionsParams = api.GetTypesAtPositionsParams
 type GetTypesOfSymbolsParams = api.GetTypesOfSymbolsParams
 type GetWidenedTypeParams = api.GetWidenedTypeParams
-type Handle[T any] = api.Handle[T]
 type Handler = api.Handler
 type IndexInfoResponse = api.IndexInfoResponse
 type InitializeResponse = api.InitializeResponse
 type IsArrayLikeTypeParams = api.IsArrayLikeTypeParams
+type IsTypeAssignableToParams = api.IsTypeAssignableToParams
 type JSONRPCProtocol = api.JSONRPCProtocol
 type Message = api.Message
 type MessagePackProtocol = api.MessagePackProtocol
@@ -72,6 +75,8 @@ const MessageTypeRequest = api.MessageTypeRequest
 const MessageTypeResponse = api.MessageTypeResponse
 const MessageTypeUnknown = api.MessageTypeUnknown
 type Method = api.Method
+const MethodGetAliasSymbolOfType = api.MethodGetAliasSymbolOfType
+const MethodGetAliasTypeArgumentsOfType = api.MethodGetAliasTypeArgumentsOfType
 const MethodGetAnyType = api.MethodGetAnyType
 const MethodGetBaseTypeOfLiteralType = api.MethodGetBaseTypeOfLiteralType
 const MethodGetBaseTypeOfType = api.MethodGetBaseTypeOfType
@@ -90,6 +95,7 @@ const MethodGetESSymbolType = api.MethodGetESSymbolType
 const MethodGetExportSymbolOfSymbol = api.MethodGetExportSymbolOfSymbol
 const MethodGetExportsOfSymbol = api.MethodGetExportsOfSymbol
 const MethodGetExtendsTypeOfType = api.MethodGetExtendsTypeOfType
+const MethodGetFreshTypeOfType = api.MethodGetFreshTypeOfType
 const MethodGetIndexInfosOfType = api.MethodGetIndexInfosOfType
 const MethodGetIndexTypeOfType = api.MethodGetIndexTypeOfType
 const MethodGetLocalTypeParametersOfType = api.MethodGetLocalTypeParametersOfType
@@ -103,11 +109,15 @@ const MethodGetOuterTypeParametersOfType = api.MethodGetOuterTypeParametersOfTyp
 const MethodGetParameterType = api.MethodGetParameterType
 const MethodGetParentOfSymbol = api.MethodGetParentOfSymbol
 const MethodGetPropertiesOfType = api.MethodGetPropertiesOfType
+const MethodGetReferencedSymbolsForNode = api.MethodGetReferencedSymbolsForNode
+const MethodGetReferencesToSymbolInFile = api.MethodGetReferencesToSymbolInFile
+const MethodGetRegularTypeOfType = api.MethodGetRegularTypeOfType
 const MethodGetResolvedSignature = api.MethodGetResolvedSignature
 const MethodGetRestTypeOfSignature = api.MethodGetRestTypeOfSignature
 const MethodGetReturnTypeOfSignature = api.MethodGetReturnTypeOfSignature
 const MethodGetSemanticDiagnostics = api.MethodGetSemanticDiagnostics
 const MethodGetShorthandAssignmentValueSymbol = api.MethodGetShorthandAssignmentValueSymbol
+const MethodGetSignatureUsages = api.MethodGetSignatureUsages
 const MethodGetSignaturesOfType = api.MethodGetSignaturesOfType
 const MethodGetSourceFile = api.MethodGetSourceFile
 const MethodGetStringType = api.MethodGetStringType
@@ -138,11 +148,15 @@ const MethodGetWidenedType = api.MethodGetWidenedType
 const MethodInitialize = api.MethodInitialize
 const MethodIsArrayLikeType = api.MethodIsArrayLikeType
 const MethodIsContextSensitive = api.MethodIsContextSensitive
+const MethodIsTypeAssignableTo = api.MethodIsTypeAssignableTo
 const MethodParseConfigFile = api.MethodParseConfigFile
 const MethodPrintNode = api.MethodPrintNode
 const MethodRelease = api.MethodRelease
 const MethodResolveName = api.MethodResolveName
+const MethodSaveHeapProfile = api.MethodSaveHeapProfile
 const MethodSignatureToSignatureDeclaration = api.MethodSignatureToSignatureDeclaration
+const MethodStartCPUProfile = api.MethodStartCPUProfile
+const MethodStopCPUProfile = api.MethodStopCPUProfile
 const MethodTypeToString = api.MethodTypeToString
 const MethodTypeToTypeNode = api.MethodTypeToTypeNode
 const MethodUpdateSnapshot = api.MethodUpdateSnapshot
@@ -172,37 +186,45 @@ func NewStdioTransport(stdin io.ReadCloser, stdout io.WriteCloser) *api.StdioTra
 func NewSymbolResponse(symbol *ast.Symbol) *api.SymbolResponse
 //go:linkname NewSyncConn github.com/microsoft/typescript-go/internal/api.NewSyncConn
 func NewSyncConn(rwc io.ReadWriteCloser, protocol api.Protocol, handler api.Handler) *api.SyncConn
-//go:linkname NodeHandleFrom github.com/microsoft/typescript-go/internal/api.NodeHandleFrom
-func NodeHandleFrom(node *ast.Node) api.Handle[ast.Node]
+type NodeHandle = api.NodeHandle
 type ParseConfigFileParams = api.ParseConfigFileParams
 type PipeTransport = api.PipeTransport
 type PrintNodeParams = api.PrintNodeParams
+type ProfileParams = api.ProfileParams
+type ProfileResult = api.ProfileResult
 type ProjectFileChanges = api.ProjectFileChanges
 //go:linkname ProjectHandle github.com/microsoft/typescript-go/internal/api.ProjectHandle
-func ProjectHandle(p *project.Project) api.Handle[project.Project]
+func ProjectHandle(p *project.Project) api.ProjectID
+type ProjectID = api.ProjectID
 type ProjectResponse = api.ProjectResponse
 type Protocol = api.Protocol
 type RawBinary = api.RawBinary
+type ReferencedSymbolEntry = api.ReferencedSymbolEntry
 type ReleaseParams = api.ReleaseParams
 type ResolveNameParams = api.ResolveNameParams
 type Session = api.Session
 type SessionOptions = api.SessionOptions
 //go:linkname SignatureHandle github.com/microsoft/typescript-go/internal/api.SignatureHandle
-func SignatureHandle(id uint64) api.Handle[checker.Signature]
+func SignatureHandle(id uint64) api.SignatureID
+type SignatureID = api.SignatureID
 type SignatureResponse = api.SignatureResponse
 type SignatureToSignatureDeclarationParams = api.SignatureToSignatureDeclarationParams
+type SignatureUsageResponse = api.SignatureUsageResponse
 type SnapshotChanges = api.SnapshotChanges
+type SnapshotID = api.SnapshotID
 type SourceFileResponse = api.SourceFileResponse
 type StdioServer = api.StdioServer
 type StdioServerOptions = api.StdioServerOptions
 type StdioTransport = api.StdioTransport
 //go:linkname SymbolHandle github.com/microsoft/typescript-go/internal/api.SymbolHandle
-func SymbolHandle(symbol *ast.Symbol) api.Handle[ast.Symbol]
+func SymbolHandle(symbol *ast.Symbol) api.SymbolID
+type SymbolID = api.SymbolID
 type SymbolResponse = api.SymbolResponse
 type SyncConn = api.SyncConn
 type Transport = api.Transport
 //go:linkname TypeHandle github.com/microsoft/typescript-go/internal/api.TypeHandle
-func TypeHandle(t *checker.Type) api.Handle[checker.Type]
+func TypeHandle(t *checker.Type) api.TypeID
+type TypeID = api.TypeID
 type TypePredicateResponse = api.TypePredicateResponse
 type TypeResponse = api.TypeResponse
 type TypeToTypeNodeParams = api.TypeToTypeNodeParams

@@ -326,6 +326,8 @@ preresolved
 Prettier
 prioritises
 progressbar
+promisify
+promisifying
 promiseutil
 propertyassignment
 proptypes
@@ -396,6 +398,7 @@ scopemanager
 sectionhead
 Seeked
 segs
+sonarjs
 setsize
 setstate
 Setstate
@@ -571,3 +574,6 @@ rustup
 serde
 SIGSEGV
 zigbuild
+lockfiles
+smajobber
+isatty

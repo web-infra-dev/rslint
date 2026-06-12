@@ -1,6 +1,6 @@
 {
   "name": "@rslint/native-linux-arm64-gnu",
-  "version": "0.5.3",
+  "version": "0.6.0",
   "license": "MIT",
   "description": "rslint native binaries for linux-arm64-gnu",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
