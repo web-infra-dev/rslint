@@ -154,6 +154,17 @@ func TestNoMultipleResolvedExtras(t *testing.T) {
           reject(b)
         }
       })`},
+
+			// ---- Unlabeled break inside labeled block inside loop ----
+			{Code: `new Promise((resolve, reject) => {
+        while (foo) {
+          bar: {
+            resolve(1);
+            break;
+          }
+          resolve(2); // unreachable, should not be reported
+        }
+      })`},
 		},
 		[]rule_tester.InvalidTestCase{
 

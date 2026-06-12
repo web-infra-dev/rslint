@@ -266,9 +266,14 @@ func analyzeStmtWithLabel(stmt *ast.Node, state pathState, rCtx *ruleCtx, label 
 		bs := stmt.AsBreakStatement()
 		if len(rCtx.targets) > 0 {
 			if bs.Label == nil {
-				target := rCtx.targets[len(rCtx.targets)-1]
-				if target.exitState != nil {
-					*target.exitState = mergeStates(*target.exitState, state)
+				for i := len(rCtx.targets) - 1; i >= 0; i-- {
+					t := rCtx.targets[i]
+					if isLoopOrSwitch(t.node) {
+						if t.exitState != nil {
+							*t.exitState = mergeStates(*t.exitState, state)
+						}
+						break
+					}
 				}
 			} else {
 				labelName := bs.Label.Text()
