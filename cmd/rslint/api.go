@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -162,6 +164,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				})
 			}
 		}
+		// GetAllRules iterates a map, so sort by name for a deterministic
+		// rule order — same policy as GetEnabledRules, which the
+		// RuleOptions-less path below goes through.
+		slices.SortFunc(rulesWithOptions, func(a, b RuleWithOption) int {
+			return strings.Compare(a.rule.Name, b.rule.Name)
+		})
 	}
 
 	// Create compiler host
