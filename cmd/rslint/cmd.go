@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -1343,6 +1345,26 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixedCount += passFixed
 		}
 	}
+
+	// Diagnostics arrive in completion order — programs and, within a
+	// program, file shards run in parallel — so impose a deterministic
+	// order before printing. The key is (file, start position) only,
+	// deliberately with NO end/rule tie-break: ESLint orders same-start
+	// diagnostics by emission order (parent reported before nested child),
+	// and a file's diagnostics are all emitted by a single worker, so under
+	// a STABLE sort this key is already fully deterministic. Keep this
+	// comparator in sync with the --api one in api.go (same policy over
+	// api.Diagnostic).
+	// Known pre-existing exception: a file rooted by two tsconfigs at once
+	// is linted by both programs (duplicate diagnostics with
+	// scheduling-dependent interleaving) — neither introduced nor fixed
+	// here.
+	slices.SortStableFunc(allDiags, func(a, b rule.RuleDiagnostic) int {
+		if c := strings.Compare(a.FilePath, b.FilePath); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Range.Pos(), b.Range.Pos())
+	})
 
 	// Phase 3: Print diagnostics and count errors/warnings.
 	// allDiags contains: original diagnostics (no fix), or remaining after fix.

@@ -281,15 +281,26 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []api.Diagnostic{}
 	}
-	// sort diagnostics
-	sort.Slice(diagnostics, func(i, j int) bool {
-		if diagnostics[i].FilePath != diagnostics[j].FilePath {
-			return diagnostics[i].FilePath < diagnostics[j].FilePath
+	// Sort diagnostics by (file, start position) only — deliberately NO
+	// end/rule tie-break: ESLint and the upstream rule tests order
+	// same-start diagnostics by emission order (parent reported before
+	// nested child), and a file's diagnostics are all emitted by a single
+	// worker, so under a STABLE sort this key is already fully
+	// deterministic. Keep this comparator in sync with the CLI one in
+	// cmd.go (same policy over rule.RuleDiagnostic).
+	// Known pre-existing exception: a file rooted by two tsconfigs at once
+	// is linted by both programs (duplicate diagnostics with
+	// scheduling-dependent interleaving) — neither introduced nor fixed
+	// here.
+	sort.SliceStable(diagnostics, func(i, j int) bool {
+		a, b := diagnostics[i], diagnostics[j]
+		if a.FilePath != b.FilePath {
+			return a.FilePath < b.FilePath
 		}
-		if diagnostics[i].Range.Start.Line != diagnostics[j].Range.Start.Line {
-			return diagnostics[i].Range.Start.Line < diagnostics[j].Range.Start.Line
+		if a.Range.Start.Line != b.Range.Start.Line {
+			return a.Range.Start.Line < b.Range.Start.Line
 		}
-		return diagnostics[i].Range.Start.Column < diagnostics[j].Range.Start.Column
+		return a.Range.Start.Column < b.Range.Start.Column
 	})
 
 	// Create response

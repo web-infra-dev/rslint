@@ -87,9 +87,10 @@ type LintResult struct {
 //   - OnDiagnostic=nil                    → diagnostics are dropped
 //
 // Thread-safety: OnDiagnostic is invoked from multiple goroutines
-// concurrently — Phase 1 fans out per program, Phase 2 (type-check) does
-// the same. Callers MUST make their handler safe for concurrent calls
-// (channel send, mutex-guarded slice append, sync.Map, etc.).
+// concurrently — Phase 1 fans out per program AND per file shard within
+// each program (one worker per pool checker), Phase 2 (type-check) fans
+// out per program. Callers MUST make their handler safe for concurrent
+// calls (channel send, mutex-guarded slice append, sync.Map, etc.).
 type RunLinterOptions struct {
 	Programs       []*compiler.Program
 	SingleThreaded bool
