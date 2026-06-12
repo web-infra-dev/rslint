@@ -8,7 +8,7 @@ const recommended: RslintConfigEntry = {
     'promise/always-return': 'error',
     'promise/no-return-wrap': 'error',
     'promise/param-names': 'error',
-    // 'promise/catch-or-return': 'error', // not implemented
+    'promise/catch-or-return': 'error',
     // 'promise/no-native': 'off', // not implemented
     'promise/no-nesting': 'warn',
     // 'promise/no-promise-in-callback': 'warn', // not implemented
