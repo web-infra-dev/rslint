@@ -439,6 +439,7 @@ const ImportKindDefault = lsproto.ImportKindDefault
 const ImportKindNamed = lsproto.ImportKindNamed
 const ImportKindNamespace = lsproto.ImportKindNamespace
 type InitializationOptions = lsproto.InitializationOptions
+type InitializationOptionsOrNull = lsproto.InitializationOptionsOrNull
 type InitializeAPISessionParams = lsproto.InitializeAPISessionParams
 type InitializeAPISessionResult = lsproto.InitializeAPISessionResult
 type InitializeError = lsproto.InitializeError

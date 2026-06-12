@@ -15,6 +15,9 @@ type APIFileChanges = api.APIFileChanges
 type AsyncConn = api.AsyncConn
 type CheckerSignatureParams = api.CheckerSignatureParams
 type CheckerTypeParams = api.CheckerTypeParams
+type CompletionEntryLabelDetailsResponse = api.CompletionEntryLabelDetailsResponse
+type CompletionEntryResponse = api.CompletionEntryResponse
+type CompletionInfoResponse = api.CompletionInfoResponse
 type ConfigFileResponse = api.ConfigFileResponse
 type Conn = api.Conn
 type DiagnosticResponse = api.DiagnosticResponse
@@ -26,6 +29,7 @@ var ErrRequestTimeout = api.ErrRequestTimeout
 //go:linkname GeneratePipePath github.com/microsoft/typescript-go/internal/api.GeneratePipePath
 func GeneratePipePath(name string) string
 type GetBaseTypeOfLiteralTypeParams = api.GetBaseTypeOfLiteralTypeParams
+type GetCompletionsAtPositionParams = api.GetCompletionsAtPositionParams
 type GetContextualTypeParams = api.GetContextualTypeParams
 type GetDefaultProjectForFileParams = api.GetDefaultProjectForFileParams
 type GetDiagnosticsParams = api.GetDiagnosticsParams
@@ -84,6 +88,7 @@ const MethodGetBaseTypes = api.MethodGetBaseTypes
 const MethodGetBigIntType = api.MethodGetBigIntType
 const MethodGetBooleanType = api.MethodGetBooleanType
 const MethodGetCheckTypeOfType = api.MethodGetCheckTypeOfType
+const MethodGetCompletionsAtPosition = api.MethodGetCompletionsAtPosition
 const MethodGetConfigFileParsingDiagnostics = api.MethodGetConfigFileParsingDiagnostics
 const MethodGetConstraintOfType = api.MethodGetConstraintOfType
 const MethodGetConstraintOfTypeParameter = api.MethodGetConstraintOfTypeParameter
