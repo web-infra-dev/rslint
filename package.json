@@ -52,9 +52,9 @@
       "prettier --write"
     ]
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.34.3",
   "engines": {
-    "pnpm": ">=10.33.0"
+    "pnpm": ">=10.34.3"
   },
   "files": [],
   "dependencies": {
