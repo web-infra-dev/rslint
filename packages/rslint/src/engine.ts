@@ -40,7 +40,7 @@ export interface EngineRunOptions {
   /** Working directory (defaults to process.cwd()). */
   cwd?: string;
   /** Runtime hints forwarded in the `init` payload's `runtime` block. */
-  runtime?: { forceColor?: boolean; singleThreaded?: boolean };
+  runtime?: { singleThreaded?: boolean };
   /**
    * Extra fields merged into the `init` payload (positional files, --format,
    * --fix, workingDirectory). Pass-through so the engine stays unaware of CLI
@@ -67,6 +67,12 @@ export interface EngineRunOptions {
 export async function runEngine(opts: EngineRunOptions): Promise<number> {
   const stdout = opts.stdout ?? process.stdout;
   const stderr = opts.stderr ?? process.stderr;
+  // TTY fact for the Go side's color decision, probed on the actual sink the
+  // forwarded output frames land on. Only this process can observe it — the
+  // Go child's own stdout is the IPC pipe. Non-TTY sinks (pipes, files, test
+  // streams) have no isTTY property, which coerces to false here.
+  // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  const stdoutIsTTY = (stdout as Partial<NodeJS.WriteStream>).isTTY === true;
 
   const child = spawn(opts.binPath, opts.goArgs, {
     stdio: ['pipe', 'pipe', 'inherit'],
@@ -223,7 +229,7 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
             configs: opts.configs,
             eslintPlugins: opts.eslintPluginEntries,
             runtime: {
-              forceColor: opts.runtime?.forceColor,
+              stdoutIsTTY,
               singleThreaded: opts.runtime?.singleThreaded,
             },
           }),

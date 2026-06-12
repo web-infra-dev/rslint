@@ -44,6 +44,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fatih/color"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/ipc"
@@ -91,7 +92,11 @@ type initPayload struct {
 // runtimePayload is the IPC-bound subset of runtime knobs that don't have (or
 // shouldn't duplicate) a 1:1 user flag. Adding a field is a wire change.
 type runtimePayload struct {
-	ForceColor     bool `json:"forceColor,omitempty"`
+	// StdoutIsTTY reports whether the peer's real stdout — the terminal the
+	// forwarded lint output lands on — is a TTY. The Go process cannot
+	// observe this itself (its own stdout is the IPC pipe). Absent (false)
+	// with an older peer, which degrades to colorless output.
+	StdoutIsTTY    bool `json:"stdoutIsTTY,omitempty"`
 	SingleThreaded bool `json:"singleThreaded,omitempty"`
 }
 
@@ -223,9 +228,7 @@ func runCLI(args []string) int {
 	if payload.FixMode {
 		baseArgs.Fix = true
 	}
-	if payload.Runtime.ForceColor {
-		baseArgs.ForceColor = true
-	}
+	baseArgs.StdoutIsTTY = payload.Runtime.StdoutIsTTY
 	if payload.Runtime.SingleThreaded {
 		baseArgs.SingleThreaded = true
 	}
@@ -249,6 +252,12 @@ func runCLI(args []string) int {
 	stdoutDrainDone := make(chan struct{})
 	go drainStdoutToIPC(stdoutR, ch, stdoutDrainDone)
 	os.Stdout = stdoutW
+	// fatih/color captured its package-level Output at init, pointing at the
+	// real fd-1 — which in IPC mode is the frame stream. Re-aim it at the
+	// redirect pipe so a stray color.Print-family call degrades to ordinary
+	// forwarded text instead of corrupting the frame protocol. (color.Error
+	// already points at the inherited stderr; leave it.)
+	color.Output = stdoutW
 	// finalizeStdout flushes + restores stdout before the shutdown handshake.
 	finalizeStdout := func() {
 		os.Stdout = origStdout

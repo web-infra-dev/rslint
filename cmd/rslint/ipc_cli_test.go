@@ -4,9 +4,13 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -113,5 +117,151 @@ func TestSplitAtUTF8Boundary(t *testing.T) {
 				t.Errorf("incomplete = %v, want %v", incomplete, tc.wantIncomplete)
 			}
 		})
+	}
+}
+
+// TestRunCLI_StdoutIsTTYWireToANSI pins the issue-#1080 seam end-to-end in
+// process: the runtime.stdoutIsTTY fact of a real init frame must cross the
+// wire (json tag), the payload→lintArgs merge, and the pipeline's color
+// decision, putting ANSI escapes into the forwarded `output` frames — and
+// only then. Every env tier above the TTY fact is neutralized so the result
+// is identical on dev machines and CI.
+func TestRunCLI_StdoutIsTTYWireToANSI(t *testing.T) {
+	cases := []struct {
+		name     string
+		tty      bool
+		wantANSI bool
+	}{
+		{"stdoutIsTTY=true colors output frames", true, true},
+		{"stdoutIsTTY=false stays colorless", false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			runStdoutTTYCase(t, tc.tty, tc.wantANSI)
+		})
+	}
+}
+
+func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
+	// Truly unset NO_COLOR/FORCE_COLOR (set-but-empty would trip tiers 3/4);
+	// t.Setenv first arranges restoration and marks the test non-parallel,
+	// which the os.Stdin/os.Stdout/cwd swaps below require anyway.
+	for _, key := range []string{"NO_COLOR", "FORCE_COLOR"} {
+		if v, ok := os.LookupEnv(key); ok {
+			t.Setenv(key, v)
+			os.Unsetenv(key)
+		}
+	}
+	t.Setenv("GITHUB_ACTIONS", "") // non-empty check → falls through to the TTY fact
+	t.Setenv("TERM", "xterm-256color")
+
+	// EvalSymlinks: macOS t.TempDir lives under the /var → /private/var
+	// symlink; the pipeline matches normalized real paths, so anchor the
+	// fixture at the physical path.
+	dir, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFixture := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFixture("tsconfig.json", `{"compilerOptions":{"strict":true},"include":["**/*.ts"]}`)
+	writeFixture("index.ts", "// @ts-ignore\nconst a = 1;\n")
+
+	// runCLI binds its IPC channel to the os.Stdin/os.Stdout globals and
+	// changes directory to the payload workingDirectory; swap in pipe ends
+	// and restore everything afterwards. t.Chdir into the current directory
+	// is a no-op move that registers automatic cwd restoration.
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(wd)
+	stdinR, stdinW, err := os.Pipe() // test peer writes → CLI reads
+	if err != nil {
+		t.Fatal(err)
+	}
+	stdoutR, stdoutW, err := os.Pipe() // CLI writes → test peer reads
+	if err != nil {
+		t.Fatal(err)
+	}
+	origStdin, origStdout := os.Stdin, os.Stdout
+	os.Stdin, os.Stdout = stdinR, stdoutW
+	t.Cleanup(func() {
+		os.Stdin, os.Stdout = origStdin, origStdout
+		_ = stdinR.Close()
+		_ = stdinW.Close()
+		_ = stdoutR.Close()
+		_ = stdoutW.Close()
+	})
+
+	// The test plays the Node peer on the other pipe ends.
+	peer := ipc.NewChannel(stdoutR, stdinW)
+	var outMu sync.Mutex
+	var out bytes.Buffer
+	peer.RegisterNotification(kindOutput, func(msg *ipc.Message) {
+		var d struct {
+			Text string `json:"text"`
+		}
+		if err := msg.Decode(&d); err != nil {
+			return
+		}
+		outMu.Lock()
+		out.WriteString(d.Text)
+		outMu.Unlock()
+	})
+	peer.SetInboundHandler(func(_ context.Context, msg *ipc.Message) (any, error) {
+		if msg.Kind == kindShutdown {
+			return map[string]any{"ok": true}, nil
+		}
+		return nil, fmt.Errorf("unexpected inbound kind %q", msg.Kind)
+	})
+	peer.Start()
+	t.Cleanup(func() { _ = peer.Close() })
+
+	codeCh := make(chan int, 1)
+	go func() { codeCh <- runCLI(nil) }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	_, err = peer.SendRequest(ctx, kindInit, map[string]any{
+		"workingDirectory": dir,
+		"runtime":          map[string]any{"stdoutIsTTY": tty},
+		"configs": []map[string]any{{
+			"configDirectory": dir,
+			"entries": []map[string]any{{
+				"files":   []string{"**/*.ts"},
+				"rules":   map[string]any{"@typescript-eslint/ban-ts-comment": "error"},
+				"plugins": []string{"@typescript-eslint"},
+			}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("init request failed: %v", err)
+	}
+
+	var code int
+	select {
+	case code = <-codeCh:
+	case <-time.After(60 * time.Second):
+		t.Fatal("runCLI did not return within 60s")
+	}
+
+	// runCLI returns only after finalizeStdout drained every output frame and
+	// the shutdown round-trip completed, so `out` is complete here.
+	outMu.Lock()
+	text := out.String()
+	outMu.Unlock()
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1 (one lint error)", code)
+	}
+	if !strings.Contains(text, "ban-ts-comment") {
+		t.Fatalf("no diagnostic in forwarded output — lint did not run; output: %q", text)
+	}
+	if gotANSI := strings.Contains(text, "\x1b["); gotANSI != wantANSI {
+		t.Errorf("ANSI in output = %v, want %v (stdoutIsTTY=%v); output: %q", gotANSI, wantANSI, tty, text)
 	}
 }
