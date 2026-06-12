@@ -1,6 +1,5 @@
 import * as path from 'path';
 import * as fs from 'fs';
-import * as os from 'os';
 
 import { runTests, downloadAndUnzipVSCode } from '@vscode/test-electron';
 
@@ -73,7 +72,11 @@ async function main() {
   await Promise.allSettled(
     suites.map(async (suite, index) => {
       // Create isolated user-data and extensions directories for each suite to prevent conflicts
-      const tmpBase = path.join(os.tmpdir(), `rslint-test-${index}`);
+      // Avoid UNIX socket path length limit (108 chars) by keeping paths short.
+      // Also avoid os.tmpdir() (/tmp) on CI containers where it's mapped to a small tmpfs.
+      // We place the directories under the workspace root where there is plenty of disk space.
+      const repoRoot = path.resolve(extensionDevelopmentPath, '../..');
+      const tmpBase = path.join(repoRoot, `.tmp-test-dir-${index}`);
       const userDataDir = path.join(tmpBase, 'user-data');
       const extensionsDir = path.join(tmpBase, 'extensions');
 
