@@ -2,17 +2,17 @@ import path from 'node:path';
 
 export const STAMP_FD = 3;
 
-type ExecFileSyncStamp = {
+type SpawnStamp = {
   interceptedAtMs?: number;
   file?: string | null;
 };
 
-function parseExecFileSyncStamp(output: string | Buffer | null): {
-  payload: ExecFileSyncStamp;
+function parseSpawnStamp(output: string | Buffer | null): {
+  payload: SpawnStamp;
   rawOutput: string;
 } {
   if (output == null) {
-    throw new Error('Missing execFileSync stamp output');
+    throw new Error('Missing spawn stamp output');
   }
 
   const rawOutput =
@@ -23,11 +23,13 @@ function parseExecFileSyncStamp(output: string | Buffer | null): {
     .filter((line) => line.length > 0);
 
   if (lines.length === 0) {
-    throw new Error('Empty execFileSync stamp output');
+    throw new Error(
+      'Empty spawn stamp output: the CLI never spawned the Go rslint binary',
+    );
   }
 
   return {
-    payload: JSON.parse(lines[lines.length - 1]) as ExecFileSyncStamp,
+    payload: JSON.parse(lines[lines.length - 1]) as SpawnStamp,
     rawOutput,
   };
 }
@@ -37,11 +39,12 @@ export function readPreBinaryLatencyNs(
   output: string | Buffer | null,
 ): number {
   // "before_go_exec" latency is computed against the parent timestamp:
-  // startedAtMs (parent pre-spawn) -> interceptedAtMs (child first execFileSync).
-  const { payload, rawOutput } = parseExecFileSyncStamp(output);
+  // startedAtMs (parent pre-spawn) -> interceptedAtMs (child's first spawn of
+  // the Go binary).
+  const { payload, rawOutput } = parseSpawnStamp(output);
 
   if (typeof payload.interceptedAtMs !== 'number') {
-    throw new Error(`Invalid execFileSync stamp payload: ${rawOutput}`);
+    throw new Error(`Invalid spawn stamp payload: ${rawOutput}`);
   }
 
   const expectedBinaryName =
@@ -50,9 +53,7 @@ export function readPreBinaryLatencyNs(
     typeof payload.file !== 'string' ||
     path.basename(payload.file) !== expectedBinaryName
   ) {
-    throw new Error(
-      `Unexpected execFileSync target in stamp payload: ${rawOutput}`,
-    );
+    throw new Error(`Unexpected spawn target in stamp payload: ${rawOutput}`);
   }
 
   return Math.round((payload.interceptedAtMs - startedAtMs) * 1_000_000);

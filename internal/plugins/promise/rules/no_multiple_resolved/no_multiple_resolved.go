@@ -347,17 +347,18 @@ func analyzeExprForResolvers(expr *ast.Node, state pathState, rCtx *ruleCtx) pat
 
 	case ast.KindBinaryExpression:
 		be := expr.AsBinaryExpression()
-		op := be.OperatorToken.Kind
-		if op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken || op == ast.KindQuestionQuestionToken {
+		switch op := be.OperatorToken.Kind; op {
+		case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
 			state = analyzeExprForResolvers(be.Left, state, rCtx)
 			rightState := analyzeExprForResolvers(be.Right, state, rCtx)
 			return mergeStates(rightState, state)
-		} else if op == ast.KindCommaToken {
+		case ast.KindCommaToken:
+			state = analyzeExprForResolvers(be.Left, state, rCtx)
+			return analyzeExprForResolvers(be.Right, state, rCtx)
+		default:
 			state = analyzeExprForResolvers(be.Left, state, rCtx)
 			return analyzeExprForResolvers(be.Right, state, rCtx)
 		}
-		state = analyzeExprForResolvers(be.Left, state, rCtx)
-		return analyzeExprForResolvers(be.Right, state, rCtx)
 
 	default:
 		expr.ForEachChild(func(child *ast.Node) bool {

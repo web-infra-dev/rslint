@@ -462,6 +462,7 @@ export default defineConfig({
 
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
+    './tests/eslint-plugin-promise/rules/avoid-new.test.ts',
     './tests/eslint-plugin-promise/rules/catch-or-return.test.ts',
     './tests/eslint-plugin-promise/rules/no-multiple-resolved.test.ts',
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
