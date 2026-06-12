@@ -1,5 +1,5 @@
 // TestNoMultipleResolvedUpstream migrates the full valid/invalid suite from upstream
-// __tests__/no-multiple-resolved.js 1:1. Position assertions cover line/column for every
+// __tests__/no-multiple-resolved.js 1:1. Position assertions cover the line for every
 // invalid case. rslint-specific lock-in cases live in no_multiple_resolved_extras_test.go.
 package no_multiple_resolved_test
 

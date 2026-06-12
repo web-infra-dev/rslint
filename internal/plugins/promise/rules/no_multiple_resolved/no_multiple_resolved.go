@@ -28,6 +28,7 @@ type ruleCtx struct {
 	resolverSymbols map[*ast.Symbol]bool // non-nil in TS mode only
 	ctx             rule.RuleContext
 	reported        map[*ast.Node]bool
+	breakExitStates []*pathState
 }
 
 func buildAlreadyResolvedMessage(line int) rule.RuleMessage {
@@ -128,8 +129,7 @@ func walkNestedFunctions(node *ast.Node, rCtx *ruleCtx) {
 	if node == nil {
 		return
 	}
-	switch node.Kind {
-	case ast.KindFunctionExpression, ast.KindArrowFunction:
+	if ast.IsFunctionLike(node) {
 		if rCtx.resolverSymbols != nil {
 			// TS mode: symbol comparison handles shadowing; reuse same rCtx.
 			analyzeFunctionBody(node, rCtx)
@@ -217,34 +217,54 @@ func analyzeStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
 	case ast.KindIfStatement:
 		return analyzeIfStmt(stmt, state, rCtx)
 
+	case ast.KindFunctionDeclaration:
+		walkNestedFunctions(stmt, rCtx)
+		return state
+
 	case ast.KindReturnStatement:
 		rs := stmt.AsReturnStatement()
 		if rs.Expression != nil {
-			walkNestedFunctions(rs.Expression, rCtx)
+			state = analyzeExprForResolvers(rs.Expression, state, rCtx)
 		}
-		return pathState{dead: true}
+		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
 
 	case ast.KindThrowStatement:
 		ts := stmt.AsThrowStatement()
 		if ts.Expression != nil {
-			walkNestedFunctions(ts.Expression, rCtx)
+			state = analyzeExprForResolvers(ts.Expression, state, rCtx)
 		}
-		return pathState{dead: true}
+		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
 
-	case ast.KindBreakStatement, ast.KindContinueStatement:
-		return pathState{dead: true}
+	case ast.KindBreakStatement:
+		if len(rCtx.breakExitStates) > 0 {
+			s := rCtx.breakExitStates[len(rCtx.breakExitStates)-1]
+			if s != nil {
+				*s = mergeStates(*s, state)
+			}
+		}
+		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
+
+	case ast.KindContinueStatement:
+		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
 
 	case ast.KindWhileStatement:
 		ws := stmt.AsWhileStatement()
 		walkNestedFunctions(ws.Expression, rCtx)
+		loopExitState := pathState{dead: true}
+		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
 		bodyState := analyzeStmt(ws.Statement, state, rCtx)
-		return mergeStates(state, bodyState)
+		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		return mergeStates(loopExitState, mergeStates(state, bodyState))
 
 	case ast.KindDoStatement:
 		ds := stmt.AsDoStatement()
 		walkNestedFunctions(ds.Expression, rCtx)
 		// do-while body always executes at least once
-		return analyzeStmt(ds.Statement, state, rCtx)
+		loopExitState := pathState{dead: true}
+		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
+		bodyState := analyzeStmt(ds.Statement, state, rCtx)
+		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		return mergeStates(loopExitState, bodyState)
 
 	case ast.KindForStatement:
 		fs := stmt.AsForStatement()
@@ -257,14 +277,20 @@ func analyzeStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
 		if fs.Incrementor != nil {
 			walkNestedFunctions(fs.Incrementor, rCtx)
 		}
+		loopExitState := pathState{dead: true}
+		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
 		bodyState := analyzeStmt(fs.Statement, state, rCtx)
-		return mergeStates(state, bodyState)
+		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		return mergeStates(loopExitState, mergeStates(state, bodyState))
 
 	case ast.KindForInStatement, ast.KindForOfStatement:
 		fio := stmt.AsForInOrOfStatement()
 		walkNestedFunctions(fio.Expression, rCtx)
+		loopExitState := pathState{dead: true}
+		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
 		bodyState := analyzeStmt(fio.Statement, state, rCtx)
-		return mergeStates(state, bodyState)
+		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		return mergeStates(loopExitState, mergeStates(state, bodyState))
 
 	case ast.KindTryStatement:
 		return analyzeTryStmt(stmt, state, rCtx)
@@ -306,8 +332,40 @@ func analyzeExprForResolvers(expr *ast.Node, state pathState, rCtx *ruleCtx) pat
 	if call := isDirectResolverCall(expr, rCtx); call != nil {
 		return onResolverCall(call, state, rCtx)
 	}
-	walkNestedFunctions(expr, rCtx)
-	return state
+	if ast.IsFunctionLike(expr) {
+		walkNestedFunctions(expr, rCtx)
+		return state
+	}
+
+	switch expr.Kind {
+	case ast.KindConditionalExpression:
+		ce := expr.AsConditionalExpression()
+		state = analyzeExprForResolvers(ce.Condition, state, rCtx)
+		thenState := analyzeExprForResolvers(ce.WhenTrue, state, rCtx)
+		elseState := analyzeExprForResolvers(ce.WhenFalse, state, rCtx)
+		return mergeStates(thenState, elseState)
+
+	case ast.KindBinaryExpression:
+		be := expr.AsBinaryExpression()
+		op := be.OperatorToken.Kind
+		if op == ast.KindAmpersandAmpersandToken || op == ast.KindBarBarToken || op == ast.KindQuestionQuestionToken {
+			state = analyzeExprForResolvers(be.Left, state, rCtx)
+			rightState := analyzeExprForResolvers(be.Right, state, rCtx)
+			return mergeStates(rightState, state)
+		} else if op == ast.KindCommaToken {
+			state = analyzeExprForResolvers(be.Left, state, rCtx)
+			return analyzeExprForResolvers(be.Right, state, rCtx)
+		}
+		state = analyzeExprForResolvers(be.Left, state, rCtx)
+		return analyzeExprForResolvers(be.Right, state, rCtx)
+
+	default:
+		expr.ForEachChild(func(child *ast.Node) bool {
+			state = analyzeExprForResolvers(child, state, rCtx)
+			return false
+		})
+		return state
+	}
 }
 
 func analyzeIfStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
@@ -407,8 +465,7 @@ func walkThrowables(node *ast.Node, rCtx *ruleCtx, onThrowable func(isResolver b
 		return
 	}
 	// Don't descend into nested functions
-	switch node.Kind {
-	case ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindFunctionDeclaration:
+	if ast.IsFunctionLike(node) {
 		return
 	}
 
@@ -424,7 +481,7 @@ func walkThrowables(node *ast.Node, rCtx *ruleCtx, onThrowable func(isResolver b
 		onThrowable(isResolver)
 
 	case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression, ast.KindNewExpression,
-		ast.KindYieldExpression, ast.KindAwaitExpression:
+		ast.KindYieldExpression:
 		node.ForEachChild(func(child *ast.Node) bool {
 			walkThrowables(child, rCtx, onThrowable)
 			return false
@@ -437,28 +494,6 @@ func walkThrowables(node *ast.Node, rCtx *ruleCtx, onThrowable func(isResolver b
 			return false
 		})
 	}
-}
-
-// analyzeSwitchCaseStmts processes switch case statements where break exits the case
-// (not the entire function). A trailing break is replaced with "not dead" state.
-func analyzeSwitchCaseStmts(stmts []*ast.Node, state pathState, rCtx *ruleCtx) pathState {
-	for i, stmt := range stmts {
-		if state.dead {
-			break
-		}
-		// A break at the end of a case just exits the switch, not the function.
-		// Replace it with "not dead" so the resolved state is preserved.
-		if stmt.Kind == ast.KindBreakStatement && i == len(stmts)-1 {
-			break
-		}
-		state = analyzeStmt(stmt, state, rCtx)
-	}
-	// If state is dead due to break (handled above) or other terminal, unmark dead
-	// so it can be merged as a live branch from the switch.
-	if state.dead {
-		state = pathState{firstCall: state.firstCall, certain: state.certain}
-	}
-	return state
 }
 
 func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
@@ -481,7 +516,13 @@ func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState
 		}
 	}
 
-	merged := pathState{dead: true} // start with dead; merge in each clause
+	// Create and push the switch exit state onto breakExitStates
+	switchExitState := pathState{dead: true}
+	rCtx.breakExitStates = append(rCtx.breakExitStates, &switchExitState)
+
+	// fallthroughState carries the state falling through from the previous case.
+	fallthroughState := pathState{dead: true}
+
 	for _, clause := range cb.Clauses.Nodes {
 		if clause == nil {
 			continue
@@ -490,15 +531,29 @@ func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState
 		if cc.Expression != nil {
 			walkNestedFunctions(cc.Expression, rCtx)
 		}
-		clauseState := analyzeSwitchCaseStmts(cc.Statements.Nodes, state, rCtx)
-		merged = mergeStates(merged, clauseState)
+
+		caseEntryState := mergeStates(state, fallthroughState)
+
+		caseExitState := caseEntryState
+		for _, caseStmt := range cc.Statements.Nodes {
+			if caseExitState.dead {
+				break
+			}
+			caseExitState = analyzeStmt(caseStmt, caseExitState, rCtx)
+		}
+
+		fallthroughState = caseExitState
 	}
 
+	// Pop the switch exit state
+	rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+
+	finalExitState := mergeStates(switchExitState, fallthroughState)
 	if !hasDefault {
-		// Without a default clause, the switch may match no case.
-		merged = mergeStates(merged, state)
+		finalExitState = mergeStates(finalExitState, state)
 	}
-	return merged
+
+	return finalExitState
 }
 
 func analyzeVarStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {

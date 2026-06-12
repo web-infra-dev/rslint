@@ -65,10 +65,21 @@ new Promise(async (resolve, reject) => {
 
 ## Differences from ESLint
 
-Correlated conditions across separate `if` statements (e.g. `if (err) { reject(err) }` followed
-by `if (!err) { resolve(val) }`) are not recognized as mutually exclusive. This rule reports them
-as potential double-resolution. Full ESLint code-path analysis handles these; our simplified
-state-based analysis does not.
+- Correlated conditions across separate `if` statements (e.g. `if (err) { reject(err) }` followed
+  by `if (!err) { resolve(val) }`) are not recognized as mutually exclusive. This rule reports them
+  as potential double-resolution. Full ESLint code-path analysis handles these; our simplified
+  state-based analysis does not.
+
+- Calling an outer resolver multiple times inside a nested executor is reported here, whereas ESLint does not report it. For example:
+  ```javascript
+  new Promise((resolve) => {
+    new Promise((res) => {
+      resolve(1)
+      resolve(2) // rslint: reported — ESLint: not reported
+    })
+  })
+  ```
+
 
 ## Original Documentation
 

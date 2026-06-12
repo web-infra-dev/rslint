@@ -132,6 +132,18 @@ func TestNoMultipleResolvedExtras(t *testing.T) {
 
 			// N/A: Dimension 3 (autofix) — this rule has no autofix
 			// N/A: optional chaining on resolver call (e.g. resolve?.()) — no test case in upstream
+
+			// ---- Try-catch where await occurs after resolve ----
+			// await after resolve should not trigger a false positive when catch handles reject
+			{Code: `new Promise(async (resolve, reject) => {
+        try {
+          const r = await foo();
+          resolve();
+          await r;
+        } catch (error) {
+          reject(error);
+        }
+      })`},
 		},
 		[]rule_tester.InvalidTestCase{
 
@@ -278,6 +290,126 @@ func TestNoMultipleResolvedExtras(t *testing.T) {
 					{
 						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 3.",
 						Line:    4,
+					},
+				},
+			},
+
+			// ---- Fallthrough switch potential double resolution ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        switch (x) {
+          case 1: reject(e)
+          case 2: resolve(v); break
+        }
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 3.",
+						Line:    4,
+					},
+				},
+			},
+
+			// ---- Function declaration inside executor ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        function onDone(e, v) {
+          reject(e)
+          resolve(v)
+        }
+        fn(onDone)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 3.",
+						Line:    4,
+					},
+				},
+			},
+
+			// ---- Nested executor calling outer resolve multiple times ----
+			{
+				Code: `new Promise((resolve) => {
+        new Promise((res) => {
+          resolve(1)
+          resolve(2)
+        })
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 3.",
+						Line:    4,
+					},
+				},
+			},
+
+			// ---- Resolver call inside return statement expression ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        if (error) reject(error)
+        return resolve(value)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 2.",
+						Line:    3,
+					},
+				},
+			},
+
+			// ---- Resolver call inside conditional expression ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        error ? reject(error) : resolve(value)
+        resolve(value)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 2.",
+						Line:    3,
+					},
+				},
+			},
+
+			// ---- Resolver call inside binary logical expression ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        error && reject(error)
+        resolve(value)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 2.",
+						Line:    3,
+					},
+				},
+			},
+
+			// ---- Resolver call inside comma expression ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        (reject(e), resolve(v))
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 2.",
+						Line:    2,
+					},
+				},
+			},
+
+			// ---- Loop with conditional break rejoining after loop ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        while (foo) {
+          if (error) { reject(error); break }
+        }
+        resolve(value)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 3.",
+						Line:    5,
 					},
 				},
 			},
