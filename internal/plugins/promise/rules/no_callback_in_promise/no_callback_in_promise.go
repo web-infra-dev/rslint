@@ -121,11 +121,7 @@ func isInsidePromise(node *ast.Node) bool {
 	for parent != nil && ast.IsOuterExpression(parent, skipTransparent) {
 		parent = parent.Parent
 	}
-	if parent == nil {
-		return false
-	}
-	name := getMemberCallName(parent)
-	return name == "then" || name == "catch"
+	return parent != nil && isPromiseMemberCall(parent)
 }
 
 // isInsideTimeout mirrors eslint-plugin-promise's isInsideTimeout:
