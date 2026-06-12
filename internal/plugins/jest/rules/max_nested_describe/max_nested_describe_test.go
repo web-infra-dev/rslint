@@ -77,6 +77,46 @@ func TestMaxNestedDescribeRule(t *testing.T) {
 					map[string]interface{}{"max": 0},
 				},
 			},
+			{
+				Code: `
+        describe('foo', () => {
+          describe('bar', () => {
+            describe('baz', () => {
+              describe('qux', () => {
+                describe('quux', () => {
+                  it('something', async () => {
+                    expect('something').toBe('something');
+                  });
+                });
+              });
+            });
+          });
+        });
+    `,
+				Options: []interface{}{
+					map[string]interface{}{"max": -1},
+				},
+			},
+			{
+				Code: `
+        describe('foo', () => {
+          describe('bar', () => {
+            describe('baz', () => {
+              describe('qux', () => {
+                describe('quux', () => {
+                  it('something', async () => {
+                    expect('something').toBe('something');
+                  });
+                });
+              });
+            });
+          });
+        });
+    `,
+				Options: []interface{}{
+					map[string]interface{}{"max": 1.5},
+				},
+			},
 			{Code: `
       describe('foo', () => {
         describe.each(['hello', 'world'])("%s", (a) => {});
@@ -85,6 +125,21 @@ func TestMaxNestedDescribeRule(t *testing.T) {
 			{Code: "describe('foo', () => {\n  describe.each`\n  foo  | bar\n  ${'1'} | ${'2'}\n  `('$foo $bar', ({ foo, bar }) => {});\n});"},
 		},
 		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+        describe('qux', () => {
+          it('should get something', () => {
+            expect(getSomething()).toBe('Something');
+          });
+        });
+      `,
+				Options: []interface{}{
+					map[string]interface{}{"max": 0},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "exceededMaxDepth", Line: 2, Column: 9},
+				},
+			},
 			{
 				Code: `
         describe('foo', function() {
@@ -172,21 +227,6 @@ func TestMaxNestedDescribeRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxDepth", Line: 4, Column: 13},
 					{MessageId: "exceededMaxDepth", Line: 10, Column: 13},
-				},
-			},
-			{
-				Code: `
-        describe('qux', () => {
-          it('should get something', () => {
-            expect(getSomething()).toBe('Something');
-          });
-        });
-      `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 0},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "exceededMaxDepth", Line: 2, Column: 9},
 				},
 			},
 			{
