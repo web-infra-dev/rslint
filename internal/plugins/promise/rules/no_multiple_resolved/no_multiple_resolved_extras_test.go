@@ -144,6 +144,16 @@ func TestNoMultipleResolvedExtras(t *testing.T) {
           reject(error);
         }
       })`},
+
+			// ---- Labeled break from outer loop avoids false positive ----
+			{Code: `new Promise((resolve, reject) => {
+        outer: while (foo) {
+          switch (x) {
+            case 1: resolve(a); break outer
+          }
+          reject(b)
+        }
+      })`},
 		},
 		[]rule_tester.InvalidTestCase{
 
@@ -410,6 +420,94 @@ func TestNoMultipleResolvedExtras(t *testing.T) {
 					{
 						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 3.",
 						Line:    5,
+					},
+				},
+			},
+
+			// ---- Loop with conditional continue rejoining after loop ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        while (foo) {
+          if (error) { reject(error); continue }
+        }
+        resolve(value)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 3.",
+						Line:    5,
+					},
+				},
+			},
+
+			// ---- Labeled block with break rejoining after block ----
+			{
+				Code: `new Promise((resolve, reject) => {
+        outer: {
+          if (error) { reject(error); break outer }
+        }
+        resolve(value)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 3.",
+						Line:    5,
+					},
+				},
+			},
+
+			// ---- Statement-head condition resolve ----
+			{
+				Code: `new Promise((resolve) => {
+        if (resolve(1)) { foo() }
+        resolve(2)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 2.",
+						Line:    3,
+					},
+				},
+			},
+
+			// ---- Statement-head while loop condition resolve ----
+			{
+				Code: `new Promise((resolve) => {
+        while (resolve(1)) { foo() }
+        resolve(2)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 2.",
+						Line:    3,
+					},
+				},
+			},
+
+			// ---- Optional chaining resolve?.() followed by resolve ----
+			{
+				Code: `new Promise((resolve) => {
+        resolve?.(1)
+        resolve(2)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is potentially resolved on line 2.",
+						Line:    3,
+					},
+				},
+			},
+
+			// ---- Certain resolve followed by optional chaining resolve?.() ----
+			{
+				Code: `new Promise((resolve) => {
+        resolve(1)
+        resolve?.(2)
+      })`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						Message: "Promise should not be resolved multiple times. Promise is already resolved on line 2.",
+						Line:    3,
 					},
 				},
 			},

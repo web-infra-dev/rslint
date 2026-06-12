@@ -19,6 +19,13 @@ type pathState struct {
 	dead      bool
 }
 
+type controlTarget struct {
+	node      *ast.Node
+	label     string
+	exitState *pathState
+	isLoop    bool
+}
+
 // ruleCtx holds shared analysis context.
 // In TS mode (TypeChecker available), resolverSymbols is populated and used for
 // scope-accurate resolver detection. In JS mode, resolverSymbols is nil and
@@ -28,7 +35,7 @@ type ruleCtx struct {
 	resolverSymbols map[*ast.Symbol]bool // non-nil in TS mode only
 	ctx             rule.RuleContext
 	reported        map[*ast.Node]bool
-	breakExitStates []*pathState
+	targets         []controlTarget
 }
 
 func buildAlreadyResolvedMessage(line int) rule.RuleMessage {
@@ -86,7 +93,8 @@ func onResolverCall(callExpr *ast.Node, state pathState, rCtx *ruleCtx) pathStat
 		rCtx.ctx.ReportNode(callExpr, msg)
 		rCtx.reported[callExpr] = true
 	}
-	return pathState{firstCall: callExpr, certain: true}
+	certain := state.certain || (callExpr.AsCallExpression().QuestionDotToken == nil)
+	return pathState{firstCall: callExpr, certain: certain}
 }
 
 // isResolverIdent reports whether ident refers to a tracked resolver parameter.
@@ -201,11 +209,30 @@ func analyzeStmts(stmts []*ast.Node, state pathState, rCtx *ruleCtx) pathState {
 	return state
 }
 
-// analyzeStmt dispatches to the appropriate handler for a statement.
+// analyzeStmt processes a single statement under the default empty label.
 func analyzeStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
+	return analyzeStmtWithLabel(stmt, state, rCtx, "")
+}
+
+// analyzeStmtWithLabel processes a single statement, taking into account any enclosing label.
+func analyzeStmtWithLabel(stmt *ast.Node, state pathState, rCtx *ruleCtx, label string) pathState {
 	if stmt == nil {
 		return state
 	}
+
+	if label != "" && !isLoopOrSwitch(stmt) {
+		blockExitState := pathState{dead: true}
+		rCtx.targets = append(rCtx.targets, controlTarget{
+			node:      stmt,
+			label:     label,
+			exitState: &blockExitState,
+			isLoop:    false,
+		})
+		bodyState := analyzeStmtWithLabel(stmt, state, rCtx, "")
+		rCtx.targets = rCtx.targets[:len(rCtx.targets)-1]
+		return mergeStates(blockExitState, bodyState)
+	}
+
 	switch stmt.Kind {
 	case ast.KindExpressionStatement:
 		expr := stmt.AsExpressionStatement().Expression
@@ -236,72 +263,131 @@ func analyzeStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
 		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
 
 	case ast.KindBreakStatement:
-		if len(rCtx.breakExitStates) > 0 {
-			s := rCtx.breakExitStates[len(rCtx.breakExitStates)-1]
-			if s != nil {
-				*s = mergeStates(*s, state)
+		bs := stmt.AsBreakStatement()
+		if len(rCtx.targets) > 0 {
+			if bs.Label == nil {
+				target := rCtx.targets[len(rCtx.targets)-1]
+				if target.exitState != nil {
+					*target.exitState = mergeStates(*target.exitState, state)
+				}
+			} else {
+				labelName := bs.Label.Text()
+				for i := len(rCtx.targets) - 1; i >= 0; i-- {
+					if rCtx.targets[i].label == labelName {
+						if rCtx.targets[i].exitState != nil {
+							*rCtx.targets[i].exitState = mergeStates(*rCtx.targets[i].exitState, state)
+						}
+						break
+					}
+				}
 			}
 		}
 		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
 
 	case ast.KindContinueStatement:
+		cs := stmt.AsContinueStatement()
+		if len(rCtx.targets) > 0 {
+			if cs.Label == nil {
+				for i := len(rCtx.targets) - 1; i >= 0; i-- {
+					if rCtx.targets[i].isLoop {
+						if rCtx.targets[i].exitState != nil {
+							*rCtx.targets[i].exitState = mergeStates(*rCtx.targets[i].exitState, state)
+						}
+						break
+					}
+				}
+			} else {
+				labelName := cs.Label.Text()
+				for i := len(rCtx.targets) - 1; i >= 0; i-- {
+					if rCtx.targets[i].label == labelName && rCtx.targets[i].isLoop {
+						if rCtx.targets[i].exitState != nil {
+							*rCtx.targets[i].exitState = mergeStates(*rCtx.targets[i].exitState, state)
+						}
+						break
+					}
+				}
+			}
+		}
 		return pathState{firstCall: state.firstCall, certain: state.certain, dead: true}
 
 	case ast.KindWhileStatement:
 		ws := stmt.AsWhileStatement()
-		walkNestedFunctions(ws.Expression, rCtx)
+		state = analyzeExprForResolvers(ws.Expression, state, rCtx)
 		loopExitState := pathState{dead: true}
-		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
+		rCtx.targets = append(rCtx.targets, controlTarget{
+			node:      stmt,
+			label:     label,
+			exitState: &loopExitState,
+			isLoop:    true,
+		})
 		bodyState := analyzeStmt(ws.Statement, state, rCtx)
-		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		rCtx.targets = rCtx.targets[:len(rCtx.targets)-1]
 		return mergeStates(loopExitState, mergeStates(state, bodyState))
 
 	case ast.KindDoStatement:
 		ds := stmt.AsDoStatement()
-		walkNestedFunctions(ds.Expression, rCtx)
-		// do-while body always executes at least once
 		loopExitState := pathState{dead: true}
-		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
+		rCtx.targets = append(rCtx.targets, controlTarget{
+			node:      stmt,
+			label:     label,
+			exitState: &loopExitState,
+			isLoop:    true,
+		})
 		bodyState := analyzeStmt(ds.Statement, state, rCtx)
-		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		bodyState = analyzeExprForResolvers(ds.Expression, bodyState, rCtx)
+		rCtx.targets = rCtx.targets[:len(rCtx.targets)-1]
 		return mergeStates(loopExitState, bodyState)
 
 	case ast.KindForStatement:
 		fs := stmt.AsForStatement()
 		if fs.Initializer != nil {
-			walkNestedFunctions(fs.Initializer, rCtx)
+			state = analyzeExprForResolvers(fs.Initializer, state, rCtx)
 		}
 		if fs.Condition != nil {
-			walkNestedFunctions(fs.Condition, rCtx)
-		}
-		if fs.Incrementor != nil {
-			walkNestedFunctions(fs.Incrementor, rCtx)
+			state = analyzeExprForResolvers(fs.Condition, state, rCtx)
 		}
 		loopExitState := pathState{dead: true}
-		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
+		rCtx.targets = append(rCtx.targets, controlTarget{
+			node:      stmt,
+			label:     label,
+			exitState: &loopExitState,
+			isLoop:    true,
+		})
 		bodyState := analyzeStmt(fs.Statement, state, rCtx)
-		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		if fs.Incrementor != nil {
+			bodyState = analyzeExprForResolvers(fs.Incrementor, bodyState, rCtx)
+		}
+		rCtx.targets = rCtx.targets[:len(rCtx.targets)-1]
 		return mergeStates(loopExitState, mergeStates(state, bodyState))
 
 	case ast.KindForInStatement, ast.KindForOfStatement:
 		fio := stmt.AsForInOrOfStatement()
-		walkNestedFunctions(fio.Expression, rCtx)
+		state = analyzeExprForResolvers(fio.Expression, state, rCtx)
 		loopExitState := pathState{dead: true}
-		rCtx.breakExitStates = append(rCtx.breakExitStates, &loopExitState)
+		rCtx.targets = append(rCtx.targets, controlTarget{
+			node:      stmt,
+			label:     label,
+			exitState: &loopExitState,
+			isLoop:    true,
+		})
 		bodyState := analyzeStmt(fio.Statement, state, rCtx)
-		rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+		rCtx.targets = rCtx.targets[:len(rCtx.targets)-1]
 		return mergeStates(loopExitState, mergeStates(state, bodyState))
 
 	case ast.KindTryStatement:
 		return analyzeTryStmt(stmt, state, rCtx)
 
 	case ast.KindSwitchStatement:
-		return analyzeSwitchStmt(stmt, state, rCtx)
+		return analyzeSwitchStmt(stmt, state, rCtx, label)
 
 	case ast.KindLabeledStatement:
 		ls := stmt.AsLabeledStatement()
+		labelName := ""
+		if ls.Label != nil {
+			labelName = ls.Label.Text()
+		}
 		if ls.Statement != nil {
-			return analyzeStmt(ls.Statement, state, rCtx)
+			return analyzeStmtWithLabel(ls.Statement, state, rCtx, labelName)
 		}
 		return state
 
@@ -310,7 +396,7 @@ func analyzeStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
 
 	case ast.KindWithStatement:
 		ws := stmt.AsWithStatement()
-		walkNestedFunctions(ws.Expression, rCtx)
+		state = analyzeExprForResolvers(ws.Expression, state, rCtx)
 		return analyzeStmt(ws.Statement, state, rCtx)
 
 	default:
@@ -320,6 +406,18 @@ func analyzeStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
 		})
 		return state
 	}
+}
+
+func isLoopOrSwitch(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement,
+		ast.KindForInStatement, ast.KindForOfStatement, ast.KindSwitchStatement:
+		return true
+	}
+	return false
 }
 
 // analyzeExprForResolvers checks if expr is a direct resolver call and updates state.
@@ -371,8 +469,7 @@ func analyzeExprForResolvers(expr *ast.Node, state pathState, rCtx *ruleCtx) pat
 
 func analyzeIfStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
 	ifStmt := stmt.AsIfStatement()
-	// Condition may contain nested functions but doesn't affect resolver state
-	walkNestedFunctions(ifStmt.Expression, rCtx)
+	state = analyzeExprForResolvers(ifStmt.Expression, state, rCtx)
 
 	thenState := analyzeStmt(ifStmt.ThenStatement, state, rCtx)
 
@@ -497,9 +594,9 @@ func walkThrowables(node *ast.Node, rCtx *ruleCtx, onThrowable func(isResolver b
 	}
 }
 
-func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState {
+func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx, label string) pathState {
 	ss := stmt.AsSwitchStatement()
-	walkNestedFunctions(ss.Expression, rCtx)
+	state = analyzeExprForResolvers(ss.Expression, state, rCtx)
 
 	if ss.CaseBlock == nil {
 		return state
@@ -517,9 +614,14 @@ func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState
 		}
 	}
 
-	// Create and push the switch exit state onto breakExitStates
+	// Create and push the switch exit state onto targets
 	switchExitState := pathState{dead: true}
-	rCtx.breakExitStates = append(rCtx.breakExitStates, &switchExitState)
+	rCtx.targets = append(rCtx.targets, controlTarget{
+		node:      stmt,
+		label:     label,
+		exitState: &switchExitState,
+		isLoop:    false,
+	})
 
 	// fallthroughState carries the state falling through from the previous case.
 	fallthroughState := pathState{dead: true}
@@ -530,7 +632,7 @@ func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState
 		}
 		cc := clause.AsCaseOrDefaultClause()
 		if cc.Expression != nil {
-			walkNestedFunctions(cc.Expression, rCtx)
+			state = analyzeExprForResolvers(cc.Expression, state, rCtx)
 		}
 
 		caseEntryState := mergeStates(state, fallthroughState)
@@ -547,7 +649,7 @@ func analyzeSwitchStmt(stmt *ast.Node, state pathState, rCtx *ruleCtx) pathState
 	}
 
 	// Pop the switch exit state
-	rCtx.breakExitStates = rCtx.breakExitStates[:len(rCtx.breakExitStates)-1]
+	rCtx.targets = rCtx.targets[:len(rCtx.targets)-1]
 
 	finalExitState := mergeStates(switchExitState, fallthroughState)
 	if !hasDefault {
