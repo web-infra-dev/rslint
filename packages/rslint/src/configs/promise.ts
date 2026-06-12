@@ -16,7 +16,7 @@ const recommended: RslintConfigEntry = {
     'promise/avoid-new': 'off',
     // 'promise/no-new-statics': 'error', // not implemented
     // 'promise/no-return-in-finally': 'warn', // not implemented
-    // 'promise/valid-params': 'warn', // not implemented
+    'promise/valid-params': 'warn',
   },
 };
 
