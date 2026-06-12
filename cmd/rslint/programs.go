@@ -40,6 +40,7 @@ func parallelGitignoreAndPrograms(
 	fsys vfs.FS,
 	singleThreaded bool,
 	seenTsConfigs map[string]struct{},
+	parseCache *utils.ParseCache,
 ) (rslintconfig.RslintConfig, []*compiler.Program, int) {
 	configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
 
@@ -50,7 +51,7 @@ func parallelGitignoreAndPrograms(
 	)
 	if singleThreaded {
 		gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
-		progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs)
+		progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs, parseCache)
 	} else {
 		var wg sync.WaitGroup
 		wg.Add(2)
@@ -60,7 +61,7 @@ func parallelGitignoreAndPrograms(
 		}()
 		go func() {
 			defer wg.Done()
-			progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs)
+			progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs, parseCache)
 		}()
 		wg.Wait()
 	}
@@ -87,6 +88,7 @@ func createProgramsForConfig(
 	singleThreaded bool,
 	fsys vfs.FS,
 	seenTsConfigs map[string]struct{},
+	parseCache *utils.ParseCache,
 ) ([]*compiler.Program, int) {
 	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, configDir, fsys)
 	if err != nil {
@@ -95,7 +97,7 @@ func createProgramsForConfig(
 	}
 
 	var programs []*compiler.Program
-	host := utils.CreateCompilerHost(configDir, fsys)
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 
 	if len(tsConfigs) > 0 {
 		for _, tc := range tsConfigs {
@@ -154,8 +156,9 @@ func createFallbackProgram(
 	singleThreaded bool,
 	configDir string,
 	fsys vfs.FS,
+	parseCache *utils.ParseCache,
 ) (*compiler.Program, int) {
-	host := utils.CreateCompilerHost(configDir, fsys)
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
 		Target:  core.ScriptTargetESNext,
 		Module:  core.ModuleKindESNext,

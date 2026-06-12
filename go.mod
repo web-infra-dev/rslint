@@ -16,6 +16,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/jsonrpc => ./shim/jsonrpc
 	github.com/microsoft/typescript-go/shim/ls => ./shim/ls
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
+	github.com/microsoft/typescript-go/shim/parser => ./shim/parser
 	github.com/microsoft/typescript-go/shim/project => ./shim/project
 	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
 	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms => ./shim/transformers/jsxtransforms
@@ -41,6 +42,7 @@ require (
 	github.com/microsoft/typescript-go/shim/evaluator v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/jsonrpc v0.0.0
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
+	github.com/microsoft/typescript-go/shim/parser v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
 	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms v0.0.0
@@ -52,6 +54,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/vfsmatch v0.0.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
+	github.com/zeebo/xxh3 v1.1.0
 	golang.org/x/sync v0.21.0
 	golang.org/x/sys v0.46.0
 	golang.org/x/tools v0.45.0
@@ -65,7 +68,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/zeebo/xxh3 v1.1.0 // indirect
 	golang.org/x/mod v0.36.0 // indirect
 )
 

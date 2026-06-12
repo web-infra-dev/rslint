@@ -172,8 +172,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		})
 	}
 
-	// Create compiler host
-	host := utils.CreateCompilerHost(configDirectory, fs)
+	// Create compiler host with a request-scoped parse cache: the tsconfig
+	// loop below builds one Program per tsconfig on this host, and shared
+	// dependencies (lib/node_modules d.ts, cross-package sources) parse once.
+	// The cache dies with this request — no RetainOnly sweep here, and none
+	// may be added inside the tsConfigs loop (a mid-build eviction boundary
+	// buys nothing per I7 and complicates reasoning).
+	parseCache := utils.NewParseCache()
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDirectory, fs), parseCache)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),

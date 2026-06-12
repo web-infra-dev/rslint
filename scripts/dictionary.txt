@@ -101,6 +101,7 @@ datepicker
 deboucne
 dedup
 dedupe
+dedups
 deprec
 Deque
 describedby
@@ -127,7 +128,9 @@ esmodule
 espree
 estree
 fontstack
+parsecache
 stroustrup
+zeebo
 Éurströmming
 exclam
 execdir
