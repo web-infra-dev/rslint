@@ -38,6 +38,16 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 			// N/A for return-statement analysis since expression body has no ReturnStatement.
 			{Code: `myPromise.finally(() => 2)`},
 
+			// Nested FunctionDeclaration creates its own function boundary;
+			// returns inside the declaration are ignored by the rule.
+
+			// Ensure the callback is only checked when it is the first argument of finally()
+			{Code: `Promise.finally(arg1, () => { return 1; })`},
+
+			// Ensure only top-level returns in the function's block are checked (ESLint parity).
+			{Code: `Promise.finally(() => { if (true) { return 1; } })`},
+			{Code: `Promise.finally(() => { try { return 1; } catch(e) {} })`},
+
 			// ---- Dimension 4: access / key forms ----
 			// Computed access: promise['finally'](fn) is NOT matched by IsMemberCall.
 			// N/A: IsMemberCall only checks PropertyAccessExpression (dotted access).
@@ -114,6 +124,16 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 			{
 				Code:   `myPromise.finally(function() { var f = function() { return 2; }; return 3; })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 66}},
+			},
+			// FunctionDeclaration boundary: outer return is flagged, inner return is ignored.
+			{
+				Code:   `myPromise.finally(() => { function a() { return 1; } return a(); })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg}},
+			},
+			// Empty returns at the top level should still be caught.
+			{
+				Code:   `Promise.finally(() => { return; })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg}},
 			},
 
 			// ---- Real-user: return in multiline finally callback ----

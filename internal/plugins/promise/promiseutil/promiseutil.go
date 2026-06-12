@@ -63,6 +63,7 @@ func NearestFunctionBoundary(node *ast.Node) *ast.Node {
 	for cur := node.Parent; cur != nil; cur = cur.Parent {
 		switch cur.Kind {
 		case ast.KindFunctionExpression,
+			ast.KindFunctionDeclaration,
 			ast.KindArrowFunction,
 			ast.KindMethodDeclaration,
 			ast.KindGetAccessor,
