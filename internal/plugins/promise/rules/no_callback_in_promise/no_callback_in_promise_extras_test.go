@@ -132,6 +132,9 @@ func TestNoCallbackInPromiseExtras(t *testing.T) {
 			{Code: `call(next, iterator)`},
 			// Same pattern inside a while loop that is NOT in a promise.
 			{Code: `while (cond) { call(next, iter) }`},
+
+			// Top-level then should not be flagged (not a member expression)
+			{Code: `then(function() { cb() })`},
 		},
 		[]rule_tester.InvalidTestCase{
 
