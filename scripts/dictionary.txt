@@ -575,3 +575,4 @@ SIGSEGV
 zigbuild
 lockfiles
 smajobber
+isatty

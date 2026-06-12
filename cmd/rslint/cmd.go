@@ -34,6 +34,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/term"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
@@ -52,10 +53,15 @@ type lintArgs struct {
 	Format         string
 	NoColor        bool
 	ForceColor     bool
-	Quiet          bool
-	MaxWarnings    int
-	StartTimeMs    int64
-	RuleFlags      []string
+	// StdoutIsTTY is the TTY fact for the real output destination, reported
+	// by the Node host via the IPC init payload (the Go process's own stdout
+	// is an IPC pipe and says nothing about the user's terminal). False when
+	// unknown (old peer, wasm build).
+	StdoutIsTTY bool
+	Quiet       bool
+	MaxWarnings int
+	StartTimeMs int64
+	RuleFlags   []string
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
@@ -76,42 +82,41 @@ type ColorScheme struct {
 	BoldText    func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
 	WarnText    func(format string, a ...interface{}) string
+	// Reset is the trailing SGR reset sequence the summary lines emit (empty
+	// when colors are off) — byte-identical to the inline
+	// color.New().SprintFunc()("") emitters it replaces.
+	Reset string
 }
 
-// setupColors initializes the color scheme based on environment and flags
+// newPinnedColor builds a color object pinned to the resolved decision.
+// color.New seeds a per-object noColor switch from the NO_COLOR env at
+// creation time, which would silently override the pipeline-entry decision
+// (e.g. NO_COLOR set but --force-color given) — Enable/DisableColor makes
+// the object follow color.NoColor unconditionally.
+func newPinnedColor(attrs ...color.Attribute) *color.Color {
+	c := color.New(attrs...)
+	if color.NoColor {
+		c.DisableColor()
+	} else {
+		c.EnableColor()
+	}
+	return c
+}
+
+// setupColors builds the SprintfFunc scheme used by the formatters. It is a
+// pure factory: the on/off decision is owned by term.ResolveColorEnabled,
+// applied once at pipeline entry and propagated here via color.NoColor.
 func setupColors() *ColorScheme {
-	// Handle color flags and environment variables
-	if os.Getenv("NO_COLOR") != "" {
-		color.NoColor = true
-	}
-	if os.Getenv("FORCE_COLOR") != "" {
-		color.NoColor = false
-	}
-
-	// GitHub Actions specific handling
-	if os.Getenv("GITHUB_ACTIONS") != "" {
-		color.NoColor = false // Enable colors in GitHub Actions
-	}
-
-	// Create color functions
-	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
-	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
-	errorTextColor := color.New(color.FgRed, color.Bold).SprintfFunc()
-	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
-	dimColor := color.New(color.Faint).SprintfFunc()
-	boldColor := color.New(color.Bold).SprintfFunc()
-	borderColor := color.New(color.Faint).SprintfFunc()
-	WarnColor := color.New(color.FgYellow).SprintfFunc()
-
 	return &ColorScheme{
-		RuleName:    ruleNameColor,
-		FileName:    fileNameColor,
-		ErrorText:   errorTextColor,
-		SuccessText: successColor,
-		DimText:     dimColor,
-		BoldText:    boldColor,
-		BorderText:  borderColor,
-		WarnText:    WarnColor,
+		RuleName:    newPinnedColor(color.FgHiGreen).SprintfFunc(),
+		FileName:    newPinnedColor(color.FgCyan, color.Italic).SprintfFunc(),
+		ErrorText:   newPinnedColor(color.FgRed, color.Bold).SprintfFunc(),
+		SuccessText: newPinnedColor(color.FgGreen, color.Bold).SprintfFunc(),
+		DimText:     newPinnedColor(color.Faint).SprintfFunc(),
+		BoldText:    newPinnedColor(color.Bold).SprintfFunc(),
+		BorderText:  newPinnedColor(color.Faint).SprintfFunc(),
+		WarnText:    newPinnedColor(color.FgYellow).SprintfFunc(),
+		Reset:       newPinnedColor().SprintFunc()(""),
 	}
 }
 
@@ -772,8 +777,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	cpuprofOut := args.CpuprofOut
 	singleThreaded := args.SingleThreaded
 	format := args.Format
-	noColor := args.NoColor
-	forceColor := args.ForceColor
 	quiet := args.Quiet
 	maxWarnings := args.MaxWarnings
 	startTimeMs := args.StartTimeMs
@@ -781,13 +784,24 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
 
-	// Override color detection based on flags
-	if noColor {
-		color.NoColor = true
-	}
-	if forceColor {
-		color.NoColor = false
-	}
+	// The single color decision for the whole run. It unconditionally
+	// overwrites fatih/color's package-init value, whose isatty component
+	// keyed off the Go process's own stdout — an IPC pipe in every native
+	// lint run, never the user's terminal (its NO_COLOR/TERM components are
+	// re-derived in the tiers below). Nothing after this line mutates
+	// color.NoColor.
+	forceColorEnv, forceColorEnvSet := os.LookupEnv("FORCE_COLOR")
+	_, noColorEnvSet := os.LookupEnv("NO_COLOR")
+	color.NoColor = !term.ResolveColorEnabled(term.ColorInputs{
+		NoColorFlag:      args.NoColor,
+		ForceColorFlag:   args.ForceColor,
+		ForceColorEnv:    forceColorEnv,
+		ForceColorEnvSet: forceColorEnvSet,
+		NoColorEnvSet:    noColorEnvSet,
+		GithubActionsEnv: os.Getenv("GITHUB_ACTIONS"),
+		Term:             os.Getenv("TERM"),
+		StdoutIsTTY:      args.StdoutIsTTY,
+	})
 
 	enableVirtualTerminalProcessing()
 	timeBefore := resolveStartTime(startTimeMs)
@@ -1437,7 +1451,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				pluralize(typeCheckedFileCount, "file", "files"),
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
-				color.New().SprintFunc()(""),
+				colors.Reset,
 			)
 		} else if fix && fixedCount > 0 {
 			fixText := pluralize(fixedCount, "issue", "issues")
@@ -1456,7 +1470,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				colors.BoldText("%d", threadsCount),
 				colors.SuccessText("%d", fixedCount),
 				fixText,
-				color.New().SprintFunc()(""), // Reset
+				colors.Reset,
 			)
 		} else {
 			fmt.Fprintf(
@@ -1472,7 +1486,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
-				color.New().SprintFunc()(""), // Reset
+				colors.Reset,
 			)
 		}
 	}
