@@ -14,5 +14,7 @@ type Logger = logging.Logger
 func NewLogTree(name string) *logging.LogTree
 //go:linkname NewLogger github.com/microsoft/typescript-go/internal/project/logging.NewLogger
 func NewLogger(output io.Writer) logging.Logger
+//go:linkname NewNopLogger github.com/microsoft/typescript-go/internal/project/logging.NewNopLogger
+func NewNopLogger() logging.Logger
 //go:linkname NewTestLogger github.com/microsoft/typescript-go/internal/project/logging.NewTestLogger
 func NewTestLogger() logging.LogCollector
