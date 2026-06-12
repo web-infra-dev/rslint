@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -69,6 +70,9 @@ type runProgramOptions struct {
 	ExcludePaths    []string
 	FileFilter      FileFilter
 	GetRulesForFile RuleHandler
+	// SingleThreaded, when true, lints this program's file shards
+	// sequentially on the calling goroutine instead of in parallel workers.
+	SingleThreaded bool
 	// TypeInfoFiles is the set of files with reliable type information.
 	// Gap files (not in this set) get a nil TypeChecker passed to rule
 	// contexts as defense-in-depth — type-aware rules are already filtered
@@ -81,6 +85,11 @@ type runProgramOptions struct {
 // runLintRulesInProgram lints files in a single Program. Files are filtered
 // through ExcludePaths, Scope (Files+Dirs), and FileFilter before rule
 // execution. Pass FileFilter=nil to disable that layer.
+//
+// Unless SingleThreaded is set, files are linted in parallel shards — one
+// worker per pool checker, each worker owning its checker exclusively and
+// processing the files associated to it (see the sharding comment in the
+// function body for the invariants this preserves).
 //
 // This is the post-refactor internal implementation behind both RunLinter and
 // LintSingleFile. It does NOT run type-check — type-check is a program-level
@@ -108,14 +117,17 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		return 0
 	}
 
-	// Run lint rules. Acquires a checker from the pool for type-aware rules.
-	checker, done := opts.Program.GetTypeChecker(context.Background())
-	for _, file := range filesToLint {
+	// lintFile lints one file with the given checker. All per-file state
+	// (listener map, comments, DisableManager, rule contexts) lives inside
+	// this function, so concurrent calls for different files are independent;
+	// the checker is the only shared resource and is owned exclusively by the
+	// calling worker (see the sharding below).
+	lintFile := func(file *ast.SourceFile, chk *checker.Checker) {
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
 		rules := getRulesForFile(file)
 		if len(rules) == 0 {
-			continue
+			return
 		}
 
 		comments := make([]*ast.CommentRange, 0)
@@ -128,7 +140,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		// as defense-in-depth. Type-aware rules are already filtered out by
 		// getRulesForFile, but this ensures rules with optional TypeChecker
 		// usage degrade gracefully.
-		fileChecker := checker
+		fileChecker := chk
 		if opts.TypeInfoFiles != nil {
 			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
 				fileChecker = nil
@@ -345,7 +357,46 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		file.Node.ForEachChild(childVisitor)
 		clear(registeredListeners)
 	}
-	done()
+
+	// Phase 1 parallelism is per-file within the program: files are grouped
+	// by the checker the pool associated to them (for the compiler pool this
+	// is the stable index%N mapping built in checkerpool.go), and each group
+	// is linted serially by ONE worker holding that checker exclusively.
+	// This keeps three invariants:
+	//   - a checker is never used by two goroutines at once (pool contract:
+	//     checkers must not be accessed concurrently);
+	//   - every file's diagnostics are emitted by a single worker, so the
+	//     file-internal diagnostic order stays deterministic — the fixer's
+	//     tie-breaking and reporters rely on this;
+	//   - Phase 2 type-check visits files through the same association,
+	//     reusing the type caches warmed during lint.
+	// The LSP project pool builds its file association dynamically on first
+	// GetChecker instead of precomputing index%N — with this loop's
+	// acquire/release probing, a fresh project pool associates every file
+	// to the first checker, so the grouping collapses to a single group
+	// (no intra-program parallelism on that path; today it is only reached
+	// via LintSingleFile, where one file means one group anyway).
+	// Correctness never depends on the grouping: each worker only uses the
+	// checker it acquired exclusively for its own shard.
+	ctx := context.Background()
+	checkerGroups := make(map[*checker.Checker][]*ast.SourceFile)
+	for _, file := range filesToLint {
+		chk, release := opts.Program.GetTypeCheckerForFile(ctx, file)
+		release()
+		checkerGroups[chk] = append(checkerGroups[chk], file)
+	}
+
+	wg := core.NewWorkGroup(opts.SingleThreaded)
+	for _, files := range checkerGroups {
+		wg.Queue(func() {
+			chk, done := opts.Program.GetTypeCheckerForFileExclusive(ctx, files[0])
+			defer done()
+			for _, file := range files {
+				lintFile(file, chk)
+			}
+		})
+	}
+	wg.RunAndWait()
 
 	return lintedFileCount
 }
@@ -357,6 +408,9 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 // Phase 1 — lint rules: each program is processed via
 // runLintRulesInProgram, with files filtered through opts.ExcludePaths,
 // opts.Scope, opts.PerProgramFilter and the program's own owned-file set.
+// Within a program, files are linted in parallel shards (one per pool
+// checker); diagnostics therefore arrive in nondeterministic cross-file
+// order and callers that print them should impose an explicit order.
 // When opts.GetRulesForFile is nil, Phase 1 is skipped entirely — no work
 // group is created, no per-program goroutines are spawned, and no
 // owned-file sets are built. This is how callers run a pure type-check
@@ -409,6 +463,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 				ExcludePaths:    opts.ExcludePaths,
 				FileFilter:      filter,
 				GetRulesForFile: trackedGetRules,
+				SingleThreaded:  opts.SingleThreaded,
 				TypeInfoFiles:   opts.TypeInfoFiles,
 				OnDiagnostic:    opts.OnDiagnostic,
 			}
@@ -535,7 +590,10 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		Scope:           FileScope{Files: []string{opts.File}},
 		ExcludePaths:    opts.ExcludePaths,
 		GetRulesForFile: opts.GetRulesForFile,
-		OnDiagnostic:    opts.OnDiagnostic,
+		// A single file is a single shard — run it on the calling goroutine
+		// instead of spawning a worker.
+		SingleThreaded: true,
+		OnDiagnostic:   opts.OnDiagnostic,
 	})
 }
 

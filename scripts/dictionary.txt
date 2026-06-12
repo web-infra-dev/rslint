@@ -65,6 +65,7 @@ categorisation
 Cbar
 centralising
 CHARCLASS
+checkerpool
 classnames
 CLASSSET
 clazz
