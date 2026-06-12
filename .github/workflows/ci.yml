@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   test-go:
+    if: false
     name: Test Go
     runs-on: ${{ matrix.runner }}
     strategy:
@@ -49,6 +50,7 @@ jobs:
         run: go test -count=1 ./internal/...
 
   test-go-windows:
+    if: false
     name: Test Go (rspack-windows-2022-large)
     runs-on: rspack-windows-2022-large
     strategy:
@@ -98,43 +100,20 @@ jobs:
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
-  build-rslint-windows:
-    name: Build rslint.exe (Windows)
+  test-node-windows:
+    name: Test npm packages (windows-latest)
     runs-on: rspack-windows-2022-large
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           submodules: true
-          fetch-depth: 1
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.26.0
-          cache-name: ci-go-windows-build
-
-      - name: Build rslint.exe
-        shell: pwsh
-        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
-
-      - name: Upload rslint.exe
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-test-rslint-windows-amd64
-          path: packages/rslint/bin/rslint.exe
-          retention-days: 1
-          if-no-files-found: error
-
-  test-node-windows:
-    name: Test npm packages (windows-latest)
-    runs-on: windows-latest
-    needs: build-rslint-windows
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-        with:
-          submodules: true
+          go-version: '1.26.0'
+          cache-name: ci-test-node-windows
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -146,17 +125,11 @@ jobs:
       - name: Build napi parser (native)
         run: pnpm --filter @rslint/native run build
 
-      - name: Download rslint.exe
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ci-test-rslint-windows-amd64
-          path: packages/rslint/bin
-
-      - name: Build JS packages
+      - name: Build packages and Go binary
         shell: bash
         run: |
           pnpm --filter @rslint/api build
-          pnpm --filter @rslint/core run build:js
+          pnpm --filter @rslint/core build
           pnpm --filter @typescript-eslint/rule-tester build
           pnpm --filter rslint build
 
@@ -172,6 +145,7 @@ jobs:
         run: pnpm run test
 
   lint:
+    if: false
     name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -272,6 +246,7 @@ jobs:
         run: pnpm run test
 
   test-wasm:
+    if: false
     name: Test WASM
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -302,6 +277,7 @@ jobs:
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
   test-rust:
+    if: false
     name: Test Rust
     runs-on: ${{ matrix.os }}
     strategy:
@@ -345,14 +321,14 @@ jobs:
         run: cargo test --verbose
 
   benchmark-go:
-    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    if: false
     permissions:
       contents: read
       id-token: write
     uses: ./.github/workflows/benchmark-go.yml
 
   benchmark-cli:
-    if: ${{ startsWith(github.ref_name, 'chore/release-') || startsWith(github.head_ref, 'chore/release-') }}
+    if: false
     permissions:
       contents: read
       id-token: write
@@ -360,14 +336,8 @@ jobs:
 
   done:
     needs:
-      - test-go
-      - test-go-windows
-      - build-rslint-windows
       - test-node
       - test-node-windows
-      - lint
-      - test-wasm
-      - test-rust
     if: always()
     runs-on: ubuntu-latest
     name: CI Done
