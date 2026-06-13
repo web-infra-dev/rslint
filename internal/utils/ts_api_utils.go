@@ -355,6 +355,15 @@ func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *as
 func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), sourceFile *ast.SourceFile) {
 	fullText := sourceFile.Text()
 	notJsx := sourceFile.LanguageVariant != core.LanguageVariantJSX
+	// One factory reused across every token of this file instead of
+	// allocating two per token. scanner.GetLeading/TrailingCommentRanges
+	// only ever calls factory.NewCommentRange, which constructs a value
+	// and never reads or mutates the factory (see ast.NodeFactory.
+	// NewCommentRange) — so reuse changes nothing about the comments
+	// produced. The factory is goroutine-local: ForEachToken walks tokens
+	// serially within this single ForEachComment call, so the parallel
+	// per-file lint workers each get their own, never sharing one.
+	commentFactory := &ast.NodeFactory{}
 
 	ForEachToken(
 		node,
@@ -369,13 +378,13 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 					pos = len(scanner.GetShebang(fullText))
 				}
 
-				for comment := range scanner.GetLeadingCommentRanges(&ast.NodeFactory{}, fullText, pos) {
+				for comment := range scanner.GetLeadingCommentRanges(commentFactory, fullText, pos) {
 					callback(&comment)
 				}
 			}
 
 			if notJsx || canHaveTrailingTrivia(token) {
-				for comment := range scanner.GetTrailingCommentRanges(&ast.NodeFactory{}, fullText, token.End()) {
+				for comment := range scanner.GetTrailingCommentRanges(commentFactory, fullText, token.End()) {
 					callback(&comment)
 				}
 				return
