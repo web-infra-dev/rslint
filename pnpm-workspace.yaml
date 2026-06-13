@@ -23,6 +23,8 @@ minimumReleaseAgeExclude:
   - '@rstest/*'
   - '@rsdoctor/*'
   - '@rslint/*'
+  # Renovate security update: esbuild@0.28.1
+  - esbuild@0.28.1
 
 # Prevent un-reviewed build scripts
 strictDepBuilds: true
