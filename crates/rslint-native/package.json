@@ -45,6 +45,6 @@
     "@rslint/native-win32-x64-msvc": "workspace:*"
   },
   "devDependencies": {
-    "@napi-rs/cli": "3.7.0"
+    "@napi-rs/cli": "3.7.1"
   }
 }
