@@ -1,6 +1,6 @@
 module github.com/web-infra-dev/rslint
 
-go 1.26.0
+go 1.26.4
 
 replace (
 	github.com/microsoft/typescript-go/shim/api => ./shim/api
@@ -73,7 +73,7 @@ require (
 
 require (
 	github.com/dlclark/regexp2 v1.12.0
-	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/fxamacker/cbor/v2 v2.9.2
 	github.com/go-json-experiment/json v0.0.0-20260601182631-00ed12fed2a6
 	github.com/microsoft/typescript-go v0.0.0-20260611224133-79fe60a804ac // indirect
 	golang.org/x/text v0.38.0

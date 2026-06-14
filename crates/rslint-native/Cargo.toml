@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-napi = "3.9.0"
+napi = "3.9.1"
 napi-derive = "3.5.6"
 oxc_allocator = "0.133.0"
 # oxc_ast is a direct dependency solely to enable its `serialize` feature, which provides
@@ -20,7 +20,7 @@ oxc_ast_visit = { version = "0.133.0", features = ["serialize"] }
 oxc_parser = "0.133.0"
 oxc_span = "0.133.0"
 # token_map builds the AST cover from the ESTree JSON value.
-serde_json = "1"
+serde_json = "1.0.150"
 
 [build-dependencies]
 napi-build = "2.3.2"
