@@ -1,0 +1,111 @@
+package prefer_await_to_then
+
+import (
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
+)
+
+const skipTransparent = ast.OEKParentheses
+
+type Options struct {
+	Strict bool
+}
+
+func parseOptions(options any) Options {
+	opts := Options{}
+	optsMap := utils.GetOptionsMap(options)
+	if optsMap != nil {
+		if v, ok := optsMap["strict"].(bool); ok {
+			opts.Strict = v
+		}
+	}
+	return opts
+}
+
+var preferAwaitToCallbackMessage = rule.RuleMessage{
+	Id:          "preferAwaitToCallback",
+	Description: "Prefer await to then()/catch()/finally().",
+}
+
+// isTopLevelScoped reports whether node is outside any function-like scope,
+// mirroring ESLint's getScope().block.type === 'Program' check.
+func isTopLevelScoped(node *ast.Node) bool {
+	for cur := node.Parent; cur != nil; cur = cur.Parent {
+		if ast.IsFunctionLike(cur) {
+			return false
+		}
+	}
+	return true
+}
+
+// isInsideYieldOrAwait reports whether any ancestor of node is an AwaitExpression
+// or YieldExpression.
+func isInsideYieldOrAwait(node *ast.Node) bool {
+	for cur := node.Parent; cur != nil; cur = cur.Parent {
+		if cur.Kind == ast.KindAwaitExpression || cur.Kind == ast.KindYieldExpression {
+			return true
+		}
+	}
+	return false
+}
+
+// isInsideConstructor reports whether any ancestor of node is a constructor declaration.
+func isInsideConstructor(node *ast.Node) bool {
+	for cur := node.Parent; cur != nil; cur = cur.Parent {
+		if cur.Kind == ast.KindConstructor {
+			return true
+		}
+	}
+	return false
+}
+
+// isCypress reports whether callNode is part of a Cypress cy.* chain.
+// It mirrors eslint-plugin-promise's recursive isMemberCallWithObjectName('cy', node) check.
+func isCypress(node *ast.Node) bool {
+	if node == nil || !ast.IsCallExpression(node) {
+		return false
+	}
+	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
+	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+		return false
+	}
+	obj := ast.SkipOuterExpressions(callee.AsPropertyAccessExpression().Expression, skipTransparent)
+	if obj == nil {
+		return false
+	}
+	if ast.IsIdentifier(obj) && obj.AsIdentifier().Text == "cy" {
+		return true
+	}
+	return isCypress(obj)
+}
+
+var PreferAwaitToThenRule = rule.Rule{
+	Name: "promise/prefer-await-to-then",
+	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		opts := parseOptions(options)
+		return rule.RuleListeners{
+			ast.KindCallExpression: func(node *ast.Node) {
+				callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
+				if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+					return
+				}
+				nameNode := callee.AsPropertyAccessExpression().Name()
+				if nameNode == nil || !ast.IsIdentifier(nameNode) {
+					return
+				}
+				propName := nameNode.AsIdentifier().Text
+				if propName != "then" && propName != "catch" && propName != "finally" {
+					return
+				}
+				if isTopLevelScoped(node) ||
+					(!opts.Strict && isInsideYieldOrAwait(node)) ||
+					(!opts.Strict && isInsideConstructor(node)) ||
+					isCypress(node) {
+					return
+				}
+				ctx.ReportNode(nameNode, preferAwaitToCallbackMessage)
+			},
+		}
+	},
+}
