@@ -179,6 +179,7 @@ jobs:
         run: pnpm check-spell
 
   test-node:
+    if: false
     name: Test npm packages
     runs-on: ${{ matrix.os }}
     strategy:

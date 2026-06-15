@@ -1,4 +1,3 @@
-import * as os from 'os';
 import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';
@@ -11,17 +10,7 @@ async function main() {
   const extensionDevelopmentPath = path.resolve(__dirname, '..');
   let failed = false;
 
-  // fixups for WSALookupServiceBegin failed with: 10091
-  const launchArgs = [
-    '--headless=new',
-    '--no-sandbox',
-    '--disable-gpu',
-    '--disable-dev-shm-usage',
-    '--disable-extensions',
-  ];
-  if (os.platform() === 'win32') {
-    launchArgs.push('--disable-features=NetworkChangeNotifier');
-  }
+  const launchArgs = ['--no-sandbox', '--disable-gpu', '--disable-extensions'];
 
   // --- Existing tests (JSON config workspace) ---
   const testWorkspace = resolveFixture('fixtures');
