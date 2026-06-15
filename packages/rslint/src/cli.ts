@@ -127,7 +127,7 @@ export async function run(
   const { files, dirs } = classifyArgs(args.positionals, cwd);
 
   // Discover JS/TS configs
-  const configs = discoverConfigs(files, dirs, cwd, args.config);
+  const configs = await discoverConfigs(files, dirs, cwd, args.config);
 
   // Check if any discovered config is a JS/TS config.
   // NOTE: If any JS config is found (even in subdirectories), the entire flow
