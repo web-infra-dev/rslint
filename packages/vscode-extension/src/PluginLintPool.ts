@@ -14,7 +14,7 @@
  * `./eslint-plugin/index.js` (not the bare `@rslint/core/eslint-plugin`):
  * relative to the built `dist/main.js` it resolves to the extension's OWN
  * `dist/eslint-plugin/index.js`, which `scripts/build.js` stages into the
- * package (worker bundle + nested `@rslint/native`). The bare
+ * package (worker bundle + nested `@rslint/native-<tuple>` platform pkg). The bare
  * specifier only resolves in dev (workspace `node_modules`); the packaged
  * vsix ships no `@rslint/core`, so it must be the relative sibling. The host
  * is ESM (uses `import.meta.url` to spawn its sibling `lint-worker.js`) while

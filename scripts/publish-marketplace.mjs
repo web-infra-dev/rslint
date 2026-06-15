@@ -21,9 +21,10 @@ async function publish_all() {
     { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
   ];
 
-  // build:js is one rslib build (library surface + eslint-plugin worker); the
-  // worker needs @rslint/native's index.d.ts from `napi build`.
-  await $`pnpm run --filter @rslint/native build`;
+  // build:js is one rslib build (library surface + eslint-plugin worker). The
+  // worker's native loader resolves the platform .node at runtime, so no napi
+  // build is needed here — the per-platform .node comes from the napi-build job
+  // (downloaded to binaries/) and is staged per-target in the loop below.
   await $`pnpm run --filter @rslint/core build:js`;
   await $`pnpm run --filter rslint build`;
 
@@ -40,24 +41,37 @@ async function publish_all() {
 
     await $`chmod +x ./packages/vscode-extension/dist/${targetFilename}`;
 
-    // napi parser `.node` for the eslint-plugin worker. `build.js` already
-    // staged the publish-runner's host `.node` as a fixed `rslint.node`;
-    // overwrite it with THIS platform's `.node` so the worker's
-    // `@rslint/native` shim loads the matching ABI. Source artifact comes from
-    // the `napi-build` job (`native-<tuple>`, downloaded to `binaries/`); the
-    // shim requires a constant `./rslint.node`, so one filename is overwritten
-    // per iteration — no wrong-arch leak is possible. Linux ships gnu only
-    // (musl is not a vsce target).
+    // napi parser `.node` for the eslint-plugin worker. `build.js` staged the
+    // publish-runner's HOST platform package; replace it with THIS target's
+    // package (`@rslint/native-<napiTuple>`), which the worker's loader resolves
+    // at runtime. Source artifact comes from the `napi-build` job
+    // (`native-<tuple>`, downloaded to `binaries/`). Linux ships gnu only (musl
+    // is not a vsce target; the loader picks gnu under the glibc Electron host).
     const napiTuple =
       os === 'win32'
         ? `win32-${arch}-msvc`
         : os === 'linux'
           ? `linux-${arch}-gnu`
           : `${os}-${arch}`; // darwin-x64 / darwin-arm64
-    const nativeDir =
-      './packages/vscode-extension/dist/eslint-plugin/node_modules/@rslint/native';
-    await $`rm -f ${nativeDir}/rslint.node`;
-    await $`cp binaries/native-${napiTuple}/rslint.${napiTuple}.node ${nativeDir}/rslint.node`;
+    const nativeRoot =
+      './packages/vscode-extension/dist/eslint-plugin/node_modules/@rslint';
+    const targetPkgDir = `${nativeRoot}/native-${napiTuple}`;
+    // Drop any prior iteration's package (and build.js's host one) — only the
+    // current target's package may ship in this vsix.
+    await $`rm -rf ${nativeRoot}/native-*`;
+    await $`mkdir -p ${targetPkgDir}`;
+    fs.writeFileSync(
+      `${targetPkgDir}/package.json`,
+      `${JSON.stringify(
+        {
+          name: `@rslint/native-${napiTuple}`,
+          exports: { '.': `./rslint.${napiTuple}.node` },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await $`cp binaries/native-${napiTuple}/rslint.${napiTuple}.node ${targetPkgDir}/rslint.${napiTuple}.node`;
 
     await $`ls -lR ./packages/vscode-extension/dist`;
     const prereleaseFlag = prerelease ? ['--pre-release'] : [];
@@ -76,8 +90,7 @@ async function publish_all() {
       'extension/dist/eslint-plugin/index.js',
       'extension/dist/eslint-plugin/lint-worker.js',
       'extension/dist/eslint-plugin/package.json',
-      'extension/dist/eslint-plugin/node_modules/@rslint/native/index.js',
-      'extension/dist/eslint-plugin/node_modules/@rslint/native/rslint.node',
+      `extension/dist/eslint-plugin/node_modules/@rslint/native-${napiTuple}/rslint.${napiTuple}.node`,
     ];
     const missing = requiredEntries.filter((e) => !listing.includes(e));
     if (missing.length > 0) {

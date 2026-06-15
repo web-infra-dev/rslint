@@ -20,7 +20,7 @@
  * `ruleErrors` fields rather than thrown — a single broken file must
  * not abort the batch.
  *
- * Caveat on `parseError`: the native parser (@rslint/native over oxc) is a
+ * Caveat on `parseError`: the native parser (oxc via napi) is a
  * RECOVERING parser — for most syntax errors it returns a best-effort AST rather than
  * throwing, so such files are linted against the recovery AST instead of being reported
  * as a parse error the way espree (which aborts on any syntax error) would. `parseError`
@@ -29,7 +29,7 @@
  */
 
 import { readFileSync } from 'node:fs';
-import { parse as nativeParse } from '@rslint/native';
+import { parse as nativeParse } from '../native/load-binding.js';
 
 import {
   buildLineStartOffsets,

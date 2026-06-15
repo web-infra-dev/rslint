@@ -140,17 +140,8 @@ async function main() {
     const npmTsgoPackagePaths = await glob('npm/tsgo/*/package.json', {
       cwd: process.cwd(),
     });
-    // The native main package lives under crates/ (not packages/*), so it is
-    // not covered by workspacePackagePaths; add it explicitly so its version
-    // stays in sync with @rslint/core.
-    const nativeMainPackagePath = path.join(
-      process.cwd(),
-      'crates/rslint-native/package.json',
-    );
-
     const allPackagePaths = [
       rootPackagePath,
-      nativeMainPackagePath,
       ...workspacePackagePaths.map((p) => path.join(process.cwd(), p)),
       ...npmRslintPackagePaths.map((p) => path.join(process.cwd(), p)),
       ...npmTsgoPackagePaths.map((p) => path.join(process.cwd(), p)),

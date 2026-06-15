@@ -31,8 +31,8 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build:bin": "go build -v -o bin/ ../../cmd/rslint",
-    "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o bin/ ../../cmd/rslint ",
+    "build:bin": "node ../../scripts/place-host-build.mjs bin",
+    "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
     "build:js": "rslib build",
     "dev": "rslib build --watch",
     "build": "pnpm build:bin && pnpm build:js",
@@ -96,7 +96,6 @@
     "@rslint/native-win32-x64-msvc": "workspace:*"
   },
   "dependencies": {
-    "@rslint/native": "workspace:*",
     "picomatch": "4.0.4"
   }
 }

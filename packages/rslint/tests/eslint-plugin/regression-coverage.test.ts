@@ -20,7 +20,7 @@ import { createSourceCode } from '../../src/eslint-plugin/source-code/source-cod
 import { lintFile } from '../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../src/eslint-plugin/linter/context.js';
-import { parse as nativeParse } from '@rslint/native';
+import { parse as nativeParse } from '../../src/eslint-plugin/native/load-binding.js';
 
 import { buildTokens } from '../../src/eslint-plugin/source-code/token-builder.js';
 import {

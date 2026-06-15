@@ -116,13 +116,13 @@ jobs:
 
       - name: Build rslint.exe
         shell: pwsh
-        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
+        run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint
 
       - name: Upload rslint.exe
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ci-test-rslint-windows-amd64
-          path: packages/rslint/bin/rslint.exe
+          path: npm/rslint/win32-x64-msvc/rslint.exe
           retention-days: 1
           if-no-files-found: error
 
@@ -139,8 +139,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build produces @rslint/native's index.d.ts (needed by core's
-      # build:js dts) + the win32 .node (needed at test runtime).
+      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
+      # package; the worker loads it at test runtime.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
@@ -150,7 +150,7 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: ci-test-rslint-windows-amd64
-          path: packages/rslint/bin
+          path: npm/rslint/win32-x64-msvc
 
       - name: Build JS packages
         shell: bash
@@ -227,8 +227,8 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      # napi build produces @rslint/native's index.d.ts (needed by core's
-      # build:js dts) + the host .node (needed at test runtime).
+      # napi build drops the host .node into its @rslint/native-{tuple} package;
+      # the worker loads it at test runtime.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
       - name: Build napi parser (native)
@@ -289,16 +289,11 @@ jobs:
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          cache: 'false'
-
-      # build:js is one rslib build (library surface + eslint-plugin worker);
-      # the worker needs @rslint/native's index.d.ts from `napi build`.
+      # build:js is one rslib build (library surface + eslint-plugin worker).
+      # The worker's native loader is bundled from core sources and resolves the
+      # platform .node at runtime, so no napi build / Rust is needed to compile.
       - name: Build
         run: |
-          pnpm --filter @rslint/native run build
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
   test-rust:
