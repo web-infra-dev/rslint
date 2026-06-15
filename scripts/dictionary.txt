@@ -580,3 +580,8 @@ zigbuild
 lockfiles
 smajobber
 isatty
+semacquire
+pollable
+unpark
+acked
+backgrounded
