@@ -21,11 +21,11 @@ function cleanup(dir: string): void {
 }
 
 describe('discoverConfigs', () => {
-  test('no files/dirs uses cwd', () => {
+  test('no files/dirs uses cwd', async () => {
     const tmp = createTempDir();
     try {
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = discoverConfigs([], [], tmp, null);
+      const result = await discoverConfigs([], [], tmp, null);
       expect(result.size).toBe(1);
       const configPath = [...result.keys()][0];
       expect(configPath).toBe(path.join(tmp, 'rslint.config.js'));
@@ -34,12 +34,12 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('explicit config overrides discovery', () => {
+  test('explicit config overrides discovery', async () => {
     const tmp = createTempDir();
     const configFile = path.join(tmp, 'custom.config.js');
     try {
       fs.writeFileSync(configFile, 'export default []');
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         ['/some/file.ts'],
         ['/some/dir'],
         tmp,
@@ -52,13 +52,13 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('deduplicates files in same directory', () => {
+  test('deduplicates files in same directory', async () => {
     const tmp = createTempDir();
     const src = path.join(tmp, 'src');
     try {
       fs.mkdirSync(src);
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         [path.join(src, 'a.ts'), path.join(src, 'b.ts')],
         [],
         tmp,
@@ -70,7 +70,7 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('different directories find different configs', () => {
+  test('different directories find different configs', async () => {
     const tmp = createTempDir();
     const foo = path.join(tmp, 'packages', 'foo');
     const bar = path.join(tmp, 'packages', 'bar');
@@ -79,7 +79,7 @@ describe('discoverConfigs', () => {
       fs.mkdirSync(bar, { recursive: true });
       fs.writeFileSync(path.join(foo, 'rslint.config.js'), 'export default []');
       fs.writeFileSync(path.join(bar, 'rslint.config.js'), 'export default []');
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         [path.join(foo, 'a.ts'), path.join(bar, 'b.ts')],
         [],
         tmp,
@@ -91,12 +91,12 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('no config found returns empty map', () => {
+  test('no config found returns empty map', async () => {
     const tmp = createTempDir();
     const deep = path.join(tmp, 'a', 'b');
     try {
       fs.mkdirSync(deep, { recursive: true });
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         [path.join(deep, 'file.ts')],
         [],
         tmp,
@@ -108,20 +108,20 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('directory arg uses dir as start point', () => {
+  test('directory arg uses dir as start point', async () => {
     const tmp = createTempDir();
     const src = path.join(tmp, 'src');
     try {
       fs.mkdirSync(src);
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = discoverConfigs([], [src], tmp, null);
+      const result = await discoverConfigs([], [src], tmp, null);
       expect(result.size).toBe(1);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('files and dirs finding same config deduplicated', () => {
+  test('files and dirs finding same config deduplicated', async () => {
     const tmp = createTempDir();
     const src = path.join(tmp, 'src');
     const lib = path.join(tmp, 'lib');
@@ -129,7 +129,7 @@ describe('discoverConfigs', () => {
       fs.mkdirSync(src);
       fs.mkdirSync(lib);
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         [path.join(src, 'a.ts')],
         [lib],
         tmp,
@@ -141,7 +141,7 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('no args discovers nested configs in monorepo', () => {
+  test('no args discovers nested configs in monorepo', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'packages', 'foo'), { recursive: true });
@@ -155,14 +155,14 @@ describe('discoverConfigs', () => {
         path.join(tmp, 'packages', 'bar', 'rslint.config.ts'),
         'export default []',
       );
-      const result = discoverConfigs([], [], tmp, null);
+      const result = await discoverConfigs([], [], tmp, null);
       expect(result.size).toBe(3);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('dir arg discovers nested configs within scope', () => {
+  test('dir arg discovers nested configs within scope', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'packages', 'foo'), { recursive: true });
@@ -176,7 +176,7 @@ describe('discoverConfigs', () => {
         path.join(tmp, 'packages', 'bar', 'rslint.config.js'),
         'export default []',
       );
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         [],
         [path.join(tmp, 'packages')],
         tmp,
@@ -188,7 +188,7 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('file args do not trigger nested config scan', () => {
+  test('file args do not trigger nested config scan', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'packages', 'foo'), { recursive: true });
@@ -198,7 +198,7 @@ describe('discoverConfigs', () => {
         path.join(tmp, 'packages', 'bar', 'rslint.config.js'),
         'export default []',
       );
-      const result = discoverConfigs(
+      const result = await discoverConfigs(
         [path.join(tmp, 'packages', 'foo', 'a.ts')],
         [],
         tmp,
@@ -903,18 +903,18 @@ describe('findJSConfigUp', () => {
 });
 
 describe('findJSConfigsInDir', () => {
-  test('finds config in root directory', () => {
+  test('finds config in root directory', async () => {
     const tmp = createTempDir();
     try {
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigsInDir(tmp);
+      const result = await findJSConfigsInDir(tmp);
       expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('finds configs in nested directories', () => {
+  test('finds configs in nested directories', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'packages', 'foo'), { recursive: true });
@@ -928,7 +928,7 @@ describe('findJSConfigsInDir', () => {
         path.join(tmp, 'packages', 'bar', 'rslint.config.mjs'),
         'export default []',
       );
-      const result = findJSConfigsInDir(tmp).sort();
+      const result = (await findJSConfigsInDir(tmp)).sort();
       expect(result).toEqual(
         [
           path.join(tmp, 'rslint.config.js'),
@@ -941,7 +941,7 @@ describe('findJSConfigsInDir', () => {
     }
   });
 
-  test('skips node_modules', () => {
+  test('skips node_modules', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'node_modules', 'pkg'), { recursive: true });
@@ -950,14 +950,14 @@ describe('findJSConfigsInDir', () => {
         'export default []',
       );
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigsInDir(tmp);
+      const result = await findJSConfigsInDir(tmp);
       expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('skips .git directory', () => {
+  test('skips .git directory', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, '.git', 'hooks'), { recursive: true });
@@ -966,31 +966,31 @@ describe('findJSConfigsInDir', () => {
         'export default []',
       );
       fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
-      const result = findJSConfigsInDir(tmp);
+      const result = await findJSConfigsInDir(tmp);
       expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('returns empty array when no configs found', () => {
+  test('returns empty array when no configs found', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'src'), { recursive: true });
       fs.writeFileSync(path.join(tmp, 'src', 'index.ts'), 'const x = 1;');
-      const result = findJSConfigsInDir(tmp);
+      const result = await findJSConfigsInDir(tmp);
       expect(result).toEqual([]);
     } finally {
       cleanup(tmp);
     }
   });
 
-  test('handles non-existent directory gracefully', () => {
-    const result = findJSConfigsInDir('/tmp/does-not-exist-99999');
+  test('handles non-existent directory gracefully', async () => {
+    const result = await findJSConfigsInDir('/tmp/does-not-exist-99999');
     expect(result).toEqual([]);
   });
 
-  test('does not traverse into nested node_modules', () => {
+  test('does not traverse into nested node_modules', async () => {
     const tmp = createTempDir();
     try {
       fs.mkdirSync(path.join(tmp, 'packages', 'foo', 'node_modules', 'dep'), {
@@ -1011,7 +1011,7 @@ describe('findJSConfigsInDir', () => {
         path.join(tmp, 'packages', 'foo', 'rslint.config.js'),
         'export default []',
       );
-      const result = findJSConfigsInDir(tmp);
+      const result = await findJSConfigsInDir(tmp);
       expect(result).toEqual([
         path.join(tmp, 'packages', 'foo', 'rslint.config.js'),
       ]);
@@ -1020,13 +1020,13 @@ describe('findJSConfigsInDir', () => {
     }
   });
 
-  test('finds all config file types', () => {
+  test('finds all config file types', async () => {
     const tmp = createTempDir();
     try {
       for (const name of JS_CONFIG_FILES) {
         fs.writeFileSync(path.join(tmp, name), 'export default []');
       }
-      const result = findJSConfigsInDir(tmp).sort();
+      const result = (await findJSConfigsInDir(tmp)).sort();
       expect(result).toEqual(
         JS_CONFIG_FILES.map((name) => path.join(tmp, name)).sort(),
       );
