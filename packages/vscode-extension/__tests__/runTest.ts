@@ -100,16 +100,21 @@ async function main() {
     process.exit(1);
   }
 
-  const limit = os.platform() === 'win32' ? 1 : 8;
+  const limit = os.platform() === 'win32' ? 1 : 4;
   console.log(`Running test suites with concurrency limit of ${limit}...`);
 
   const tasks = suites.map((suite, index) => async () => {
     // Create isolated user-data and extensions directories for each suite to prevent conflicts
     // Avoid UNIX socket path length limit (108 chars) by keeping paths short.
-    // Also avoid os.tmpdir() (/tmp) on CI containers where it's mapped to a small tmpfs.
-    // We place the directories under the workspace root where there is plenty of disk space.
-    const repoRoot = path.resolve(extensionDevelopmentPath, '../..');
-    const tmpBase = path.join(repoRoot, `.tmp-test-dir-${index}`);
+    // On Linux, use workspace root (repoRoot) to avoid /tmp space limits.
+    // On Windows, use os.tmpdir() to avoid STATUS_ACCESS_VIOLATION crashes on container volume mounts.
+    const tmpBase =
+      process.platform === 'win32'
+        ? path.join(os.tmpdir(), `rslint-test-${index}`)
+        : path.join(
+            path.resolve(extensionDevelopmentPath, '../..'),
+            `.tmp-test-dir-${index}`,
+          );
     const userDataDir = path.join(tmpBase, 'user-data');
     const extensionsDir = path.join(tmpBase, 'extensions');
 
