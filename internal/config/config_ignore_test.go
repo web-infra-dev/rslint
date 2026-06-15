@@ -105,7 +105,7 @@ func TestIsFileIgnored_Negation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileIgnored(tt.filePath, tt.patterns, cwd)
+			result := isFileIgnored(tt.filePath, ParseIgnorePatterns(tt.patterns), cwd)
 			if result != tt.shouldIgnore {
 				t.Errorf("isFileIgnored(%q, %v) = %v, expected %v",
 					tt.filePath, tt.patterns, result, tt.shouldIgnore)
@@ -175,7 +175,7 @@ func TestIsFileIgnored_NegationBeforePositive(t *testing.T) {
 
 	// Negation before positive pattern: ! has nothing to negate yet,
 	// then positive pattern ignores. Result: ignored.
-	result := isFileIgnored("build/test.js", []string{"!build/test.js", "build/**"}, cwd)
+	result := isFileIgnored("build/test.js", ParseIgnorePatterns([]string{"!build/test.js", "build/**"}), cwd)
 	if !result {
 		t.Error("Expected ignored: negation before positive has no effect, positive wins")
 	}
@@ -212,7 +212,7 @@ func TestIsFileIgnored_FileExtensionNegation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileIgnored(tt.filePath, tt.patterns, cwd)
+			result := isFileIgnored(tt.filePath, ParseIgnorePatterns(tt.patterns), cwd)
 			if result != tt.shouldIgnore {
 				t.Errorf("isFileIgnored(%q, %v) = %v, expected %v",
 					tt.filePath, tt.patterns, result, tt.shouldIgnore)
@@ -240,7 +240,7 @@ func TestIsFileIgnored_MultiLevelNegateAndReIgnore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileIgnored(tt.filePath, patterns, cwd)
+			result := isFileIgnored(tt.filePath, ParseIgnorePatterns(patterns), cwd)
 			if result != tt.shouldIgnore {
 				t.Errorf("isFileIgnored(%q) = %v, expected %v", tt.filePath, result, tt.shouldIgnore)
 			}
@@ -284,7 +284,7 @@ func TestIsFileIgnoredSimple_Negation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileIgnoredSimple(tt.filePath, tt.patterns)
+			result := isFileIgnoredSimple(tt.filePath, ParseIgnorePatterns(tt.patterns))
 			if result != tt.shouldIgnore {
 				t.Errorf("isFileIgnoredSimple(%q, %v) = %v, expected %v",
 					tt.filePath, tt.patterns, result, tt.shouldIgnore)
