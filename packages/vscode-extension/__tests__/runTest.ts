@@ -1,3 +1,4 @@
+import * as os from 'os';
 import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';
@@ -10,6 +11,18 @@ async function main() {
   const extensionDevelopmentPath = path.resolve(__dirname, '..');
   let failed = false;
 
+  // fixups for WSALookupServiceBegin failed with: 10091
+  const launchArgs = [
+    '--headless=new',
+    '--no-sandbox',
+    '--disable-gpu',
+    '--disable-dev-shm-usage',
+    '--disable-extensions',
+  ];
+  if (os.platform() === 'win32') {
+    launchArgs.push('--disable-features=NetworkChangeNotifier');
+  }
+
   // --- Existing tests (JSON config workspace) ---
   const testWorkspace = resolveFixture('fixtures');
   const extensionTestsPath = path.resolve(__dirname, './suite');
@@ -18,7 +31,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace],
+      launchArgs: [...launchArgs, testWorkspace],
       version: 'stable',
     });
   } catch (err) {
@@ -35,7 +48,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: jsConfigTestsPath,
-      launchArgs: ['--disable-extensions', jsConfigWorkspace],
+      launchArgs: [...launchArgs, jsConfigWorkspace],
       version: 'stable',
     });
   } catch (err) {
@@ -51,7 +64,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: monorepoTestsPath,
-      launchArgs: ['--disable-extensions', monorepoWorkspace],
+      launchArgs: [...launchArgs, monorepoWorkspace],
       version: 'stable',
     });
   } catch (err) {
@@ -67,7 +80,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: noConfigTestsPath,
-      launchArgs: ['--disable-extensions', noConfigWorkspace],
+      launchArgs: [...launchArgs, noConfigWorkspace],
       version: 'stable',
     });
   } catch (err) {
@@ -89,7 +102,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: typeAwareScopeTestsPath,
-      launchArgs: ['--disable-extensions', typeAwareScopeWorkspace],
+      launchArgs: [...launchArgs, typeAwareScopeWorkspace],
       version: 'stable',
     });
   } catch (err) {
@@ -111,7 +124,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: projectServiceScopeTestsPath,
-      launchArgs: ['--disable-extensions', projectServiceScopeWorkspace],
+      launchArgs: [...launchArgs, projectServiceScopeWorkspace],
       version: 'stable',
     });
   } catch (err) {
@@ -133,7 +146,7 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath: eslintPluginsTestsPath,
-      launchArgs: ['--disable-extensions', eslintPluginsWorkspace],
+      launchArgs: [...launchArgs, eslintPluginsWorkspace],
       version: 'stable',
     });
   } catch (err) {
