@@ -100,7 +100,7 @@ async function main() {
     process.exit(1);
   }
 
-  const limit = os.platform() === 'win32' ? 1 : 4;
+  const limit = os.platform() === 'win32' ? 1 : 8;
   console.log(`Running test suites with concurrency limit of ${limit}...`);
 
   const tasks = suites.map((suite, index) => async () => {
@@ -113,9 +113,14 @@ async function main() {
     const userDataDir = path.join(tmpBase, 'user-data');
     const extensionsDir = path.join(tmpBase, 'extensions');
 
-    const extraArgs = ['--disable-gpu', '--disable-updates', '--no-sandbox'];
+    const extraArgs: string[] = [];
     if (process.platform === 'linux') {
-      extraArgs.push('--disable-dev-shm-usage');
+      extraArgs.push(
+        '--disable-gpu',
+        '--disable-updates',
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+      );
     }
 
     try {
