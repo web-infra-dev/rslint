@@ -74,10 +74,33 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
   // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
   const stdoutIsTTY = (stdout as Partial<NodeJS.WriteStream>).isTTY === true;
 
+  // Opt-in hang diagnostics (no-op unless RSLINT_HANG_* env set) — the Node
+  // half of the windows-latest hang hunt. Phase traces show how far the host
+  // got; the host watchdog is a backstop to the Go-side one (hangdiag.go) for
+  // a hang that wedges on the Node side (or if the Go watchdog can't fire),
+  // dumping host-side state and failing fast instead of waiting forever on
+  // `await childExit`.
+  const hangStart = Date.now();
+  const hangTraceOn = !!process.env.RSLINT_HANG_TRACE;
+  const hangTrace = (msg: string): void => {
+    if (hangTraceOn) {
+      stderr.write(`[hangdiag host +${Date.now() - hangStart}ms] ${msg}\n`);
+    }
+  };
+  // Host watchdog fires AFTER the Go watchdog (+15s margin) so the in-process
+  // goroutine dump wins the race on a Go-side wedge; this only takes over when
+  // the Go side never self-terminates.
+  const goWatchdogMs = Number(process.env.RSLINT_HANG_WATCHDOG_MS ?? 0);
+  const hostWatchdogMs = goWatchdogMs > 0 ? goWatchdogMs + 15_000 : 0;
+  let initAcked = false;
+  let lastOutputAt = 0;
+  let outputFrames = 0;
+
   const child = spawn(opts.binPath, opts.goArgs, {
     stdio: ['pipe', 'pipe', 'inherit'],
     cwd: opts.cwd ?? process.cwd(),
   });
+  hangTrace(`spawned Go child pid=${child.pid}`);
 
   // childExit always RESOLVES (never rejects); awaits race against it so a
   // child that drops out mid-handshake unwinds cleanly instead of hanging.
@@ -214,7 +237,11 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       'output',
       (msg: IpcMessage<{ stream?: string; text?: string }>) => {
         const text = msg.data?.text;
-        if (text != null) stdout.write(text);
+        if (text != null) {
+          outputFrames++;
+          lastOutputAt = Date.now() - hangStart;
+          stdout.write(text);
+        }
       },
     );
     ipc.start();
@@ -267,9 +294,33 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
       }
     }
 
+    initAcked = true;
+    hangTrace('init acked — entering lint wait');
+
     // Output forwarding + shutdown ack happen in the handlers above; just wait
     // for the Go child to finish (it exits with its own lint exit code).
+    // Backstop host watchdog: if the child never exits (Node-side wedge, or
+    // the Go watchdog failed to fire), report host-side state and force the
+    // child down so this never hangs the CI job forever.
+    let hostWatchdog: ReturnType<typeof setTimeout> | undefined;
+    if (hostWatchdogMs > 0) {
+      hostWatchdog = setTimeout(() => {
+        stderr.write(
+          `\n===== RSLINT HANG DIAG (host): no child exit within ${hostWatchdogMs}ms =====\n` +
+            `  elapsed=${Date.now() - hangStart}ms initAcked=${initAcked} ` +
+            `outputFrames=${outputFrames} lastOutputAt=${lastOutputAt}ms ` +
+            `pluginHost=${pluginHost ? 'yes' : 'no'} childPid=${child.pid} ` +
+            `childExitCode=${child.exitCode} childKilled=${child.killed}\n` +
+            `  (the Go-side goroutine dump above, if present, localizes the wedge)\n` +
+            `===== end host hang diag =====\n`,
+        );
+        safeKillGo(child);
+      }, hostWatchdogMs);
+      hostWatchdog.unref?.();
+    }
     const finalExit = await childExit;
+    if (hostWatchdog) clearTimeout(hostWatchdog);
+    hangTrace(`child exited code=${finalExit.code}`);
     ipc.close();
     return finalExit.code;
   } finally {

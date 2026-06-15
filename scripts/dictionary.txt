@@ -580,3 +580,11 @@ zigbuild
 lockfiles
 smajobber
 isatty
+hangdiag
+SIGBREAK
+GOTRACEBACK
+lintable
+nfiles
+tinypool
+endgroup
+acked

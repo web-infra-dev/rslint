@@ -117,6 +117,11 @@ func runCLI(args []string) int {
 		return parseFatal // parseLintFlags already printed to stderr
 	}
 
+	// Opt-in hang diagnostics (no-op unless RSLINT_HANG_* env set). See
+	// hangdiag.go — the watchdog is armed later, once init is received.
+	installDumpSignalHandler()
+	tracePhase("runCLI: start")
+
 	// Two signal registrations: sigChInit aborts the init-handshake select
 	// before we have a lint context; lintCtx (NotifyContext) cancels the lint
 	// file-loop at its per-file boundary. SIGHUP guards against a closed
@@ -206,6 +211,14 @@ func runCLI(args []string) int {
 		_ = ch.Close() // peer disconnected before init
 		return 2
 	}
+
+	// init handshake done — arm the hang watchdog for the lint+output+shutdown
+	// phases (where the CI hang lives). A normal run unwinds in ~2s, so the
+	// deferred cancel almost always wins the race; the watchdog only fires on a
+	// genuine wedge, dumping all goroutines before forcing exit.
+	tracePhase("runCLI: init received (configs=%d, cwd=%q)", len(payload.Configs), payload.WorkingDirectory)
+	cancelWatchdog := armHangWatchdog()
+	defer cancelWatchdog()
 
 	// Apply the payload. Working directory, configs, and the positional file
 	// set are payload-authoritative; the rest supplement flag values.
@@ -324,15 +337,21 @@ func runCLI(args []string) int {
 		return &res, nil
 	}
 
+	tracePhase("runCLI: lint pipeline start")
 	exitCode := executeLintPipeline(baseArgs, lintCtx, dispatch)
+	tracePhase("runCLI: lint pipeline done (exit=%d)", exitCode)
 
 	finalizeStdout()
+	tracePhase("runCLI: stdout drained")
 	shutdownPeer(ch, state)
+	tracePhase("runCLI: shutdown acked")
 	_ = ch.Close()
 
 	if state.signalled.Load() {
+		tracePhase("runCLI: exiting 130 (signalled)")
 		return 130
 	}
+	tracePhase("runCLI: exiting %d", exitCode)
 	return exitCode
 }
 

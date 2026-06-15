@@ -1,0 +1,165 @@
+# Debug-only workflow: hunt the intermittent windows-latest CLI hang and
+# capture WHY in one run. Builds rslint.exe with the (env-gated) hang
+# diagnostics from cmd/rslint/hangdiag.go, then loops many concurrent
+# type-aware lints on windows-latest with the Go watchdog armed. When an
+# invocation wedges, the watchdog dumps every goroutine stack (the deadlock
+# site) to stderr + a file, the loop fails the job, and the dumps are uploaded
+# as an artifact. Delete this workflow + the diagnostics once the root cause is
+# found.
+name: Debug Windows Hang
+
+on:
+  push:
+    branches: ['debug/windows-hang-diagnostics']
+  workflow_dispatch:
+    inputs:
+      rounds:
+        description: max rounds per hunt leg (a 70-min wall-clock budget caps it first)
+        default: '100000'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debug-hang-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # NOT windows-latest: a from-scratch go build of rslint + typescript-go
+    # exhausts the GitHub-hosted runner's disk ("not enough space on the
+    # disk"). Build on the same large runner ci.yml uses; the amd64 binary
+    # runs fine on the windows-latest hunt jobs below.
+    name: Build rslint.exe (hangdiag)
+    runs-on: rspack-windows-2022-large
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: true
+          fetch-depth: 1
+      - uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: debug-hang-go
+      - name: Build rslint.exe
+        shell: pwsh
+        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: debug-hang-rslint-exe
+          path: packages/rslint/bin/rslint.exe
+          retention-days: 2
+          if-no-files-found: error
+
+  # Vector 1 — tight concurrent CLI-spawn loop (fast, max invocations).
+  hunt:
+    name: Hunt (${{ matrix.name }})
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # exact shape of the failing test (1 lintable file = single shard)
+          - { name: single-file, nfiles: '1', concurrency: '8' }
+          # multi-file: exercises the per-file shard parallelism (#1088)
+          - { name: shards, nfiles: '24', concurrency: '6' }
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: true
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-rust
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native run build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: debug-hang-rslint-exe
+          path: packages/rslint/bin
+      - name: Build JS packages
+        shell: bash
+        run: |
+          pnpm --filter @rslint/api build
+          pnpm --filter @rslint/core run build:js
+      - name: Hunt the hang
+        shell: bash
+        env:
+          HANG_CONCURRENCY: ${{ matrix.concurrency }}
+          HANG_NFILES: ${{ matrix.nfiles }}
+          HANG_ROUNDS: ${{ github.event.inputs.rounds || '100000' }}
+          HANG_MAX_MINUTES: '70'
+          HANG_WATCHDOG_MS: '45000'
+          HANG_DUMP_DIR: ${{ github.workspace }}/hang-dumps
+        run: node scripts/hang-hunt.mjs
+      - name: Upload goroutine dumps
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hang-dumps-${{ matrix.name }}
+          path: hang-dumps
+          if-no-files-found: ignore
+
+  # Vector 2 — the REAL full rslint-test-tools suite in a loop, the exact
+  # environment the hang occurs in (403 files / 1636 tests under rstest's
+  # tinypool, each spawning rslint — the contention a single-file loop can't
+  # recreate). Watchdog armed via env so a wedge dumps goroutines into the log;
+  # we grep for the dump marker and fail the job if it appears.
+  hunt-rstest:
+    name: Hunt (real full-suite loop)
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: true
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-rust
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native run build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: debug-hang-rslint-exe
+          path: packages/rslint/bin
+      - name: Build JS packages
+        shell: bash
+        run: |
+          pnpm --filter @rslint/api build
+          pnpm --filter @rslint/core run build:js
+          pnpm --filter @typescript-eslint/rule-tester build
+          pnpm --filter rslint build
+      - name: Loop the full rslint-test-tools suite under watchdog
+        shell: bash
+        env:
+          RSLINT_HANG_WATCHDOG_MS: '45000'
+          RSLINT_HANG_TRACE: '1'
+          RSLINT_HANG_DUMP_DIR: ${{ github.workspace }}/hang-dumps
+        run: |
+          mkdir -p "$RSLINT_HANG_DUMP_DIR"
+          # Loop the whole suite until a wedge dumps (grep marker) or the
+          # 70-min budget runs out — the per-test 120s timeout overrides the
+          # package's --testTimeout=0 so a wedge can't stall the runner.
+          end=$(( $(date +%s) + 70*60 ))
+          i=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            i=$((i+1))
+            echo "::group::full suite iteration $i"
+            pnpm --filter @rslint/test-tools exec rstest run --testTimeout=120000 \
+              2>&1 | tee -a rstest-loop.log || true
+            echo "::endgroup::"
+            if grep -q "RSLINT HANG DIAG" rstest-loop.log; then
+              echo "::error::reproduced the hang — goroutine dump in log + hang-dumps artifact"
+              exit 1
+            fi
+          done
+          echo "no hang reproduced in $i full-suite iterations"
+      - name: Upload goroutine dumps + log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hang-dumps-rstest
+          path: |
+            hang-dumps
+            rstest-loop.log
+          if-no-files-found: ignore

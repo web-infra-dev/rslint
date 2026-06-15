@@ -20,3 +20,10 @@ func waitForDebugSignal(pollInterval time.Duration) {
 	sig := <-sigCh
 	log.Println("SIGUSR2 signal:", sig)
 }
+
+// dumpSignals is the platform signal that triggers an on-demand goroutine dump
+// (see hangdiag.go). On unix this is SIGQUIT — same signal Go's built-in
+// traceback uses, but our handler dumps without crashing.
+func dumpSignals() []os.Signal {
+	return []os.Signal{syscall.SIGQUIT}
+}
