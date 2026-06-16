@@ -31,6 +31,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -930,39 +931,30 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// pre-augmentation entries (createProgramsForConfig only reads
 			// languageOptions.parserOptions.project — Ignores entries are
 			// no-ops for it; verified in LoadTsConfigsFromRslintConfig).
+			// Read each config's gitignore on the shared WorkGroup (honoring
+			// --singleThreaded). In the parallel path these overlap with the
+			// serial createProgramsForConfig loop below; that is safe because
+			// createProgramsForConfig only reads parserOptions.project, never
+			// Ignores, so observing the pre-augmentation configMap is fine.
+			// Results are merged after the loop — DiscoverGapFiles needs them.
 			type giResult struct {
 				configDir string
 				globs     []string
 			}
 			var (
-				giResults chan giResult
-				giWG      sync.WaitGroup
+				giResults []giResult
+				giMu      sync.Mutex
 			)
-			if singleThreaded {
-				// Inline serial gitignore reads.
-				giResults = nil
-				for configDir, entries := range configMap {
-					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-					globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores)
-					if len(globs) > 0 {
-						configMap[configDir] = append(
-							rslintconfig.RslintConfig{{Ignores: globs}},
-							configMap[configDir]...,
-						)
+			giWG := core.NewWorkGroup(singleThreaded)
+			for configDir, entries := range configMap {
+				configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+				giWG.Queue(func() {
+					if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
+						giMu.Lock()
+						giResults = append(giResults, giResult{configDir, globs})
+						giMu.Unlock()
 					}
-				}
-			} else {
-				giResults = make(chan giResult, len(configMap))
-				for configDir, entries := range configMap {
-					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-					giWG.Add(1)
-					go func(dir string, ignores []string) {
-						defer giWG.Done()
-						globs := rslintconfig.ReadGitignoreAsGlobs(dir, fs, ignores)
-						giResults <- giResult{configDir: dir, globs: globs}
-					}(configDir, configIgnores)
-				}
-				go func() { giWG.Wait(); close(giResults) }()
+				})
 			}
 
 			seenTsConfigs := make(map[string]struct{})
@@ -978,18 +970,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				programs = append(programs, progs...)
 			}
 
-			// Drain gitignore results (parallel path only) and merge into
-			// configMap. Must complete before DiscoverGapFiles, which relies
-			// on the augmented configMap.
-			if giResults != nil {
-				for r := range giResults {
-					if len(r.globs) > 0 {
-						configMap[r.configDir] = append(
-							rslintconfig.RslintConfig{{Ignores: r.globs}},
-							configMap[r.configDir]...,
-						)
-					}
-				}
+			// Join the gitignore reads and merge into configMap. Must complete
+			// before DiscoverGapFiles, which relies on the augmented configMap.
+			giWG.RunAndWait()
+			for _, r := range giResults {
+				configMap[r.configDir] = append(
+					rslintconfig.RslintConfig{{Ignores: r.globs}},
+					configMap[r.configDir]...,
+				)
 			}
 		} else {
 			// Legacy single-config format
