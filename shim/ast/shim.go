@@ -2410,6 +2410,7 @@ func SkipPartiallyEmittedExpressions(node *ast.Expression) *ast.Expression
 //go:linkname SkipTypeParentheses github.com/microsoft/typescript-go/internal/ast.SkipTypeParentheses
 func SkipTypeParentheses(node *ast.Node) *ast.Node
 type SourceFile = ast.SourceFile
+type SourceFileDataKey[T any] = ast.SourceFileDataKey[T]
 type SourceFileLike = ast.SourceFileLike
 type SourceFileMetaData = ast.SourceFileMetaData
 type SourceFileNode = ast.SourceFileNode

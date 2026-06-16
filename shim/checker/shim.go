@@ -201,6 +201,7 @@ type extra_Checker struct {
   moduleSymbols map[*ast.Node]*ast.Symbol
   globalThisSymbol *ast.Symbol
   symbolTableAliasCache map[uint64][]*ast.Symbol
+  classExpressionNameTables map[ast.NodeId]ast.SymbolTable
   resolveName func(location *ast.Node, name string, meaning ast.SymbolFlags, nameNotFoundMessage *diagnostics.Message, isUse bool, excludeGlobals bool) *ast.Symbol
   resolveNameForSymbolSuggestion func(location *ast.Node, name string, meaning ast.SymbolFlags, nameNotFoundMessage *diagnostics.Message, isUse bool, excludeGlobals bool) *ast.Symbol
   tupleTypes map[checker.CacheHashKey]*checker.Type

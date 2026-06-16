@@ -17,6 +17,8 @@ func DecodeSourceFile(data []byte) (*ast.SourceFile, error)
 func EncodeNode(node *ast.Node, sourceFile *ast.SourceFile) ([]byte, *encoder.NodeIndexTable, error)
 //go:linkname EncodeSourceFile github.com/microsoft/typescript-go/internal/api/encoder.EncodeSourceFile
 func EncodeSourceFile(sourceFile *ast.SourceFile) ([]byte, *encoder.NodeIndexTable, error)
+//go:linkname GetNodeIndexTable github.com/microsoft/typescript-go/internal/api/encoder.GetNodeIndexTable
+func GetNodeIndexTable(sourceFile *ast.SourceFile) *encoder.NodeIndexTable
 const HeaderOffsetExtendedData = encoder.HeaderOffsetExtendedData
 const HeaderOffsetHashHi0 = encoder.HeaderOffsetHashHi0
 const HeaderOffsetHashHi1 = encoder.HeaderOffsetHashHi1
