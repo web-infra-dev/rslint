@@ -1,0 +1,1085 @@
+/**
+ * @fileoverview Tests for block-spacing rule.
+ * @author Toru Nagashima
+ *
+ * Ported verbatim from @stylistic/eslint-plugin v5.10.0:
+ *   packages/eslint-plugin/rules/block-spacing/block-spacing.test.ts
+ *
+ * Transformations applied per the porting spec:
+ *  - `run({ name, rule, ... })` -> `ruleTester.run('block-spacing', null as never, { valid, invalid })`
+ *  - The local `import` of the rule / types and the `name`/`rule` fields are dropped.
+ *  - `parserOptions` (ecmaVersion 6 / 2022 — for-of and class static blocks) are
+ *    dropped; rslint resolves syntax via tsconfig (the generated tsconfig targets
+ *    `esnext`, so both features parse).
+ *
+ * The upstream test uses no `$`/unindent template tag, no spread/error helpers,
+ * no Babel/Flow cases, no `readFileSync` external fixtures, and no `suggestions`,
+ * so nothing required evaluation or isolation on those grounds. The `._css_` /
+ * `._json_` / `._markdown_` test files don't exist for this rule.
+ *
+ * Every invalid error pins `data: { location, token }`, so the `missing` /
+ * `extra` messages (which interpolate `{{location}}` and `{{token}}`) are fully
+ * resolved and asserted by the RuleTester through the plugin's `meta.messages`.
+ */
+
+import { RuleTester } from '../rule-tester';
+
+const ruleTester = new RuleTester();
+
+ruleTester.run('block-spacing', null as never, {
+  valid: [
+
+    // default/always
+    { code: '{ foo(); }', options: ['always'] },
+    '{ foo(); }',
+    '{ foo();\n}',
+    '{\nfoo(); }',
+    '{\r\nfoo();\r\n}',
+    'if (a) { foo(); }',
+    'if (a) {} else { foo(); }',
+    'switch (a) {}',
+    'switch (a) { case 0: foo(); }',
+    'while (a) { foo(); }',
+    'do { foo(); } while (a);',
+    'for (;;) { foo(); }',
+    'for (var a in b) { foo(); }',
+    { code: 'for (var a of b) { foo(); }' },
+    'try { foo(); } catch (e) { foo(); }',
+    'function foo() { bar(); }',
+    '(function() { bar(); });',
+    { code: '(() => { bar(); });' },
+    'if (a) { /* comment */ foo(); /* comment */ }',
+    'if (a) { //comment\n foo(); }',
+    { code: 'class C { static {} }' },
+    { code: 'class C { static { foo; } }' },
+    { code: 'class C { static { /* comment */foo;/* comment */ } }' },
+
+    // never
+    { code: '{foo();}', options: ['never'] },
+    { code: '{foo();\n}', options: ['never'] },
+    { code: '{\nfoo();}', options: ['never'] },
+    { code: '{\r\nfoo();\r\n}', options: ['never'] },
+    { code: 'if (a) {foo();}', options: ['never'] },
+    { code: 'if (a) {} else {foo();}', options: ['never'] },
+    { code: 'switch (a) {}', options: ['never'] },
+    { code: 'switch (a) {case 0: foo();}', options: ['never'] },
+    { code: 'while (a) {foo();}', options: ['never'] },
+    { code: 'do {foo();} while (a);', options: ['never'] },
+    { code: 'for (;;) {foo();}', options: ['never'] },
+    { code: 'for (var a in b) {foo();}', options: ['never'] },
+    { code: 'for (var a of b) {foo();}', options: ['never'] },
+    { code: 'try {foo();} catch (e) {foo();}', options: ['never'] },
+    { code: 'function foo() {bar();}', options: ['never'] },
+    { code: '(function() {bar();});', options: ['never'] },
+    { code: '(() => {bar();});', options: ['never'] },
+    { code: 'if (a) {/* comment */ foo(); /* comment */}', options: ['never'] },
+    { code: 'if (a) { //comment\n foo();}', options: ['never'] },
+    { code: 'class C { static { } }', options: ['never'] },
+    { code: 'class C { static {foo;} }', options: ['never'] },
+    { code: 'class C { static {/* comment */ foo; /* comment */} }', options: ['never'] },
+    { code: 'class C { static { // line comment is allowed\n foo;\n} }', options: ['never'] },
+    { code: 'class C { static {\nfoo;\n} }', options: ['never'] },
+    { code: 'class C { static { \n foo; \n } }', options: ['never'] },
+  ],
+
+  invalid: [
+
+    // default/always
+    {
+      code: '{foo();}',
+      output: '{ foo(); }',
+      options: ['always'],
+      errors: [
+        { line: 1, column: 1, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 8, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: '{foo();}',
+      output: '{ foo(); }',
+      errors: [
+        { line: 1, column: 1, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 8, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: '{ foo();}',
+      output: '{ foo(); }',
+      errors: [
+        { line: 1, column: 9, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: '{foo(); }',
+      output: '{ foo(); }',
+      errors: [
+        { line: 1, column: 1, messageId: 'missing', data: { location: 'after', token: '{' } },
+      ],
+    },
+    {
+      code: '{\nfoo();}',
+      output: '{\nfoo(); }',
+      errors: [
+        { line: 2, column: 7, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: '{foo();\n}',
+      output: '{ foo();\n}',
+      errors: [
+        { line: 1, column: 1, messageId: 'missing', data: { location: 'after', token: '{' } },
+      ],
+    },
+    {
+      code: 'if (a) {foo();}',
+      output: 'if (a) { foo(); }',
+      errors: [
+        { line: 1, column: 8, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 15, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'if (a) {} else {foo();}',
+      output: 'if (a) {} else { foo(); }',
+      errors: [
+        { line: 1, column: 16, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 23, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'switch (a) {case 0: foo();}',
+      output: 'switch (a) { case 0: foo(); }',
+      errors: [
+        { line: 1, column: 12, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 27, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'while (a) {foo();}',
+      output: 'while (a) { foo(); }',
+      errors: [
+        { line: 1, column: 11, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 18, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'do {foo();} while (a);',
+      output: 'do { foo(); } while (a);',
+      errors: [
+        { line: 1, column: 4, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 11, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'for (;;) {foo();}',
+      output: 'for (;;) { foo(); }',
+      errors: [
+        { line: 1, column: 10, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 17, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'for (var a in b) {foo();}',
+      output: 'for (var a in b) { foo(); }',
+      errors: [
+        { line: 1, column: 18, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 25, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'for (var a of b) {foo();}',
+      output: 'for (var a of b) { foo(); }',
+      errors: [
+        { line: 1, column: 18, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 25, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'try {foo();} catch (e) {foo();} finally {foo();}',
+      output: 'try { foo(); } catch (e) { foo(); } finally { foo(); }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 6,
+        },
+        {
+          messageId: 'missing',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 13,
+        },
+        {
+          messageId: 'missing',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
+        },
+        {
+          messageId: 'missing',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 31,
+          endLine: 1,
+          endColumn: 32,
+        },
+        {
+          messageId: 'missing',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 41,
+          endLine: 1,
+          endColumn: 42,
+        },
+        {
+          messageId: 'missing',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 48,
+          endLine: 1,
+          endColumn: 49,
+        },
+      ],
+    },
+    {
+      code: 'function foo() {bar();}',
+      output: 'function foo() { bar(); }',
+      errors: [
+        { line: 1, column: 16, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 23, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: '(function() {bar();});',
+      output: '(function() { bar(); });',
+      errors: [
+        { line: 1, column: 13, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 20, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: '(() => {bar();});',
+      output: '(() => { bar(); });',
+      errors: [
+        { line: 1, column: 8, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 15, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'if (a) {/* comment */ foo(); /* comment */}',
+      output: 'if (a) { /* comment */ foo(); /* comment */ }',
+      errors: [
+        { line: 1, column: 8, messageId: 'missing', data: { location: 'after', token: '{' } },
+        { line: 1, column: 43, messageId: 'missing', data: { location: 'before', token: '}' } },
+      ],
+    },
+    {
+      code: 'if (a) {//comment\n foo(); }',
+      output: 'if (a) { //comment\n foo(); }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 9,
+        },
+      ],
+    },
+
+    // class static blocks
+    {
+      code: 'class C { static {foo; } }',
+      output: 'class C { static { foo; } }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { foo;} }',
+      output: 'class C { static { foo; } }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: 'class C { static {foo;} }',
+      output: 'class C { static { foo; } }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 19,
+        },
+        {
+          messageId: 'missing',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: 'class C { static {/* comment */} }',
+      output: 'class C { static { /* comment */ } }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 19,
+        },
+        {
+          messageId: 'missing',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 32,
+          endLine: 1,
+          endColumn: 33,
+        },
+      ],
+    },
+    {
+      code: 'class C { static {/* comment 1 */ foo; /* comment 2 */} }',
+      output: 'class C { static { /* comment 1 */ foo; /* comment 2 */ } }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 19,
+        },
+        {
+          messageId: 'missing',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 55,
+          endLine: 1,
+          endColumn: 56,
+        },
+      ],
+    },
+    {
+      code: 'class C {\n static {foo()\nbar()} }',
+      output: 'class C {\n static { foo()\nbar() } }',
+      errors: [
+        {
+          messageId: 'missing',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 2,
+          column: 9,
+          endLine: 2,
+          endColumn: 10,
+        },
+        {
+          messageId: 'missing',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 3,
+          column: 6,
+          endLine: 3,
+          endColumn: 7,
+        },
+      ],
+    },
+
+    // ----------------------------------------------------------------------
+    // never
+    {
+      code: '{ foo(); }',
+      output: '{foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 3,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+    {
+      code: '{ foo();}',
+      output: '{foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: '{foo(); }',
+      output: '{foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 8,
+          endLine: 1,
+          endColumn: 9,
+        },
+      ],
+    },
+    {
+      code: '{\nfoo(); }',
+      output: '{\nfoo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 2,
+          column: 7,
+          endLine: 2,
+          endColumn: 8,
+        },
+      ],
+    },
+    {
+      code: '{ foo();\n}',
+      output: '{foo();\n}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 2,
+          endLine: 1,
+          endColumn: 3,
+        },
+      ],
+    },
+    {
+      code: 'if (a) { foo(); }',
+      output: 'if (a) {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 10,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: 'if (a) {} else { foo(); }',
+      output: 'if (a) {} else {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: 'switch (a) { case 0: foo(); }',
+      output: 'switch (a) {case 0: foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 14,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 28,
+          endLine: 1,
+          endColumn: 29,
+        },
+      ],
+    },
+    {
+      code: 'while (a) { foo(); }',
+      output: 'while (a) {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 13,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: 'do { foo(); } while (a);',
+      output: 'do {foo();} while (a);',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 5,
+          endLine: 1,
+          endColumn: 6,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 12,
+          endLine: 1,
+          endColumn: 13,
+        },
+      ],
+    },
+    {
+      code: 'for (;;) { foo(); }',
+      output: 'for (;;) {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 11,
+          endLine: 1,
+          endColumn: 12,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 19,
+        },
+      ],
+    },
+    {
+      code: 'for (var a in b) { foo(); }',
+      output: 'for (var a in b) {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: 'for (var a of b) { foo(); }',
+      output: 'for (var a of b) {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 26,
+          endLine: 1,
+          endColumn: 27,
+        },
+      ],
+    },
+    {
+      code: 'try { foo(); } catch (e) { foo(); } finally { foo(); }',
+      output: 'try {foo();} catch (e) {foo();} finally {foo();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 6,
+          endLine: 1,
+          endColumn: 7,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 13,
+          endLine: 1,
+          endColumn: 14,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 27,
+          endLine: 1,
+          endColumn: 28,
+        },
+        {
+          line: 1,
+          column: 34,
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          endLine: 1,
+          endColumn: 35,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 46,
+          endLine: 1,
+          endColumn: 47,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 53,
+          endLine: 1,
+          endColumn: 54,
+        },
+      ],
+    },
+    {
+      code: 'function foo() { bar(); }',
+      output: 'function foo() {bar();}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 17,
+          endLine: 1,
+          endColumn: 18,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: '(function() { bar(); });',
+      output: '(function() {bar();});',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 14,
+          endLine: 1,
+          endColumn: 15,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 21,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: '(() => { bar(); });',
+      output: '(() => {bar();});',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 10,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 16,
+          endLine: 1,
+          endColumn: 17,
+        },
+      ],
+    },
+    {
+      code: 'if (a) { /* comment */ foo(); /* comment */ }',
+      output: 'if (a) {/* comment */ foo(); /* comment */}',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 10,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 44,
+          endLine: 1,
+          endColumn: 45,
+        },
+      ],
+    },
+    {
+      code: '(() => {   bar();});',
+      output: '(() => {bar();});',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 12,
+        },
+      ],
+    },
+    {
+      code: '(() => {bar();   });',
+      output: '(() => {bar();});',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 15,
+          endLine: 1,
+          endColumn: 18,
+        },
+      ],
+    },
+    {
+      code: '(() => {   bar();   });',
+      output: '(() => {bar();});',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: { location: 'after', token: '{' },
+          line: 1,
+          column: 9,
+          endLine: 1,
+          endColumn: 12,
+        },
+        {
+          messageId: 'extra',
+          data: { location: 'before', token: '}' },
+          line: 1,
+          column: 18,
+          endLine: 1,
+          endColumn: 21,
+        },
+      ],
+    },
+
+    // class static blocks
+    {
+      code: 'class C { static { foo;} }',
+      output: 'class C { static {foo;} }',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: 'class C { static {foo; } }',
+      output: 'class C { static {foo;} }',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 23,
+          endLine: 1,
+          endColumn: 24,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { foo; } }',
+      output: 'class C { static {foo;} }',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 24,
+          endLine: 1,
+          endColumn: 25,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { /* comment */ } }',
+      output: 'class C { static {/* comment */} }',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 33,
+          endLine: 1,
+          endColumn: 34,
+        },
+      ],
+    },
+    {
+      code: 'class C { static { /* comment 1 */ foo; /* comment 2 */ } }',
+      output: 'class C { static {/* comment 1 */ foo; /* comment 2 */} }',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 1,
+          column: 19,
+          endLine: 1,
+          endColumn: 20,
+        },
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 1,
+          column: 56,
+          endLine: 1,
+          endColumn: 57,
+        },
+      ],
+    },
+    {
+      code: 'class C { static\n{   foo()\nbar()  } }',
+      output: 'class C { static\n{foo()\nbar()} }',
+      options: ['never'],
+      errors: [
+        {
+          messageId: 'extra',
+          data: {
+            location: 'after',
+            token: '{',
+          },
+          line: 2,
+          column: 2,
+          endLine: 2,
+          endColumn: 5,
+        },
+        {
+          messageId: 'extra',
+          data: {
+            location: 'before',
+            token: '}',
+          },
+          line: 3,
+          column: 6,
+          endLine: 3,
+          endColumn: 8,
+        },
+      ],
+    },
+  ],
+});

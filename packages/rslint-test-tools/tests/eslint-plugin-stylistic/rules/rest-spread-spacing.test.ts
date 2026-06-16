@@ -1,0 +1,713 @@
+/**
+ * @fileoverview Enforce spacing between rest and spread operators and their expressions.
+ * @author Kai Cataldo
+ *
+ * Ported verbatim from @stylistic/eslint-plugin v5.10.0:
+ *   packages/eslint-plugin/rules/rest-spread-spacing/rest-spread-spacing.test.ts
+ *
+ * Transformations applied per the porting spec:
+ *  - `run({ name, rule, ... })` -> `ruleTester.run('rest-spread-spacing', null as never, { valid, invalid })`
+ *  - `parserOptions` (`ecmaVersion: 2018` on the object-rest/spread cases) dropped
+ *    — rslint resolves syntax via tsconfig (`target/module: esnext`), so object
+ *    rest/spread parses without an explicit `ecmaVersion`.
+ *  - Each `errors[]` entry keeps its `messageId`, `data.type`, and the
+ *    `line/column/endLine/endColumn` that upstream pins. The rule sets an explicit
+ *    `loc` per report (the whitespace gap for `unexpectedWhitespace`, the operator
+ *    token for `expectedWhitespace`), and the RuleTester asserts the diagnostic
+ *    `range.start`/`range.end` against those coordinates.
+ *
+ * The upstream test file is a single `run()` block (no `if (!skipBabel)` block,
+ * no Babel/Flow cases, no `$` unindent, no helpers — every fixture is a
+ * single-line string literal, several embedding `\t`/`\n`). Whitespace for this
+ * rule is "any space, tab, or line break" (`isSpaceBetween`), so `...\targs` /
+ * `...\nargs` are treated as having whitespace. No octal/escape or
+ * import-attribute fixtures exist, so nothing trips ts-go's strict/module parser.
+ * The `._js_` / `._ts_` / `._css_` / `._json_` / `._markdown_` split test files
+ * don't exist for this rule (it ships a single `rest-spread-spacing.test.ts`).
+ *
+ * No rslint<->upstream gap was found: every case runs in the green
+ * `ruleTester.run` below and there is no KNOWN GAPS block.
+ */
+
+import { RuleTester } from '../rule-tester';
+
+const ruleTester = new RuleTester();
+
+ruleTester.run('rest-spread-spacing', null as never, {
+  valid: [
+    'fn(...args)',
+    'fn(...(args))',
+    'fn(...( args ))',
+    { code: 'fn(...args)', options: ['never'] },
+    { code: 'fn(... args)', options: ['always'] },
+    { code: 'fn(...\targs)', options: ['always'] },
+    { code: 'fn(...\nargs)', options: ['always'] },
+    '[...arr, 4, 5, 6]',
+    '[...(arr), 4, 5, 6]',
+    '[...( arr ), 4, 5, 6]',
+    { code: '[...arr, 4, 5, 6]', options: ['never'] },
+    { code: '[... arr, 4, 5, 6]', options: ['always'] },
+    { code: '[...\tarr, 4, 5, 6]', options: ['always'] },
+    { code: '[...\narr, 4, 5, 6]', options: ['always'] },
+    'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+    { code: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];', options: ['never'] },
+    { code: 'let [a, b, ... arr] = [1, 2, 3, 4, 5];', options: ['always'] },
+    { code: 'let [a, b, ...\tarr] = [1, 2, 3, 4, 5];', options: ['always'] },
+    { code: 'let [a, b, ...\narr] = [1, 2, 3, 4, 5];', options: ['always'] },
+    { code: 'let n = { x, y, ...z };' },
+    { code: 'let n = { x, y, ...(z) };' },
+    { code: 'let n = { x, y, ...( z ) };' },
+    { code: 'let n = { x, y, ...z };', options: ['never'] },
+    { code: 'let n = { x, y, ... z };', options: ['always'] },
+    { code: 'let n = { x, y, ...\tz };', options: ['always'] },
+    { code: 'let n = { x, y, ...\nz };', options: ['always'] },
+    { code: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };' },
+    { code: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };', options: ['never'] },
+    { code: 'let { x, y, ... z } = { x: 1, y: 2, a: 3, b: 4 };', options: ['always'] },
+    { code: 'let { x, y, ...\tz } = { x: 1, y: 2, a: 3, b: 4 };', options: ['always'] },
+    { code: 'let { x, y, ...\nz } = { x: 1, y: 2, a: 3, b: 4 };', options: ['always'] },
+  ],
+
+  invalid: [
+    {
+      code: 'fn(... args)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 8,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...  args)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 9,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...\targs)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 8,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(... \t args)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 10,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...\nargs)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...\n    args)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 2,
+        endColumn: 5,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...\n\targs)',
+      output: 'fn(...args)',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 2,
+        endColumn: 2,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(... args)',
+      output: 'fn(...args)',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 8,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...\targs)',
+      output: 'fn(...args)',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 8,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...\nargs)',
+      output: 'fn(...args)',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...args)',
+      output: 'fn(... args)',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 4,
+        endLine: 1,
+        endColumn: 7,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(... (args))',
+      output: 'fn(...(args))',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 8,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(... ( args ))',
+      output: 'fn(...( args ))',
+      errors: [{
+        line: 1,
+        column: 7,
+        endLine: 1,
+        endColumn: 8,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...(args))',
+      output: 'fn(... (args))',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 4,
+        endLine: 1,
+        endColumn: 7,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'fn(...( args ))',
+      output: 'fn(... ( args ))',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 4,
+        endLine: 1,
+        endColumn: 7,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[... arr, 4, 5, 6]',
+      output: '[...arr, 4, 5, 6]',
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 1,
+        endColumn: 6,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...\tarr, 4, 5, 6]',
+      output: '[...arr, 4, 5, 6]',
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 1,
+        endColumn: 6,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...\narr, 4, 5, 6]',
+      output: '[...arr, 4, 5, 6]',
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[... arr, 4, 5, 6]',
+      output: '[...arr, 4, 5, 6]',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 1,
+        endColumn: 6,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...\tarr, 4, 5, 6]',
+      output: '[...arr, 4, 5, 6]',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 1,
+        endColumn: 6,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...\narr, 4, 5, 6]',
+      output: '[...arr, 4, 5, 6]',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...arr, 4, 5, 6]',
+      output: '[... arr, 4, 5, 6]',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 2,
+        endLine: 1,
+        endColumn: 5,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[... (arr), 4, 5, 6]',
+      output: '[...(arr), 4, 5, 6]',
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 1,
+        endColumn: 6,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[... ( arr ), 4, 5, 6]',
+      output: '[...( arr ), 4, 5, 6]',
+      errors: [{
+        line: 1,
+        column: 5,
+        endLine: 1,
+        endColumn: 6,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...(arr), 4, 5, 6]',
+      output: '[... (arr), 4, 5, 6]',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 2,
+        endLine: 1,
+        endColumn: 5,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: '[...( arr ), 4, 5, 6]',
+      output: '[... ( arr ), 4, 5, 6]',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 2,
+        endLine: 1,
+        endColumn: 5,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread' },
+      }],
+    },
+    {
+      code: 'let [a, b, ... arr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      errors: [{
+        line: 1,
+        column: 15,
+        endLine: 1,
+        endColumn: 16,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let [a, b, ...\tarr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      errors: [{
+        line: 1,
+        column: 15,
+        endLine: 1,
+        endColumn: 16,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let [a, b, ...\narr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      errors: [{
+        line: 1,
+        column: 15,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let [a, b, ... arr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 15,
+        endLine: 1,
+        endColumn: 16,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let [a, b, ...\tarr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 15,
+        endLine: 1,
+        endColumn: 16,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let [a, b, ...\narr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 15,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let [a, b, ...arr] = [1, 2, 3, 4, 5];',
+      output: 'let [a, b, ... arr] = [1, 2, 3, 4, 5];',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 12,
+        endLine: 1,
+        endColumn: 15,
+        messageId: 'expectedWhitespace',
+        data: { type: 'rest' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ... z };',
+      output: 'let n = { x, y, ...z };',
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 1,
+        endColumn: 21,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...\tz };',
+      output: 'let n = { x, y, ...z };',
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 1,
+        endColumn: 21,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...\nz };',
+      output: 'let n = { x, y, ...z };',
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ... z };',
+      output: 'let n = { x, y, ...z };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 1,
+        endColumn: 21,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...\tz };',
+      output: 'let n = { x, y, ...z };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 1,
+        endColumn: 21,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...\nz };',
+      output: 'let n = { x, y, ...z };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...z };',
+      output: 'let n = { x, y, ... z };',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 17,
+        endLine: 1,
+        endColumn: 20,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ... (z) };',
+      output: 'let n = { x, y, ...(z) };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 1,
+        endColumn: 21,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ... ( z ) };',
+      output: 'let n = { x, y, ...( z ) };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 20,
+        endLine: 1,
+        endColumn: 21,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...(z) };',
+      output: 'let n = { x, y, ... (z) };',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 17,
+        endLine: 1,
+        endColumn: 20,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let n = { x, y, ...( z ) };',
+      output: 'let n = { x, y, ... ( z ) };',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 17,
+        endLine: 1,
+        endColumn: 20,
+        messageId: 'expectedWhitespace',
+        data: { type: 'spread property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ... z } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      errors: [{
+        line: 1,
+        column: 16,
+        endLine: 1,
+        endColumn: 17,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ...\tz } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      errors: [{
+        line: 1,
+        column: 16,
+        endLine: 1,
+        endColumn: 17,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ...\nz } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      errors: [{
+        line: 1,
+        column: 16,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ... z } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 16,
+        endLine: 1,
+        endColumn: 17,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ...\tz } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 16,
+        endLine: 1,
+        endColumn: 17,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ...\nz } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      options: ['never'],
+      errors: [{
+        line: 1,
+        column: 16,
+        endLine: 2,
+        endColumn: 1,
+        messageId: 'unexpectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+    {
+      code: 'let { x, y, ...z } = { x: 1, y: 2, a: 3, b: 4 };',
+      output: 'let { x, y, ... z } = { x: 1, y: 2, a: 3, b: 4 };',
+      options: ['always'],
+      errors: [{
+        line: 1,
+        column: 13,
+        endLine: 1,
+        endColumn: 16,
+        messageId: 'expectedWhitespace',
+        data: { type: 'rest property' },
+      }],
+    },
+  ],
+});
