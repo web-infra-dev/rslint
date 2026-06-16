@@ -1064,7 +1064,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	fallbackProgramIndex := -1    // index of the gap-file fallback program (if any) within `programs`
 
 	{
-		programFiles := utils.CollectProgramFiles(programs, fs)
+		programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
 
 		var gapFiles []string
 		if configMap != nil {
@@ -1108,7 +1108,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if gapFiles != nil {
 			// Build type-info set from existing (tsconfig) Programs BEFORE
 			// appending the fallback, so fallback files are NOT in this set.
-			typeInfoFiles = utils.CollectProgramFiles(programs, fs)
+			typeInfoFiles = utils.CollectProgramFiles(programs, fs, singleThreaded)
 			capturedGapFiles = gapFiles
 
 			if len(gapFiles) > 0 {
