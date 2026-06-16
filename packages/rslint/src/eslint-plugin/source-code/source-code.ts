@@ -320,7 +320,7 @@ export interface SourceCodeBuildInput {
     end: number;
   }>;
   /**
-   * Native-parser token stream in columnar form (`@rslint/native`'s `parse()`:
+   * Native-parser token stream in columnar form (the napi parser's `parse()`:
    * `tokenTypes`/`tokenStarts`/`tokenEnds`, all UTF-16 offsets). The token
    * getters lazily rebuild `Token[]` from these via {@link token-builder.buildTokens} on
    * first use. When omitted, the token stream is empty (the main lint path always supplies

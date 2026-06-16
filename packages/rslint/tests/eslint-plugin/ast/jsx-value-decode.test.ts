@@ -15,7 +15,7 @@
  */
 import { describe, test, expect } from '@rstest/core';
 import * as espree from 'espree';
-import { parse as nativeParse } from '@rslint/native';
+import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 
 import {
   normalizeAst,

@@ -1,7 +1,7 @@
 /**
  * Whether to skip the real-worker teardown e2e suites on win32.
  *
- * Tearing down a worker that holds the napi parser addon (`@rslint/native`)
+ * Tearing down a worker that holds the napi parser addon (the platform `.node`)
  * used to abort below the JS layer on win32 (nodejs/node#34567), crashing the
  * rstest child — so these suites were win32-skipped. `terminateWorker`
  * (worker-pool.ts) now destroys the worker's stdio pipes before terminating,

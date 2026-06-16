@@ -10,7 +10,7 @@ const isWatchMode = process.argv.includes('--watch');
 // living next to that worker inside the staged `dist/eslint-plugin/`. Bundling
 // it into `dist/main.js` would break that sibling resolution. The `copy-files`
 // plugin below stages the whole worker payload (worker bundle + nested
-// `@rslint/native` loader/.node) into `dist/eslint-plugin/`. Unlike
+// platform package carrying the napi `.node`) into `dist/eslint-plugin/`. Unlike
 // `config-loader`, which IS bundled into `main.js`, the host is never bundled.
 const config = {
   entryPoints: ['src/main.ts'],
@@ -73,22 +73,35 @@ const config = {
  * not bundle into `dist/main.js`:
  *   1. the Go LSP binary + launcher (`@rslint/core/bin`)
  *   2. the eslint-plugin worker bundle (`@rslint/core/dist/eslint-plugin/`)
- *   3. a nested `@rslint/native` (a tiny fixed-name shim loader + the napi
- *      `.node`), so the worker can `import "@rslint/native"` via Node's
- *      node_modules walk-up from the worker file.
+ *   3. a nested `@rslint/native-<tuple>` platform package (the napi `.node` +
+ *      a minimal package.json), which the worker's loader resolves at runtime
+ *      via Node's node_modules walk-up from the worker file.
  *
- * Resolution of `@rslint/native` MUST be anchored on @rslint/core's directory:
- * the vscode-extension package doesn't declare it, so a bare `require.resolve`
+ * Resolution MUST be anchored on @rslint/core's directory: the vscode-extension
+ * package doesn't declare the platform packages, so a bare `require.resolve`
  * from here throws MODULE_NOT_FOUND.
  */
 function stageRuntimeAssets() {
   const distDir = path.join(__dirname, '../dist');
   const coreDir = path.dirname(require.resolve('@rslint/core/package.json'));
 
-  // 1. Go LSP binary (`rslint`/`rslint.exe`) + launcher (`rslint.cjs`). In CI,
-  //    publish-marketplace.mjs overwrites `dist/rslint` with the per-platform
-  //    binary; locally this copy makes `pnpm build` self-sufficient for dev.
+  // 1. Launcher (`rslint.cjs`) from core/bin + the Go LSP binary. build:bin now
+  //    lands the Go binary in the host platform package (not core/bin), so copy
+  //    it from there. In CI, publish-marketplace.mjs overwrites dist/rslint with
+  //    the target-platform binary; locally this makes `pnpm build` dev-ready.
   fs.cpSync(path.join(coreDir, 'bin'), distDir, { recursive: true });
+  const goBin = process.platform === 'win32' ? 'rslint.exe' : 'rslint';
+  try {
+    const goSrc = require.resolve(`@rslint/native-${hostTuple()}/bin`, {
+      paths: [coreDir],
+    });
+    fs.copyFileSync(goSrc, path.join(distDir, goBin));
+  } catch {
+    console.warn(
+      'build.js: no local Go LSP binary in the host platform package; the LSP ' +
+        'will not start in the dev host until `pnpm --filter @rslint/core build:bin` is run.',
+    );
+  }
 
   // 2. eslint-plugin worker bundle — copy the WHOLE dir, never enumerate file
   //    names: the Rspack runtime chunk (`<id>.js`) has a non-deterministic id
@@ -106,47 +119,53 @@ function stageRuntimeAssets() {
     `${JSON.stringify({ type: 'module' }, null, 2)}\n`,
   );
 
-  // 4. Nested `@rslint/native`: a minimal shim (./native-loader-shim.cjs) that
-  //    requires a FIXED-name `./rslint.node`, replacing napi-rs's auto-generated
-  //    loader. We control exactly which per-platform `.node` ships in each vsix,
-  //    so the loader's platform/libc/universal probing is unnecessary and — in
-  //    the Electron host — a liability (see native-loader-shim.cjs for why).
-  const nativeDest = path.join(epDest, 'node_modules', '@rslint', 'native');
+  // 4. Nested platform package `@rslint/native-<tuple>`: the worker's native
+  //    loader (bundled into lint-worker.js from core sources) resolves it at
+  //    runtime via createRequire walk-up to load the `.node`. The vsix is
+  //    per-platform; CI (publish-marketplace.mjs) re-stages this as the TARGET
+  //    platform's package. Dev stages the host's so a local `pnpm build` works
+  //    in the dev extension host.
+  const tuple = hostTuple();
+  const pkgBase = `native-${tuple}`;
+  const nodeFile = `rslint.${tuple}.node`;
+  const nativeDest = path.join(epDest, 'node_modules', '@rslint', pkgBase);
   fs.mkdirSync(nativeDest, { recursive: true });
-  fs.copyFileSync(
-    path.join(__dirname, 'native-loader-shim.cjs'),
-    path.join(nativeDest, 'index.js'),
-  );
-  fs.writeFileSync(
-    path.join(nativeDest, 'package.json'),
-    `${JSON.stringify(
-      { name: '@rslint/native', type: 'commonjs', main: 'index.js' },
-      null,
-      2,
-    )}\n`,
-  );
-  // Dev: stage the current host's `.node` as the fixed `rslint.node` so a
-  // local `pnpm build` works in the dev extension host. CI overwrites this
-  // single fixed-name file with the target platform's `.node`
-  // (publish-marketplace.mjs) — one filename, so no wrong-arch leak is possible.
-  const nativeSrcDir = path.dirname(
-    require.resolve('@rslint/native', { paths: [coreDir] }),
-  );
-  const hostNode = fs
-    .readdirSync(nativeSrcDir)
-    .find((f) => /^rslint\..*\.node$/.test(f));
-  if (hostNode) {
-    fs.copyFileSync(
-      path.join(nativeSrcDir, hostNode),
-      path.join(nativeDest, 'rslint.node'),
+  let hostNodePath = null;
+  try {
+    const srcPkgDir = path.dirname(
+      require.resolve(`@rslint/${pkgBase}/package.json`, { paths: [coreDir] }),
+    );
+    const candidate = path.join(srcPkgDir, nodeFile);
+    if (fs.existsSync(candidate)) hostNodePath = candidate;
+  } catch {
+    // platform package not resolvable for this host — fall through to the warning
+  }
+  if (hostNodePath) {
+    fs.copyFileSync(hostNodePath, path.join(nativeDest, nodeFile));
+    fs.writeFileSync(
+      path.join(nativeDest, 'package.json'),
+      `${JSON.stringify(
+        { name: `@rslint/${pkgBase}`, exports: { '.': `./${nodeFile}` } },
+        null,
+        2,
+      )}\n`,
     );
   } else {
     console.warn(
-      'build.js: no local @rslint/native .node found; the eslint-plugin ' +
-        'worker will not load in the dev host until `pnpm --filter ' +
-        '@rslint/native build` is run.',
+      `build.js: no local ${nodeFile} found; the eslint-plugin worker will not ` +
+        'load in the dev host until `pnpm --filter @rslint/native build` is run.',
     );
   }
+}
+
+// The platform-package tuple the worker's loader computes on THIS host. Electron
+// embeds glibc, so linux is always gnu here (the loader's musl probe never
+// selects musl under an Electron host).
+function hostTuple() {
+  const { platform, arch } = process;
+  if (platform === 'win32') return `win32-${arch}-msvc`;
+  if (platform === 'linux') return `linux-${arch}-gnu`;
+  return `${platform}-${arch}`;
 }
 
 async function main() {

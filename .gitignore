@@ -151,10 +151,12 @@ npm/*/rslint
 npm/*/rslint.exe
 npm/tsgo/*/local
 
-# napi-generated entry files (index.js loader + index.d.ts) ARE committed: the
-# website deploy env has no Rust toolchain, so `build:js` can't regenerate them
-# and instead consumes the checked-in index.d.ts. Only the per-platform .node
-# binaries stay ignored (built by CI, published to @rslint/native-<platform>).
+# napi build artifacts, never committed: the platform loader + its types now
+# live in @rslint/core (src/eslint-plugin/native/), so build:js needs neither
+# the generated index.js nor index.d.ts; the .node ships in the platform
+# subpackages (built by CI via move-artifacts).
+crates/rslint-native/index.js
+crates/rslint-native/index.d.ts
 crates/rslint-native/*.node
 # per-platform binaries (napi .node + Go CLI) land in the subpackages at
 # publish time via move-artifacts; never committed

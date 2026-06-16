@@ -1,15 +1,8 @@
 {
   "name": "@rslint/native",
-  "version": "0.6.1",
-  "type": "commonjs",
-  "main": "index.js",
-  "types": "index.d.ts",
-  "license": "MIT",
-  "description": "Native bindings for rslint",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/web-infra-dev/rslint"
-  },
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build-only napi config and Rust sources for the rslint native parser. Not published — the compiled .node ships in the @rslint/native-<tuple> platform packages.",
   "napi": {
     "binaryName": "rslint",
     "targets": [
@@ -23,26 +16,9 @@
       "x86_64-pc-windows-msvc"
     ]
   },
-  "files": [
-    "index.js",
-    "index.d.ts"
-  ],
   "scripts": {
-    "build": "napi build --platform --release",
-    "build:debug": "napi build --platform"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "optionalDependencies": {
-    "@rslint/native-darwin-arm64": "workspace:*",
-    "@rslint/native-darwin-x64": "workspace:*",
-    "@rslint/native-linux-arm64-gnu": "workspace:*",
-    "@rslint/native-linux-x64-gnu": "workspace:*",
-    "@rslint/native-linux-arm64-musl": "workspace:*",
-    "@rslint/native-linux-x64-musl": "workspace:*",
-    "@rslint/native-win32-arm64-msvc": "workspace:*",
-    "@rslint/native-win32-x64-msvc": "workspace:*"
+    "build": "napi build --platform --release --no-js && node ../../scripts/place-host-build.mjs node",
+    "build:debug": "napi build --platform --no-js && node ../../scripts/place-host-build.mjs node"
   },
   "devDependencies": {
     "@napi-rs/cli": "3.7.0"

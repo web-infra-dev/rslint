@@ -42,31 +42,6 @@ importers:
       '@napi-rs/cli':
         specifier: 3.7.0
         version: 3.7.0(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)(@types/node@25.5.0)(node-addon-api@7.1.1)
-    optionalDependencies:
-      '@rslint/native-darwin-arm64':
-        specifier: workspace:*
-        version: link:../../npm/rslint/darwin-arm64
-      '@rslint/native-darwin-x64':
-        specifier: workspace:*
-        version: link:../../npm/rslint/darwin-x64
-      '@rslint/native-linux-arm64-gnu':
-        specifier: workspace:*
-        version: link:../../npm/rslint/linux-arm64-gnu
-      '@rslint/native-linux-arm64-musl':
-        specifier: workspace:*
-        version: link:../../npm/rslint/linux-arm64-musl
-      '@rslint/native-linux-x64-gnu':
-        specifier: workspace:*
-        version: link:../../npm/rslint/linux-x64-gnu
-      '@rslint/native-linux-x64-musl':
-        specifier: workspace:*
-        version: link:../../npm/rslint/linux-x64-musl
-      '@rslint/native-win32-arm64-msvc':
-        specifier: workspace:*
-        version: link:../../npm/rslint/win32-arm64-msvc
-      '@rslint/native-win32-x64-msvc':
-        specifier: workspace:*
-        version: link:../../npm/rslint/win32-x64-msvc
 
   npm/rslint/darwin-arm64: {}
 
@@ -98,9 +73,6 @@ importers:
 
   packages/rslint:
     dependencies:
-      '@rslint/native':
-        specifier: workspace:*
-        version: link:../../crates/rslint-native
       jiti:
         specifier: ^2.0.0
         version: 2.6.1
