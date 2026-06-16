@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/avoid_new"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/catch_or_return"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_multiple_resolved"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_nesting"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_wrap"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/param_names"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -16,6 +17,7 @@ func GetAllRules() []rule.Rule {
 		avoid_new.AvoidNewRule,
 		catch_or_return.CatchOrReturnRule,
 		no_multiple_resolved.NoMultipleResolvedRule,
+		no_nesting.NoNestingRule,
 		no_return_wrap.NoReturnWrapRule,
 		param_names.ParamNamesRule,
 	}
