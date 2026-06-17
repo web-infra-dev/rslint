@@ -149,18 +149,18 @@ jobs:
         if: runner.os == 'Linux'
         run: pnpm format:check
 
-      - name: Build
-        if: runner.os != 'Windows'
-        run: pnpm run build
-
-      - name: Build (Windows)
+      # no free space in default tmpdir on windows-latest
+      - name: Setup Tmpdir (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
-          mkdir -p "$GOTMPDIR"
-          pnpm run build
+          mkdir -p "$TMPDIR"
+          echo "GOTMPDIR=$TMPDIR" >> "$GITHUB_ENV"
         env:
-          GOTMPDIR: ${{ github.workspace }}/.gotmpdir
+          TMPDIR: ${{ github.workspace }}/.gotmpdir
+
+      - name: Build
+        run: pnpm run build
 
       - name: Dogfooding
         if: runner.os == 'Linux'
