@@ -336,50 +336,6 @@ func registerAllCoreEslintRules() {
 	}
 }
 
-// isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
-// Later patterns override earlier ones; a `!` prefix negates (re-includes) a previously
-// ignored file. This aligns with ESLint v10's ignore semantics.
-//
-// For directory-level blocking (dir/** prevents traversal entirely), use isDirPathBlocked.
-func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
-	if cwd == "" {
-		return isFileIgnoredSimple(filePath, ignorePatterns)
-	}
-
-	// Normalize the file path relative to cwd
-	normalizedPath := normalizePath(filePath, cwd)
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-
-	// Evaluate patterns sequentially. Later patterns override earlier ones.
-	// A `!` prefix negates (re-includes) a previously ignored file.
-	// This aligns with ESLint v10's ignore semantics.
-	ignored := false
-	for _, pattern := range ignorePatterns {
-		negated := false
-		if strings.HasPrefix(pattern, "!") {
-			negated = true
-			pattern = pattern[1:]
-		}
-
-		normalizedPattern := normalizePattern(pattern)
-
-		// Match against the relative path only. Do NOT fall back to the
-		// absolute filePath — patterns with **/ prefix (e.g., **/tmp/**/*)
-		// would incorrectly match system directory names in the absolute path
-		// (e.g., /tmp/ on Linux/macOS).
-		matched := matchGlob(normalizedPattern, normalizedPath)
-		// Windows path separator fallback.
-		if !matched && unixPath != normalizedPath {
-			matched = matchGlob(normalizedPattern, unixPath)
-		}
-
-		if matched {
-			ignored = !negated
-		}
-	}
-	return ignored
-}
-
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
@@ -389,24 +345,16 @@ func matchGlob(pattern, path string) bool {
 	return err == nil && m
 }
 
-// isFileLevelPattern returns true if the pattern only matches files (not directories).
-// File-level patterns end with /**/* or /* (but not /**).
-// These do NOT block directory traversal in ESLint v10's isDirectoryIgnored.
-func isFileLevelPattern(pattern string) bool {
-	return strings.HasSuffix(pattern, "/**/*") ||
-		(strings.HasSuffix(pattern, "/*") && !strings.HasSuffix(pattern, "/**"))
-}
-
 func normalizePattern(pattern string) string {
 	return tspath.NormalizePath(pattern)
 }
 
 // isDirBlockedByIgnores checks if the file's directory is blocked by a
-// directory-level ignore pattern (e.g., `dir/**`). File-level patterns
-// (`dir/**/*`, `dir/*`) and negation patterns are skipped.
-// This aligns with ESLint v10: `dir/**` blocks directory traversal entirely,
-// and `!` negation cannot undo it.
-func isDirBlockedByIgnores(filePath string, ignorePatterns []string, cwd string) bool {
+// directory-level ignore pattern (e.g., `dir/**`). File-level patterns and
+// negation patterns are excluded (by Kind) in isDirAbsolutelyBlocked. This
+// aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
+// `!` negation cannot undo it.
+func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
 	var dirPath string
 	if cwd != "" {
 		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
@@ -418,39 +366,7 @@ func isDirBlockedByIgnores(filePath string, ignorePatterns []string, cwd string)
 	if dirPath == "" || dirPath == "." {
 		return false
 	}
-	return isDirPathBlocked(dirPath, ignorePatterns)
-}
-
-// isDirPathBlocked checks if a directory path is blocked by any directory-level ignore
-// pattern. Shared between GetConfigForFile and DiscoverGapFiles.
-//
-// A directory is blocked if a pattern matches the path itself or any parent segment.
-// For example, pattern "dir1/**" blocks "dir1", "dir1/sub", and "dir1/sub/deep".
-// File-level patterns (ending with /**/* or /*) and negation (!) patterns are skipped —
-// directory blocking is absolute and cannot be negated.
-func isDirPathBlocked(dirPath string, ignorePatterns []string) bool {
-	for _, pattern := range ignorePatterns {
-		if pattern == "" || strings.HasPrefix(pattern, "!") {
-			continue
-		}
-		if isFileLevelPattern(pattern) {
-			continue
-		}
-
-		normalizedPattern := normalizePattern(pattern)
-
-		if matchGlob(normalizedPattern, dirPath) || matchGlob(normalizedPattern, dirPath+"/x") {
-			return true
-		}
-		segments := strings.Split(dirPath, "/")
-		for i := 1; i < len(segments); i++ {
-			partial := strings.Join(segments[:i], "/")
-			if matchGlob(normalizedPattern, partial) || matchGlob(normalizedPattern, partial+"/x") {
-				return true
-			}
-		}
-	}
-	return false
+	return isDirAbsolutelyBlocked(dirPath, patterns)
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -459,23 +375,6 @@ func normalizePath(filePath, cwd string) string {
 		UseCaseSensitiveFileNames: true,
 		CurrentDirectory:          cwd,
 	}))
-}
-
-// isFileIgnoredSimple provides fallback matching when cwd is unavailable
-func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
-	ignored := false
-	for _, pattern := range ignorePatterns {
-		negated := false
-		if strings.HasPrefix(pattern, "!") {
-			negated = true
-			pattern = pattern[1:]
-		}
-		normalizedPattern := normalizePattern(pattern)
-		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
-			ignored = !negated
-		}
-	}
-	return ignored
 }
 
 // MergedConfig is the final computed configuration for a single file
@@ -546,8 +445,10 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			continue
 		}
 
-		// 3. Entry-level ignores
-		if isFileIgnored(filePath, entry.Ignores, cwd) {
+		// 3. Entry-level ignores. Parsed per entry; entry.Ignores is usually
+		// empty (ESLint configs put ignores in a dedicated global-ignore entry),
+		// so ParseIgnorePatterns returns nil and this is free in the common case.
+		if isFileIgnored(filePath, ParseIgnorePatterns(entry.Ignores), cwd) {
 			continue
 		}
 
