@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -28,6 +29,8 @@ const (
 	JestFnTypeTest     JestFnType = "test"
 	JestFnTypeUnknown  JestFnType = "unknown"
 )
+
+var JEST_HOOKS_ORDER = []string{"beforeAll", "beforeEach", "afterEach", "afterAll"}
 
 var JEST_METHOD_NAMES = map[string]bool{
 	"afterAll":   true,
@@ -158,15 +161,21 @@ func GetJestKind(name string) JestFnType {
 		return JestFnTypeDescribe
 	case "fit", "it", "test", "xit", "xtest":
 		return JestFnTypeTest
-	case "beforeEach", "afterEach", "beforeAll", "afterAll":
-		return JestFnTypeHook
 	case "jest":
 		return JestFnTypeJest
 	case "expect":
 		return JestFnTypeExpect
 	default:
+		if slices.Contains(JEST_HOOKS_ORDER, name) {
+			return JestFnTypeHook
+		}
 		return JestFnTypeUnknown
 	}
+}
+
+// JestHookOrderIndex returns the expected declaration order index for a Jest hook name, or -1 if unknown.
+func JestHookOrderIndex(name string) int {
+	return slices.Index(JEST_HOOKS_ORDER, name)
 }
 
 func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
