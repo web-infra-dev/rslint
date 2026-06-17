@@ -115,6 +115,36 @@ func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int) []str
 	return lines
 }
 
+func findVariableIdentifier(t *testing.T, file *ast.SourceFile, name string) *ast.Node {
+	t.Helper()
+
+	var found *ast.Node
+	var visit func(node *ast.Node)
+	visit = func(node *ast.Node) {
+		if node == nil || found != nil {
+			return
+		}
+
+		if ast.IsIdentifier(node) && node.AsIdentifier().Text == name && node.Parent != nil && ast.IsVariableDeclaration(node.Parent) {
+			if node.Parent.Name() == node {
+				found = node
+				return
+			}
+		}
+
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return found != nil
+		})
+	}
+	visit(file.AsNode())
+
+	if found == nil {
+		t.Fatalf("variable identifier %q not found", name)
+	}
+	return found
+}
+
 func TestSemanticSnapshot_PrimitiveTypes(t *testing.T) {
 	fixture := buildSemanticFixture(t, "let a:number = 1;\nlet b: number = 2;")
 	snapshot := strings.Join(snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID), "\n")
@@ -163,6 +193,52 @@ func TestSemanticSnapshot_ElementAccess(t *testing.T) {
 
 	if snapshot != expected {
 		t.Fatalf("semantic snapshot mismatch.\nGot:\n%s\n\nExpected:\n%s", snapshot, expected)
+	}
+}
+
+func TestSemanticTypeInfo_ClassInstanceKeepsClassSymbol(t *testing.T) {
+	fixture := buildSemanticFixture(t, `class A {
+    foo() {}
+}
+interface ALike {
+    foo(): void;
+}
+declare function foo(value: ALike): void;
+function main() {
+    let a = new A();
+    foo(a);
+}`)
+
+	aIdentifier := findVariableIdentifier(t, fixture.sourceFile, "a")
+	positionMap := fixture.sourceFile.GetPositionMap()
+	key := NodeReference{
+		SourceFileId: fixture.sourceFileID,
+		Start:        positionMap.UTF8ToUTF16(aIdentifier.Pos()),
+		End:          positionMap.UTF8ToUTF16(aIdentifier.End()),
+	}
+
+	typeID, ok := fixture.semantic.Node2type[key]
+	if !ok || typeID == 0 {
+		t.Fatalf("identifier 'a' has no type entry")
+	}
+
+	typeInfo, ok := fixture.semantic.Typetab[typeID]
+	if !ok {
+		t.Fatalf("type id %d for identifier 'a' not found in typetab", typeID)
+	}
+	if typeInfo.Symbol == 0 {
+		t.Fatalf("instance type for identifier 'a' does not carry a symbol")
+	}
+
+	symbolInfo, ok := fixture.semantic.Symtab[typeInfo.Symbol]
+	if !ok {
+		t.Fatalf("type symbol id %d not found in symtab", typeInfo.Symbol)
+	}
+	if got := string(symbolInfo.Name); got != "A" {
+		t.Fatalf("instance type symbol = %q, want %q", got, "A")
+	}
+	if symbolInfo.Flags&int(ast.SymbolFlagsClass) == 0 {
+		t.Fatalf("instance type symbol flags = %d, want class flag %d", symbolInfo.Flags, ast.SymbolFlagsClass)
 	}
 }
 

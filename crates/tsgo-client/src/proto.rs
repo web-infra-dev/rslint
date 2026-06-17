@@ -74,6 +74,8 @@ pub struct SymbolData {
 pub struct TypeData {
     pub id: u32,
     pub flags: u32,
+    #[serde(default)]
+    pub symbol: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

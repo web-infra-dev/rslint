@@ -50,8 +50,9 @@ type FuncSignature struct {
 	Result checker.TypeId `json:"result"`
 }
 type TypeInfo struct {
-	Id    checker.TypeId `json:"id"`
-	Flags int            `json:"flags"`
+	Id     checker.TypeId `json:"id"`
+	Flags  int            `json:"flags"`
+	Symbol ast.SymbolId   `json:"symbol,omitempty"`
 }
 type SymbolTable = map[NodeReference]SymbolInfo
 type TypeTable = map[NodeReference]TypeInfo
@@ -176,16 +177,41 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		}
 	}
 
+	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
+		if symbol == nil {
+			return 0
+		}
+
+		symID := ast.GetSymbolId(symbol)
+		declRef := nodeReference(symbol.ValueDeclaration)
+
+		semantic.Symtab[symID] = SymbolInfo{
+			Id:         symID,
+			Name:       sanitizeSymbolName(symbol.Name),
+			Flags:      int(symbol.Flags),
+			CheckFlags: int(symbol.CheckFlags),
+			Decl:       declRef,
+		}
+
+		return symID
+	}
+
 	recordType := func(ty *checker.Type) checker.TypeId {
 		if ty == nil {
 			return 0
 		}
 
 		typeID := ty.Id()
+		var symbolID ast.SymbolId
+		if symbol := ty.Symbol(); symbol != nil {
+			symbolID = recordSymbolInfo(symbol)
+		}
+
 		if _, exists := semantic.Typetab[typeID]; !exists {
 			semantic.Typetab[typeID] = TypeInfo{
-				Id:    typeID,
-				Flags: int(ty.Flags()),
+				Id:     typeID,
+				Flags:  int(ty.Flags()),
+				Symbol: symbolID,
 			}
 			semantic.TypeExtra.Name[int(typeID)] = []byte(tc.TypeToString(ty))
 			callSignatures := tc.GetCallSignatures(ty)
@@ -201,6 +227,12 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				semantic.TypeExtra.Func[int(typeID)] = FunctionData{
 					Signatures: signatures,
 				}
+			}
+		} else if symbolID != 0 {
+			typeInfo := semantic.Typetab[typeID]
+			if typeInfo.Symbol == 0 {
+				typeInfo.Symbol = symbolID
+				semantic.Typetab[typeID] = typeInfo
 			}
 		}
 
@@ -233,17 +265,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 
 				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
 					typeID := recordType(ty)
-					sym_id := ast.GetSymbolId(symbol)
-
-					declRef := nodeReference(symbol.ValueDeclaration)
-
-					semantic.Symtab[sym_id] = SymbolInfo{
-						Id:         sym_id,
-						Name:       sanitizeSymbolName(symbol.Name),
-						Flags:      int(symbol.Flags),
-						CheckFlags: int(symbol.CheckFlags),
-						Decl:       declRef,
-					}
+					sym_id := recordSymbolInfo(symbol)
 					semantic.Sym2type[sym_id] = typeID
 					(semantic.Node2sym)[key] = sym_id
 					semantic.Node2type[key] = typeID
@@ -251,7 +273,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					// Resolve alias symbol if this is an alias
 					if symbol.Flags&ast.SymbolFlagsAlias != 0 {
 						if aliasedSymbol := getAliasedSymbol(tc, symbol); aliasedSymbol != nil {
-							aliased_id := ast.GetSymbolId(aliasedSymbol)
+							aliased_id := recordSymbolInfo(aliasedSymbol)
 							if aliased_id != sym_id {
 								semantic.AliasSymbols[sym_id] = aliased_id
 							}
@@ -271,16 +293,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				if _, exists := semantic.Symtab[value_sym_id]; !exists {
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
-
-						declRef := nodeReference(valueSymbol.ValueDeclaration)
-
-						semantic.Symtab[value_sym_id] = SymbolInfo{
-							Id:         value_sym_id,
-							Name:       sanitizeSymbolName(valueSymbol.Name),
-							Flags:      int(valueSymbol.Flags),
-							CheckFlags: int(valueSymbol.CheckFlags),
-							Decl:       declRef,
-						}
+						recordSymbolInfo(valueSymbol)
 						semantic.Sym2type[value_sym_id] = typeID
 					}
 				}
