@@ -198,6 +198,7 @@ func TestSemanticSnapshot_ElementAccess(t *testing.T) {
 
 func TestSemanticTypeInfo_ClassInstanceKeepsClassSymbol(t *testing.T) {
 	fixture := buildSemanticFixture(t, `class A {
+    field = 1;
     foo() {}
 }
 interface ALike {
@@ -239,6 +240,23 @@ function main() {
 	}
 	if symbolInfo.Flags&int(ast.SymbolFlagsClass) == 0 {
 		t.Fatalf("instance type symbol flags = %d, want class flag %d", symbolInfo.Flags, ast.SymbolFlagsClass)
+	}
+
+	memberNames := map[string]SymbolInfo{}
+	for _, memberID := range symbolInfo.Members {
+		memberInfo, ok := fixture.semantic.Symtab[memberID]
+		if !ok {
+			t.Fatalf("class member symbol id %d not found in symtab", memberID)
+		}
+		memberNames[string(memberInfo.Name)] = memberInfo
+	}
+
+	fieldInfo, ok := memberNames["field"]
+	if !ok {
+		t.Fatalf("class symbol members = %v, want member %q", memberNames, "field")
+	}
+	if fieldInfo.Flags&int(ast.SymbolFlagsProperty) == 0 {
+		t.Fatalf("field symbol flags = %d, want property flag %d", fieldInfo.Flags, ast.SymbolFlagsProperty)
 	}
 }
 

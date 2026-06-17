@@ -67,6 +67,8 @@ pub struct SymbolData {
     pub flags: u32,
     pub check_flags: u32,
     #[serde(default)]
+    pub members: Vec<u32>,
+    #[serde(default)]
     pub decl: Option<NodeReference>,
 }
 

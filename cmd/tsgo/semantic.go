@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"sort"
 	"strings"
 	_ "unsafe"
 
@@ -32,10 +33,11 @@ type NodeReference struct {
 	End          int          `json:"end"`
 }
 type SymbolInfo struct {
-	Id         ast.SymbolId `json:"id"`
-	Name       CString      `json:"name"`
-	Flags      int          `json:"flags"`
-	CheckFlags int          `json:"check_flags"`
+	Id         ast.SymbolId   `json:"id"`
+	Name       CString        `json:"name"`
+	Flags      int            `json:"flags"`
+	CheckFlags int            `json:"check_flags"`
+	Members    []ast.SymbolId `json:"members,omitempty"`
 	// Declaration node reference (if available)
 	Decl *NodeReference `json:"decl,omitempty"`
 }
@@ -177,19 +179,41 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		}
 	}
 
-	recordSymbolInfo := func(symbol *ast.Symbol) ast.SymbolId {
+	recordingSymbols := map[ast.SymbolId]bool{}
+	var recordSymbolInfo func(symbol *ast.Symbol) ast.SymbolId
+	recordSymbolInfo = func(symbol *ast.Symbol) ast.SymbolId {
 		if symbol == nil {
 			return 0
 		}
 
 		symID := ast.GetSymbolId(symbol)
+		if recordingSymbols[symID] {
+			return symID
+		}
+		recordingSymbols[symID] = true
+		defer delete(recordingSymbols, symID)
+
 		declRef := nodeReference(symbol.ValueDeclaration)
+		var members []ast.SymbolId
+		if len(symbol.Members) > 0 {
+			members = make([]ast.SymbolId, 0, len(symbol.Members))
+			for _, member := range symbol.Members {
+				memberID := recordSymbolInfo(member)
+				if memberID != 0 {
+					members = append(members, memberID)
+				}
+			}
+			sort.Slice(members, func(i, j int) bool {
+				return members[i] < members[j]
+			})
+		}
 
 		semantic.Symtab[symID] = SymbolInfo{
 			Id:         symID,
 			Name:       sanitizeSymbolName(symbol.Name),
 			Flags:      int(symbol.Flags),
 			CheckFlags: int(symbol.CheckFlags),
+			Members:    members,
 			Decl:       declRef,
 		}
 
