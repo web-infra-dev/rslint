@@ -172,6 +172,62 @@ fn test_fixture_structure() {
     assert!(shorthand_ts.exists(), "shorthand.ts should exist");
 }
 
+#[test]
+fn test_type_data_includes_symbol() {
+    let tsgo_path = get_tsgo_path().expect(
+        "Could not find tsgo executable. \
+         Please build tsgo first or ensure it's in your PATH.",
+    );
+
+    let fixture_dir = get_fixtures_dir().join("simple-project");
+    let config_file = fixture_dir.join("tsconfig.json");
+
+    let options = Options {
+        cwd: Some(fixture_dir.clone()),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+
+    let uninitialized_client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+
+    let api =
+        Api::with_uninitialized_client(uninitialized_client).expect("Failed to initialize API");
+
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+
+    let semantic = &project.semantic;
+    let calculator_symbol_ids = semantic
+        .symtab
+        .iter()
+        .filter_map(|(symbol_id, symbol_data)| {
+            let name = String::from_utf8_lossy(&symbol_data.name);
+            let flags = SymbolFlags::from_bits_truncate(symbol_data.flags);
+            (name == "Calculator" && flags.contains(SymbolFlags::CLASS)).then_some(*symbol_id)
+        })
+        .collect::<Vec<_>>();
+
+    assert!(
+        !calculator_symbol_ids.is_empty(),
+        "Expected class symbol for Calculator in symbol table"
+    );
+
+    let has_calculator_type_symbol = semantic.typetab.iter().any(|(_, type_data)| {
+        type_data
+            .symbol
+            .is_some_and(|symbol_id| calculator_symbol_ids.contains(&symbol_id))
+    });
+
+    assert!(
+        has_calculator_type_symbol,
+        "Expected at least one type entry to reference the Calculator symbol"
+    );
+}
+
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 struct ShorthandSymbolMapping {
     source_node_span: String,
