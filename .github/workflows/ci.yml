@@ -150,7 +150,15 @@ jobs:
         run: pnpm format:check
 
       - name: Build
+        if: runner.os != 'Windows'
         run: pnpm run build
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p "$GOTMPDIR"
+          pnpm run build
         env:
           GOTMPDIR: ${{ github.workspace }}/.gotmpdir
 
