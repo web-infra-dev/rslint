@@ -1,6 +1,6 @@
 {
   "name": "@rslint/native-win32-arm64-msvc",
-  "version": "0.6.1",
+  "version": "0.6.2-canary.1781671243",
   "license": "MIT",
   "description": "rslint native binaries for win32-arm64-msvc",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
