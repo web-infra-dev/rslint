@@ -153,11 +153,9 @@ jobs:
       - name: Setup Tmpdir (Windows)
         if: runner.os == 'Windows'
         shell: bash
-        run: |
-          mkdir -p "$TMPDIR"
-          echo "GOTMPDIR=$TMPDIR" >> "$GITHUB_ENV"
+        run: mkdir -p "$GOTMPDIR" && go env -w GOTMPDIR="$GOTMPDIR"
         env:
-          TMPDIR: ${{ github.workspace }}/.gotmpdir
+          GOTMPDIR: ${{ github.workspace }}/.gotmpdir
 
       - name: Build
         run: pnpm run build
