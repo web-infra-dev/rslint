@@ -27,7 +27,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [rspack-ubuntu-22.04-large, rspack-darwin-14-medium, rspack-windows-2022-large]
+        runner:
+          - rspack-ubuntu-22.04-large
+          - rspack-darwin-14-medium
+          - rspack-windows-2022-large
         go-version: ['1.26.0']
     steps:
       - name: Checkout code
