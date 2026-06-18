@@ -164,6 +164,23 @@ func runMain() int {
 		log.Printf("error creating program: %v", err)
 		return 1
 	}
+	sourceFiles := program.GetSourceFiles()
+	for _, file := range sourceFiles {
+		sourceFile := file.AsSourceFile()
+		// Workaround for https://github.com/microsoft/typescript-go/issues/4358:
+		// SourceFile.ContainsNonASCII is scanner-derived and can miss non-ASCII
+		// bytes skipped by scanner fast paths, such as simple string literals.
+		// Recompute it from the full source text before any position map can be
+		// cached, so encoder offsets are reliably converted from UTF-8 to UTF-16.
+		sourceFile.ContainsNonASCII = false
+		sourceText := sourceFile.Text()
+		for i := 0; i < len(sourceText); i++ {
+			if sourceText[i] >= 0x80 {
+				sourceFile.ContainsNonASCII = true
+				break
+			}
+		}
+	}
 	diagnostics := compiler.GetDiagnosticsOfAnyProgram(context.Background(), program, nil, false, func(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic {
 
 		diags := program.GetBindDiagnostics(ctx, file)
@@ -184,7 +201,6 @@ func runMain() int {
 
 	initPrimitiveTypes(tc, &checkResult.Semantic)
 	fileMap := make(map[string]int32)
-	sourceFiles := program.GetSourceFiles()
 	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
 	for sourcefileId, file := range sourceFiles {
 		sourceFileIds[file] = sourcefileId
