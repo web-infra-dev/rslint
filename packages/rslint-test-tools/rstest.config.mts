@@ -34,6 +34,7 @@ export default defineConfig({
     './tests/cli/js-config/eslint-plugin-conformance/stylistic/ts-types.test.ts',
     './tests/cli/js-config/eslint-plugin-conformance/simple-import-sort.test.ts',
     './tests/cli/js-config/eslint-plugin-conformance/eslint-comments.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/security.test.ts',
     './tests/cli/js-config/gitignore-integration.test.ts',
     './tests/cli/fix/cascade.test.ts',
     './tests/cli/fix/edge-cases.test.ts',
