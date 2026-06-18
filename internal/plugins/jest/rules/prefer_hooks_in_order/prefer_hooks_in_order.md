@@ -124,7 +124,7 @@ describe('foo', () => {
 
 ## Also See
 
-- [`prefer-hooks-on-top`](prefer_hooks_on_top.md) — require hooks before test cases in the same scope
+- [`prefer-hooks-on-top`](/rules/jest/prefer-hooks-on-top) — require hooks before test cases in the same scope
 
 ## Original Documentation
 
