@@ -75,6 +75,7 @@ export const ALIASES: Record<string, string> = {
   'eslint-plugin-simple-import-sort': 'sis',
   '@eslint-community/eslint-plugin-eslint-comments': 'ec',
   'eslint-plugin-security': 'sec',
+  'eslint-plugin-es-x': 'esx',
 };
 
 /** Resolve + dynamically import a plugin package's live default export. */
