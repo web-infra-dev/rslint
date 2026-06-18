@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@rslint/core": "workspace:*",
     "@rstest/core": "0.9.2",
     "@stylistic/eslint-plugin": "5.10.0",
@@ -22,6 +23,7 @@
     "@typescript-eslint/utils": "workspace:*",
     "eslint": "10.5.0",
     "eslint-plugin-promise": "7.3.0",
+    "eslint-plugin-security": "^4.0.1",
     "eslint-plugin-simple-import-sort": "^13.0.0",
     "eslint-plugin-sonarjs": "4.0.3",
     "eslint-plugin-unicorn": "64.0.0"
