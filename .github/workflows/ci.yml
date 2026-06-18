@@ -141,7 +141,6 @@ jobs:
         uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: ci-test-node-github
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
