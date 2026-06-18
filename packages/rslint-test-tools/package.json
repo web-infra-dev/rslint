@@ -22,6 +22,7 @@
     "@typescript-eslint/utils": "workspace:*",
     "eslint": "10.5.0",
     "eslint-plugin-promise": "7.3.0",
+    "eslint-plugin-simple-import-sort": "^13.0.0",
     "eslint-plugin-sonarjs": "4.0.3",
     "eslint-plugin-unicorn": "64.0.0"
   },
