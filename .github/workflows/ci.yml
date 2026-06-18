@@ -47,7 +47,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: ${{ matrix.runner == 'rspack-windows-2022-large' && 'ci-go-windows' || 'ci-test-go' }}
+          cache-name: ci-test-go
 
       - name: Unit Test
         if: matrix.runner != 'rspack-windows-2022-large'
