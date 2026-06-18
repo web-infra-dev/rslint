@@ -192,6 +192,9 @@ importers:
       eslint-plugin-promise:
         specifier: 7.3.0
         version: 7.3.0(eslint@10.5.0(jiti@2.6.1))
+      eslint-plugin-simple-import-sort:
+        specifier: ^13.0.0
+        version: 13.0.0(eslint@10.5.0(jiti@2.6.1))
       eslint-plugin-sonarjs:
         specifier: 4.0.3
         version: 4.0.3(eslint@10.5.0(jiti@2.6.1))
@@ -3658,6 +3661,11 @@ packages:
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     peerDependencies:
       eslint: ^7.0.0 || ^8.0.0 || ^9.0.0 || ^10.0.0
+
+  eslint-plugin-simple-import-sort@13.0.0:
+    resolution: {integrity: sha512-McAc+/Nlvcg4byY/CABGH8kqnefWBj8s3JA2okEtz8ixbECQgU46p0HkTUKa4YS7wvgGceimlc34p1nXqbWqtA==}
+    peerDependencies:
+      eslint: '>=5.0.0'
 
   eslint-plugin-sonarjs@4.0.3:
     resolution: {integrity: sha512-5drkJKLC9qQddIiaATV0e8+ygbUc7b0Ti6VB7M2d3jmKNh3X0RaiIJYTs3dr9xnlhlrxo+/s1FoO3Jgv6O/c7g==}
@@ -9273,6 +9281,10 @@ snapshots:
   eslint-plugin-promise@7.3.0(eslint@10.5.0(jiti@2.6.1)):
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.5.0(jiti@2.6.1))
+      eslint: 10.5.0(jiti@2.6.1)
+
+  eslint-plugin-simple-import-sort@13.0.0(eslint@10.5.0(jiti@2.6.1)):
+    dependencies:
       eslint: 10.5.0(jiti@2.6.1)
 
   eslint-plugin-sonarjs@4.0.3(eslint@10.5.0(jiti@2.6.1)):
