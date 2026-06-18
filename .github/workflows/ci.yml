@@ -129,11 +129,19 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup Go
+      - name: Setup Go (No GOCACHE)
+        if: runner.environment == 'self-hosted'
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-node
+
+      - name: Setup Go
+        if: runner.environment == 'github-hosted'
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-name: ci-test-node-github
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
