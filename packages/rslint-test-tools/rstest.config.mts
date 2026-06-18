@@ -49,6 +49,7 @@ export default defineConfig({
     './tests/cli/js-config/eslint-plugin-conformance/es-x/regexp.test.ts',
     './tests/cli/js-config/eslint-plugin-conformance/es-x/string.test.ts',
     './tests/cli/js-config/eslint-plugin-conformance/es-x/syntax.test.ts',
+    './tests/cli/js-config/eslint-plugin-conformance/cypress.test.ts',
     './tests/cli/js-config/gitignore-integration.test.ts',
     './tests/cli/fix/cascade.test.ts',
     './tests/cli/fix/edge-cases.test.ts',

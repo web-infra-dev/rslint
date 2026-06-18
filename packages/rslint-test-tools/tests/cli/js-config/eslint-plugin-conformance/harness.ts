@@ -76,6 +76,7 @@ export const ALIASES: Record<string, string> = {
   '@eslint-community/eslint-plugin-eslint-comments': 'ec',
   'eslint-plugin-security': 'sec',
   'eslint-plugin-es-x': 'esx',
+  'eslint-plugin-cypress': 'cy',
 };
 
 /** Resolve + dynamically import a plugin package's live default export. */
