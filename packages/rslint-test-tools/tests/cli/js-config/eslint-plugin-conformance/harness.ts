@@ -77,6 +77,7 @@ export const ALIASES: Record<string, string> = {
   'eslint-plugin-security': 'sec',
   'eslint-plugin-es-x': 'esx',
   'eslint-plugin-cypress': 'cy',
+  'eslint-plugin-playwright': 'pw',
 };
 
 /** Resolve + dynamically import a plugin package's live default export. */
