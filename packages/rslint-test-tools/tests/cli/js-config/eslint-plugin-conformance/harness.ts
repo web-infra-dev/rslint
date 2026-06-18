@@ -73,6 +73,7 @@ export const ALIASES: Record<string, string> = {
   'eslint-plugin-promise': 'p',
   '@stylistic/eslint-plugin': 'st',
   'eslint-plugin-simple-import-sort': 'sis',
+  '@eslint-community/eslint-plugin-eslint-comments': 'ec',
 };
 
 /** Resolve + dynamically import a plugin package's live default export. */
