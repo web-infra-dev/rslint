@@ -82,6 +82,7 @@ export interface ESTreeNode {
 export interface SourceCode {
   text: string;
   ast: ESTreeNode;
+  isESTree: boolean;
   lines: string[];
   hasBOM: boolean;
   scopeManager: unknown;
@@ -576,6 +577,12 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
   const sc: SourceCode = {
     text,
     ast,
+    // ESLint sets `isESTree = (ast.type === "Program")` on ESTree-backed
+    // SourceCode (eslint/lib/languages/js/source-code/source-code.js:316).
+    // Stylistic's `indent` rule (alone among the 97 rules) guards
+    // `if (!isESTreeSourceCode(...)) return {}` and would otherwise register
+    // zero listeners under rslint. Mirror ESLint's exact predicate.
+    isESTree: ast.type === 'Program',
     get lines(): string[] {
       // ESLint splits on ALL ECMAScript line terminators (LF, CR, CRLF,
       // U+2028, U+2029) — see `LINE_TERMINATOR_RE`. Splitting on `\n`
