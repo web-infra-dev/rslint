@@ -1,6 +1,5 @@
 package rule
 
-// cache-bust
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
