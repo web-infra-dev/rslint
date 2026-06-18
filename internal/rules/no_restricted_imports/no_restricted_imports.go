@@ -309,14 +309,12 @@ func BuildAllowTypeImportSourceFilter(options any) func(source string) bool {
 func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, patternGroups []restrictedPatternGroup) {
 	groupedPaths = make(map[string][]restrictedPathEntry)
 
-	// Handle the case where the config parser unwraps a single-element array,
-	// delivering a map directly instead of [map]. Wrap it back into an array.
-	if obj, ok := options.(map[string]interface{}); ok {
-		options = []interface{}{obj}
-	}
-
-	arr, ok := options.([]interface{})
-	if !ok || len(arr) == 0 {
+	// config.rules unwraps a single configured option to a bare value — a map
+	// for an object option, or a string for a string option such as
+	// ["error","import1"]. NormalizeOptions re-wraps either into eslint
+	// context.options form so each arrives uniformly as arr[0].
+	arr := rule.NormalizeOptions(options)
+	if len(arr) == 0 {
 		return groupedPaths, patternGroups
 	}
 

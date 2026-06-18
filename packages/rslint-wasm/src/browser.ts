@@ -5,7 +5,7 @@ import type {
   RSlintOptions,
   PendingMessage,
   IpcMessage,
-} from './types.js';
+} from '@rslint/core/service';
 
 /**
  * Browser implementation of RslintService using web workers

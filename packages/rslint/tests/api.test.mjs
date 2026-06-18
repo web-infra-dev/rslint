@@ -1,23 +1,33 @@
-import { lint, applyFixes } from '@rslint/core';
+import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
-import { RemoteSourceFile, Node } from '@rslint/api';
+import { RemoteSourceFile } from '@rslint/api';
+
+// rslint's Node API takes a config OBJECT (Go never reads config from disk, and
+// there is no separate ruleOptions surface). A single-rule config keeps each
+// test scoped to the rule under test.
+const cfg = (project, rule) => [
+  {
+    files: ['**/*.ts'],
+    languageOptions: { parserOptions: { project: [project] } },
+    rules: { [rule]: 'error' },
+    plugins: ['@typescript-eslint'],
+  },
+];
 
 describe('lint api', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
   test('virtual file support', async (t) => {
-    let config = path.resolve(
-      import.meta.dirname,
-      '../fixtures/rslint.virtual.json',
+    let config = cfg(
+      './tsconfig.virtual.json',
+      '@typescript-eslint/no-unsafe-member-access',
     );
     let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
     // Use virtual file contents instead of reading from disk
     const diags = await lint({
       config,
+      configDirectory: cwd,
       workingDirectory: cwd,
-      ruleOptions: {
-        '@typescript-eslint/no-unsafe-member-access': 'error',
-      },
       fileContents: {
         [virtual_entry]: `
                     let a:any = 10;
@@ -29,89 +39,68 @@ describe('lint api', async (t) => {
     expect(diags).toMatchSnapshot();
   });
   test('diag snapshot', async (t) => {
-    let config = path.resolve(import.meta.dirname, '../fixtures/rslint.json');
+    let config = cfg(
+      './tsconfig.json',
+      '@typescript-eslint/no-unsafe-member-access',
+    );
     const diags = await lint({
       config,
+      configDirectory: cwd,
       workingDirectory: cwd,
-      ruleOptions: {
-        '@typescript-eslint/no-unsafe-member-access': 'error',
-      },
     });
     expect(diags).toMatchSnapshot();
   });
 
   test('explicit files filter limits lint scope', async () => {
-    const config = path.resolve(import.meta.dirname, '../fixtures/rslint.json');
+    const config = cfg(
+      './tsconfig.json',
+      '@typescript-eslint/no-unsafe-member-access',
+    );
     const targetFile = path.resolve(cwd, 'src/index.ts');
     const diags = await lint({
       config,
       files: [targetFile],
-      ruleOptions: {
-        '@typescript-eslint/no-unsafe-member-access': 'error',
-      },
+      configDirectory: cwd,
       workingDirectory: cwd,
     });
 
     expect(diags.fileCount).toBe(1);
-    expect(diags.diagnostics.length).toBeGreaterThan(0);
+    expect(diags.diagnostics.length).toBe(2);
     expect(new Set(diags.diagnostics.map((diag) => diag.filePath))).toEqual(
       new Set(['src/index.ts']),
     );
   });
 });
 
-describe('applyFixes api', async (t) => {
+describe('lint fix:true', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
 
-  test('apply fixes with real diagnostics', async (t) => {
-    // Since the linter isn't working as expected, let's simulate what real diagnostics would look like
-    // This test simulates the scenario where we have diagnostics from a previous lint operation
-    let config = path.resolve(
-      import.meta.dirname,
-      '../fixtures/rslint.virtual.json',
+  test('fix:true returns fixed output in-band', async (t) => {
+    let config = cfg(
+      './tsconfig.virtual.json',
+      '@typescript-eslint/array-type',
     );
     let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
-    const fileContent = `let x: string = "hello";
-const y = x as string;`;
+    const fileContent = `let a: Array<string> = [];`;
 
     const diags = await lint({
       config,
+      configDirectory: cwd,
       workingDirectory: cwd,
-      ruleOptions: {
-        '@typescript-eslint/no-unnecessary-type-assertion': 'error',
-      },
       fileContents: {
         [virtual_entry]: fileContent,
       },
+      fix: true,
     });
 
-    // Check if we have diagnostics with fixes
-    if (!diags.diagnostics || diags.diagnostics.length === 0) {
-      console.log('No diagnostics found, skipping test');
-      return;
-    }
-
-    // Filter diagnostics that have fixes
-    const diagnosticsWithFixes = diags.diagnostics.filter(
-      (d) => d.fixes && d.fixes.length > 0,
-    );
-    if (diagnosticsWithFixes.length === 0) {
-      console.log('No diagnostics with fixes found, skipping test');
-      return;
-    }
-
-    // Apply fixes using the diagnostics with fixes
-    const result = await applyFixes({
-      fileContent,
-      diagnostics: diagnosticsWithFixes,
-    });
-    // The result should show that fixes were attempted
-    expect(result.fixedContent).toBeDefined();
-    expect(result.appliedCount).toBeGreaterThanOrEqual(0);
-    expect(result.unappliedCount).toBeGreaterThanOrEqual(0);
+    // fix:true applies fixes in-band and returns the fixed source per file in
+    // `output` (array-type rewrites `Array<string>` → `string[]`); the fix is
+    // not written to disk.
+    expect(diags.output).toBeDefined();
+    expect(diags.fixableErrorCount).toBe(1);
     expect({
       input: fileContent,
-      output: result.fixedContent,
+      output: diags.output,
     }).toMatchSnapshot();
   });
 });
@@ -122,14 +111,12 @@ describe('encoded source files', async (t) => {
   const fileContent = `let x: string = "hello";const y = x as string;`;
   test('encoded source files', async (t) => {
     const diags = await lint({
-      config: path.resolve(
-        import.meta.dirname,
-        '../fixtures/rslint.virtual.json',
+      config: cfg(
+        './tsconfig.virtual.json',
+        '@typescript-eslint/no-unnecessary-type-assertion',
       ),
+      configDirectory: cwd,
       workingDirectory: cwd,
-      ruleOptions: {
-        '@typescript-eslint/no-unnecessary-type-assertion': 'error',
-      },
       includeEncodedSourceFiles: true,
       fileContents: {
         [virtual_entry]: fileContent,

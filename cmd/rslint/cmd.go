@@ -1192,68 +1192,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// --- Gap file discovery and fallback Program ---
 	// Discover files that match config `files` patterns but are not in any
 	// tsconfig Program. These "gap" files get a fallback Program (AST-only,
-	// no type info) and only run non-type-aware rules.
-	var typeInfoFiles map[string]struct{}
-	var capturedGapFiles []string // retained for --fix rebuild
-	fallbackProgramIndex := -1    // index of the gap-file fallback program (if any) within `programs`
-
-	{
-		programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
-
-		var gapFiles []string
-		if configMap != nil {
-			gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded)
-		} else {
-			gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded)
-		}
-
-		// CLI file args bypass config `files` patterns (ESLint behavior):
-		// if a user explicitly passes a file, lint it even if no config entry
-		// has a matching `files` pattern.
-		if gapFiles != nil && len(allowFiles) > 0 {
-			gapSet := make(map[string]struct{}, len(gapFiles))
-			for _, f := range gapFiles {
-				gapSet[f] = struct{}{}
-			}
-			for _, f := range allowFiles {
-				nf := tspath.NormalizePath(f)
-				if _, inProgram := programFiles[nf]; inProgram {
-					continue
-				}
-				if _, alreadyGap := gapSet[nf]; alreadyGap {
-					continue
-				}
-				// Check if config would assign any rules to this file.
-				var merged *rslintconfig.MergedConfig
-				if configMap != nil {
-					cfgDir, cfg := rslintconfig.FindNearestConfig(nf, configMap)
-					if cfg != nil {
-						merged = cfg.GetConfigForFile(nf, cfgDir)
-					}
-				} else {
-					merged = rslintConfig.GetConfigForFile(nf, currentDirectory)
-				}
-				if merged != nil {
-					gapFiles = append(gapFiles, nf)
-				}
-			}
-		}
-
-		if gapFiles != nil {
-			// Build type-info set from existing (tsconfig) Programs BEFORE
-			// appending the fallback, so fallback files are NOT in this set.
-			typeInfoFiles = utils.CollectProgramFiles(programs, fs, singleThreaded)
-			capturedGapFiles = gapFiles
-
-			if len(gapFiles) > 0 {
-				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs, parseCache)
-				if fallback != nil {
-					programs = append(programs, fallback)
-					fallbackProgramIndex = len(programs) - 1
-				}
-			}
-		}
-	}
+	// no type info) and only run non-type-aware rules. Shared verbatim with
+	// the --api path (HandleLint) via buildProgramsWithGapFallback, so both
+	// resolve gap files, the fallback Program, and the type-info set (the
+	// type-aware gate's only input) identically. cwd == currentDirectory here
+	// (see above), so passing currentDirectory preserves prior behavior.
+	programs, typeInfoFiles, fallbackProgramIndex, capturedGapFiles := buildProgramsWithGapFallback(
+		programs, configMap, rslintConfig, currentDirectory, fs, allowFiles, allowDirs, parseCache, singleThreaded,
+	)
 
 	// Initial build (including the gap fallback) is complete: evict cache
 	// entries for files that ended up in no program — build-time dedup

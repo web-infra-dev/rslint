@@ -2,14 +2,14 @@ import type {
   RslintServiceInterface as RslintServiceBackend,
   LintOptions,
   LintResponse,
-  ApplyFixesRequest,
-  ApplyFixesResponse,
   GetAstInfoRequest,
   GetAstInfoResponse,
-} from './types.js';
+} from '../types.js';
 
 /**
- * Main RslintService class that automatically uses the appropriate implementation
+ * Environment-agnostic RslintService facade: drives the handshake +
+ * lint / getAstInfo / close protocol over a backend (NodeRslintService or
+ * BrowserRslintService) supplied by the caller.
  */
 export class RSLintService {
   private readonly service: RslintServiceBackend;
@@ -25,11 +25,11 @@ export class RSLintService {
     const {
       files,
       config,
+      configDirectory,
       workingDirectory,
-      ruleOptions,
       fileContents,
-      languageOptions,
       includeEncodedSourceFiles,
+      fix,
     } = options;
 
     // Send handshake
@@ -39,28 +39,11 @@ export class RSLintService {
     return this.service.sendMessage('lint', {
       files,
       config,
+      configDirectory,
       workingDirectory,
-      ruleOptions,
       fileContents,
-      languageOptions,
       includeEncodedSourceFiles,
-      format: 'jsonline',
-    });
-  }
-
-  /**
-   * Apply fixes to a file based on diagnostics
-   */
-  async applyFixes(options: ApplyFixesRequest): Promise<ApplyFixesResponse> {
-    const { fileContent, diagnostics } = options;
-
-    // Send handshake
-    await this.service.sendMessage('handshake', { version: '1.0.0' });
-
-    // Send apply fixes request
-    return this.service.sendMessage('applyFixes', {
-      fileContent,
-      diagnostics,
+      fix,
     });
   }
 
@@ -98,12 +81,17 @@ export class RSLintService {
    * Close the service
    */
   async close(): Promise<void> {
-    return new Promise((resolve) => {
-      this.service.sendMessage('exit', {}).finally(() => {
-        this.service.terminate();
-        resolve();
-      });
-    });
+    // Ask the peer to exit, then tear down regardless. The peer may exit before
+    // its ack frame is read; the exit handler resolves the pending on that
+    // expected path, but swallow any rejection too (defensive — e.g. the
+    // process was already dead) so a floating promise can't become an
+    // unhandledRejection.
+    try {
+      await this.service.sendMessage('exit', {});
+    } catch {
+      // peer already gone — expected during close
+    }
+    this.service.terminate();
   }
 }
 
@@ -112,12 +100,10 @@ export type {
   Diagnostic,
   LintOptions,
   LintResponse,
-  ApplyFixesRequest,
-  ApplyFixesResponse,
-  LanguageOptions,
-  ParserOptions,
   RSlintOptions,
   RslintServiceInterface,
+  PendingMessage,
+  IpcMessage,
   // AST Info types
   GetAstInfoRequest,
   GetAstInfoResponse,
@@ -130,4 +116,4 @@ export type {
   TypeParamInfo,
   IndexInfo,
   TypePredicateInfo,
-} from './types.js';
+} from '../types.js';

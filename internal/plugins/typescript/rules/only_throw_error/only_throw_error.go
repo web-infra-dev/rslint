@@ -138,8 +138,9 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 		opts, ok := options.(OnlyThrowErrorOptions)
 		if !ok {
 			opts = OnlyThrowErrorOptions{}
-			// When options come from JSON (API/TS tests), they arrive as []interface{}
-			if optionsArray, arrayOk := options.([]interface{}); arrayOk && len(optionsArray) > 0 {
+			// When options come from JSON (API/TS tests), they arrive as []interface{};
+			// NormalizeOptions also re-wraps config.rules' unwrapped single option.
+			if optionsArray := rule.NormalizeOptions(options); len(optionsArray) > 0 {
 				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
 					json.Unmarshal(optsJSON, &opts)
 				}

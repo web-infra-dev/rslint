@@ -590,3 +590,9 @@ acked
 backgrounded
 resolv
 unref
+acking
+multifile
+outputfixes
+pendings
+relskip
+ruleopts

@@ -21,8 +21,8 @@ func parseOptions(raw any) options {
 		return opts
 	}
 
-	optArray, ok := raw.([]interface{})
-	if !ok || len(optArray) == 0 {
+	optArray := rule.NormalizeOptions(raw)
+	if len(optArray) == 0 {
 		return opts
 	}
 

@@ -7,7 +7,7 @@ import {
   findJSConfigsInDir,
   JS_CONFIG_FILES,
 } from '../src/utils/config-discovery.js';
-import type { RslintConfigEntry } from '../src/define-config.js';
+import type { RslintConfigEntry } from '../src/config/define-config.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';

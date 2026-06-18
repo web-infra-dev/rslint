@@ -12,8 +12,8 @@
  * Exit codes propagate from the Go child (or 2 on a host-level failure).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
-import { IpcClient } from './ipc/index.js';
-import type { IpcMessage } from './ipc/index.js';
+import { IpcClient } from '../ipc/index.js';
+import type { IpcMessage } from '../ipc/index.js';
 
 // POSIX: a process killed by signal N exits 128+N. Node reports the signal
 // NAME, so map the ones we can receive; collapsing all to 130 would mislabel
