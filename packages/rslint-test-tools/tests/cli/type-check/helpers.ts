@@ -75,12 +75,16 @@ export async function addUntypedPackage(
  * - Replace timing/thread info in summary line
  */
 export function normalizeOutput(output: string, tempDir: string): string {
-  const privateTempDir = `/private${tempDir}`;
+  // Diagnostic output always uses forward slashes, even on Windows where
+  // tempDir (from fs.mkdtemp) uses backslashes, so compare using a
+  // posix-style form of tempDir rather than the raw path.
+  const posixTempDir = tempDir.replace(/\\/g, '/');
+  const privateTempDir = `/private${posixTempDir}`;
   let result = output;
-  if (privateTempDir.length > tempDir.length) {
+  if (privateTempDir.length > posixTempDir.length) {
     result = result.replaceAll(privateTempDir, '<TEMPDIR>');
   }
-  result = result.replaceAll(tempDir, '<TEMPDIR>');
+  result = result.replaceAll(posixTempDir, '<TEMPDIR>');
   // macOS: relative paths through /private/tmp symlink
   result = result.replace(
     /(?:\.\.\/)+private\/tmp\/rslint-typecheck-[^\s/)]+/g,
@@ -90,14 +94,15 @@ export function normalizeOutput(output: string, tempDir: string): string {
     /(?:\.\.\/)+tmp\/rslint-typecheck-[^\s/)]+/g,
     '<TEMPDIR>',
   );
-  // Windows: absolute paths with possible 8.3 short names (e.g. RUNNER~1)
+  // Windows: absolute paths with possible 8.3 short names (e.g. RUNNER~1),
+  // regardless of which directory %TEMP%/%TMP% points to on the runner
   result = result.replace(
-    /[A-Z]:\/Users\/[^/]+\/AppData\/Local\/Temp\/rslint-typecheck-[^\s/)]+/g,
+    /[A-Z]:\/(?:[^\s/)]+\/)*rslint-typecheck-[^\s/)]+/g,
     '<TEMPDIR>',
   );
   // Windows: relative paths through 8.3 short name directories
   result = result.replace(
-    /(?:\.\.\/)+[^/]+\/AppData\/Local\/Temp\/rslint-typecheck-[^\s/)]+/g,
+    /(?:\.\.\/)+(?:[^\s/)]+\/)*rslint-typecheck-[^\s/)]+/g,
     '<TEMPDIR>',
   );
   result = result.replace(
