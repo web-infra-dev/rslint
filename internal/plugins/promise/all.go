@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_new_statics"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/no_return_wrap"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/param_names"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/rules/valid_params"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -22,5 +23,6 @@ func GetAllRules() []rule.Rule {
 		no_new_statics.NoNewStaticsRule,
 		no_return_wrap.NoReturnWrapRule,
 		param_names.ParamNamesRule,
+		valid_params.ValidParamsRule,
 	}
 }
