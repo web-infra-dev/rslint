@@ -246,8 +246,16 @@ jobs:
           name: ci-test-rslint-windows-amd64
           path: npm/rslint/win32-x64-msvc
 
+      # build:js only - skip @rslint/core's build:bin, which invokes `go
+      # build` directly. The host rslint.exe was already built on the
+      # self-hosted Windows runner and downloaded above; this job has no Go
+      # toolchain set up and shouldn't need one.
       - name: Build
-        run: pnpm -r --filter=rslint... build
+        shell: bash
+        run: |
+          pnpm --filter @rslint/api build
+          pnpm --filter @rslint/core run build:js
+          pnpm --filter rslint build
 
       - name: VSCode Test Cache
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
@@ -258,7 +266,7 @@ jobs:
             vscode-test-windows-
 
       - name: Test
-        run: pnpm -r --filter=rslint... test
+        run: pnpm --filter rslint test
 
   test-wasm:
     name: Test WASM
