@@ -19,7 +19,7 @@
   "devDependencies": {
     "@rslib/core": "0.23.0",
     "@types/node": "24.3.0",
-    "@typescript/native-preview": "7.0.0-dev.20260427.1"
+    "@typescript/native-preview": "7.0.0-dev.20260621.1"
   },
   "publishConfig": {
     "access": "public"
