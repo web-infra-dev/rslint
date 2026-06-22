@@ -1,6 +1,6 @@
 {
   "name": "@rslint/api",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Rslint AST library",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -17,7 +17,7 @@
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {
-    "@rslib/core": "0.22.0",
+    "@rslib/core": "0.23.0",
     "@types/node": "24.3.0",
     "@typescript/native-preview": "7.0.0-dev.20260427.1"
   },

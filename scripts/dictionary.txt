@@ -585,3 +585,5 @@ pollable
 unpark
 acked
 backgrounded
+resolv
+unref
