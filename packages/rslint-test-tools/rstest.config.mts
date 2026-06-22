@@ -484,6 +484,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-each.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-equality-matcher.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-expect-resolves.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-hooks-in-order.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-hooks-on-top.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
