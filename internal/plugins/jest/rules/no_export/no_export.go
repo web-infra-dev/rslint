@@ -4,7 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintutils "github.com/web-infra-dev/rslint/internal/utils"
+	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildUnexpectedExportMessage() rule.RuleMessage {
@@ -22,12 +22,12 @@ func isModuleExportsMemberExpression(node *ast.Node, ctx rule.RuleContext) bool 
 	current := node
 	innermostProperty := ""
 	for utils.IsMemberAccessNode(current) {
-		property, ok := rslintutils.AccessExpressionStaticName(current)
+		property, ok := rslintUtils.AccessExpressionStaticName(current)
 		if !ok {
 			return false
 		}
 		innermostProperty = property
-		current = ast.SkipParentheses(rslintutils.AccessExpressionObject(current))
+		current = ast.SkipParentheses(rslintUtils.AccessExpressionObject(current))
 	}
 
 	if current == nil || current.Kind != ast.KindIdentifier ||
