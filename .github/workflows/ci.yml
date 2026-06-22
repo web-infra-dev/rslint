@@ -121,7 +121,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [rspack-ubuntu-22.04-large, windows-latest]
+        os: [rspack-ubuntu-22.04-large]
         go-version: ['1.26.0']
     steps:
       - name: Checkout code
@@ -129,18 +129,11 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup Go (No GOCACHE)
-        if: runner.environment == 'self-hosted'
+      - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-test-node
-
-      - name: Setup Go
-        if: runner.environment == 'github-hosted'
-        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
-        with:
-          go-version: ${{ matrix.go-version }}
 
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
@@ -153,30 +146,18 @@ jobs:
         run: pnpm --filter @rslint/native run build
 
       - name: Format
-        if: runner.os == 'Linux'
         run: pnpm format:check
-
-      # no free space in default tmpdir on windows-latest
-      - name: Setup Tmpdir (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: mkdir -p "$GOTMPDIR" && go env -w GOTMPDIR="$GOTMPDIR"
-        env:
-          GOTMPDIR: ${{ github.workspace }}/.gotmpdir
 
       - name: Build
         run: pnpm run build
 
       - name: Dogfooding
-        if: runner.os == 'Linux'
         run: pnpm run lint --format github
 
       - name: TypeCheck
-        if: runner.os == 'Linux'
         run: pnpm typecheck
 
-      - name: Install xvfb and dependencies (Linux only)
-        if: runner.os == 'Linux'
+      - name: Install xvfb and dependencies
         run: |
           sudo apt update
           sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
@@ -189,13 +170,95 @@ jobs:
           restore-keys: |
             vscode-test-${{ matrix.os }}-
 
-      - name: Test on Linux
-        if: runner.os == 'Linux'
+      - name: Test
         run: xvfb-run -a pnpm run test
 
-      - name: Test on non-Linux
-        if: runner.os != 'Linux'
-        run: pnpm run test
+  test-node-windows:
+    name: Test npm packages (rspack-windows-2022-large)
+    runs-on: rspack-windows-2022-large
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: true
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: ci-test-node-windows
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
+      # package; the worker loads it at test runtime.
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native run build
+
+      - name: Build rslint.exe
+        shell: pwsh
+        run: go build -o npm/rslint/win32-x64-msvc/rslint.exe ./cmd/rslint
+
+      # vscode-extension (package "rslint") is excluded here - it's tested on
+      # windows-latest instead, since the vscode-extension test does not run
+      # reliably on this self-hosted runner.
+      - name: Build
+        run: pnpm -r --filter=@rslint/test-tools... build
+
+      - name: Test
+        run: pnpm -r --filter=@rslint/test-tools... test
+
+      - name: Upload rslint.exe
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-test-rslint-windows-amd64
+          path: npm/rslint/win32-x64-msvc/rslint.exe
+          retention-days: 1
+          if-no-files-found: error
+
+  test-vscode-windows:
+    name: Test vscode-extension (windows-latest)
+    runs-on: windows-latest
+    needs: test-node-windows
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      # napi build drops the host (win32) .node into its @rslint/native-{tuple}
+      # package; the worker loads it at test runtime.
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+      - name: Build napi parser (native)
+        run: pnpm --filter @rslint/native run build
+
+      - name: Download rslint.exe
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ci-test-rslint-windows-amd64
+          path: npm/rslint/win32-x64-msvc
+
+      - name: Build
+        run: pnpm -r --filter=rslint... build
+
+      - name: VSCode Test Cache
+        uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
+        with:
+          path: packages/vscode-extension/.vscode-test
+          key: vscode-test-windows
+          restore-keys: |
+            vscode-test-windows-
+
+      - name: Test
+        run: pnpm -r --filter=rslint... test
 
   test-wasm:
     name: Test WASM
@@ -283,6 +346,8 @@ jobs:
     needs:
       - test-go
       - test-node
+      - test-node-windows
+      - test-vscode-windows
       - lint
       - test-wasm
       - test-rust
