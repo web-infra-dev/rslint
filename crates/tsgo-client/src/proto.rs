@@ -43,6 +43,8 @@ pub struct Semantic {
     pub node2sym: Vec<(NodeReference, u32)>,
     #[serde(deserialize_with = "vecmap")]
     pub node2type: Vec<(NodeReference, u32)>,
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub node_flags: Vec<(NodeReference, u32)>,
     pub type_extra: TypeExtra,
     pub primtypes: PrimTypes,
     // (aliasSymbolId, targetSymbolId)
