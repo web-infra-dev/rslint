@@ -92,9 +92,14 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
+	// Schema0 represents the declarative schema for validating the first options argument.
 	Schema0            Schema
+	// Schema1 represents the declarative schema for validating the second options argument (if any).
 	Schema1            Schema
+	// Run is the legacy, unvalidated rule execution callback. Receives the raw configuration object.
 	Run                func(ctx RuleContext, options any) RuleListeners
+	// RunWithOptions is the schema-driven rule execution callback. Receives parsed, validated,
+	// and default-hydrated options matching the declared schemas.
 	RunWithOptions   func(ctx RuleContext, options any) RuleListeners
 }
 

@@ -57,8 +57,9 @@ export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Rule-specific options object. Each rule defines its own shape; until per-rule
- * types are generated, options are accepted as an open record.
+ * Rule-specific options object. Each rule defines its own shape; for rules with
+ * declarative schemas, their specific options shapes are typed in RulesRecord,
+ * while other rules fallback to this open record.
  */
 export type RuleOptions = Record<string, any>;
 
@@ -66,9 +67,9 @@ export type RuleOptions = Record<string, any>;
  * Configuration value accepted for a single rule.
  *
  * - `RuleSeverity` — just toggle the rule.
- * - `[RuleSeverity, ...args]` — ESLint-style array form. Most rules take a
- *   single options object (`[severity, { ... }]`); some accept positional
- *   string/object args (`[severity, "always", { ... }]`).
+ * - `[RuleSeverity, T0?, T1?]` — ESLint-style array form. Most rules take a
+ *   single options object (`[severity, options]`); some accept positional
+ *   arguments (`[severity, option0, option1]`).
  * - `{ level, options }` — object form supported by the loader.
  */
 export type RuleEntry<T0 = never, T1 = never> =
@@ -77,8 +78,7 @@ export type RuleEntry<T0 = never, T1 = never> =
   | { level: RuleSeverity; options?: T0 };
 
 /**
- * Map of rule name → rule configuration. Rule names are `string` (no
- * enumeration of known rules yet); the value shape is what gives editors
+ * Map of rule name → rule configuration. The value shape is what gives editors
  * hints when typing the array or object form.
  */
 export interface RulesRecord {

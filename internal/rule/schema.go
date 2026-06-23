@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// Schema defines the interface for options validators. It supports validating
+// raw configuration maps/slices, applying default values, and exporting
+// TypeScript declarations for the generated TypeScript type definitions.
 type Schema interface {
 	Validate(raw any) (any, error)
 	TSType() string
