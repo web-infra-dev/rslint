@@ -8,7 +8,6 @@
     "noImplicitReturns": false,
     "noImplicitOverride": false,
     "rootDir": "../..",
-    "baseUrl": ".",
     // No source file in `src/**` references `#enums/*`. The mapping exists
     // purely so api-extractor (rslib's d.ts bundler) can resolve the Node
     // subpath imports inside transitively pulled `_packages/native-preview`
