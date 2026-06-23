@@ -8,10 +8,10 @@ import {
 } from './helpers';
 
 describe('CLI --fix multi-pass cascade', () => {
-  test('ban-types → no-inferrable-types fixed in single run', async () => {
+  test('no-wrapper-object-types → no-inferrable-types fixed in single run', async () => {
     const tempDir = await createFixTestDir(
       {
-        '@typescript-eslint/ban-types': 'error',
+        '@typescript-eslint/no-wrapper-object-types': 'error',
         '@typescript-eslint/no-inferrable-types': 'error',
       },
       {
@@ -25,7 +25,7 @@ describe('CLI --fix multi-pass cascade', () => {
       expect(result.exitCode).toBe(0);
 
       const content = await fs.readFile(path.join(tempDir, 'index.ts'), 'utf8');
-      // Pass 1: String → string, Number → number (ban-types)
+      // Pass 1: String → string, Number → number (no-wrapper-object-types)
       // Pass 2: `: string` removed, `: number` removed (no-inferrable-types)
       expect(content).not.toContain(': String');
       expect(content).not.toContain(': string');

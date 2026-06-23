@@ -256,11 +256,11 @@ export async function replaceAll(
 }
 
 /**
- * Run the on-save fixAll pipeline once with a tiny ban-types fixture so
+ * Run the on-save fixAll pipeline once with a tiny no-wrapper-object-types fixture so
  * subsequent tests that rely on `editor.codeActionsOnSave: { 'source.fixAll.rslint': 'explicit' }`
  * skip the first-trigger cold-start cost (VS Code wiring up the on-save
  * code-actions handler, the LSP `textDocument/codeAction` round-trip, the
- * workspace edit application). Best-effort: if ban-types doesn't fire (rule
+ * workspace edit application). Best-effort: if no-wrapper-object-types doesn't fire (rule
  * disabled / config not loaded yet) we silently no-op rather than failing
  * the suite — actual coverage lives in the real tests.
  *
@@ -280,7 +280,8 @@ export function prewarmOnSaveFixAll(): Promise<void> {
       "const _prewarmOnSave: String = 'x';\nexport { _prewarmOnSave };\n",
     );
     const diags = await waitForDiagnostics(doc);
-    if (!diags.some((d) => d.message.includes('ban-types'))) return;
+    if (!diags.some((d) => d.message.includes('no-wrapper-object-types')))
+      return;
     await doc.save();
     try {
       await waitForContentChange(
