@@ -164,7 +164,7 @@ func hasDeprecatedTagInSource(node *ast.Node) bool {
 		if variableDeclaration != nil && variableDeclaration.Name() != nil {
 			anchor = variableDeclaration.Name().Pos()
 		}
-		if declarationNode.Parent != nil && declarationNode.Parent.Parent != nil {
+		if declarationNode.Parent != nil && declarationNode.Parent.Kind == ast.KindVariableDeclarationList && declarationNode.Parent.Parent != nil {
 			declList := declarationNode.Parent.AsVariableDeclarationList()
 			if declList != nil && declList.Declarations != nil && len(declList.Declarations.Nodes) > 0 && declList.Declarations.Nodes[0] == declarationNode {
 				anchor = declarationNode.Parent.Parent.Pos()
