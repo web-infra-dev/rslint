@@ -248,7 +248,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/consistent-generic-constructors.test.ts',
     // './tests/typescript-eslint/rules/consistent-indexed-object-style.test.ts',
     // './tests/typescript-eslint/rules/consistent-return.test.ts',
-    // './tests/typescript-eslint/rules/consistent-type-assertions.test.ts',
+    './tests/typescript-eslint/rules/consistent-type-assertions.test.ts',
     './tests/typescript-eslint/rules/consistent-type-definitions.test.ts',
     // './tests/typescript-eslint/rules/consistent-type-exports.test.ts',
     // './tests/typescript-eslint/rules/consistent-type-imports.test.ts',
