@@ -393,8 +393,6 @@ function bar<T = F<string>>() {}
 bar();
       `,
 			},
-			// TODO(port): why do we need to report on `error` types?
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryTypeParameter",
