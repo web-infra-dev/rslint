@@ -108,6 +108,12 @@ var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 
 			// Just check the last one. Must specify previous type parameters if the last one is specified.
 			i := len(arguments.Nodes) - 1
+			// More type arguments than parameters is a type error in the source;
+			// upstream's `param?.default` short-circuits to undefined there, so bail
+			// out instead of indexing past the parameter list.
+			if i >= len(parameters) {
+				return
+			}
 			arg := arguments.Nodes[i]
 			param := parameters[i]
 
