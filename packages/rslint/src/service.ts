@@ -1,6 +1,7 @@
 import type {
   RslintServiceInterface as RslintServiceBackend,
   LintOptions,
+  LintTextOptions,
   LintResponse,
   ApplyFixesRequest,
   ApplyFixesResponse,
@@ -45,6 +46,25 @@ export class RSLintService {
       languageOptions,
       includeEncodedSourceFiles,
       format: 'jsonline',
+    });
+  }
+
+  /**
+   * Run the linter on an in-memory source string without writing to disk.
+   *
+   * Mirrors ESLint's `lintText`: the `code` is linted under a virtual
+   * `filePath` (default `virtual.tsx`) via the existing VFS `fileContents`
+   * plumbing. No file is ever written to disk.
+   */
+  async lintText(
+    code: string,
+    options: LintTextOptions = {},
+  ): Promise<LintResponse> {
+    const { filePath = 'virtual.tsx', ...rest } = options;
+    return this.lint({
+      ...rest,
+      files: [filePath],
+      fileContents: { [filePath]: code },
     });
   }
 
@@ -111,6 +131,7 @@ export class RSLintService {
 export type {
   Diagnostic,
   LintOptions,
+  LintTextOptions,
   LintResponse,
   ApplyFixesRequest,
   ApplyFixesResponse,

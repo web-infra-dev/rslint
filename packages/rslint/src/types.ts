@@ -40,6 +40,15 @@ export interface LintOptions {
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
 }
 
+export interface LintTextOptions {
+  filePath?: string; // Virtual path to lint the code under. Defaults to a virtual TSX name. Determines the parser (ts/tsx/js/jsx) by extension.
+  config?: string; // Path to rslint.json config file
+  workingDirectory?: string;
+  ruleOptions?: Record<string, string>;
+  languageOptions?: LanguageOptions; // Override languageOptions from config file
+  includeEncodedSourceFiles?: boolean;
+}
+
 export interface LanguageOptions {
   parserOptions?: ParserOptions;
 }

@@ -1,6 +1,7 @@
 import { NodeRslintService } from './node.js';
 import {
   LintOptions,
+  LintTextOptions,
   LintResponse,
   RSLintService,
   ApplyFixesRequest,
@@ -41,6 +42,25 @@ export async function lint(options: LintOptions): Promise<LintResponse> {
   return result;
 }
 
+// Convenience function for in-memory linting (no disk write), mirroring ESLint's lintText
+export async function lintText(
+  code: string,
+  options: LintTextOptions = {},
+): Promise<LintResponse> {
+  const service = new RSLintService(
+    new NodeRslintService({
+      workingDirectory: options.workingDirectory,
+    }),
+  );
+  let result: LintResponse;
+  try {
+    result = await service.lintText(code, options);
+  } finally {
+    await service.close();
+  }
+  return result;
+}
+
 // Convenience function for applying fixes
 export async function applyFixes(
   options: ApplyFixesRequest,
@@ -65,6 +85,7 @@ export async function getAstInfo(
 export {
   type Diagnostic,
   type LintOptions,
+  type LintTextOptions,
   type LintResponse,
   type ApplyFixesRequest,
   type ApplyFixesResponse,
