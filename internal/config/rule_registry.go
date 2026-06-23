@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"os"
 	"slices"
 	"strings"
 
@@ -64,16 +66,34 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				ruleConfigCopy := ruleConfig
+				
+				var runFunc func(ctx rule.RuleContext) rule.RuleListeners
+				var finalOptions any = ruleConfigCopy.Options
+
+				if ruleImpl.Schema0 != nil && ruleImpl.RunWithOptions != nil {
+					validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema0, ruleImpl.Schema1, ruleImpl.Name, ruleConfigCopy.Options)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "[rslint] Error validating options for rule %q: %v\n", ruleName, err)
+						continue
+					}
+					finalOptions = validated
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return ruleImpl.RunWithOptions(ctx, validated)
+					}
+				} else {
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
+					}
+				}
+
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
 					Name:               ruleName,
 					Settings:           CloneSettings(mergedConfig.Settings),
 					Severity:           ruleConfig.GetSeverity(),
 					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
-					Options:            ruleConfigCopy.Options,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
-					},
+					Options:            finalOptions,
+					Run:                runFunc,
 				})
 			}
 		}

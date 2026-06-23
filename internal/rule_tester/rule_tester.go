@@ -140,14 +140,31 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			Scope:          linter.FileScope{Files: allowedFiles},
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+				var runFunc func(ctx rule.RuleContext) rule.RuleListeners
+				var finalOptions any = options
+
+				if r.Schema0 != nil && r.RunWithOptions != nil {
+					validated, err := rule.ValidateAndHydrateOptions(r.Schema0, r.Schema1, r.Name, options)
+					if err != nil {
+						t.Fatalf("options validation failed for rule %q in test case: %v", r.Name, err)
+					}
+					finalOptions = validated
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return r.RunWithOptions(ctx, validated)
+					}
+				} else {
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return r.Run(ctx, options)
+					}
+				}
+
 				return []linter.ConfiguredRule{
 					{
 						Name:     "test",
 						Settings: settings,
 						Severity: rule.SeverityError,
-						Run: func(ctx rule.RuleContext) rule.RuleListeners {
-							return r.Run(ctx, options)
-						},
+						Options:  finalOptions,
+						Run:      runFunc,
 					},
 				}
 			},

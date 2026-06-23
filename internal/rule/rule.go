@@ -1,6 +1,8 @@
 package rule
 
 import (
+	"fmt"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -90,14 +92,71 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
+	Schema0            Schema
+	Schema1            Schema
 	Run                func(ctx RuleContext, options any) RuleListeners
+	RunWithOptions   func(ctx RuleContext, options any) RuleListeners
+}
+
+// ValidateAndHydrateOptions decodes raw config options against the rule's Schema0 and Schema1,
+// applying defaults and returning the validated typed options.
+func ValidateAndHydrateOptions(schema0 Schema, schema1 Schema, ruleName string, raw any) (any, error) {
+	if schema0 == nil {
+		return nil, nil
+	}
+
+	// Normalize raw config into a slice of 2 option elements
+	var raw0, raw1 any
+	if raw != nil {
+		if arr, ok := raw.([]any); ok {
+			if len(arr) > 0 {
+				raw0 = arr[0]
+			}
+			if len(arr) > 1 {
+				raw1 = arr[1]
+			}
+		} else if arrInterface, ok := raw.([]interface{}); ok {
+			if len(arrInterface) > 0 {
+				raw0 = arrInterface[0]
+			}
+			if len(arrInterface) > 1 {
+				raw1 = arrInterface[1]
+			}
+		} else {
+			// Single option value passed directly
+			raw0 = raw
+		}
+	}
+
+	// Validate Option 0
+	val0, err := schema0.Validate(raw0)
+	if err != nil {
+		return nil, fmt.Errorf("configuration validation failed for rule %q (option 0): %w", ruleName, err)
+	}
+
+	// If there's no Option 1 schema, just return the validated Option 0
+	if schema1 == nil {
+		return val0, nil
+	}
+
+	// Validate Option 1
+	val1, err := schema1.Validate(raw1)
+	if err != nil {
+		return nil, fmt.Errorf("configuration validation failed for rule %q (option 1): %w", ruleName, err)
+	}
+
+	// Return as a slice containing both validated options
+	return []any{val0, val1}, nil
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
+		Schema0:          r.Schema0,
+		Schema1:          r.Schema1,
 		Run:              r.Run,
+		RunWithOptions:   r.RunWithOptions,
 	}
 }
 

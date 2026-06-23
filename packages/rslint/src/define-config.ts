@@ -71,17 +71,20 @@ export type RuleOptions = Record<string, any>;
  *   string/object args (`[severity, "always", { ... }]`).
  * - `{ level, options }` — object form supported by the loader.
  */
-export type RuleEntry =
+export type RuleEntry<T0 = never, T1 = never> =
   | RuleSeverity
-  | readonly [RuleSeverity, ...any[]]
-  | { level: RuleSeverity; options?: RuleOptions };
+  | readonly [RuleSeverity, T0?, T1?]
+  | { level: RuleSeverity; options?: T0 };
 
 /**
  * Map of rule name → rule configuration. Rule names are `string` (no
  * enumeration of known rules yet); the value shape is what gives editors
  * hints when typing the array or object form.
  */
-export type RulesRecord = Record<string, RuleEntry>;
+export interface RulesRecord {
+  /** @__RULE_OPTIONS__ */
+  [key: string]: RuleEntry<any, any> | undefined;
+}
 
 /**
  * TypeScript parser options. `project` may be a single tsconfig path or a list.

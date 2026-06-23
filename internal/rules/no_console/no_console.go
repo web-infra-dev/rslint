@@ -3,13 +3,15 @@ package no_console
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // https://eslint.org/docs/latest/rules/no-console
 var NoConsoleRule = rule.Rule{
 	Name: "no-console",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Schema0: rule.Object(map[string]rule.Schema{
+		"allow": rule.Array(rule.String()),
+	}),
+	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		reportIfConsole := func(node *ast.Node, consoleIdent *ast.Node, propertyName string) {
@@ -107,13 +109,15 @@ func parseOptions(opts any) consoleOptions {
 		allow: make(map[string]bool),
 	}
 
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allowArr, ok := optsMap["allow"].([]interface{}); ok {
-			for _, item := range allowArr {
-				if str, ok := item.(string); ok {
-					result.allow[str] = true
-				}
+	optsMap, ok := opts.(map[string]any)
+	if !ok {
+		return result
+	}
+
+	if allowArr, ok := optsMap["allow"].([]any); ok {
+		for _, item := range allowArr {
+			if str, ok := item.(string); ok {
+				result.allow[str] = true
 			}
 		}
 	}
