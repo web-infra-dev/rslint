@@ -130,6 +130,45 @@ func (r *RuleRegistry) GetActiveRulesForFile(
 	return activeRules
 }
 
+// ValidateConfig checks all rule options in the configuration against their schemas.
+// It collects and returns all validation errors found.
+func (r *RuleRegistry) ValidateConfig(config RslintConfig) []error {
+	var errs []error
+	for _, entry := range config {
+		for ruleName, ruleValue := range entry.Rules {
+			var rawOptions any
+			var isEnabled bool
+
+			switch v := ruleValue.(type) {
+			case string:
+				isEnabled = v != "off" && v != ""
+			case []interface{}:
+				rc := parseArrayRuleConfig(v)
+				if rc != nil {
+					isEnabled = rc.IsEnabled()
+					rawOptions = rc.Options
+				}
+			case map[string]interface{}:
+				level, _ := v["level"].(string)
+				isEnabled = level != "off" && level != ""
+				rawOptions = v["options"]
+			}
+
+			if isEnabled {
+				if ruleImpl, exists := r.rules[ruleName]; exists {
+					if ruleImpl.Schema0 != nil && ruleImpl.RunWithOptions != nil {
+						_, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema0, ruleImpl.Schema1, ruleImpl.Name, rawOptions)
+						if err != nil {
+							errs = append(errs, err)
+						}
+					}
+				}
+			}
+		}
+	}
+	return errs
+}
+
 func CloneSettings(settings map[string]interface{}) map[string]interface{} {
 	if len(settings) == 0 {
 		return nil

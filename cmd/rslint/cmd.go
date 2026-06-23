@@ -1037,6 +1037,27 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}
 
+	// Validate rule configurations and options schema.
+	var validationErrors []error
+	if configMap != nil {
+		for _, cfg := range configMap {
+			if errs := rslintconfig.GlobalRuleRegistry.ValidateConfig(cfg); len(errs) > 0 {
+				validationErrors = append(validationErrors, errs...)
+			}
+		}
+	} else {
+		if errs := rslintconfig.GlobalRuleRegistry.ValidateConfig(rslintConfig); len(errs) > 0 {
+			validationErrors = append(validationErrors, errs...)
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		for _, err := range validationErrors {
+			fmt.Fprintf(os.Stderr, "[rslint] Configuration error: %v\n", err)
+		}
+		return 1
+	}
+
 	// Use CWD for display paths (not any config directory).
 	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
 	// so it already holds the normalized CWD.

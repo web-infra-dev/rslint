@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -641,4 +642,55 @@ func ruleNameSet(rules []linter.ConfiguredRule) map[string]bool {
 		set[r.Name] = true
 	}
 	return set
+}
+
+func TestValidateConfig_ReturnsErrors(t *testing.T) {
+	RegisterAllRules()
+
+	// Invalid config: "allow" option of no-console should be an array of strings, not a number
+	invalidConfig := RslintConfig{
+		{
+			Rules: Rules{
+				"no-console": []interface{}{
+					"error",
+					map[string]interface{}{
+						"allow": 123,
+					},
+				},
+			},
+		},
+	}
+
+	errs := GlobalRuleRegistry.ValidateConfig(invalidConfig)
+	if len(errs) == 0 {
+		t.Fatal("Expected validation errors, got none")
+	}
+
+	foundNoConsoleErr := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), `configuration validation failed for rule "no-console"`) {
+			foundNoConsoleErr = true
+		}
+	}
+	if !foundNoConsoleErr {
+		t.Errorf("Expected a validation error for 'no-console', got: %v", errs)
+	}
+
+	// Valid config should return no errors
+	validConfig := RslintConfig{
+		{
+			Rules: Rules{
+				"no-console": []interface{}{
+					"error",
+					map[string]interface{}{
+						"allow": []interface{}{"log", "warn"},
+					},
+				},
+			},
+		},
+	}
+	errs = GlobalRuleRegistry.ValidateConfig(validConfig)
+	if len(errs) > 0 {
+		t.Errorf("Expected no validation errors, got %d: %v", len(errs), errs)
+	}
 }
