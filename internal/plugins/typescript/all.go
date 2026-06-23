@@ -6,7 +6,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_ts_comment"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_tslint_comment"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/consistent_generic_constructors"
@@ -142,7 +141,6 @@ func GetAllRules() []rule.Rule {
 		await_thenable.AwaitThenableRule,
 		ban_ts_comment.BanTsCommentRule,
 		ban_tslint_comment.BanTslintCommentRule,
-		ban_types.BanTypesRule,
 		class_literal_property_style.ClassLiteralPropertyStyleRule,
 		class_methods_use_this.ClassMethodsUseThisRule,
 		consistent_generic_constructors.ConsistentGenericConstructorsRule,

@@ -22,7 +22,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
     await prewarmOnSaveFixAll();
   });
 
-  test('ban-types triggers no-inferrable-types in second pass', async () => {
+  test('no-wrapper-object-types triggers no-inferrable-types in second pass', async () => {
     const cascadeContent = [
       "const csA: String = 'hello';",
       'const csB: Number = 42;',
@@ -32,10 +32,10 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
     ].join('\n');
     await withTmpFile(cascadeContent, async (doc) => {
       const initialDiags = await waitForDiagnostics(doc);
-      const banTypeDiags = initialDiags.filter((d) =>
-        d.message.includes('ban-types'),
+      const wrapperDiags = initialDiags.filter((d) =>
+        d.message.includes('no-wrapper-object-types'),
       );
-      if (banTypeDiags.length === 0) return;
+      if (wrapperDiags.length === 0) return;
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
       if (!fixAllAction?.edit) return;
@@ -47,7 +47,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
         !fixedContent.includes(': String') &&
           !fixedContent.includes(': Number') &&
           !fixedContent.includes(': Boolean'),
-        `ban-types should be fixed. Content: ${fixedContent}`,
+        `no-wrapper-object-types should be fixed. Content: ${fixedContent}`,
       );
       assert.ok(
         !fixedContent.includes(': string') &&
@@ -69,7 +69,8 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       await replaceAll(editor, cascadeContent);
 
       const diags = await waitForDiagnostics(doc);
-      if (!diags.some((d) => d.message.includes('ban-types'))) return;
+      if (!diags.some((d) => d.message.includes('no-wrapper-object-types')))
+        return;
 
       await doc.save();
 

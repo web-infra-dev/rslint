@@ -1279,7 +1279,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	// Phase 2: Apply fixes if --fix flag is enabled.
 	// Uses multi-pass fixing: after applying fixes, rebuild programs and re-lint
-	// to catch cascading issues (e.g. ban-types fix triggers no-inferrable-types).
+	// to catch cascading issues (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 	// After fixing, allDiags is replaced with remaining (unfixed) diagnostics.
 	const maxFixPasses = 10
 	if fix && len(allDiags) > 0 {
