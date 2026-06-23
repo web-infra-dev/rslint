@@ -14,40 +14,46 @@ func buildUnexpectedExportMessage() rule.RuleMessage {
 	}
 }
 
-func isModuleExportsMemberExpression(node *ast.Node, ctx rule.RuleContext) bool {
+func isLocallyDeclaredIdentifier(node *ast.Node, ctx rule.RuleContext) bool {
+	if ctx.TypeChecker == nil {
+		return false
+	}
+	if symbol := ctx.TypeChecker.GetSymbolAtLocation(node); symbol != nil {
+		for _, declaration := range symbol.Declarations {
+			if ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isCommonJSExportsMemberExpression(node *ast.Node, ctx rule.RuleContext) bool {
 	if node == nil || !utils.IsMemberAccessNode(node) {
 		return false
 	}
 
 	current := node
 	innermostProperty := ""
+	innermostPropertyKnown := false
 	for utils.IsMemberAccessNode(current) {
-		property, ok := rslintUtils.AccessExpressionStaticName(current)
-		if !ok {
-			return false
-		}
-		innermostProperty = property
+		innermostProperty, innermostPropertyKnown = rslintUtils.AccessExpressionStaticName(current)
 		current = ast.SkipParentheses(rslintUtils.AccessExpressionObject(current))
 	}
 
-	if current == nil || current.Kind != ast.KindIdentifier ||
-		current.AsIdentifier().Text != "module" || innermostProperty != "exports" {
+	if current == nil || current.Kind != ast.KindIdentifier {
 		return false
 	}
 
-	// A locally declared variable or parameter named `module` shadows the
-	// CommonJS global and must not be treated as an export target.
-	if ctx.TypeChecker != nil {
-		if symbol := ctx.TypeChecker.GetSymbolAtLocation(current); symbol != nil {
-			for _, declaration := range symbol.Declarations {
-				if ast.GetSourceFileOfNode(declaration) == ctx.SourceFile {
-					return false
-				}
-			}
-		}
+	switch current.AsIdentifier().Text {
+	case "exports":
+		return !isLocallyDeclaredIdentifier(current, ctx)
+	case "module":
+		return innermostPropertyKnown && innermostProperty == "exports" &&
+			!isLocallyDeclaredIdentifier(current, ctx)
+	default:
+		return false
 	}
-
-	return true
 }
 
 func hasExportModifier(node *ast.Node) bool {
@@ -95,7 +101,7 @@ var NoExportRule = rule.Rule{
 
 				for _, operand := range []*ast.Node{bin.Left, bin.Right} {
 					operand = ast.SkipParentheses(operand)
-					if operand != nil && isModuleExportsMemberExpression(operand, ctx) {
+					if operand != nil && isCommonJSExportsMemberExpression(operand, ctx) {
 						collectExport(operand)
 					}
 				}

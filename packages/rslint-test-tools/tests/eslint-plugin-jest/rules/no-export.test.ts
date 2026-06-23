@@ -21,6 +21,12 @@ ruleTester.run('no-export', {} as never, {
     {
       code: 'const run = (module: { exports: object }) => { module.exports.foo = "valid" }; test("a test", () => {});',
     },
+    {
+      code: 'const exports = { foo: "" }; exports.foo = "valid"; test("a test", () => {});',
+    },
+    {
+      code: 'const run = (exports: { foo: string }) => { exports.foo = "valid" }; test("a test", () => {});',
+    },
   ],
   invalid: [
     {
@@ -92,6 +98,14 @@ ruleTester.run('no-export', {} as never, {
     {
       code: 'value = module.exports; test("a test", () => {});',
       errors: [{ endColumn: 23, column: 9, messageId: 'unexpectedExport' }],
+    },
+    {
+      code: 'exports.foo = "invalid"; test("a test", () => {});',
+      errors: [{ endColumn: 12, column: 1, messageId: 'unexpectedExport' }],
+    },
+    {
+      code: 'exports["foo"].bar = "invalid"; test("a test", () => {});',
+      errors: [{ endColumn: 19, column: 1, messageId: 'unexpectedExport' }],
     },
     {
       code: 'export import foo = require("./foo"); test("a test", () => {});',

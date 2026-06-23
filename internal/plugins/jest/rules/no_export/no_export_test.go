@@ -26,6 +26,8 @@ func TestNoExportRule(t *testing.T) {
 			{Code: `const exports = "exports"; module[exports] = {}; test("a test", () => {});`},
 			{Code: `const module = { exports: {} }; module.exports.foo = "valid"; test("a test", () => {});`},
 			{Code: `const run = (module: { exports: object }) => { module.exports.foo = "valid" }; test("a test", () => {});`},
+			{Code: `const exports = { foo: "" }; exports.foo = "valid"; test("a test", () => {});`},
+			{Code: `const run = (exports: { foo: string }) => { exports.foo = "valid" }; test("a test", () => {});`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -116,6 +118,18 @@ test.only.each` + "`" + "`('my code', () => {\n  expect(1).toBe(1);\n});\n",
 				Code: `value = module.exports; test("a test", () => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedExport", Line: 1, Column: 9, EndColumn: 23},
+				},
+			},
+			{
+				Code: `exports.foo = "invalid"; test("a test", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedExport", Line: 1, Column: 1, EndColumn: 12},
+				},
+			},
+			{
+				Code: `exports["foo"].bar = "invalid"; test("a test", () => {});`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedExport", Line: 1, Column: 1, EndColumn: 19},
 				},
 			},
 			{
