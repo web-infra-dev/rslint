@@ -302,8 +302,8 @@ importers:
         specifier: 24.0.14
         version: 24.0.14
       '@types/vscode':
-        specifier: ^1.74.0
-        version: 1.102.0
+        specifier: ^1.125.0
+        version: 1.125.0
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20250904.1
         version: 7.0.0-dev.20250904.1
@@ -2882,8 +2882,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.102.0':
-    resolution: {integrity: sha512-V9sFXmcXz03FtYTSUsYsu5K0Q9wH9w9V25slddcxrh5JgORD14LpnOA7ov0L9ALi+6HrTjskLJ/tY5zeRF3TFA==}
+  '@types/vscode@1.125.0':
+    resolution: {integrity: sha512-0icm/ZQAaism87P0ekHqi4/Ju9du+Tm0RUW+y7vqRsxY2cY0FNRX1nAnaW7nT6npPt2tfHiheZ55Zm9UhqonFA==}
 
   '@typescript-eslint/parser@8.59.0':
     resolution: {integrity: sha512-TI1XGwKbDpo9tRW8UDIXCOeLk55qe9ZFGs8MTKU6/M08HWTw52DD/IYhfQtOEhEdPhLMT26Ka/x7p70nd3dzDg==}
@@ -8596,7 +8596,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.102.0': {}
+  '@types/vscode@1.125.0': {}
 
   '@typescript-eslint/parser@8.59.0(eslint@10.5.0(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
