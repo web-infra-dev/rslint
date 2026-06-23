@@ -102,7 +102,7 @@ type Semantic struct {
 	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
 	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
 	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
-	NodeFlags    map[NodeReference]int            `json:"node_flags"`
+	NodeFlags    map[NodeReference]uint32         `json:"node_flags"`
 	Primtypes    PrimTypes                        `json:"primtypes"`
 	TypeExtra    TypeExtra                        `json:"type_extra"`
 	FuncData     FunctionData                     `json:"func_data"`
@@ -119,7 +119,7 @@ func NewSemantic() Semantic {
 		AliasSymbols:     make(map[ast.SymbolId]ast.SymbolId),
 		Node2sym:         make(map[NodeReference]ast.SymbolId),
 		Node2type:        make(map[NodeReference]checker.TypeId),
-		NodeFlags:        make(map[NodeReference]int),
+		NodeFlags:        make(map[NodeReference]uint32),
 		ShorthandSymbols: make(map[NodeReference]ast.SymbolId),
 		Primtypes:        PrimTypes{},
 		TypeExtra: TypeExtra{
