@@ -25,16 +25,16 @@
   },
   "packageManager": "pnpm@10.34.4",
   "devDependencies": {
-    "@rslint/core": "workspace:*",
     "@microsoft/api-extractor": "7.58.7",
+    "@rslint/core": "workspace:*",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1",
     "@wasmer/wasmfs": "0.12.0",
-    "esbuild": "^0.28.0",
     "buffer": "^6.0.3",
     "cross-env": "^10.1.0",
+    "esbuild": "^0.28.1",
     "esbuild-plugin-polyfill-node": "0.3.0",
-    "memfs": "^4.57.1",
-    "prebundle": "1.6.0",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "memfs": "^4.57.8",
+    "prebundle": "1.6.0"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"
