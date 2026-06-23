@@ -67,6 +67,7 @@ export default defineConfig({
 
     // eslint
     './tests/eslint/rules/accessor-pairs.test.ts',
+    './tests/eslint/rules/arrow-body-style.test.ts',
     './tests/eslint/rules/default-case.test.ts',
     './tests/eslint/rules/no-case-declarations.test.ts',
     './tests/eslint/rules/no-console.test.ts',
