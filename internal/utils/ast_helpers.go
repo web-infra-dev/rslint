@@ -7,6 +7,17 @@ import (
 // skipTransparentKinds matches parentheses + TS type assertions.
 const skipTransparentKinds = ast.OEKParentheses | ast.OEKAssertions
 
+// SkipAssertionsAndParens strips parentheses and all TS assertion wrappers
+// (as, satisfies, !, <T>) from an expression, mirroring ESLint's
+// unwrapTSAsExpression(uncast(node)). Returns nil when node is nil so callers
+// can safely pass optional AST fields such as an absent initializer.
+func SkipAssertionsAndParens(node *ast.Node) *ast.Node {
+	if node == nil {
+		return nil
+	}
+	return ast.SkipOuterExpressions(node, skipTransparentKinds)
+}
+
 // IsCallee checks if a node is the callee of a CallExpression or NewExpression,
 // skipping parentheses and TS type assertions between the node and the call.
 func IsCallee(node *ast.Node) bool {
