@@ -222,7 +222,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				Start:        utf16(node.Pos()),
 				End:          utf16(node.End()),
 			}
-			semantic.NodeFlags[key] = int(node.Flags)
+			if node.Flags != 0 {
+				semantic.NodeFlags[key] = uint32(node.Flags)
+			}
 			// typescript will panic if we pass typeDeclaration to GetTypeAtLocation
 			if !ast.IsTypeDeclaration(node) {
 				if tyAtNode := tc.GetTypeAtLocation(node); tyAtNode != nil {
