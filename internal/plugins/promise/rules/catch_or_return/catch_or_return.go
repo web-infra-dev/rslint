@@ -87,7 +87,7 @@ var CatchOrReturnRule = rule.Rule{
 		var terminationMethod []string
 		if t, ok := optsMap["terminationMethod"].(string); ok {
 			terminationMethod = []string{t}
-		} else if arr, ok := optsMap["terminationMethod"].([]any); ok {
+		} else if arr, ok := optsMap["terminationMethod"].([]any); ok && len(arr) > 0 {
 			terminationMethod = make([]string, len(arr))
 			for i, v := range arr {
 				s, _ := v.(string)

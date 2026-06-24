@@ -59,6 +59,11 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			// .finally() terminates via terminationMethod list (not via allowFinally recursion).
 			{Code: `frank().then(go).finally()`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "finally"}}},
 
+			// ---- Branch lock-in: terminationMethod explicit empty array falls back to default ----
+			// An explicitly empty array must not disable the allowlist entirely; it falls
+			// back to the documented default ["catch"], same as omitting the option.
+			{Code: `frank().then(go).catch(doIt)`, Options: map[string]interface{}{"terminationMethod": []interface{}{}}},
+
 			// ---- Dimension 4: terminationMethod array with custom name ----
 			{Code: `frank().then(go).asCallback(fn)`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "asCallback"}}},
 

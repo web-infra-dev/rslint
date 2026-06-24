@@ -140,6 +140,20 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			tsConfigs = overrideTsconfigs
 		}
 	}
+
+	// Validate rule options against their schemas before linting. Without
+	// this, a misconfigured rule is silently dropped per-file by
+	// GetEnabledRules with only a stderr line to show for it — the IPC
+	// caller would get a "successful" lint response that's just missing a
+	// rule's diagnostics.
+	if errs := rslintconfig.GlobalRuleRegistry.ValidateConfig(rslintConfig); len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, err := range errs {
+			msgs[i] = err.Error()
+		}
+		return nil, fmt.Errorf("invalid rule configuration: %s", strings.Join(msgs, "; "))
+	}
+
 	type RuleWithOption struct {
 		rule   rule.Rule
 		option interface{}
