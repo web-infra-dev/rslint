@@ -256,12 +256,17 @@ go test -count=1 ./internal/rules/<rule_name>
 # Run JS tests (first run: append -u to generate snapshots)
 cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
 
+# Regenerate TS option types (only if the rule declares Schema0/Schema1)
+pnpm --filter @rslint/core run build:js
+
 # Pre-commit gate (BLOCKING — all must pass before commit)
 pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && pnpm lint:go
 
 # Auto-fix formatting issues
 pnpm format && pnpm format:go
 ```
+
+**Options framework**: new rules with options MUST use `Schema0`/`Schema1` + `RunWithOptions` (declarative schema combinators in `internal/rule/schema.go`), not the legacy `Run` + hand-rolled `parseOptions`/`utils.GetOptionsMap` pattern. See [PORT_RULE.md § Handling Options](references/PORT_RULE.md#handling-options).
 
 ## References
 
