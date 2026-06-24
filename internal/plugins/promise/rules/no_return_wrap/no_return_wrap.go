@@ -74,7 +74,7 @@ func checkCallExpression(ctx rule.RuleContext, opts Options, callNode *ast.Node,
 }
 
 func isInPromise(node *ast.Node) bool {
-	functionNode := promiseutil.NearestFunctionBoundary(node)
+	functionNode := nearestFunctionBoundary(node)
 	if functionNode == nil {
 		return false
 	}
@@ -108,6 +108,26 @@ func isInPromise(node *ast.Node) bool {
 		cur = cur.Parent
 	}
 	return cur != nil && promiseutil.IsPromiseLikeCall(cur)
+}
+
+// nearestFunctionBoundary mirrors eslint-plugin-promise's no-return-wrap,
+// which only considers ArrowFunctionExpression/FunctionExpression ancestors
+// (filtering out FunctionDeclaration) when locating the enclosing function.
+// This differs from promiseutil.NearestFunctionBoundary, which is shared with
+// no-return-in-finally and does include FunctionDeclaration.
+func nearestFunctionBoundary(node *ast.Node) *ast.Node {
+	for cur := node.Parent; cur != nil; cur = cur.Parent {
+		switch cur.Kind {
+		case ast.KindFunctionExpression,
+			ast.KindArrowFunction,
+			ast.KindMethodDeclaration,
+			ast.KindGetAccessor,
+			ast.KindSetAccessor,
+			ast.KindConstructor:
+			return cur
+		}
+	}
+	return nil
 }
 
 func isExpressionBodyArrowCall(node *ast.Node) bool {
