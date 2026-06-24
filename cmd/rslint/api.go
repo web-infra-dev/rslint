@@ -172,6 +172,13 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 					fmt.Fprintf(os.Stderr, "rslint: api does not support eslint-plugin rule %q; ignoring\n", r.Name)
 					continue
 				}
+				if r.RunWithOptions != nil {
+					validated, err := rule.ValidateAndHydrateOptions(r.Schema0, r.Schema1, r.Name, option)
+					if err != nil {
+						return nil, fmt.Errorf("invalid options for rule %q: %w", r.Name, err)
+					}
+					option = validated
+				}
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
 					rule:   r,
 					option: option,
@@ -290,13 +297,19 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				settings = rslintconfig.CloneSettings(merged.Settings)
 			}
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
+				runFunc := func(ctx rule.RuleContext) rule.RuleListeners {
+					return r.rule.Run(ctx, r.option)
+				}
+				if r.rule.RunWithOptions != nil {
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return r.rule.RunWithOptions(ctx, r.option)
+					}
+				}
 				return linter.ConfiguredRule{
 					Name:             r.rule.Name,
 					Settings:         settings,
 					RequiresTypeInfo: r.rule.RequiresTypeInfo,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.rule.Run(ctx, r.option)
-					},
+					Run:              runFunc,
 				}
 			})
 		},

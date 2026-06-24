@@ -50,6 +50,48 @@ func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 	}
 }
 
+// TestHandleLint_RuleOptionsWithSchemaDrivenRule guards against a regression
+// where rules migrated to Schema0/Schema1 + RunWithOptions panicked with a
+// nil-pointer dereference when invoked through the req.RuleOptions path
+// (used by packages/rslint-test-tools rule-tester harnesses): that path
+// called the now-nil legacy Run callback directly instead of dispatching to
+// RunWithOptions with validated, default-hydrated options.
+func TestHandleLint_RuleOptionsWithSchemaDrivenRule(t *testing.T) {
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	if err != nil {
+		t.Fatalf("resolve fixtures dir: %v", err)
+	}
+	configPath := filepath.Join(fixturesDir, "rslint.json")
+	targetFile := filepath.Join(fixturesDir, "src", "index.ts")
+
+	preserveWorkingDirectory(t)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           configPath,
+		Files:            []string{targetFile},
+		WorkingDirectory: fixturesDir,
+		FileContents: map[string]string{
+			targetFile: "console.log('a'); console.error('b');\n",
+		},
+		RuleOptions: map[string]interface{}{
+			"no-console": map[string]interface{}{
+				"allow": []interface{}{"log"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+
+	if len(response.Diagnostics) != 1 {
+		t.Fatalf("expected exactly one diagnostic (console.error, with console.log allowed), got %d: %+v", len(response.Diagnostics), response.Diagnostics)
+	}
+	if response.Diagnostics[0].RuleName != "no-console" {
+		t.Fatalf("expected diagnostic from no-console, got %q", response.Diagnostics[0].RuleName)
+	}
+}
+
 func TestHandleLint_ExplicitFilesRestrictsScope(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
