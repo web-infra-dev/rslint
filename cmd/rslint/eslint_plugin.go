@@ -6,6 +6,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -54,7 +58,15 @@ func buildPluginFileInputs(runOpts linter.RunLinterOptions, resolver pluginConfi
 	if len(targets) == 0 {
 		return nil
 	}
-	var inputs []linter.EslintPluginFileInput
+	// Phase 1 (serial): assemble each plugin file's dispatch input WITHOUT its
+	// type snapshot yet, recording the program + file so phase 2 can build
+	// snapshots in parallel.
+	type pending struct {
+		input   linter.EslintPluginFileInput
+		program *compiler.Program
+		file    *ast.SourceFile
+	}
+	var pendings []pending
 	for _, t := range targets {
 		// Short-circuit pure-native files before resolving their config (resolve
 		// re-runs GetConfigForFile), avoiding that cost across the whole repo.
@@ -71,7 +83,55 @@ func buildPluginFileInputs(runOpts linter.RunLinterOptions, resolver pluginConfi
 		if !ok {
 			continue
 		}
-		inputs = append(inputs, input)
+		pendings = append(pendings, pending{input: input, program: t.Program, file: t.File})
+	}
+	if len(pendings) == 0 {
+		return nil
+	}
+
+	// Phase 2 (parallel): build each file's type snapshot, sharded by owning
+	// checker exactly like the native pass (linter.go's runLintRulesInProgram,
+	// F1). A type snapshot is built for every file that HAS a program (project-
+	// gate: parserOptions.project makes the program available — NOT gated on any
+	// requiresTypeChecking meta). A file with no program gets no snapshot, and a
+	// rule calling getParserServices there throws in the worker, like real ESLint.
+	// Snapshots are self-contained per file (type-ids consistent within whichever
+	// checker built them), so different files may use different pool checkers.
+	// Build is serial WITHIN one checker (per-checker mutex) but PARALLEL across
+	// checkers, and runs BEFORE RunLinter so it never races the native pass on the
+	// same checker (this func completes before RunLinter is called in cmd.go).
+	ctx := context.Background()
+	type checkerKey struct {
+		program *compiler.Program
+		checker *checker.Checker
+	}
+	groups := map[checkerKey][]int{}
+	for i := range pendings {
+		p := pendings[i].program
+		if p == nil {
+			continue // no program → no snapshot (getParserServices throws in the worker)
+		}
+		chk, release := p.GetTypeCheckerForFile(ctx, pendings[i].file)
+		release()
+		key := checkerKey{program: p, checker: chk}
+		groups[key] = append(groups[key], i)
+	}
+	wg := core.NewWorkGroup(runOpts.SingleThreaded)
+	for key, idxs := range groups {
+		key, idxs := key, idxs
+		wg.Queue(func() {
+			chk, done := key.program.GetTypeCheckerForFileExclusive(ctx, pendings[idxs[0]].file)
+			defer done()
+			for _, i := range idxs {
+				linter.AttachTypeSnapshot(&pendings[i].input, chk, pendings[i].file)
+			}
+		})
+	}
+	wg.RunAndWait()
+
+	inputs := make([]linter.EslintPluginFileInput, len(pendings))
+	for i := range pendings {
+		inputs[i] = pendings[i].input
 	}
 	return inputs
 }

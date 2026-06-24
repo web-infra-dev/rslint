@@ -72,6 +72,41 @@ func TestChannel_RequestResponse(t *testing.T) {
 	}
 }
 
+// TestChannel_SendRequestWithBinary pins that SendRequestWithBinary delivers the
+// binary trailer to the peer's inbound handler intact (alongside the JSON) — the
+// Channel-layer end of the binary-frame path that frame round-trip tests don't
+// cover.
+func TestChannel_SendRequestWithBinary(t *testing.T) {
+	a, b := newChannelPair(t)
+	b.SetInboundHandler(func(_ context.Context, msg *Message) (any, error) {
+		// 0xfe/0xff catch text corruption; the empty blob must survive too.
+		if len(msg.Binary) != 2 {
+			t.Errorf("handler got %d binary blobs, want 2", len(msg.Binary))
+		} else {
+			if !bytes.Equal(msg.Binary[0], []byte{0x00, 0xfe, 0xff}) {
+				t.Errorf("blob 0 = %v, want [0 254 255]", msg.Binary[0])
+			}
+			if len(msg.Binary[1]) != 0 {
+				t.Errorf("blob 1 = %v, want empty", msg.Binary[1])
+			}
+		}
+		return greetResp{Greeting: "ok"}, nil
+	})
+	a.Start()
+	b.Start()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	blobs := [][]byte{{0x00, 0xfe, 0xff}, {}}
+	resp, err := a.SendRequestWithBinary(ctx, "pluginLint", greetReq{Name: "x"}, blobs)
+	if err != nil {
+		t.Fatalf("SendRequestWithBinary: %v", err)
+	}
+	if resp.Kind != KindResponse {
+		t.Fatalf("expected response kind, got %q", resp.Kind)
+	}
+}
+
 func TestChannel_InboundError(t *testing.T) {
 	a, b := newChannelPair(t)
 	b.SetInboundHandler(func(_ context.Context, _ *Message) (any, error) {
@@ -244,6 +279,108 @@ func TestReadFrame_EOF(t *testing.T) {
 	_, err := ReadFrame(bufio.NewReader(bytes.NewReader(nil)))
 	if !errors.Is(err, io.EOF) {
 		t.Fatalf("expected io.EOF, got %v", err)
+	}
+}
+
+// TestFrame_RoundTripWithBinary pins the binary trailer: a frame's Binary blobs
+// survive WriteFrame→ReadFrame intact alongside the JSON, the length header
+// carries frameBinaryFlag, and an empty blob round-trips as a present
+// zero-length entry.
+func TestFrame_RoundTripWithBinary(t *testing.T) {
+	src, err := NewMessage("pluginLint", 7, map[string]int{"x": 42})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 0xfe/0xff would corrupt under any latin1/utf8 misread — pins the trailer
+	// carries raw bytes, not text.
+	src.Binary = [][]byte{
+		{0x00, 0x01, 0xfe, 0xff},
+		{},                 // empty blob must survive as a present, zero-length entry
+		[]byte("snapshot"), // ascii
+	}
+	var buf bytes.Buffer
+	if err := WriteFrame(&buf, src); err != nil {
+		t.Fatalf("WriteFrame: %v", err)
+	}
+	if raw := binary.LittleEndian.Uint32(buf.Bytes()[:4]); raw&frameBinaryFlag == 0 {
+		t.Fatal("binary frame did not set frameBinaryFlag in the length header")
+	}
+	got, err := ReadFrame(bufio.NewReader(&buf))
+	if err != nil {
+		t.Fatalf("ReadFrame: %v", err)
+	}
+	if got.Kind != "pluginLint" || got.ID != 7 {
+		t.Fatalf("got kind=%q id=%d", got.Kind, got.ID)
+	}
+	var v struct {
+		X int `json:"x"`
+	}
+	if err := got.Decode(&v); err != nil || v.X != 42 {
+		t.Fatalf("decode mismatch: v=%+v err=%v", v, err)
+	}
+	want := [][]byte{{0x00, 0x01, 0xfe, 0xff}, {}, []byte("snapshot")}
+	if len(got.Binary) != len(want) {
+		t.Fatalf("got %d binary blobs, want %d", len(got.Binary), len(want))
+	}
+	for i, w := range want {
+		if !bytes.Equal(got.Binary[i], w) {
+			t.Errorf("blob %d = %v, want %v", i, got.Binary[i], w)
+		}
+	}
+}
+
+// TestFrame_NoBinaryIsLegacyFormat guards every non-pluginLint frame (and the
+// whole LSP path): with no Binary attachments, WriteFrame must emit the exact
+// legacy [4B len][JSON] bytes — no flag bit — so nil and empty-slice Binary are
+// indistinguishable on the wire and pre-binary peers stay compatible.
+func TestFrame_NoBinaryIsLegacyFormat(t *testing.T) {
+	src, err := NewMessage("output", 0, map[string]string{"text": "hi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var withEmpty, withNil bytes.Buffer
+	src.Binary = [][]byte{} // explicitly empty
+	if err := WriteFrame(&withEmpty, src); err != nil {
+		t.Fatal(err)
+	}
+	src.Binary = nil
+	if err := WriteFrame(&withNil, src); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(withEmpty.Bytes(), withNil.Bytes()) {
+		t.Fatal("empty Binary slice and nil Binary must produce identical frames")
+	}
+	if raw := binary.LittleEndian.Uint32(withNil.Bytes()[:4]); raw&frameBinaryFlag != 0 {
+		t.Fatal("legacy frame must not set frameBinaryFlag")
+	}
+	// Body is bare JSON (starts with '{') — not a jsonLen prefix.
+	if withNil.Bytes()[4] != '{' {
+		t.Fatalf("legacy frame body should be bare JSON, got first byte 0x%02x", withNil.Bytes()[4])
+	}
+}
+
+// TestReadFrame_BinaryTruncated confirms decodeBinaryFrame bounds-checks every
+// trailer field: truncating a valid binary frame at any interior offset (with
+// the length header rewritten to match, so ReadFrame doesn't just block) must
+// error rather than panic or decode garbage.
+func TestReadFrame_BinaryTruncated(t *testing.T) {
+	src, _ := NewMessage("pluginLint", 1, map[string]int{"x": 1})
+	src.Binary = [][]byte{[]byte("abcd")}
+	var full bytes.Buffer
+	if err := WriteFrame(&full, src); err != nil {
+		t.Fatal(err)
+	}
+	body := full.Bytes()
+	for cut := 5; cut < len(body); cut++ {
+		trunc := make([]byte, cut)
+		copy(trunc, body[:cut])
+		// Rewrite the length header to the truncated body length (keep the
+		// flag) so ReadFrame reads exactly cut-4 body bytes and hands them to
+		// decodeBinaryFrame, exercising its bounds checks rather than blocking.
+		binary.LittleEndian.PutUint32(trunc[:4], uint32(cut-4)|frameBinaryFlag)
+		if _, err := ReadFrame(bufio.NewReader(bytes.NewReader(trunc))); err == nil {
+			t.Errorf("truncated binary frame at cut=%d decoded without error", cut)
+		}
 	}
 }
 

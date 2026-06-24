@@ -1156,13 +1156,22 @@ export class WorkerPool {
     // `slot.worker.terminate()` on a possibly-already-replaced slot —
     // at best wasted work, at worst spurious termination of an
     // innocent successor.
+    // Transfer the snapshot ArrayBuffer (zero-copy) instead of structuredClone-
+    // copying it. Safe under the per-file model (one worker per file): the main
+    // thread never reads it again after transfer, and a failed task is settled
+    // (resolveOk), never re-queued — so the now-detached buffer is never re-sent.
+    const transfer: ArrayBuffer[] =
+      task.typeSnapshot instanceof ArrayBuffer ? [task.typeSnapshot] : [];
     try {
-      slot.worker.postMessage({
-        kind: 'task',
-        taskId,
-        cancelSlot,
-        request: task,
-      });
+      slot.worker.postMessage(
+        {
+          kind: 'task',
+          taskId,
+          cancelSlot,
+          request: task,
+        },
+        transfer,
+      );
     } catch (err) {
       clearTimeout(timer);
       slot.inflight.delete(taskId);

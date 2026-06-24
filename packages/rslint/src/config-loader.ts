@@ -124,8 +124,16 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
               `[rslint] Config entry at index ${index}: plugins["${prefix}"] must expose a "rules" object.`,
             );
           }
+          const ruleEntries = Object.entries(
+            pluginRules as Record<string, unknown>,
+          );
+          // No `requiresTypeChecking` extraction: type-aware gating no longer
+          // depends on that (optional, non-standard) meta. A file gets a type
+          // snapshot purely by having a program (parserOptions.project); a rule
+          // that calls getParserServices on a project-less file throws, exactly
+          // like real ESLint.
           eslintPluginMeta[prefix] = {
-            ruleNames: Object.keys(pluginRules).sort(),
+            ruleNames: ruleEntries.map(([n]) => n).sort(),
           };
           pluginPrefixes.push(prefix);
         }
@@ -181,7 +189,10 @@ export function collectPluginMeta(
     entries: ReadonlyArray<unknown>;
   }>,
 ): {
-  eslintPluginEntries: Array<{ prefix: string; ruleNames: string[] }>;
+  eslintPluginEntries: Array<{
+    prefix: string;
+    ruleNames: string[];
+  }>;
   pluginConfigs: PluginConfigDescriptor[];
 } {
   // Entries are normalizeConfig output, so an `eslintPlugins` field — when
@@ -191,7 +202,7 @@ export function collectPluginMeta(
     v: unknown,
   ): v is Record<string, { ruleNames: string[] }> =>
     v !== null && typeof v === 'object';
-  const byPrefix = new Map<string, string[]>();
+  const byPrefix = new Map<string, { ruleNames: string[] }>();
   const pluginConfigs: PluginConfigDescriptor[] = [];
   for (const c of configs) {
     let hasPlugins = false;
@@ -216,10 +227,11 @@ export function collectPluginMeta(
         const existing = byPrefix.get(prefix);
         if (existing) {
           for (const name of meta.ruleNames) {
-            if (!existing.includes(name)) existing.push(name);
+            if (!existing.ruleNames.includes(name))
+              existing.ruleNames.push(name);
           }
         } else {
-          byPrefix.set(prefix, [...meta.ruleNames]);
+          byPrefix.set(prefix, { ruleNames: [...meta.ruleNames] });
         }
       }
     }
@@ -230,8 +242,9 @@ export function collectPluginMeta(
       });
     }
   }
-  const eslintPluginEntries = [...byPrefix.entries()].map(
-    ([prefix, ruleNames]) => ({ prefix, ruleNames }),
-  );
+  const eslintPluginEntries = [...byPrefix.entries()].map(([prefix, m]) => ({
+    prefix,
+    ruleNames: m.ruleNames,
+  }));
   return { eslintPluginEntries, pluginConfigs };
 }

@@ -313,7 +313,8 @@ func runCLI(args []string) int {
 	// over the IPC channel and decode its result. Runs concurrently with the
 	// native lint pass (executeLintPipeline awaits it before output / --fix).
 	dispatch := func(reqCtx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
-		msg, sendErr := ch.SendRequest(reqCtx, kindPluginLint, req)
+		req, blobs := hoistTypeSnapshots(req)
+		msg, sendErr := ch.SendRequestWithBinary(reqCtx, kindPluginLint, req, blobs)
 		if sendErr != nil {
 			return nil, sendErr
 		}
@@ -334,6 +335,28 @@ func runCLI(args []string) int {
 		return 130
 	}
 	return exitCode
+}
+
+// hoistTypeSnapshots moves each file's type snapshot out of the request's JSON
+// body into a binary-trailer slice for the IPC frame, replacing TypeSnapshot
+// with a 1-based TypeSnapshotIndex. Base64-in-JSON would inflate a multi-MB
+// snapshot ~33% and force an extra decode round-trip; the trailer ships the raw
+// bytes. Files is shallow-copied so the caller's request is left intact. When
+// no file carries a snapshot, blobs is empty (WriteFrame then emits a plain
+// legacy JSON frame — zero overhead).
+func hoistTypeSnapshots(req linter.EslintPluginLintRequest) (linter.EslintPluginLintRequest, [][]byte) {
+	blobs := make([][]byte, 0, len(req.Files))
+	files := make([]linter.EslintPluginLintFile, len(req.Files))
+	copy(files, req.Files)
+	for i := range files {
+		if len(files[i].TypeSnapshot) > 0 {
+			blobs = append(blobs, files[i].TypeSnapshot)
+			files[i].TypeSnapshotIndex = len(blobs) // 1-based; 0 ⇒ no blob
+			files[i].TypeSnapshot = nil
+		}
+	}
+	req.Files = files
+	return req, blobs
 }
 
 // shutdownPeer best-effort tells the peer we're done so it drains its worker

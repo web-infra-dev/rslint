@@ -11,8 +11,10 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/typesnapshot"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -36,6 +38,24 @@ type EslintPluginLintFile struct {
 	ConfigKey       string         `json:"configKey"`
 	LanguageOptions map[string]any `json:"languageOptions,omitempty"`
 	Settings        map[string]any `json:"settings,omitempty"`
+	// TypeSnapshot carries this file's type data (node→type + type blocks) as
+	// the random-access binary wire format (typesnapshot.EncodeBinary) so
+	// type-aware plugin rules can reconstruct parserServices in the worker. nil
+	// when no type info was built for the file.
+	//
+	// Two transports carry it, chosen by the host:
+	//   - CLI: the dispatcher hoists the bytes into the IPC frame's binary
+	//     trailer (ipc.Message.Binary), leaves this field nil, and sets
+	//     TypeSnapshotIndex instead — no base64 inflation.
+	//   - LSP: vscode-jsonrpc has no binary channel, so the bytes stay here and
+	//     encoding/json base64-encodes them onto the JSON-RPC payload.
+	TypeSnapshot []byte `json:"typeSnapshot,omitempty"`
+	// TypeSnapshotIndex is the 1-based index of this file's snapshot in the IPC
+	// frame's binary trailer (CLI path only). 0 (omitted) means no trailer blob
+	// — either no type info, or the LSP path where the snapshot rides in
+	// TypeSnapshot as base64. The Node host splices the blob back onto the file
+	// before reconstructing parserServices.
+	TypeSnapshotIndex int `json:"typeSnapshotIndex,omitempty"`
 }
 
 type EslintPluginLintRequest struct {
@@ -119,6 +139,12 @@ type EslintPluginFileInput struct {
 	// Rules are the plugin rules (IsEslintPluginRule) configured for this
 	// file, carrying Name / Options / Severity.
 	Rules []ConfiguredRule
+	// TypeSnapshot is this file's type data (binary-encoded via
+	// typesnapshot.EncodeBinary) for type-aware rules, attached by AttachTypeSnapshot
+	// from the file's program + a single checker before dispatch — by BOTH the CLI
+	// (buildPluginFileInputs) and the LSP (dispatchPluginLint). nil when no type
+	// info is built. Shipped to the worker via the wire file in buildEslintPluginRequest.
+	TypeSnapshot []byte
 }
 
 // BuildEslintPluginFileInput assembles one file's plugin-lint input from its
@@ -127,6 +153,10 @@ type EslintPluginFileInput struct {
 // it returns ok=false when the file has no plugin rules (caller skips dispatch).
 // The caller supplies the frame: sourceFile (CLI — the native ts-go SourceFile)
 // or text (LSP — the overlay the worker lints); see EslintPluginFileInput.
+//
+// NOTE: TypeSnapshot is intentionally NOT assembled here — it needs a program +
+// a type checker, so the caller fills it via AttachTypeSnapshot after this call.
+// BOTH hosts do so: the CLI in buildPluginFileInputs, the LSP in dispatchPluginLint.
 func BuildEslintPluginFileInput(filePath, configKey string, rules []ConfiguredRule, languageOptions, settings map[string]any, text *string, sourceFile ast.SourceFileLike) (EslintPluginFileInput, bool) {
 	var pluginRules []ConfiguredRule
 	for _, r := range rules {
@@ -146,6 +176,33 @@ func BuildEslintPluginFileInput(filePath, configKey string, rules []ConfiguredRu
 		Settings:        settings,
 		Rules:           pluginRules,
 	}, true
+}
+
+// AttachTypeSnapshot builds this file's binary type snapshot and attaches it to
+// input.TypeSnapshot so plugin rules can reconstruct parserServices in the worker.
+// Built whenever the file has a program (checker/file non-nil), NOT gated on any
+// meta declaration: a file with a program gets a snapshot so getParserServices
+// works, exactly like real ESLint where parserOptions.project makes the program
+// available to every rule. A project-less file (nil checker) gets no snapshot,
+// and a rule calling getParserServices there throws — also like real ESLint.
+// Shared by the CLI and LSP hosts (F1).
+//
+// tc may be ANY single checker of the program: the snapshot is self-contained
+// (type-ids are internally consistent within whichever checker built it), so the
+// CLI's per-file owning checker (program.GetTypeCheckerForFile) and the LSP project
+// pool's default query checker BOTH work. What DOES matter is that Build runs
+// without a concurrent read of the SAME checker (see typesnapshot.Build's contract):
+// the CLI runs it before RunLinter, sharded per owning checker (parallel ACROSS
+// checkers, serial within one); the LSP runs it on the main dispatch loop.
+func AttachTypeSnapshot(input *EslintPluginFileInput, tc *checker.Checker, file *ast.SourceFile) {
+	if tc == nil || file == nil {
+		return
+	}
+	// Attach even an empty snapshot (e.g. a pure type-declaration file with no
+	// value node): the worker still reconstructs a program so getParserServices
+	// resolves instead of throwing, matching real ESLint where the program is
+	// present whenever the file is in the project.
+	input.TypeSnapshot = typesnapshot.EncodeBinary(typesnapshot.Build(tc, file))
 }
 
 // eslintPluginShutdownSentinel is the ONLY benign parseError the worker emits:
@@ -338,6 +395,7 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestio
 			ConfigKey:       f.ConfigKey,
 			LanguageOptions: f.LanguageOptions,
 			Settings:        f.Settings,
+			TypeSnapshot:    f.TypeSnapshot,
 		})
 	}
 	return EslintPluginLintRequest{

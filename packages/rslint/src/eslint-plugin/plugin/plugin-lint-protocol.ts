@@ -57,6 +57,16 @@ export interface EslintPluginLintRequest {
      * no JS config governs the file.
      */
     configKey?: string;
+    /**
+     * Per-file type snapshot for type-aware rules. Carried two ways:
+     *   - LSP: a base64 string here (vscode-jsonrpc has no binary channel).
+     *   - CLI: omitted here; the bytes ride in the IPC frame's binary trailer
+     *     and {@link typeSnapshotIndex} (1-based) points at them — the engine
+     *     host splices the ArrayBuffer back onto this field before dispatch.
+     */
+    typeSnapshot?: unknown;
+    /** 1-based index into the frame's binary trailer (CLI path); 0/absent ⇒ none. */
+    typeSnapshotIndex?: number;
   }>;
   rules?: Record<string, { options?: readonly unknown[] }>;
   /** Collect autofixes (driven by Go's `--fix`). */
@@ -123,8 +133,26 @@ export function buildPluginLintTasks(
       collectFixes,
       suggestionsMode,
       configKey,
+      typeSnapshot: decodeTypeSnapshot(f.typeSnapshot),
     };
   });
+}
+
+// Decode a wire type-snapshot into a transferable ArrayBuffer for the worker. The
+// wire carries it as a base64 string (CLI JSON IPC frame / LSP JSON-RPC) and —
+// once the CLI binary frame lands — possibly already as an ArrayBuffer. Decoding
+// HERE (host, once per file) means the worker reads it in place via DataView (no
+// base64 decode) and worker-pool transfers ownership (no structuredClone copy of
+// the snapshot). Returns undefined when absent.
+function decodeTypeSnapshot(raw: unknown): ArrayBuffer | undefined {
+  if (raw instanceof ArrayBuffer) return raw;
+  if (typeof raw === 'string' && raw.length > 0) {
+    const buf = Buffer.from(raw, 'base64');
+    // Slice to a tight standalone ArrayBuffer (a pooled Buffer may share its
+    // backing store) so transferList moves exactly these bytes.
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+  }
+  return undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────

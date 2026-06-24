@@ -535,8 +535,9 @@ func collectFilesToLint(opts runProgramOptions) []*ast.SourceFile {
 // LintTarget is one file paired with the rules configured for it, as
 // resolved by RunLinterOptions.GetRulesForFile.
 type LintTarget struct {
-	File  *ast.SourceFile
-	Rules []ConfiguredRule
+	File    *ast.SourceFile
+	Program *compiler.Program
+	Rules   []ConfiguredRule
 }
 
 // CollectLintTargets resolves, for every file RunLinter would lint, the
@@ -570,7 +571,7 @@ func CollectLintTargets(opts RunLinterOptions) []LintTarget {
 			if len(rules) == 0 {
 				continue
 			}
-			targets = append(targets, LintTarget{File: file, Rules: rules})
+			targets = append(targets, LintTarget{File: file, Program: program, Rules: rules})
 		}
 	}
 	return targets

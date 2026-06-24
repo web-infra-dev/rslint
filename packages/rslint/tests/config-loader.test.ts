@@ -281,7 +281,9 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ]) as NormalizedPluginEntry[];
     expect(entry.plugins).toContain('eslint-plugin-react');
     expect(entry.eslintPlugins).toEqual({
-      'eslint-plugin-react': { ruleNames: ['no-bar', 'no-foo'] },
+      'eslint-plugin-react': {
+        ruleNames: ['no-bar', 'no-foo'],
+      },
     });
   });
 
@@ -299,6 +301,27 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     ]) as NormalizedPluginEntry[];
     expect(entry.eslintPlugins).toBeUndefined();
     expect(entry.plugins).toEqual([]);
+  });
+
+  test('does NOT read requiresTypeChecking — type-aware gating is project-based, all rule names pass through', () => {
+    // requiresTypeChecking is no longer extracted: a file gets a snapshot by
+    // having a program (parserOptions.project), so the (optional, non-standard)
+    // meta is irrelevant to the wire payload. Every rule name passes through
+    // regardless of any requiresTypeChecking declaration.
+    const taPlugin = {
+      meta: { name: 't' },
+      rules: {
+        'needs-types': { meta: { docs: { requiresTypeChecking: true } } },
+        syntactic: { meta: { docs: { requiresTypeChecking: false } } },
+        'no-docs': {},
+      },
+    };
+    const [entry] = normalizeConfig([
+      { files: ['**/*.ts'], plugins: { ta: taPlugin }, rules: {} },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toEqual({
+      ta: { ruleNames: ['needs-types', 'no-docs', 'syntactic'] },
+    });
   });
 });
 
@@ -358,7 +381,10 @@ describe('collectPluginMeta', () => {
       },
     ]);
     expect(eslintPluginEntries).toEqual([
-      { prefix: 'local', ruleNames: ['no-bar', 'no-foo', 'zzz'] },
+      {
+        prefix: 'local',
+        ruleNames: ['no-bar', 'no-foo', 'zzz'],
+      },
     ]);
   });
 });

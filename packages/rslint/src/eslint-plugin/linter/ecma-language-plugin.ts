@@ -164,6 +164,8 @@ export interface LintFileRequest {
    * route the task before delegating.
    */
   configKey?: string;
+  /** Per-file type snapshot (transferred ArrayBuffer) for type-aware rules; threaded into createSourceCode. */
+  typeSnapshot?: ArrayBuffer;
 }
 
 /** Per-file lint response — one record per LintFileRequest. */
@@ -331,6 +333,7 @@ export function lintFile(
       starts: parsed.tokenStarts,
       ends: parsed.tokenEnds,
     },
+    typeSnapshot: req.typeSnapshot,
   });
 
   // ESLint v10's espree attaches `Program.tokens` (and `Program.comments`)
@@ -398,9 +401,19 @@ export function lintFile(
       continue;
     }
     const ruleAny = ruleDef as {
-      meta?: RuleConfig['meta'] & { defaultOptions?: readonly unknown[] };
+      meta?: RuleConfig['meta'] & {
+        defaultOptions?: readonly unknown[];
+      };
       create?: (ctx: RuleContext) => Record<string, ListenerFn | ListenerFn[]>;
     };
+
+    // No worker-side type-aware gate: type-aware gating no longer keys off the
+    // (optional, non-standard) `meta.docs.requiresTypeChecking`. A file in the
+    // project carries a program (snapshot attached), so getParserServices
+    // resolves; a project-less file carries none, and a rule calling
+    // getParserServices there throws "requires type information" — exactly like
+    // real ESLint. Syntactic rules never call getParserServices, so they run
+    // regardless.
 
     const ctx = createRuleContext({
       ruleName,

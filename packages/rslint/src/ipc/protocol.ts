@@ -46,6 +46,13 @@ export interface IpcMessage<T = unknown> {
   kind: MessageKind;
   id: number;
   data?: T;
+  /**
+   * Out-of-band binary blobs carried in the frame trailer (mirrors Go's
+   * `ipc.Message.Binary`). The transport surfaces them as ArrayBuffers; the
+   * application layer (e.g. pluginLint) references them by index from the JSON
+   * payload. Absent on a legacy bare-JSON frame.
+   */
+  binary?: ArrayBuffer[];
 }
 
 /**

@@ -64,6 +64,7 @@ export default defineConfig({
     './tests/cli/type-check/type-check-snapshot.test.ts',
     './tests/cli/type-check/ignores-suppression.test.ts',
     './tests/cli/type-check/type-check-only.test.ts',
+    './tests/cli/type-aware/type-aware-bridge.test.ts',
 
     // eslint
     './tests/eslint/rules/accessor-pairs.test.ts',

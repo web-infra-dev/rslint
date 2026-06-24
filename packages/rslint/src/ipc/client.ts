@@ -69,6 +69,18 @@ const HEADER_BYTES = 4;
  */
 const MAX_FRAME_BYTES = 256 * 1024 * 1024;
 
+/**
+ * High bit of the 4-byte length header. When set, the frame body is not bare
+ * JSON but a binary-carrying layout (mirrors Go's `frameBinaryFlag`):
+ *
+ *   [4B jsonLen][JSON][4B binCount]( [4B blobLen][blob] )×binCount
+ *
+ * The low 31 bits hold the body length (MAX_FRAME_BYTES = 256 MiB uses only
+ * 28, so the high bit is always free). A frame with no binary attachments
+ * keeps the original bare-JSON format, so every other frame stays unchanged.
+ */
+const FRAME_BINARY_FLAG = 0x80000000;
+
 export interface IpcClientOptions {
   /**
    * Initial buffer size for the read accumulator. Frames larger than this
@@ -335,7 +347,10 @@ export class IpcClient {
     this.bufferedBytes += chunk.length;
 
     while (this.bufferedBytes >= HEADER_BYTES) {
-      const len = this.peekHeaderLen();
+      const raw = this.peekHeaderRaw();
+      const hasBinary = (raw & FRAME_BINARY_FLAG) !== 0;
+      // Low 31 bits hold the body length; the high bit is the binary flag.
+      const len = raw & 0x7fffffff;
       // Symmetric to Go's `maxFrameSize = 256 MiB` in
       // internal/ipc/frame.go. A frame length that exceeds the
       // cap usually means a stream desync (someone wrote unframed bytes
@@ -364,12 +379,14 @@ export class IpcClient {
 
       let msg: IpcMessage;
       try {
-        msg = JSON.parse(body.toString('utf8')) as IpcMessage;
+        msg = hasBinary
+          ? decodeBinaryBody(body)
+          : (JSON.parse(body.toString('utf8')) as IpcMessage);
       } catch (err) {
         // Malformed frame — log and skip; framing is intact (we already
         // consumed the body), so subsequent frames decode normally.
         process.stderr.write(
-          `rslint: malformed JSON in frame (len=${len}): ${(err as Error).message}\n`,
+          `rslint: malformed frame (len=${len}): ${(err as Error).message}\n`,
         );
         continue;
       }
@@ -379,28 +396,30 @@ export class IpcClient {
   };
 
   /**
-   * Read the 4-byte LE frame-length header at the front of the queue
-   * WITHOUT consuming it. The header may straddle chunk boundaries
-   * (e.g. a peer that splits the length prefix), so read it byte-by-byte
-   * across the leading chunks. Caller guarantees `bufferedBytes >= 4`.
+   * Read the 4-byte LE frame header at the front of the queue WITHOUT
+   * consuming it, returning the RAW u32 (high bit = binary flag, low 31 bits
+   * = body length — the caller splits them). The header may straddle chunk
+   * boundaries (e.g. a peer that splits the length prefix), so read it
+   * byte-by-byte across the leading chunks. Caller guarantees
+   * `bufferedBytes >= 4`.
    */
-  private peekHeaderLen(): number {
+  private peekHeaderRaw(): number {
     // Fast path: the whole header lives in the first chunk (the common
     // case — frames usually arrive aligned).
     const first = this.chunks[0];
     if (first.length >= HEADER_BYTES) return first.readUInt32LE(0);
     // Slow path: header split across chunks — assemble the 4 bytes.
-    let len = 0;
+    let raw = 0;
     let seen = 0;
     for (const c of this.chunks) {
       for (let i = 0; i < c.length && seen < HEADER_BYTES; i++, seen++) {
-        len |= c[i] << (8 * seen);
+        raw |= c[i] << (8 * seen);
       }
       if (seen >= HEADER_BYTES) break;
     }
     // `>>> 0` reinterprets the (possibly sign-bit-set) result as u32 LE,
     // matching Buffer.readUInt32LE.
-    return len >>> 0;
+    return raw >>> 0;
   }
 
   /**
@@ -555,13 +574,39 @@ export class IpcClient {
 // ────────────────────────────────────────────────────────────────────
 
 /**
- * Encode an IPC message into the `[4B u32 LE length][JSON]` wire format.
+ * Encode an IPC message into the wire format. With no `binary` attachments
+ * this is the legacy `[4B u32 LE length][JSON]`; with attachments it is the
+ * binary-carrying layout (see {@link FRAME_BINARY_FLAG}). Mirrors Go's
+ * `WriteFrame`.
  */
 export function encodeFrame<T = unknown>(msg: IpcMessage<T>): Buffer {
-  const body = Buffer.from(JSON.stringify(msg), 'utf8');
-  const out = Buffer.allocUnsafe(HEADER_BYTES + body.length);
-  out.writeUInt32LE(body.length, 0);
-  body.copy(out, HEADER_BYTES);
+  const { binary, ...jsonMsg } = msg;
+  const jsonBody = Buffer.from(JSON.stringify(jsonMsg), 'utf8');
+  const blobs = binary ?? [];
+
+  if (blobs.length === 0) {
+    const out = Buffer.allocUnsafe(HEADER_BYTES + jsonBody.length);
+    out.writeUInt32LE(jsonBody.length, 0);
+    jsonBody.copy(out, HEADER_BYTES);
+    return out;
+  }
+
+  // Binary-carrying: [4B (bodyLen|FLAG)][4B jsonLen][JSON][4B binCount]( [4B blobLen][blob] )×N
+  let bodyLen = 4 + jsonBody.length + 4; // jsonLen field + JSON + binCount field
+  for (const ab of blobs) bodyLen += 4 + ab.byteLength;
+  const out = Buffer.allocUnsafe(HEADER_BYTES + bodyLen);
+  out.writeUInt32LE((bodyLen | FRAME_BINARY_FLAG) >>> 0, 0);
+  let off = HEADER_BYTES;
+  out.writeUInt32LE(jsonBody.length, off);
+  off += 4;
+  off += jsonBody.copy(out, off);
+  out.writeUInt32LE(blobs.length, off);
+  off += 4;
+  for (const ab of blobs) {
+    out.writeUInt32LE(ab.byteLength, off);
+    off += 4;
+    off += Buffer.from(ab).copy(out, off);
+  }
   return out;
 }
 
@@ -577,8 +622,10 @@ export function decodeFrame(
   buf: Buffer,
 ): { msg: IpcMessage; consumed: number } | null {
   if (buf.length < HEADER_BYTES) return null;
-  const len = buf.readUInt32LE(0);
-  // Enforce the same cap as the streaming path (ipc-client.ts:290).
+  const raw = buf.readUInt32LE(0);
+  const hasBinary = (raw & FRAME_BINARY_FLAG) !== 0;
+  const len = raw & 0x7fffffff;
+  // Enforce the same cap as the streaming path.
   // Without this guard an attacker who can write to a buffer this
   // helper consumes (test harnesses that wire arbitrary streams, or
   // callers that misuse decodeFrame on untrusted input) could pin
@@ -591,8 +638,59 @@ export function decodeFrame(
   }
   if (buf.length < HEADER_BYTES + len) return null;
   const body = buf.subarray(HEADER_BYTES, HEADER_BYTES + len);
-  const msg = JSON.parse(body.toString('utf8')) as IpcMessage;
+  const msg = hasBinary
+    ? decodeBinaryBody(body)
+    : (JSON.parse(body.toString('utf8')) as IpcMessage);
   return { msg, consumed: HEADER_BYTES + len };
+}
+
+/**
+ * Decode a binary-carrying frame body (the layout flagged by
+ * {@link FRAME_BINARY_FLAG}):
+ *
+ *   [4B jsonLen][JSON][4B binCount]( [4B blobLen][blob] )×binCount
+ *
+ * Every field is bounds-checked against the body so a truncated / malformed
+ * trailer throws rather than slicing out of range. Each blob is copied into a
+ * standalone ArrayBuffer so it neither pins the frame slab nor shares a pooled
+ * Buffer's backing store. Mirrors Go's `decodeBinaryFrame`.
+ */
+function decodeBinaryBody(body: Buffer): IpcMessage {
+  let off = 0;
+  const readU32 = (): number => {
+    if (off + 4 > body.length) {
+      throw new Error('ipc-client: binary frame truncated reading a length');
+    }
+    const v = body.readUInt32LE(off);
+    off += 4;
+    return v;
+  };
+
+  const jsonLen = readU32();
+  if (off + jsonLen > body.length) {
+    throw new Error('ipc-client: binary frame jsonLen out of bounds');
+  }
+  const msg = JSON.parse(
+    body.toString('utf8', off, off + jsonLen),
+  ) as IpcMessage;
+  off += jsonLen;
+
+  const binCount = readU32();
+  const binary: ArrayBuffer[] = [];
+  for (let i = 0; i < binCount; i++) {
+    const blobLen = readU32();
+    if (off + blobLen > body.length) {
+      throw new Error(`ipc-client: binary frame truncated at blob ${i}`);
+    }
+    // Copy into a standalone, tightly-sized ArrayBuffer so it neither pins the
+    // frame slab nor shares a pooled Buffer's backing store.
+    const blob = new Uint8Array(blobLen);
+    blob.set(body.subarray(off, off + blobLen));
+    binary.push(blob.buffer);
+    off += blobLen;
+  }
+  msg.binary = binary;
+  return msg;
 }
 
 /**

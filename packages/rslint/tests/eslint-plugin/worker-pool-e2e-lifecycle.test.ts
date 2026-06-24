@@ -59,6 +59,37 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       await pool.shutdown();
     });
 
+    // M2: a type snapshot rides along as an ArrayBuffer and is TRANSFERRED
+    // (zero-copy) to the worker, not structuredClone-copied. The observable
+    // proof is the main-thread ArrayBuffer being detached after dispatch
+    // (byteLength → 0). The local fixture plugin doesn't read the snapshot,
+    // so this isolates the transport mechanics from rule behavior; the
+    // 4-byte buffer is below the snapshot header size (24), so the worker's
+    // buildParserServicesFromSnapshot degrades to {} without crashing.
+    test('typeSnapshot ArrayBuffer is transferred (zero-copy), detaching the main-thread buffer', async () => {
+      const pool = new WorkerPool({ configs: localConfigs, workerCount: 1 });
+      await pool.init();
+
+      const snapshot = new ArrayBuffer(4);
+      const t: LintTask = {
+        ...task('a.ts', 'const x = null;'),
+        typeSnapshot: snapshot,
+      };
+      expect(snapshot.byteLength).toBe(4); // main thread owns it pre-dispatch
+
+      const results = await pool.lintBatch([t]);
+
+      // Dispatch succeeded despite the transfer — the rule still fired.
+      expect(results).toHaveLength(1);
+      expect(results[0].diagnostics).toHaveLength(1);
+      expect(results[0].diagnostics[0].ruleName).toBe('local/no-null');
+      // Transfer (not copy) detaches the source: byteLength drops to 0. A
+      // regression that dropped the transferList would leave it at 4.
+      expect(snapshot.byteLength).toBe(0);
+
+      await pool.shutdown();
+    });
+
     test('--singleThreaded honors workerCount=1', async () => {
       const pool = new WorkerPool({
         configs: localConfigs,

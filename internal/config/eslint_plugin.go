@@ -44,9 +44,13 @@ func RegisterEslintPluginRules(entries []EslintPluginEntry) {
 					fullName)
 				continue
 			}
+			// Plugin rules never set RequiresTypeInfo (defaults false): type-aware
+			// gating no longer keys off a meta declaration. A file gets a snapshot
+			// by having a program (parserOptions.project); a rule that calls
+			// getParserServices without one throws, exactly like real ESLint. So
+			// plugin rules are NOT filtered off gap-files — they run and throw there.
 			GlobalRuleRegistry.Register(fullName, rule.Rule{
 				Name:               fullName,
-				RequiresTypeInfo:   false,
 				IsEslintPluginRule: true,
 				Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 					// Never executed: plugin rules run in the Node worker.

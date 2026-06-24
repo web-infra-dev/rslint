@@ -152,6 +152,31 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 	if !ok {
 		return
 	}
+
+	// CLI parity: attach this file's type snapshot so type-aware plugin rules run
+	// under the LSP too, reusing the exact Go→worker path (F1, AttachTypeSnapshot).
+	// Built HERE on the main dispatch loop — never in the goroutine below. The
+	// language service's program reflects the latest overlay (GetLanguageService
+	// flushes pending edits, the same source the native pass reads). The snapshot
+	// is self-contained (type-ids are internally consistent within whichever single
+	// checker built it), so the project pool's default query checker suffices.
+	// Concurrency safety: this Build runs on the main dispatch loop and takes ONE
+	// checker via GetTypeChecker, which the project pool marks heldBy this request
+	// until done() — so no concurrent query reacquires THIS instance mid-Build, and
+	// a concurrent hover/completion is served by a DIFFERENT pool checker (the pool
+	// hands out idle instances under its query slots). The in-use checker is thus
+	// never read concurrently. (The CLI's model is the unlocked-but-serial one in
+	// typesnapshot.Build's contract.)
+	if s.session != nil {
+		if ls, lerr := s.session.GetLanguageService(s.backgroundCtx, uri); lerr == nil {
+			if program := ls.GetProgram(); program != nil {
+				tc, done := program.GetTypeChecker(s.backgroundCtx)
+				linter.AttachTypeSnapshot(&input, tc, program.GetSourceFile(uriToPath(uri)))
+				done()
+			}
+		}
+	}
+
 	dispatch := s.installEslintPluginDispatch()
 
 	// Bound the reverse request as a backstop: even with supersede-cancel, a

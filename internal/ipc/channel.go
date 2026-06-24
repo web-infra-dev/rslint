@@ -124,10 +124,24 @@ func (c *Channel) Done() <-chan struct{} { return c.done }
 // SendRequest sends a request and blocks until the matching response/error
 // arrives, ctx is cancelled, or the channel closes.
 func (c *Channel) SendRequest(ctx context.Context, kind MessageKind, payload any) (*Message, error) {
+	return c.sendRequest(ctx, kind, payload, nil)
+}
+
+// SendRequestWithBinary is SendRequest with opaque binary blobs attached as a
+// frame trailer (see Message.Binary). The peer receives them out of band of the
+// JSON payload — used to ship large binary data (e.g. type snapshots) without
+// base64-inflating the JSON. The CLI host's pluginLint dispatch uses this; the
+// LSP path can't (vscode-jsonrpc has no binary channel) and keeps base64.
+func (c *Channel) SendRequestWithBinary(ctx context.Context, kind MessageKind, payload any, blobs [][]byte) (*Message, error) {
+	return c.sendRequest(ctx, kind, payload, blobs)
+}
+
+func (c *Channel) sendRequest(ctx context.Context, kind MessageKind, payload any, blobs [][]byte) (*Message, error) {
 	msg, err := NewMessage(kind, 0, payload)
 	if err != nil {
 		return nil, err
 	}
+	msg.Binary = blobs
 
 	// Apply the default per-request timeout only when the caller's ctx carries
 	// none, so a peer that is alive but never replies can't hang the request

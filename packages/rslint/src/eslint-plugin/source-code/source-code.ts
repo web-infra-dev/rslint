@@ -45,6 +45,7 @@ import {
   type LocPosition,
   type SourceLocation,
 } from '../ast/normalize-ast.js';
+import { buildParserServicesFromSnapshot } from './parser-services-from-snapshot.js';
 import {
   getDeclaredVariablesFromScopeManager,
   getScopeForNode,
@@ -332,6 +333,13 @@ export interface SourceCodeBuildInput {
     starts: Uint32Array;
     ends: Uint32Array;
   };
+  /**
+   * Per-file type snapshot: Go's EncodeBinary output, decoded by the host to an
+   * ArrayBuffer and transferred in (read in place by buildParserServicesFromSnapshot).
+   * When present, `parserServices` is reconstructed from it so type-aware plugin
+   * rules can query types; absent → `parserServices` stays `{}`.
+   */
+  typeSnapshot?: ArrayBuffer;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -612,10 +620,11 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     // ESTree KEYS would return `undefined` for those types, silently
     // skipping every TS subtree.
     visitorKeys: RUNNER_VISITOR_KEYS as Record<string, readonly string[]>,
-    // Empty in plain JS (matches ESLint v10's default). Type-aware
-    // plugins that probe `parserServices.program` correctly skip
-    // type-aware checks under rslint.
-    parserServices: {},
+    // Empty in plain JS (matches ESLint v10's default), or reconstructed from
+    // the Go type snapshot for type-aware plugin rules when one was shipped.
+    parserServices: input.typeSnapshot
+      ? buildParserServicesFromSnapshot(input.typeSnapshot)
+      : {},
 
     getText(node?: ESTreeNode, beforeCount = 0, afterCount = 0): string {
       if (!node) return text;

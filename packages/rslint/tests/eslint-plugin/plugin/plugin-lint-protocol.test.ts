@@ -140,6 +140,50 @@ describe('buildPluginLintTasks', () => {
     expect(tasks[0].languageOptions).toBe(langOpts);
     expect(tasks[0].settings).toBe(settings);
   });
+
+  // typeSnapshot is decoded HERE (host side, once per file) so the worker
+  // reads it in place via DataView and worker-pool transfers ownership — no
+  // base64 round-trip / structuredClone copy in the worker.
+  test('typeSnapshot base64 string → decoded to a tight ArrayBuffer, bytes identical', () => {
+    // High bytes (252-255) round-trip through base64 but corrupt under a
+    // latin1/utf8 misread — pins that the decode is binary-exact.
+    const bytes = new Uint8Array([0, 1, 2, 252, 253, 254, 255]);
+    const b64 = Buffer.from(bytes).toString('base64');
+    const tasks = buildPluginLintTasks(
+      input([{ path: '/a.ts', text: '', typeSnapshot: b64 }]),
+      { configDirSet: new Set() },
+    );
+    const snap = tasks[0].typeSnapshot;
+    if (!(snap instanceof ArrayBuffer)) {
+      throw new Error('expected typeSnapshot to decode to an ArrayBuffer');
+    }
+    // Tight: exactly the decoded bytes, no pooled-Buffer slack carried over.
+    expect(snap.byteLength).toBe(bytes.length);
+    expect(new Uint8Array(snap)).toEqual(bytes);
+  });
+
+  test('typeSnapshot already an ArrayBuffer → passed through by reference (CLI binary frame)', () => {
+    const ab = new Uint8Array([9, 8, 7]).buffer;
+    const tasks = buildPluginLintTasks(
+      input([{ path: '/a.ts', text: '', typeSnapshot: ab }]),
+      { configDirSet: new Set() },
+    );
+    // Same reference: a binary frame already hands us an ArrayBuffer — nothing
+    // to decode, nothing to copy.
+    expect(tasks[0].typeSnapshot).toBe(ab);
+  });
+
+  test('typeSnapshot absent / empty string → task.typeSnapshot undefined (no snapshot to ship)', () => {
+    const tasks = buildPluginLintTasks(
+      input([
+        { path: '/a.ts', text: '' }, // absent
+        { path: '/b.ts', text: '', typeSnapshot: '' }, // empty string
+      ]),
+      { configDirSet: new Set() },
+    );
+    expect(tasks[0].typeSnapshot).toBeUndefined();
+    expect(tasks[1].typeSnapshot).toBeUndefined();
+  });
 });
 
 describe('buildPluginLintResult', () => {

@@ -26,6 +26,40 @@ const SIGNAL_EXIT_CODES: Record<string, number> = {
   SIGKILL: 137,
 };
 
+/**
+ * Splice the IPC frame's binary trailer back onto each file's `typeSnapshot`.
+ *
+ * The CLI dispatcher ships type snapshots out of band (the frame's binary
+ * trailer, `msg.binary`) to avoid base64-inflating the JSON; each file carries
+ * a 1-based `typeSnapshotIndex` into that array. This rewrites `typeSnapshot`
+ * to the matching ArrayBuffer so the worker pool sees one uniform shape. A
+ * frame with no trailer (the common case, and every LSP request) returns
+ * `data` untouched. Mutates and returns `data`.
+ *
+ * Exported for unit tests (it is the Node mirror of Go's `hoistTypeSnapshots`);
+ * the package entry does not re-export it, so it stays internal.
+ */
+export function spliceTypeSnapshots(
+  data: unknown,
+  binary: ArrayBuffer[] | undefined,
+): unknown {
+  if (!binary || binary.length === 0) return data;
+  if (typeof data !== 'object' || data === null || !('files' in data)) {
+    return data;
+  }
+  const files = data.files;
+  if (!Array.isArray(files)) return data;
+  for (const file of files) {
+    if (typeof file !== 'object' || file === null) continue;
+    const f = file as { typeSnapshot?: unknown; typeSnapshotIndex?: number };
+    const idx = f.typeSnapshotIndex;
+    if (typeof idx === 'number' && idx > 0 && idx <= binary.length) {
+      f.typeSnapshot = binary[idx - 1];
+    }
+  }
+  return data;
+}
+
 export interface EngineRunOptions {
   /** Path to the Go rslint binary. */
   binPath: string;
@@ -52,10 +86,15 @@ export interface EngineRunOptions {
   /** stderr sink (default process.stderr). */
   stderr?: NodeJS.WritableStream;
   /**
-   * ESLint-plugin {prefix, ruleNames} metadata forwarded to Go in the
-   * `init` payload so it registers placeholder rules for plugin rule names.
+   * ESLint-plugin {prefix, ruleNames} metadata forwarded to Go in the `init`
+   * payload so it registers placeholder rules for plugin rule names. Type-aware
+   * gating is project-based (a file with a program gets a snapshot), so no
+   * per-rule requiresTypeChecking subset is forwarded.
    */
-  eslintPluginEntries?: Array<{ prefix: string; ruleNames: string[] }>;
+  eslintPluginEntries?: Array<{
+    prefix: string;
+    ruleNames: string[];
+  }>;
   /**
    * Per-config descriptors (configPath + configDirectory) for configs that
    * mount ESLint plugins; used to init the worker pool that answers Go's
@@ -204,8 +243,12 @@ export async function runEngine(opts: EngineRunOptions): Promise<number> {
           // Go dispatched a plugin-lint batch in parallel with native linting.
           // Answer from the worker pool; an absent pool (no plugins configured)
           // yields empty results. Never throws — per-file/-rule failures travel
-          // inside the result payload.
-          return pluginHost ? pluginHost.lint(msg.data) : { results: [] };
+          // inside the result payload. CLI type snapshots ride in the frame's
+          // binary trailer (msg.binary); splice them back onto each file before
+          // dispatch so the worker sees one uniform shape (LSP keeps base64).
+          return pluginHost
+            ? pluginHost.lint(spliceTypeSnapshots(msg.data, msg.binary))
+            : { results: [] };
         default:
           throw new Error(`engine: unexpected inbound kind '${msg.kind}'`);
       }

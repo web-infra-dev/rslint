@@ -118,6 +118,67 @@ describe('encode/decode round-trip', () => {
     expect(decodeFrame(Buffer.alloc(0))).toBeNull();
     expect(decodeFrame(Buffer.alloc(3))).toBeNull();
   });
+
+  test('round-trips a frame carrying binary trailer blobs', () => {
+    // 0xfe/0xff catch any latin1/utf8 corruption of the raw bytes.
+    const blobA = new Uint8Array([0, 1, 0xfe, 0xff]).buffer;
+    const blobB = new Uint8Array([]).buffer; // empty blob must survive
+    const msg: IpcMessage = {
+      kind: 'pluginLint',
+      id: 3,
+      data: { n: 1 },
+      binary: [blobA, blobB],
+    };
+    const frame = encodeFrame(msg);
+    // High bit of the length header set ⇒ binary-carrying frame.
+    expect((frame.readUInt32LE(0) & 0x80000000) !== 0).toBe(true);
+
+    const result = decodeFrame(frame);
+    expect(result).not.toBeNull();
+    expect(result!.consumed).toBe(frame.length);
+    expect(result!.msg.kind).toBe('pluginLint');
+    expect((result!.msg.data as { n: number }).n).toBe(1);
+    const bins = result!.msg.binary;
+    expect(bins).toHaveLength(2);
+    expect(new Uint8Array(bins![0])).toEqual(
+      new Uint8Array([0, 1, 0xfe, 0xff]),
+    );
+    expect(bins![1].byteLength).toBe(0);
+  });
+
+  test('decodes a Go-layout binary frame (cross-language byte compatibility)', () => {
+    // Hand-build the exact bytes Go's WriteFrame emits for a binary frame:
+    //   [4B (bodyLen|FLAG)][4B jsonLen][JSON][4B binCount]( [4B blobLen][blob] )×N
+    // and confirm the Node decoder reads it identically — pinning both
+    // implementations to one wire layout without spawning the Go binary.
+    const json = Buffer.from(
+      JSON.stringify({ kind: 'pluginLint', id: 9 }),
+      'utf8',
+    );
+    const blob = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
+    const bodyLen = 4 + json.length + 4 + (4 + blob.length);
+    const buf = Buffer.alloc(4 + bodyLen);
+    let off = 0;
+    buf.writeUInt32LE((bodyLen | 0x80000000) >>> 0, off);
+    off += 4;
+    buf.writeUInt32LE(json.length, off);
+    off += 4;
+    off += json.copy(buf, off);
+    buf.writeUInt32LE(1, off); // binCount
+    off += 4;
+    buf.writeUInt32LE(blob.length, off);
+    off += 4;
+    off += blob.copy(buf, off);
+
+    const result = decodeFrame(buf);
+    expect(result).not.toBeNull();
+    expect(result!.msg.kind).toBe('pluginLint');
+    expect(result!.msg.id).toBe(9);
+    expect(result!.msg.binary).toHaveLength(1);
+    expect(new Uint8Array(result!.msg.binary![0])).toEqual(
+      new Uint8Array([0xde, 0xad, 0xbe, 0xef]),
+    );
+  });
 });
 
 // The streaming decoder in `IpcClient.onChunk` must reassemble frames

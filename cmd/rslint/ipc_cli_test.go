@@ -16,6 +16,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 // newCLIChannelPair wires two ipc.Channels back-to-back over two io.Pipes so
@@ -263,5 +264,75 @@ func runStdoutTTYCase(t *testing.T, tty, wantANSI bool) {
 	}
 	if gotANSI := strings.Contains(text, "\x1b["); gotANSI != wantANSI {
 		t.Errorf("ANSI in output = %v, want %v (stdoutIsTTY=%v); output: %q", gotANSI, wantANSI, tty, text)
+	}
+}
+
+// TestHoistTypeSnapshots pins the CLI dispatcher's binary-trailer hoisting:
+// snapshots move out of the JSON into the blobs slice, each file gets a 1-based
+// index (0 for none), the index round-trips back to its blob, and the caller's
+// request is left untouched.
+func TestHoistTypeSnapshots(t *testing.T) {
+	snapA := []byte{1, 2, 3}
+	snapC := []byte{9, 9}
+	orig := linter.EslintPluginLintRequest{
+		Files: []linter.EslintPluginLintFile{
+			{Path: "a.ts", TypeSnapshot: snapA},
+			{Path: "b.ts"}, // no snapshot
+			{Path: "c.ts", TypeSnapshot: snapC},
+		},
+	}
+	got, blobs := hoistTypeSnapshots(orig)
+
+	// blobs holds exactly the two non-empty snapshots, in file order.
+	if len(blobs) != 2 {
+		t.Fatalf("got %d blobs, want 2", len(blobs))
+	}
+	if !bytes.Equal(blobs[0], snapA) || !bytes.Equal(blobs[1], snapC) {
+		t.Errorf("blobs = %v, want [%v %v]", blobs, snapA, snapC)
+	}
+
+	// Each snapshot-bearing file is hoisted out (TypeSnapshot nil) and gets a
+	// 1-based index; a file with no snapshot keeps index 0 and nil.
+	if got.Files[0].TypeSnapshot != nil || got.Files[0].TypeSnapshotIndex != 1 {
+		t.Errorf("file a: snapshot=%v index=%d, want nil/1", got.Files[0].TypeSnapshot, got.Files[0].TypeSnapshotIndex)
+	}
+	if got.Files[1].TypeSnapshotIndex != 0 {
+		t.Errorf("file b (no snapshot): index=%d, want 0", got.Files[1].TypeSnapshotIndex)
+	}
+	if got.Files[2].TypeSnapshot != nil || got.Files[2].TypeSnapshotIndex != 2 {
+		t.Errorf("file c: snapshot=%v index=%d, want nil/2", got.Files[2].TypeSnapshot, got.Files[2].TypeSnapshotIndex)
+	}
+
+	// The 1-based index round-trips: blobs[index-1] is the file's snapshot.
+	if !bytes.Equal(blobs[got.Files[0].TypeSnapshotIndex-1], snapA) {
+		t.Error("file a's index does not point at its snapshot in blobs")
+	}
+	if !bytes.Equal(blobs[got.Files[2].TypeSnapshotIndex-1], snapC) {
+		t.Error("file c's index does not point at its snapshot in blobs")
+	}
+
+	// The caller's original request is untouched (shallow-copy isolation).
+	if !bytes.Equal(orig.Files[0].TypeSnapshot, snapA) || orig.Files[0].TypeSnapshotIndex != 0 {
+		t.Errorf("original file a mutated: snapshot=%v index=%d", orig.Files[0].TypeSnapshot, orig.Files[0].TypeSnapshotIndex)
+	}
+	if !bytes.Equal(orig.Files[2].TypeSnapshot, snapC) {
+		t.Errorf("original file c snapshot mutated: %v", orig.Files[2].TypeSnapshot)
+	}
+}
+
+// TestHoistTypeSnapshots_NoSnapshots: with no file carrying a snapshot, blobs is
+// empty (so WriteFrame emits a legacy JSON frame) and every index stays 0.
+func TestHoistTypeSnapshots_NoSnapshots(t *testing.T) {
+	orig := linter.EslintPluginLintRequest{
+		Files: []linter.EslintPluginLintFile{{Path: "a.ts"}, {Path: "b.ts"}},
+	}
+	got, blobs := hoistTypeSnapshots(orig)
+	if len(blobs) != 0 {
+		t.Fatalf("got %d blobs, want 0", len(blobs))
+	}
+	for i, f := range got.Files {
+		if f.TypeSnapshotIndex != 0 {
+			t.Errorf("file %d index=%d, want 0", i, f.TypeSnapshotIndex)
+		}
 	}
 }
