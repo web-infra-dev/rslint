@@ -32,19 +32,19 @@ func TestNoReturnInFinallyUpstream(t *testing.T) {
 			// ---- invalid: return inside finally callback ----
 			{
 				Code:   `Promise.resolve(1).finally(() => { return 2 })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 36}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 20}},
 			},
 			{
 				Code:   `Promise.reject(0).finally(() => { return 2 })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 35}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 19}},
 			},
 			{
 				Code:   `myPromise.finally(() => { return 2 });`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 27}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 			{
 				Code:   `Promise.resolve(1).finally(function () { return 2 })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 42}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 20}},
 			},
 		},
 	)

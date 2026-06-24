@@ -22,11 +22,11 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// ---- Dimension 4: nesting / traversal boundary ----
 			// Return inside a nested function inside finally callback: only the
-			// directly passed function is checked; inner function is a separate
-			// function boundary.
+			// callback's own direct top-level statements are scanned, so the
+			// inner function's return is not seen.
 			{Code: `myPromise.finally(function() { var f = function() { return 2; }; f(); })`},
-			// Return inside a method inside finally callback: method creates
-			// its own function boundary, not attributed to finally callback.
+			// Return inside a method inside finally callback: the callback's
+			// direct statement is a class declaration, not a return.
 			{Code: `myPromise.finally(function() { class C { m() { return 2; } } })`},
 			// Return inside getter inside finally callback.
 			{Code: `myPromise.finally(function() { class C { get x() { return 2; } } })`},
@@ -37,9 +37,6 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 			// Arrow function with expression body (no explicit return): valid.
 			// N/A for return-statement analysis since expression body has no ReturnStatement.
 			{Code: `myPromise.finally(() => 2)`},
-
-			// Nested FunctionDeclaration creates its own function boundary;
-			// returns inside the declaration are ignored by the rule.
 
 			// Ensure the callback is only checked when it is the first argument of finally()
 			{Code: `Promise.finally(arg1, () => { return 1; })`},
@@ -54,17 +51,17 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 			{Code: `myPromise['finally'](() => { return 2 })`},
 
 			// ---- Dimension 4: receiver / expression wrappers ----
-			// No function boundary above return: return at top level is not inside
+			// No `.finally()` call at all: return at top level is not inside
 			// any function → no report. N/A: ReturnStatement at module level is a
 			// parse error; covered implicitly since no listener fires.
 
-			// ---- Locks in upstream isFinallyCallback() arm: no function boundary ----
-			// A return not inside any function produces no error.
-			// (The rule listener fires only on ReturnStatement nodes; if
-			// NearestFunctionBoundary returns nil the check exits early.)
+			// ---- Locks in IsMemberCall(node, "finally") gate: no .finally() call ----
+			// A return not inside any .finally() callback produces no error.
+			// (The rule listener fires on CallExpression and exits early unless
+			// IsMemberCall(node, "finally") matches.)
 			{Code: `var x = 1`},
 
-			// ---- Locks in upstream isFinallyCallback() arm: non-finally callee ----
+			// ---- Locks in IsMemberCall(node, "finally") gate: non-finally callee ----
 			// Return inside a .then() callback is not a finally callback.
 			{Code: `myPromise.then(function() { return 2; })`},
 			// Return inside a .catch() callback is not a finally callback.
@@ -85,17 +82,17 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 			// Parenthesized callback must still be flagged (SkipOuterExpressions).
 			{
 				Code:   `myPromise.finally((function() { return 2; }))`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 33}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 			// Double parens around callback.
 			{
 				Code:   `myPromise.finally(((function() { return 2; })))`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 34}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 			// Parenthesized arrow function.
 			{
 				Code:   `myPromise.finally((() => { return 2; }))`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 28}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 
 			// ---- Dimension 4: optional chain on the callee ----
@@ -104,36 +101,46 @@ func TestNoReturnInFinallyExtras(t *testing.T) {
 			// PropertyAccessExpression name which still matches.
 			{
 				Code:   `myPromise?.finally(() => { return 2 })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 28}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 12}},
 			},
 
 			// ---- Dimension 4: declaration / container forms ----
 			// Async function expression callback.
 			{
 				Code:   `myPromise.finally(async function() { return 2; })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 38}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 			// Named function expression callback.
 			{
 				Code:   `myPromise.finally(function cleanup() { return 2; })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 40}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 
 			// ---- Dimension 4: nesting / traversal boundary ----
-			// Return in outer function is flagged; inner function's return is not.
+			// Outer return is a direct top-level statement and is flagged;
+			// the inner function's return is not a top-level statement of the
+			// callback, so it's ignored. Reports once on `.finally`, not on
+			// either return.
 			{
 				Code:   `myPromise.finally(function() { var f = function() { return 2; }; return 3; })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 66}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
-			// FunctionDeclaration boundary: outer return is flagged, inner return is ignored.
+			// FunctionDeclaration's return isn't a top-level statement of the
+			// callback either; the outer return still flags the call once.
 			{
 				Code:   `myPromise.finally(() => { function a() { return 1; } return a(); })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 			// Empty returns at the top level should still be caught.
 			{
 				Code:   `Promise.finally(() => { return; })`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 9}},
+			},
+			// Multiple top-level returns still produce a single report (upstream
+			// uses .some(), not .forEach()).
+			{
+				Code:   `myPromise.finally(() => { return 1; return 2; })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 1, Column: 11}},
 			},
 
 			// ---- Real-user: return in multiline finally callback ----
@@ -144,7 +151,7 @@ fetch('/api')
   .finally(function() {
     return cleanup();
   });`,
-				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 5}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noReturnInFinally", Message: noReturnMsg, Line: 4, Column: 4}},
 			},
 		},
 	)

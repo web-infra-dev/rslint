@@ -55,26 +55,6 @@ func IsPromiseStatic(name string) bool {
 	}
 }
 
-// NearestFunctionBoundary returns the closest ancestor of node that is a
-// function-like declaration or expression, or nil if none exists. It stops at
-// function expressions, arrow functions, method declarations, getters, setters,
-// and constructors — the same boundaries used by eslint-plugin-promise rules.
-func NearestFunctionBoundary(node *ast.Node) *ast.Node {
-	for cur := node.Parent; cur != nil; cur = cur.Parent {
-		switch cur.Kind {
-		case ast.KindFunctionExpression,
-			ast.KindFunctionDeclaration,
-			ast.KindArrowFunction,
-			ast.KindMethodDeclaration,
-			ast.KindGetAccessor,
-			ast.KindSetAccessor,
-			ast.KindConstructor:
-			return cur
-		}
-	}
-	return nil
-}
-
 // IsMemberCallWithObjectName mirrors eslint-plugin-promise's lib/is-member-call-with-object-name.
 // It reports whether node is a call expression whose callee's root object is an identifier
 // named objectName, following the member chain recursively.

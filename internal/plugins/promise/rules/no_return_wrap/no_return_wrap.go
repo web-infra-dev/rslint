@@ -113,8 +113,6 @@ func isInPromise(node *ast.Node) bool {
 // nearestFunctionBoundary mirrors eslint-plugin-promise's no-return-wrap,
 // which only considers ArrowFunctionExpression/FunctionExpression ancestors
 // (filtering out FunctionDeclaration) when locating the enclosing function.
-// This differs from promiseutil.NearestFunctionBoundary, which is shared with
-// no-return-in-finally and does include FunctionDeclaration.
 func nearestFunctionBoundary(node *ast.Node) *ast.Node {
 	for cur := node.Parent; cur != nil; cur = cur.Parent {
 		switch cur.Kind {

@@ -15,60 +15,45 @@ func buildMessage() rule.RuleMessage {
 	}
 }
 
-// isFinallyCallback reports whether fn is directly passed as a callback to a
-// .finally() call. Parentheses around fn are skipped.
-func isFinallyCallback(fn *ast.Node) bool {
-	parent := fn.Parent
-	for parent != nil && ast.IsOuterExpression(parent, skipTransparent) {
-		parent = parent.Parent
+// callbackBody returns the block body of a .finally() callback, or nil if fn
+// isn't a function/arrow expression with a block body. Upstream only ever
+// sees FunctionExpression/ArrowFunctionExpression here, since fn comes
+// straight from the call's first argument.
+func callbackBody(fn *ast.Node) *ast.Node {
+	switch fn.Kind {
+	case ast.KindFunctionExpression:
+		return fn.AsFunctionExpression().Body
+	case ast.KindArrowFunction:
+		return fn.AsArrowFunction().Body
+	default:
+		return nil
 	}
-	if parent == nil || !promiseutil.IsMemberCall(parent, "finally") {
-		return false
-	}
-	callExpr := parent.AsCallExpression()
-	if callExpr.Arguments == nil || len(callExpr.Arguments.Nodes) == 0 {
-		return false
-	}
-	firstArg := ast.SkipOuterExpressions(callExpr.Arguments.Nodes[0], skipTransparent)
-	unwrappedFn := ast.SkipOuterExpressions(fn, skipTransparent)
-	return unwrappedFn == firstArg
 }
 
 var NoReturnInFinallyRule = rule.Rule{
 	Name: "promise/no-return-in-finally",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
-			ast.KindReturnStatement: func(node *ast.Node) {
-				fn := promiseutil.NearestFunctionBoundary(node)
-				if fn == nil {
+			ast.KindCallExpression: func(node *ast.Node) {
+				if !promiseutil.IsMemberCall(node, "finally") {
 					return
 				}
-				if isFinallyCallback(fn) {
-					var body *ast.Node
-					switch fn.Kind {
-					case ast.KindFunctionExpression:
-						body = fn.AsFunctionExpression().Body
-					case ast.KindFunctionDeclaration:
-						body = fn.AsFunctionDeclaration().Body
-					case ast.KindMethodDeclaration:
-						body = fn.AsMethodDeclaration().Body
-					case ast.KindGetAccessor:
-						body = fn.AsGetAccessorDeclaration().Body
-					case ast.KindSetAccessor:
-						body = fn.AsSetAccessorDeclaration().Body
-					case ast.KindConstructor:
-						body = fn.AsConstructorDeclaration().Body
-					case ast.KindArrowFunction:
-						body = fn.AsArrowFunction().Body
-					}
-					
-					// ESLint's promise/no-return-in-finally rule only checks top-level statements
-					// in the function's block body. It ignores nested returns.
-					if body != nil && body.Kind == ast.KindBlock {
-						if node.Parent != body {
-							return
-						}
-						ctx.ReportNode(node, buildMessage())
+				call := node.AsCallExpression()
+				if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
+					return
+				}
+				fn := ast.SkipOuterExpressions(call.Arguments.Nodes[0], skipTransparent)
+				body := callbackBody(fn)
+				if body == nil || body.Kind != ast.KindBlock {
+					return
+				}
+				// Mirrors upstream's body.body.some(...): only the callback's
+				// direct top-level statements count; nested returns don't.
+				for _, stmt := range body.AsBlock().Statements.Nodes {
+					if stmt.Kind == ast.KindReturnStatement {
+						callee := ast.SkipOuterExpressions(call.Expression, skipTransparent)
+						ctx.ReportNode(callee.AsPropertyAccessExpression().Name(), buildMessage())
+						return
 					}
 				}
 			},
