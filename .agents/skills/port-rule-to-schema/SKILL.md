@@ -66,9 +66,11 @@ Within `RunWithOptions`, cast the `options` parameter to the expected Go types g
   - Cast `options` to `[]any`.
   - Access the elements via `options.([]any)[0]` (validated by `Schema0`) and `options.([]any)[1]` (validated by `Schema1`).
 
-### 5. Update Tests
+### 5. Update Tests and Custom Call Sites
 
-In `<rule_name>_test.go`, make sure the tests pass. The rule tester runner automatically leverages the schemas to validate test case options before running rules.
+- In `<rule_name>_test.go`, make sure the tests pass. The rule tester runner automatically leverages the schemas to validate test case options before running rules.
+- **Verify Execution API**: Double-check that the ported rule is running with the new `.RunWithOptions` API rather than the legacy `.Run` API.
+- **Drop Legacy `.Run` Calls**: If there is rule-specific code (such as custom test cases/fixtures in `<rule_name>_test.go` or rule-specific helper files) that only runs for this specific rule, you should drop support for the old `.Run` API entirely there. Migrate those custom calls to use `.RunWithOptions` (validating and hydrating options via `rule.ValidateAndHydrateOptions` first).
 
 ---
 
