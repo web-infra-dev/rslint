@@ -113,10 +113,10 @@ var EqeqeqRule = rule.Rule{
 		"null": rule.Enum("always", "never", "ignore").Default("always"),
 	}),
 	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := options.([]any)
-		mode := opts[0].(string)
-		optsMap := opts[1].(map[string]any)
-		nullOption := optsMap["null"].(string)
+		opts, _ := options.([]any)
+		mode, _ := opts[0].(string)
+		optsMap, _ := opts[1].(map[string]any)
+		nullOption, _ := optsMap["null"].(string)
 
 		if mode == "allow-null" {
 			mode = "always"

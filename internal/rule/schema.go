@@ -88,13 +88,13 @@ func (s *IntSchema) Default(def int) *IntSchema {
 	return s
 }
 
-func (s *IntSchema) Min(min int) *IntSchema {
-	s.min = &min
+func (s *IntSchema) Min(minVal int) *IntSchema {
+	s.min = &minVal
 	return s
 }
 
-func (s *IntSchema) Max(max int) *IntSchema {
-	s.max = &max
+func (s *IntSchema) Max(maxVal int) *IntSchema {
+	s.max = &maxVal
 	return s
 }
 
@@ -220,7 +220,7 @@ func (s *ArraySchema) Validate(raw any) (any, error) {
 	val := reflect.ValueOf(raw)
 	if val.Kind() == reflect.Slice {
 		arr = make([]any, val.Len())
-		for i := 0; i < val.Len(); i++ {
+		for i := range val.Len() {
 			arr[i] = val.Index(i).Interface()
 		}
 	} else {
@@ -310,7 +310,7 @@ func (s *TupleSchema) Validate(raw any) (any, error) {
 	val := reflect.ValueOf(raw)
 	if val.Kind() == reflect.Slice {
 		arr = make([]any, val.Len())
-		for i := 0; i < val.Len(); i++ {
+		for i := range val.Len() {
 			arr[i] = val.Index(i).Interface()
 		}
 	} else {

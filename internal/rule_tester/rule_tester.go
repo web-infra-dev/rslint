@@ -141,7 +141,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			ExcludePaths:   []string{}, // explicit empty to disable default node_modules skip in tests
 			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				var runFunc func(ctx rule.RuleContext) rule.RuleListeners
-				var finalOptions any = options
+				finalOptions := options
 
 				if r.RunWithOptions != nil {
 					validated, err := rule.ValidateAndHydrateOptions(r.Schema0, r.Schema1, r.Name, options)

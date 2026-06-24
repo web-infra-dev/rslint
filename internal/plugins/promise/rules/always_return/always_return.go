@@ -182,20 +182,22 @@ var AlwaysReturnRule = rule.Rule{
 		"ignoreAssignmentVariable": rule.Union(rule.Array(rule.String())).Default([]any{"globalThis"}),
 	}),
 	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap := options.(map[string]any)
+		optsMap, _ := options.(map[string]any)
 
 		var ignoreAssignmentVariable []string
 		if arr, ok := optsMap["ignoreAssignmentVariable"].([]any); ok {
 			ignoreAssignmentVariable = make([]string, len(arr))
 			for i, v := range arr {
-				ignoreAssignmentVariable[i] = v.(string)
+				s, _ := v.(string)
+				ignoreAssignmentVariable[i] = s
 			}
 		} else {
 			ignoreAssignmentVariable = []string{"globalThis"}
 		}
 
+		ignoreLastCallback, _ := optsMap["ignoreLastCallback"].(bool)
 		opts := Options{
-			IgnoreLastCallback:       optsMap["ignoreLastCallback"].(bool),
+			IgnoreLastCallback:       ignoreLastCallback,
 			IgnoreAssignmentVariable: ignoreAssignmentVariable,
 		}
 

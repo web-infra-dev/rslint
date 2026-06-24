@@ -107,7 +107,7 @@ type Rule struct {
 // applying defaults and returning the validated typed options.
 func ValidateAndHydrateOptions(schema0 Schema, schema1 Schema, ruleName string, raw any) (any, error) {
 	if schema0 == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil // no Schema0 means no options to validate, not an error
 	}
 
 	// Normalize raw config into a slice of 2 option elements

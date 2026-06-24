@@ -69,11 +69,12 @@ var ValidParamsRule = rule.Rule{
 		"exclude": rule.Array(rule.String()),
 	}),
 	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap := options.(map[string]any)
-		excludeArr := optsMap["exclude"].([]any)
+		optsMap, _ := options.(map[string]any)
+		excludeArr, _ := optsMap["exclude"].([]any)
 		excludeMap := make(map[string]bool, len(excludeArr))
 		for _, item := range excludeArr {
-			excludeMap[item.(string)] = true
+			s, _ := item.(string)
+			excludeMap[s] = true
 		}
 		opts := Options{
 			Exclude: excludeMap,

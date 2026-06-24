@@ -59,7 +59,11 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 		if impl.RequiresTypeInfo {
 			continue
 		}
-		body, file, err := parser.runBodyFor(impl.Run)
+		runFn := impl.Run
+		if runFn == nil {
+			runFn = impl.RunWithOptions
+		}
+		body, file, err := parser.runBodyFor(runFn)
 		if err != nil {
 			// We require an unambiguous file:line for every registered Run
 			// so the static check can never silently skip a rule. If the

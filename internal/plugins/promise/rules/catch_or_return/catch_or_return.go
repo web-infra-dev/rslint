@@ -82,7 +82,7 @@ var CatchOrReturnRule = rule.Rule{
 		"terminationMethod": rule.Union(rule.String(), rule.Array(rule.String())).Default("catch"),
 	}),
 	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap := options.(map[string]any)
+		optsMap, _ := options.(map[string]any)
 
 		var terminationMethod []string
 		if t, ok := optsMap["terminationMethod"].(string); ok {
@@ -90,16 +90,20 @@ var CatchOrReturnRule = rule.Rule{
 		} else if arr, ok := optsMap["terminationMethod"].([]any); ok {
 			terminationMethod = make([]string, len(arr))
 			for i, v := range arr {
-				terminationMethod[i] = v.(string)
+				s, _ := v.(string)
+				terminationMethod[i] = s
 			}
 		} else {
 			terminationMethod = []string{"catch"}
 		}
 
+		allowThen, _ := optsMap["allowThen"].(bool)
+		allowThenStrict, _ := optsMap["allowThenStrict"].(bool)
+		allowFinally, _ := optsMap["allowFinally"].(bool)
 		opts := Options{
-			AllowThen:         optsMap["allowThen"].(bool),
-			AllowThenStrict:   optsMap["allowThenStrict"].(bool),
-			AllowFinally:      optsMap["allowFinally"].(bool),
+			AllowThen:         allowThen,
+			AllowThenStrict:   allowThenStrict,
+			AllowFinally:      allowFinally,
 			TerminationMethod: terminationMethod,
 		}
 

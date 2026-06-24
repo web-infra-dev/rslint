@@ -18,11 +18,6 @@ import (
 // isn't the standard Promise constructor, don't lint me".
 const skipTransparent = ast.OEKParentheses
 
-const (
-	defaultResolvePattern = "^_?resolve$"
-	defaultRejectPattern  = "^_?reject$"
-)
-
 type Options struct {
 	ResolvePattern string
 	RejectPattern  string
@@ -77,10 +72,12 @@ var ParamNamesRule = rule.Rule{
 		"rejectPattern":  rule.String().Default("^_?reject$"),
 	}),
 	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap := options.(map[string]any)
+		optsMap, _ := options.(map[string]any)
+		resolvePattern, _ := optsMap["resolvePattern"].(string)
+		rejectPattern, _ := optsMap["rejectPattern"].(string)
 		opts := Options{
-			ResolvePattern: optsMap["resolvePattern"].(string),
-			RejectPattern:  optsMap["rejectPattern"].(string),
+			ResolvePattern: resolvePattern,
+			RejectPattern:  rejectPattern,
 		}
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work

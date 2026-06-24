@@ -68,7 +68,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 				ruleConfigCopy := ruleConfig
 				
 				var runFunc func(ctx rule.RuleContext) rule.RuleListeners
-				var finalOptions any = ruleConfigCopy.Options
+				finalOptions := ruleConfigCopy.Options
 
 				if ruleImpl.RunWithOptions != nil {
 					validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema0, ruleImpl.Schema1, ruleImpl.Name, ruleConfigCopy.Options)
