@@ -22,13 +22,22 @@ runs:
         go-version: ${{ inputs.go-version }}
         cache: false
 
+    # Enumerate go.sum paths explicitly rather than '**/go.sum': the recursive
+    # glob walks the entire working tree (~240k files — node_modules + the
+    # typescript-go submodule's testdata) just to find the go.sum files, which
+    # exceeds hashFiles' 120s evaluation limit on the self-hosted Windows runner
+    # and fails the cache post-step. The explicit list scans only shim/ (~75
+    # files) plus two direct stats, covering every go.sum that feeds the module
+    # cache (root + shim modules + the typescript-go submodule's main module).
+    # typescript-go uses an exact path, not 'typescript-go/**/go.sum', since
+    # that glob would walk the submodule's ~152k testdata files all over again.
     - name: Go cache
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       if: runner.environment == 'github-hosted'
       with:
-        key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('go.sum', 'shim/**/go.sum', 'typescript-go/go.sum') }}
         restore-keys: |
-          setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+          setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('go.sum', 'shim/**/go.sum', 'typescript-go/go.sum') }}
         # Only cache module downloads, not build cache (GOCACHE is too large
         # and fills up disk on self-hosted runners)
         path: |
@@ -38,9 +47,9 @@ runs:
       uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
       if: runner.environment == 'self-hosted'
       with:
-        key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('go.sum', 'shim/**/go.sum', 'typescript-go/go.sum') }}
         restore-keys: |
-          setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+          setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('go.sum', 'shim/**/go.sum', 'typescript-go/go.sum') }}
         # Only cache module downloads, not build cache (GOCACHE is too large
         # and fills up disk on self-hosted runners)
         path: |
