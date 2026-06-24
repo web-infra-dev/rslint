@@ -395,10 +395,14 @@ var boundaryInvalid = []rule_tester.InvalidTestCase{
 	// Nested useEffect inside useEffect callback — mirrors upstream's
 	// `gatherDependenciesRecursively` walk, which descends into every
 	// child scope of the callback (including nested function bodies).
-	// The outer hook collects BOTH `inner` (captured transitively via
-	// the nested callback) AND `outer` as missing deps, producing one
-	// combined "missing dependencies: 'inner' and 'outer'" report.
-	// The inner hook is analyzed independently in its own listener pass.
+	// The outer hook's component scope is `MyComponent`, so it collects
+	// BOTH `outer` AND `inner` (the latter captured transitively by
+	// descending into the nested callback) into one combined report.
+	// The inner hook's component scope is the OUTER effect callback (the
+	// nearest enclosing function), and `inner` is declared above that in
+	// `MyComponent` — i.e. outside the inner hook's pure scope — so the
+	// inner hook reports nothing. This matches eslint-plugin-react-hooks
+	// v4 and v7 exactly (verified: both emit only the single 6:6 report).
 	{
 		Code: `
 			function MyComponent({ outer, inner }: { outer: number; inner: number }) {
@@ -411,9 +415,6 @@ var boundaryInvalid = []rule_tester.InvalidTestCase{
 		Tsx: true,
 		Errors: []rule_tester.InvalidTestCaseError{
 			{
-				// Outer effect's combined missing deps. The visitor fires
-				// the outer CallExpression listener before descending
-				// into the callback body, so this report comes first.
 				Message: "React Hook useEffect has missing dependencies: 'inner' and 'outer'. Either include them or remove the dependency array.",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
 			function MyComponent({ outer, inner }: { outer: number; inner: number }) {
@@ -421,18 +422,6 @@ var boundaryInvalid = []rule_tester.InvalidTestCase{
 					console.log(outer);
 					useEffect(() => { console.log(inner); }, []);
 				}, [inner, outer]);
-			}
-		`}},
-			},
-			{
-				// Inner effect's missing dep, fired during the descent.
-				Message: "React Hook useEffect has a missing dependency: 'inner'. Either include it or remove the dependency array.",
-				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
-			function MyComponent({ outer, inner }: { outer: number; inner: number }) {
-				useEffect(() => {
-					console.log(outer);
-					useEffect(() => { console.log(inner); }, [inner]);
-				}, []);
 			}
 		`}},
 			},
