@@ -1,21 +1,23 @@
 import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
+const filename = 'src/virtual.ts';
 
 ruleTester.run('prefer-jest-mocked', {} as never, {
   valid: [
-    { code: 'foo();' },
-    { code: 'jest.mocked(foo).mockReturnValue(1);' },
-    { code: 'bar.mockReturnValue(1);' },
-    { code: 'sinon.stub(foo).returns(1);' },
-    { code: 'foo.mockImplementation(() => 1);' },
-    { code: 'obj.foo();' },
-    { code: 'mockFn.mockReturnValue(1);' },
-    { code: `arr[0]();` },
-    { code: 'obj.foo.mockReturnValue(1);' },
-    { code: `jest.spyOn(obj, 'foo').mockReturnValue(1);` },
-    { code: '(foo as Mock.jest).mockReturnValue(1);' },
+    { code: 'foo();', filename },
+    { code: 'jest.mocked(foo).mockReturnValue(1);', filename },
+    { code: 'bar.mockReturnValue(1);', filename },
+    { code: 'sinon.stub(foo).returns(1);', filename },
+    { code: 'foo.mockImplementation(() => 1);', filename },
+    { code: 'obj.foo();', filename },
+    { code: 'mockFn.mockReturnValue(1);', filename },
+    { code: `arr[0]();`, filename },
+    { code: 'obj.foo.mockReturnValue(1);', filename },
+    { code: `jest.spyOn(obj, 'foo').mockReturnValue(1);`, filename },
+    { code: '(foo as Mock.jest).mockReturnValue(1);', filename },
     {
+      filename,
       code: `
       type MockType = jest.Mock;
       const mockFn = jest.fn();
@@ -25,6 +27,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
   ],
   invalid: [
     {
+      filename,
       code: `(foo as jest.Mock).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -39,6 +42,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as unknown as string as unknown as jest.Mock).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -53,6 +57,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as unknown as jest.Mock as unknown as jest.Mock).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -67,6 +72,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(<jest.Mock>foo).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -81,6 +87,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as jest.Mock).mockImplementation(1);`,
       output: `(jest.mocked(foo)).mockImplementation(1);`,
       options: [],
@@ -95,6 +102,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as unknown as jest.Mock).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -109,6 +117,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(<jest.Mock>foo as unknown).mockReturnValue(1);`,
       output: `(jest.mocked(foo) as unknown).mockReturnValue(1);`,
       options: [],
@@ -123,6 +132,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(Obj.foo as jest.Mock).mockReturnValue(1);`,
       output: `(jest.mocked(Obj.foo)).mockReturnValue(1);`,
       options: [],
@@ -137,6 +147,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `([].foo as jest.Mock).mockReturnValue(1);`,
       output: `(jest.mocked([].foo)).mockReturnValue(1);`,
       options: [],
@@ -151,6 +162,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as jest.MockedFunction).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -165,6 +177,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as jest.MockedFunction).mockImplementation(1);`,
       output: `(jest.mocked(foo)).mockImplementation(1);`,
       options: [],
@@ -179,6 +192,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as unknown as jest.MockedFunction).mockReturnValue(1);`,
       output: `(jest.mocked(foo)).mockReturnValue(1);`,
       options: [],
@@ -193,6 +207,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(Obj.foo as jest.MockedFunction).mockReturnValue(1);`,
       output: `(jest.mocked(Obj.foo)).mockReturnValue(1);`,
       options: [],
@@ -207,6 +222,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(new Array(0).fill(null).foo as jest.MockedFunction).mockReturnValue(1);`,
       output: `(jest.mocked(new Array(0).fill(null).foo)).mockReturnValue(1);`,
       options: [],
@@ -221,6 +237,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(jest.fn(() => foo) as jest.MockedFunction).mockReturnValue(1);`,
       output: `(jest.mocked(jest.fn(() => foo))).mockReturnValue(1);`,
       options: [],
@@ -235,6 +252,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `const mockedUseFocused = useFocused as jest.MockedFunction<typeof useFocused>;`,
       output: `const mockedUseFocused = jest.mocked(useFocused);`,
       options: [],
@@ -249,6 +267,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `const filter = (MessageService.getMessage as jest.Mock).mock.calls[0][0];`,
       output: `const filter = (jest.mocked(MessageService.getMessage)).mock.calls[0][0];`,
       options: [],
@@ -263,6 +282,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `
         class A {}
         (foo as jest.MockedClass<A>)
@@ -283,6 +303,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(foo as jest.MockedObject<{method: () => void}>)`,
       output: `(jest.mocked(foo))`,
       options: [],
@@ -297,6 +318,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `(Obj['foo'] as jest.MockedFunction).mockReturnValue(1);`,
       output: `(jest.mocked(Obj['foo'])).mockReturnValue(1);`,
       options: [],
@@ -311,6 +333,7 @@ ruleTester.run('prefer-jest-mocked', {} as never, {
       ],
     },
     {
+      filename,
       code: `
         (
           new Array(100)
