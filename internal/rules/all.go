@@ -7,6 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
+	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
@@ -137,6 +138,7 @@ func GetAllRules() []rule.Rule {
 		arrow_body_style.ArrowBodyStyleRule,
 		complexity.ComplexityRule,
 		constructor_super.ConstructorSuperRule,
+		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
 		for_direction.ForDirectionRule,

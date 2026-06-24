@@ -659,15 +659,15 @@ Rules are tested in more than one style depending on where they live:
 
 ## 13. Adding a New Rule (Checklist)
 
-The maintained rule-porting workflow now lives under [`agents/port-rule`](./agents/port-rule/).
+The maintained rule-porting workflow now lives under [`.agents/skills/port-rule`](./.agents/skills/port-rule/).
 
 Use these entry points instead of duplicating a separate checklist here:
 
-- [`agents/port-rule/SKILL.md`](./agents/port-rule/SKILL.md): primary skill entry and workflow
-- [`agents/port-rule/references/PORT_RULE.md`](./agents/port-rule/references/PORT_RULE.md): detailed end-to-end porting guide
-- [`agents/QUICK_REFERENCE.md`](./agents/QUICK_REFERENCE.md): commands, naming conventions, and condensed checklist
+- [`.agents/skills/port-rule/SKILL.md`](./.agents/skills/port-rule/SKILL.md): primary skill entry and workflow
+- [`.agents/skills/port-rule/references/PORT_RULE.md`](./.agents/skills/port-rule/references/PORT_RULE.md): detailed end-to-end porting guide
+- [`.agents/skills/port-rule/references/QUICK_REFERENCE.md`](./.agents/skills/port-rule/references/QUICK_REFERENCE.md): commands, naming conventions, and condensed checklist
 
-If the rule-porting workflow changes, update the material under `agents/port-rule` rather than reintroducing a second checklist in this document.
+If the rule-porting workflow changes, update the material under `.agents/skills/port-rule` rather than reintroducing a second checklist in this document.
 
 ## 14. Dependency Layering & Boundaries
 

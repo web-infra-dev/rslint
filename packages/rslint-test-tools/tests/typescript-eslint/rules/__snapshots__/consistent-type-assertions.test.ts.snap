@@ -1,0 +1,2679 @@
+// Rstest Snapshot v1
+
+exports[`consistent-type-assertions > invalid 1`] = `
+{
+  "code": "const x = new Generic<int>() as Foo;",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 2`] = `
+{
+  "code": "const x = b as A;",
+  "diagnostics": [
+    {
+      "message": "Use '<A>' instead of 'as A'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 3`] = `
+{
+  "code": "const x = [1] as readonly number[];",
+  "diagnostics": [
+    {
+      "message": "Use '<readonly number[]>' instead of 'as readonly number[]'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 4`] = `
+{
+  "code": "const x = 'string' as a | b;",
+  "diagnostics": [
+    {
+      "message": "Use '<a | b>' instead of 'as a | b'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 5`] = `
+{
+  "code": "const x = !'string' as A;",
+  "diagnostics": [
+    {
+      "message": "Use '<A>' instead of 'as A'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 6`] = `
+{
+  "code": "const x = (a as A) + b;",
+  "diagnostics": [
+    {
+      "message": "Use '<A>' instead of 'as A'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 7`] = `
+{
+  "code": "const x = new Generic<string>() as Foo;",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 8`] = `
+{
+  "code": "const x = new (Generic<string> as Foo)();",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 9`] = `
+{
+  "code": "const x = new (Generic<string> as Foo)('string');",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 10`] = `
+{
+  "code": "const x = () => ({ bar: 5 }) as Foo;",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 11`] = `
+{
+  "code": "const x = () => bar as Foo;",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 12`] = `
+{
+  "code": "const x = bar<string>\`\${'baz'}\` as Foo;",
+  "diagnostics": [
+    {
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 13`] = `
+{
+  "code": "const x = { key: 'value' } as const;",
+  "diagnostics": [
+    {
+      "message": "Use '<const>' instead of 'as const'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 14`] = `
+{
+  "code": "const x = <Foo>new Generic<int>();",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = new Generic<int>() as Foo;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 15`] = `
+{
+  "code": "const x = <A>b;",
+  "diagnostics": [
+    {
+      "message": "Use 'as A' instead of '<A>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = b as A;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 16`] = `
+{
+  "code": "const x = <readonly number[]>[1];",
+  "diagnostics": [
+    {
+      "message": "Use 'as readonly number[]' instead of '<readonly number[]>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = [1] as readonly number[];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 17`] = `
+{
+  "code": "const x = <a | b>'string';",
+  "diagnostics": [
+    {
+      "message": "Use 'as a | b' instead of '<a | b>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = 'string' as a | b;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 18`] = `
+{
+  "code": "const x = <A>!'string';",
+  "diagnostics": [
+    {
+      "message": "Use 'as A' instead of '<A>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = !'string' as A;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 19`] = `
+{
+  "code": "const x = <A>a + b;",
+  "diagnostics": [
+    {
+      "message": "Use 'as A' instead of '<A>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = (a as A) + b;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 20`] = `
+{
+  "code": "const x = <Foo>new Generic<string>();",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = new Generic<string>() as Foo;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 21`] = `
+{
+  "code": "const x = new (<Foo>Generic<string>)();",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = new ((Generic<string>) as Foo)();",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 22`] = `
+{
+  "code": "const x = new (<Foo>Generic<string>)('string');",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = new ((Generic<string>) as Foo)('string');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 23`] = `
+{
+  "code": "const x = () => <Foo>{ bar: 5 };",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = () => ({ bar: 5 } as Foo);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 24`] = `
+{
+  "code": "const x = () => <Foo>bar;",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = () => (bar as Foo);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 25`] = `
+{
+  "code": "const x = <Foo>bar<string>\`\${'baz'}\`;",
+  "diagnostics": [
+    {
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = bar<string>\`\${'baz'}\` as Foo;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 26`] = `
+{
+  "code": "const x = <const>{ key: 'value' };",
+  "diagnostics": [
+    {
+      "message": "Use 'as const' instead of '<const>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = { key: 'value' } as const;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 27`] = `
+{
+  "code": "const x = new Generic<int>() as Foo;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 28`] = `
+{
+  "code": "const x = b as A;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 29`] = `
+{
+  "code": "const x = [1] as readonly number[];",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 30`] = `
+{
+  "code": "const x = 'string' as a | b;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 31`] = `
+{
+  "code": "const x = !'string' as A;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 32`] = `
+{
+  "code": "const x = (a as A) + b;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 33`] = `
+{
+  "code": "const x = new Generic<string>() as Foo;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 34`] = `
+{
+  "code": "const x = new (Generic<string> as Foo)();",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 35`] = `
+{
+  "code": "const x = new (Generic<string> as Foo)('string');",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 36`] = `
+{
+  "code": "const x = () => ({ bar: 5 }) as Foo;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 37`] = `
+{
+  "code": "const x = () => bar as Foo;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 38`] = `
+{
+  "code": "const x = bar<string>\`\${'baz'}\` as Foo;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 39`] = `
+{
+  "code": "const x = <Foo>new Generic<int>();",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 40`] = `
+{
+  "code": "const x = <A>b;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 41`] = `
+{
+  "code": "const x = <readonly number[]>[1];",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 42`] = `
+{
+  "code": "const x = <a | b>'string';",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 43`] = `
+{
+  "code": "const x = <A>!'string';",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 44`] = `
+{
+  "code": "const x = <A>a + b;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 45`] = `
+{
+  "code": "const x = <Foo>new Generic<string>();",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 46`] = `
+{
+  "code": "const x = new (<Foo>Generic<string>)();",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 47`] = `
+{
+  "code": "const x = new (<Foo>Generic<string>)('string');",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 48`] = `
+{
+  "code": "const x = () => <Foo>{ bar: 5 };",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 49`] = `
+{
+  "code": "const x = () => <Foo>bar;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 50`] = `
+{
+  "code": "const x = <Foo>bar<string>\`\${'baz'}\`;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 51`] = `
+{
+  "code": "const x = {} as Foo<int>;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 52`] = `
+{
+  "code": "const x = {} as a | b;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 53`] = `
+{
+  "code": "const x = ({} as A) + b;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 54`] = `
+{
+  "code": "const x = <Foo<int>>{};",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 55`] = `
+{
+  "code": "const x = <a | b>{};",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 56`] = `
+{
+  "code": "const x = <A>{} + b;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 57`] = `
+{
+  "code": "const x = {} as Foo<int>;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 58`] = `
+{
+  "code": "const x = {} as a | b;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 59`] = `
+{
+  "code": "const x = ({} as A) + b;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 60`] = `
+{
+  "code": "print({ bar: 5 } as Foo);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 61`] = `
+{
+  "code": "new print({ bar: 5 } as Foo);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 62`] = `
+{
+  "code": "
+function foo() {
+  throw { bar: 5 } as Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 63`] = `
+{
+  "code": "function b(x = {} as Foo.Bar) {}",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 64`] = `
+{
+  "code": "function c(x = {} as Foo) {}",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 65`] = `
+{
+  "code": "print?.({ bar: 5 } as Foo);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 66`] = `
+{
+  "code": "print?.call({ bar: 5 } as Foo);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 67`] = `
+{
+  "code": "print\`\${{ bar: 5 } as Foo}\`;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 68`] = `
+{
+  "code": "const x = <Foo<int>>{};",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 69`] = `
+{
+  "code": "const x = <a | b>{};",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 70`] = `
+{
+  "code": "const x = <A>{} + b;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 71`] = `
+{
+  "code": "print(<Foo>{ bar: 5 });",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 72`] = `
+{
+  "code": "new print(<Foo>{ bar: 5 });",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 73`] = `
+{
+  "code": "
+function foo() {
+  throw <Foo>{ bar: 5 };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 74`] = `
+{
+  "code": "print?.(<Foo>{ bar: 5 });",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 75`] = `
+{
+  "code": "print?.call(<Foo>{ bar: 5 });",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 76`] = `
+{
+  "code": "print\`\${<Foo>{ bar: 5 }}\`;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T = { ... }.",
+      "messageId": "unexpectedObjectTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 77`] = `
+{
+  "code": "const foo = <Foo style={{ bar: 5 } as Bar} />;",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": null,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 78`] = `
+{
+  "code": "const a = <any>(b, c);",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = (b, c) as any;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 79`] = `
+{
+  "code": "const f = <any>(() => {});",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const f = (() => {}) as any;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 80`] = `
+{
+  "code": "const f = <any>function () {};",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const f = function () {} as any;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 81`] = `
+{
+  "code": "const f = <any>(async () => {});",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const f = (async () => {}) as any;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 82`] = `
+{
+  "code": "
+function* g() {
+  const y = <any>(yield a);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function* g() {
+  const y = (yield a) as any;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 83`] = `
+{
+  "code": "
+declare let x: number, y: number;
+const bs = <any>(x <<= y);
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare let x: number, y: number;
+const bs = (x <<= y) as any;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 84`] = `
+{
+  "code": "const ternary = <any>(true ? x : y);",
+  "diagnostics": [
+    {
+      "message": "Use 'as any' instead of '<any>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const ternary = (true ? x : y) as any;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 85`] = `
+{
+  "code": "const x = [] as string[];",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 86`] = `
+{
+  "code": "const x = <string[]>[];",
+  "diagnostics": [
+    {
+      "message": "Do not use any type assertions.",
+      "messageId": "never",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 87`] = `
+{
+  "code": "const x = [] as string[];",
+  "diagnostics": [
+    {
+      "message": "Use '<string[]>' instead of 'as string[]'.",
+      "messageId": "angle-bracket",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 88`] = `
+{
+  "code": "const x = <string[]>[];",
+  "diagnostics": [
+    {
+      "message": "Use 'as string[]' instead of '<string[]>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const x = [] as string[];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 89`] = `
+{
+  "code": "const x = [] as string[];",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 90`] = `
+{
+  "code": "const x = <string[]>[];",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 91`] = `
+{
+  "code": "print([5] as Foo);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 92`] = `
+{
+  "code": "new print([5] as Foo);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 93`] = `
+{
+  "code": "function b(x = [5] as Foo.Bar) {}",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 94`] = `
+{
+  "code": "
+function foo() {
+  throw [5] as Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 95`] = `
+{
+  "code": "print\`\${[5] as Foo}\`;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 96`] = `
+{
+  "code": "const foo = () => [5] as Foo;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 97`] = `
+{
+  "code": "new print(<Foo>[5]);",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 98`] = `
+{
+  "code": "function b(x = <Foo.Bar>[5]) {}",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 99`] = `
+{
+  "code": "
+function foo() {
+  throw <Foo>[5];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 100`] = `
+{
+  "code": "print\`\${<Foo>[5]}\`;",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-assertions > invalid 101`] = `
+{
+  "code": "const foo = <Foo>[5];",
+  "diagnostics": [
+    {
+      "message": "Always prefer const x: T[] = [ ... ].",
+      "messageId": "unexpectedArrayTypeAssertion",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -212,6 +212,18 @@ ruleTester.run('no-array-index-key', {} as never, {
     { code: `foo.map((bar, i) => <Foo key={i?.toString()} />);` },
     { code: `foo.map((bar, i) => <Foo key={String?.(i)} />);` },
     { code: `foo.map((bar, i) => <Foo key={i?.toString?.()} />);` },
+
+    // ---- Logical-operator fallback (ESTree LogicalExpression) ----
+    // `||` / `&&` / `??` are LogicalExpression upstream, not a
+    // BinaryExpression, so `key={fallback || index}` is never flagged.
+    { code: `foo.map((bar, i) => <Foo key={bar.id || i} />);` },
+    { code: `foo.map((bar, i) => <Foo key={bar.id ?? i} />);` },
+    { code: `foo.map((bar, i) => <Foo key={i && bar.id} />);` },
+    { code: `foo.map((bar, i) => <Foo key={bar.a || bar.b || i} />);` },
+    {
+      code: `foo.map((bar, i) => React.createElement('Foo', { key: bar.id || i }));`,
+    },
+    { code: `foo.map((bar, i) => <Foo key={'x' + (bar.id || i)} />);` },
   ],
 
   invalid: [
@@ -242,6 +254,13 @@ ruleTester.run('no-array-index-key', {} as never, {
     },
     {
       code: `foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />);`,
+      errors: [{ messageId: 'noArrayIndex' }],
+    },
+
+    // Real BinaryExpression whose right operand is a logical subtree —
+    // the `+` reports the index on the left; the `||` subtree is skipped.
+    {
+      code: `foo.map((bar, i) => <Foo key={i + (bar.id || 0)} />);`,
       errors: [{ messageId: 'noArrayIndex' }],
     },
 

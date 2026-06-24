@@ -12,7 +12,7 @@ const recommended: RslintConfigEntry = {
     'jest/no-deprecated-functions': 'error',
     'jest/no-disabled-tests': 'warn',
     'jest/no-done-callback': 'error',
-    // 'jest/no-export': 'error', // not implemented
+    'jest/no-export': 'error',
     'jest/no-focused-tests': 'error',
     'jest/no-identical-title': 'error',
     // 'jest/no-interpolation-in-snapshots': 'error', // not implemented

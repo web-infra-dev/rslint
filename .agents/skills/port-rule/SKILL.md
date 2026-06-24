@@ -37,7 +37,7 @@ Otherwise, ask user to choose:
 **For auto search**, run for each rule:
 
 ```bash
-node agents/port-rule/scripts/search_rule.mjs <rule-name>
+node .agents/skills/port-rule/scripts/search_rule.mjs <rule-name>
 ```
 
 Multiple rules can be searched in parallel.
@@ -271,6 +271,6 @@ pnpm format && pnpm format:go
 ## References
 
 - [PORT_RULE.md](references/PORT_RULE.md) - Complete porting guide with code templates
-- [AST_PATTERNS.md](../AST_PATTERNS.md) - AST traversal patterns
-- [UTILS_REFERENCE.md](../UTILS_REFERENCE.md) - Utility functions
-- [QUICK_REFERENCE.md](../QUICK_REFERENCE.md) - Commands cheatsheet
+- [AST_PATTERNS.md](references/AST_PATTERNS.md) - AST traversal patterns
+- [UTILS_REFERENCE.md](references/UTILS_REFERENCE.md) - Utility functions
+- [QUICK_REFERENCE.md](references/QUICK_REFERENCE.md) - Commands cheatsheet

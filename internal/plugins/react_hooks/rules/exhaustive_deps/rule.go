@@ -317,17 +317,18 @@ func visitFunctionWithDependencies(
 		return
 	}
 
-	// Component scope = the nearest enclosing function-like that
-	// classifies as a React component or custom hook (PascalCase or
-	// `use*`). Walk past intermediate anonymous IIFEs / non-component
-	// closures (e.g. nested useEffect callbacks) so that a hook defined
-	// inside another hook's body still resolves component-scope props
-	// correctly. Mirrors upstream's `componentScope = currentScope`
-	// loop in `visitFunctionWithDependencies`.
+	// Component scope = the nearest enclosing function-like, whatever it is.
+	// Upstream's `visitFunctionWithDependencies` walks `scope.upper` to the
+	// first scope of `type === 'function'` and bails only when there is none;
+	// it deliberately does NOT require that function to be a PascalCase
+	// component or a `use*` Hook. Requiring that (the previous behavior) made
+	// the whole effect silently skip analysis whenever the component was made
+	// by a HOC the recognizer didn't know about — e.g. `observer(() => {...})`
+	// (mobx-react) — even though `forwardRef`/`memo` happened to be special-
+	// cased. Taking the bare enclosing function matches upstream for every
+	// wrapper and is consistent with `emitConstructionWarnings`, which already
+	// uses the unfiltered enclosing function.
 	componentFn := findEnclosingFunction(callback)
-	for componentFn != nil && !isComponentOrHookFunction(componentFn) {
-		componentFn = findEnclosingFunction(componentFn)
-	}
 	if componentFn == nil {
 		return
 	}
@@ -1105,7 +1106,7 @@ func parseDeclaredDeps(
 			}
 		}
 
-		key, ok := analyzePropertyChainText(el, nil)
+		key, ok := analyzeDepsArrayElement(el, nil)
 		if !ok {
 			// Literal value or complex expression. Mirrors upstream's full
 			// set of `Literal` value kinds — string, number, bigint, null,
@@ -1583,23 +1584,26 @@ func gatherDeps(
 	hasExtraWrite := func(s *ast.Symbol) bool {
 		return cachedHasExtraWrite(s, componentFn, tc, caches)
 	}
-	// Forward-declared so isFunctionWithoutCapturedValues can recurse
-	// through it for transitive function stability.
-	var stableForId func(id *ast.Node, sym *ast.Symbol) bool
-	stableForId = func(id *ast.Node, sym *ast.Symbol) bool {
+	// isStableKnownHookValue mirrors upstream's `isStableKnownHookValue`:
+	// the setter/dispatch from useState/useReducer/useTransition and the
+	// results of useRef/useMemo/useCallback (etc.). It deliberately does NOT
+	// treat a user-defined function-without-captured-values as stable — that
+	// is a separate classification (stableForId). The capture check inside
+	// `isFunctionWithoutCapturedValues` must use THIS predicate, because
+	// upstream "won't check functions deeper": a function whose only capture
+	// is another local function is itself not stable.
+	knownStableCache := map[*ast.Symbol]bool{}
+	isStableKnownHookValue := func(_ *ast.Node, sym *ast.Symbol) bool {
 		if sym == nil {
 			return false
 		}
-		if v, ok := stableSymCache[sym]; ok {
+		if v, ok := knownStableCache[sym]; ok {
 			return v
 		}
-		// Tag the symbol as in-progress to break recursion cycles
-		// (mutual recursion between two functions): treat as not-stable
-		// while we're still computing.
-		stableSymCache[sym] = false
+		knownStableCache[sym] = false
 		// Setter / dispatch from useState/useReducer/useTransition.
 		if _, ok := setStateCallSites[sym]; ok {
-			stableSymCache[sym] = true
+			knownStableCache[sym] = true
 			return true
 		}
 		if len(sym.Declarations) > 0 {
@@ -1615,35 +1619,47 @@ func gatherDeps(
 					vdNode = vdNode.Parent
 				}
 			}
-			stable, _ := isStableHookValue(vdNode, bindingId)
-			if stable {
+			if stable, _ := isStableHookValue(vdNode, bindingId); stable {
 				// Mirrors upstream's `writeCount > 1` gate: a stable hook
 				// binding that is reassigned anywhere is no longer stable.
 				if tc != nil && hasExtraWrite(sym) {
 					return false
 				}
-				stableSymCache[sym] = true
+				knownStableCache[sym] = true
 				return true
 			}
-			// Upstream's `isFunctionWithoutCapturedValues`: a user-defined
-			// function declared in component scope is stable iff it
-			// doesn't capture any non-stable variables from pure scope.
-			// We use the TypeChecker to resolve every Identifier inside
-			// the function body to its declaring symbol, then test each
-			// captured one against `stableForId` recursively. This mirrors
-			// upstream's `fnScope.through` walk (which we don't have access
-			// to without ESLint's scope manager).
-			//
-			// Reassignment guard: if the binding itself is reassigned
-			// elsewhere (e.g. `handler = somethingElse`), the resolved
-			// function may no longer point at our analyzed body. Mirrors
-			// upstream's `writeCount > 1` gate that disables the
-			// stable-function classification under reassignment.
-			if tc != nil && !hasExtraWrite(sym) {
-				if isFunctionWithoutCapturedValues(decl, componentFn, tc, stableForId) {
-					stableSymCache[sym] = true
-					return true
-				}
+		}
+		return false
+	}
+
+	// stableForId decides whether a directly-referenced value may be omitted
+	// from the deps array. A reference is stable if it's a known stable hook
+	// value, OR it's a user-defined function declared in component scope that
+	// doesn't capture any non-stable value (upstream's
+	// `isFunctionWithoutCapturedValues`). The capture check passes
+	// `isStableKnownHookValue` — NOT stableForId — so the classification does
+	// not recurse through other local functions, matching upstream exactly.
+	stableForId := func(id *ast.Node, sym *ast.Symbol) bool {
+		if sym == nil {
+			return false
+		}
+		if v, ok := stableSymCache[sym]; ok {
+			return v
+		}
+		stableSymCache[sym] = false
+		if isStableKnownHookValue(id, sym) {
+			stableSymCache[sym] = true
+			return true
+		}
+		// Reassignment guard: if the binding itself is reassigned elsewhere
+		// (e.g. `handler = somethingElse`), the resolved function may no
+		// longer point at our analyzed body. Mirrors upstream's
+		// `writeCount > 1` gate that disables the stable-function class.
+		if len(sym.Declarations) > 0 && tc != nil && !hasExtraWrite(sym) {
+			decl := sym.Declarations[0]
+			if isFunctionWithoutCapturedValues(decl, componentFn, tc, isStableKnownHookValue) {
+				stableSymCache[sym] = true
+				return true
 			}
 		}
 		return false
@@ -1714,16 +1730,8 @@ func processIdentifier(
 		ref        *depReference
 	},
 ) {
-	// Resolve.
-	var sym *ast.Symbol
-	if tc != nil {
-		if isObjectLiteralShorthandReference(id) {
-			sym = tc.GetShorthandAssignmentValueSymbol(id.Parent)
-		}
-		if sym == nil {
-			sym = tc.GetSymbolAtLocation(id)
-		}
-	}
+	// Resolve (shorthand-aware).
+	sym := resolveValueSymbol(tc, id)
 	// Determine if the symbol's declaration is in component scope (between
 	// callback exclusive and componentFn inclusive).
 	//
@@ -1845,12 +1853,15 @@ func processIdentifier(
 	dep.Refs = append(dep.Refs, ref)
 
 	if inCleanup {
-		if _, has := currentRefsInCleanup[key]; !has {
-			currentRefsInCleanup[key] = struct {
-				dependency string
-				ref        *depReference
-			}{dependency: key, ref: ref}
-		}
+		// Upstream keeps the LAST cleanup reference per dependency — its
+		// `currentRefsInEffectCleanup.set(dependency, …)` overwrites on every
+		// matching `ref.current` use, so the warning points at the final use
+		// inside the cleanup function. Always overwrite (the gather walk is in
+		// document order) rather than keeping the first occurrence.
+		currentRefsInCleanup[key] = struct {
+			dependency string
+			ref        *depReference
+		}{dependency: key, ref: ref}
 	}
 }
 
@@ -2038,17 +2049,18 @@ func isFunctionWithoutCapturedValues(
 			return true
 		}
 		if n.Kind == ast.KindIdentifier && isReferenceIdentifier(n) {
-			sym := tc.GetSymbolAtLocation(n)
+			sym := resolveValueSymbol(tc, n)
 			if sym != nil && len(sym.Declarations) > 0 {
 				d := sym.Declarations[0]
-				// Capture iff declaration is in component scope but
-				// outside fnNode itself. Self-reference (the function
-				// referencing its own binding) is allowed.
+				// Capture iff the declaration is in component scope but
+				// outside fnNode itself. This includes the function's own
+				// name when it recurses (`const f = () => { f() }`): the
+				// self-reference resolves to the component-scope binding, and
+				// upstream counts it as a capture, so a non-memoized recursive
+				// function is itself unstable. `isStable` is the non-recursive
+				// `isStableKnownHookValue`, so evaluating the self-reference
+				// here cannot loop.
 				if containsNode(componentFn, d) && !containsNode(fnNode, d) {
-					// Self-reference (recursion) — skip.
-					if d == decl {
-						return false
-					}
 					if !isStable(n, sym) {
 						captured = true
 						return true

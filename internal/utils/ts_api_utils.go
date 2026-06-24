@@ -54,6 +54,9 @@ func IsTypeUnknownType(t *checker.Type) bool {
 func IsObjectType(t *checker.Type) bool {
 	return IsTypeFlagSet(t, checker.TypeFlagsObject)
 }
+func IsTypeReference(t *checker.Type) bool {
+	return IsObjectType(t) && checker.Type_objectFlags(t)&checker.ObjectFlagsReference != 0
+}
 func IsTypeParameter(t *checker.Type) bool {
 	return IsTypeFlagSet(t, checker.TypeFlagsTypeParameter)
 }

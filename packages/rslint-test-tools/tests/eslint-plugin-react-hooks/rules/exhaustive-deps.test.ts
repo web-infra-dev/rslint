@@ -95,6 +95,18 @@ ruleTester.run('exhaustive-deps', {} as never, {
       `,
       options: [{ additionalHooks: '(useMyEffect)' }],
     },
+    // (alignment) a local function whose only captures are stable hook values
+    // is itself stable when used directly in an effect
+    {
+      code: `
+        function useNoCapture() {
+          const [s, setS] = useState(0);
+          const transform = (x) => x;
+          useEffect(() => { setS(transform(1)); }, []);
+          return s;
+        }
+      `,
+    },
   ],
   invalid: [
     // Missing dep
@@ -238,6 +250,99 @@ ruleTester.run('exhaustive-deps', {} as never, {
         {
           message:
             'Functions returned from `useEffectEvent` must not be included in the dependency array. Remove `onClick` from the list.',
+        },
+      ],
+    },
+    // (alignment) HOC wrapper (observer/mobx) does not gate analysis
+    {
+      code: `
+        const C = observer((props) => {
+          const [s, setS] = useState(0);
+          useEffect(() => { console.log(props.x); setS(1); }, []);
+          return null;
+        });
+      `,
+      errors: [
+        {
+          message:
+            "React Hook useEffect has a missing dependency: 'props.x'. Either include it or remove the dependency array.",
+        },
+      ],
+    },
+    // (alignment) reactive value captured only via object shorthand inside a local function
+    {
+      code: `
+        function useShorthand({ apId }) {
+          const [t, setT] = useState([]);
+          const fetchTree = () => { setT([{ apId }]); };
+          useEffect(() => { fetchTree(); }, []);
+          return t;
+        }
+      `,
+      errors: [
+        {
+          message:
+            "React Hook useEffect has a missing dependency: 'fetchTree'. Either include it or remove the dependency array.",
+        },
+      ],
+    },
+    // (alignment) local function is unstable when it calls another local function
+    {
+      code: `
+        function useCallsLocal({ apId }) {
+          const [t, setT] = useState([]);
+          const transform = (x) => [x];
+          const query = () => { setT(transform(apId)); };
+          useEffect(() => { query(); }, []);
+          return t;
+        }
+      `,
+      errors: [
+        {
+          message:
+            "React Hook useEffect has a missing dependency: 'query'. Either include it or remove the dependency array.",
+        },
+      ],
+    },
+    // (alignment) recursive local function is unstable (self-reference is a capture)
+    {
+      code: `
+        function useRecursive({ tree, id }) {
+          const findLabel = (data, target) => {
+            for (const node of data) {
+              if (node.id === target) return node.label;
+              if (node.children) { const r = findLabel(node.children, target); if (r) return r; }
+            }
+            return '';
+          };
+          return useMemo(() => findLabel(tree, id), [tree, id]);
+        }
+      `,
+      errors: [
+        {
+          message:
+            "React Hook useMemo has a missing dependency: 'findLabel'. Either include it or remove the dependency array.",
+        },
+      ],
+    },
+    // (alignment) ref.current read multiple times in cleanup -> warning at the LAST occurrence
+    {
+      code: `
+        function useRefCleanup() {
+          const handleRef = useRef(null);
+          useEffect(() => {
+            handleRef.current?.addEventListener('a', () => {});
+            return () => {
+              handleRef.current?.removeEventListener('a', () => {});
+              handleRef.current?.removeEventListener('b', () => {});
+            };
+          }, []);
+        }
+      `,
+      errors: [
+        {
+          message:
+            "The ref value 'handleRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'handleRef.current' to a variable inside the effect, and use that variable in the cleanup function.",
         },
       ],
     },

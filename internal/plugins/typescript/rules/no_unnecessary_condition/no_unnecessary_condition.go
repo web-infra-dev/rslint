@@ -461,6 +461,11 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 		}
 
 		checkNodeForNullish := func(node *ast.Node) {
+			// Match upstream: the rule operates on the ESTree node, which has no
+			// parenthesized-expression wrapper, so `(x) ?? y` reports on `x`.
+			// tsgo's AST keeps ParenthesizedExpression nodes, so skip them to
+			// align the reported range with typescript-eslint (mirrors checkNode).
+			node = ast.SkipParentheses(node)
 			t := utils.GetConstrainedTypeAtLocation(tc, node)
 
 			// Conditional is always necessary if it involves any, unknown, or type parameter
