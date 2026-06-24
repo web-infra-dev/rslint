@@ -8,8 +8,13 @@ const repoRoot = path.resolve(
   '..',
 );
 
-if (process.env.SKIP_GEN_RULE_TYPES === '1' || process.env.SKIP_GEN_RULE_TYPES === 'true') {
-  console.log('[rslint] SKIP_GEN_RULE_TYPES is set. Skipping rule type generation.');
+if (
+  process.env.SKIP_GEN_RULE_TYPES === '1' ||
+  process.env.SKIP_GEN_RULE_TYPES === 'true'
+) {
+  console.log(
+    '[rslint] SKIP_GEN_RULE_TYPES is set. Skipping rule type generation.',
+  );
   process.exit(0);
 }
 
