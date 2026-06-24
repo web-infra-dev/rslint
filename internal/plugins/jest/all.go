@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_done_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_duplicate_hooks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_identical_title"
@@ -49,6 +50,7 @@ func GetAllRules() []rule.Rule {
 		no_disabled_tests.NoDisabledTestsRule,
 		no_done_callback.NoDoneCallbackRule,
 		no_duplicate_hooks.NoDuplicateHooksRule,
+		no_export.NoExportRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,

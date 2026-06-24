@@ -475,6 +475,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-deprecated-functions.test.ts',
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-done-callback.test.ts',
+    './tests/eslint-plugin-jest/rules/no-export.test.ts',
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/no-identical-title.test.ts',
