@@ -33,7 +33,7 @@
   "scripts": {
     "build:bin": "node ../../scripts/place-host-build.mjs bin",
     "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
-    "build:js": "rslib build && go run ../../tools/gen-rule-types/main.go",
+    "build:js": "rslib build && node ../../scripts/gen-rule-types.mjs",
     "dev": "rslib build --watch",
     "build": "pnpm build:bin && pnpm build:js",
     "test": "rstest run",

@@ -15,26 +15,6 @@ type Options struct {
 	IgnoreAssignmentVariable []string
 }
 
-func parseOptions(options any) Options {
-	opts := Options{IgnoreAssignmentVariable: []string{"globalThis"}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
-		return opts
-	}
-	if v, ok := optsMap["ignoreLastCallback"].(bool); ok {
-		opts.IgnoreLastCallback = v
-	}
-	if arr, ok := optsMap["ignoreAssignmentVariable"].([]interface{}); ok {
-		opts.IgnoreAssignmentVariable = make([]string, 0, len(arr))
-		for _, item := range arr {
-			if s, ok := item.(string); ok {
-				opts.IgnoreAssignmentVariable = append(opts.IgnoreAssignmentVariable, s)
-			}
-		}
-	}
-	return opts
-}
-
 func buildThenShouldReturnOrThrowMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "thenShouldReturnOrThrow",
@@ -197,8 +177,28 @@ func rootObjectName(node *ast.Node) string {
 
 var AlwaysReturnRule = rule.Rule{
 	Name: "promise/always-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema0: rule.Object(map[string]rule.Schema{
+		"ignoreLastCallback":       rule.Bool().Default(false),
+		"ignoreAssignmentVariable": rule.Union(rule.Array(rule.String())).Default([]any{"globalThis"}),
+	}),
+	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		optsMap := options.(map[string]any)
+
+		var ignoreAssignmentVariable []string
+		if arr, ok := optsMap["ignoreAssignmentVariable"].([]any); ok {
+			ignoreAssignmentVariable = make([]string, len(arr))
+			for i, v := range arr {
+				ignoreAssignmentVariable[i] = v.(string)
+			}
+		} else {
+			ignoreAssignmentVariable = []string{"globalThis"}
+		}
+
+		opts := Options{
+			IgnoreLastCallback:       optsMap["ignoreLastCallback"].(bool),
+			IgnoreAssignmentVariable: ignoreAssignmentVariable,
+		}
+
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {
 				checkFunction(ctx, opts, node)

@@ -252,6 +252,8 @@ jobs:
       # toolchain set up and shouldn't need one.
       - name: Build
         shell: bash
+        env:
+          SKIP_GEN_RULE_TYPES: '1'
         run: |
           pnpm --filter @rslint/api build
           pnpm --filter @rslint/core run build:js

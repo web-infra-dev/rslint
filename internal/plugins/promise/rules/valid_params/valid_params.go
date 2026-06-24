@@ -7,34 +7,12 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const skipTransparent = ast.OEKParentheses
 
 type Options struct {
 	Exclude map[string]bool
-}
-
-func parseOptions(options any) Options {
-	opts := Options{Exclude: map[string]bool{}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
-		return opts
-	}
-	switch arr := optsMap["exclude"].(type) {
-	case []interface{}:
-		for _, item := range arr {
-			if name, ok := item.(string); ok {
-				opts.Exclude[name] = true
-			}
-		}
-	case []string:
-		for _, name := range arr {
-			opts.Exclude[name] = true
-		}
-	}
-	return opts
 }
 
 func buildRequireOneOptionalArgumentMessage(name string, numArgs int) rule.RuleMessage {
@@ -87,8 +65,20 @@ func calledMemberName(node *ast.Node) string {
 
 var ValidParamsRule = rule.Rule{
 	Name: "promise/valid-params",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema0: rule.Object(map[string]rule.Schema{
+		"exclude": rule.Array(rule.String()),
+	}),
+	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		optsMap := options.(map[string]any)
+		excludeArr := optsMap["exclude"].([]any)
+		excludeMap := make(map[string]bool, len(excludeArr))
+		for _, item := range excludeArr {
+			excludeMap[item.(string)] = true
+		}
+		opts := Options{
+			Exclude: excludeMap,
+		}
+
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if !promiseutil.IsPromiseLikeCall(node) {
