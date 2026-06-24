@@ -70,16 +70,6 @@ Within `RunWithOptions`, cast the `options` parameter to the expected Go types g
 
 In `<rule_name>_test.go`, make sure the tests pass. The rule tester runner automatically leverages the schemas to validate test case options before running rules.
 
-### 6. Regenerate TypeScript Types
-
-Once the rule is migrated, regenerate TypeScript types by running:
-
-```bash
-pnpm --filter @rslint/core run build:js
-```
-
-This automatically invokes the generator tool, patches `packages/rslint/dist/index.d.ts`, and updates rule option types.
-
 ---
 
 ## Code Examples

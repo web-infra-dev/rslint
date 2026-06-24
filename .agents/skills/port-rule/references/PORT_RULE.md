@@ -431,12 +431,6 @@ var MyRuleRule = rule.Rule{
 
 **Edge case — empty arrays are a valid, non-nil value, not "absent".** `rule.Array(...)` validates an explicit `[]` to `[]any{}`, not to the schema's default — `.Default(...)` only applies when the option is omitted entirely. If a rule's documented default for an array option must survive an explicit `[]`, that fallback has to be coded explicitly in `RunWithOptions` (check `len(arr) > 0` before treating it as a real value), not assumed from `.Default()`.
 
-After defining the schema, regenerate the generated TypeScript option types so `RulesRecord` picks up the new rule's shape:
-
-```bash
-pnpm --filter @rslint/core run build:js
-```
-
 ### Alignment Audit
 
 Before moving on, walk through each check. Each one targets a class of AST-shape bug that is not caught by compilation and may slip past narrowly-written unit tests. Skip a row when it doesn't apply to your rule.
@@ -701,12 +695,6 @@ Follow this **strict order** — each step depends on the previous one:
 
    ```bash
    cd packages/rslint && pnpm run build:bin
-   ```
-
-   If the rule declares `Schema0`/`Schema1` (has options), also regenerate the generated TS option types before committing — see [Handling Options](#handling-options):
-
-   ```bash
-   pnpm --filter @rslint/core run build:js
    ```
 
 4. **JS tests** (note: this changes cwd, use absolute paths for subsequent commands):
