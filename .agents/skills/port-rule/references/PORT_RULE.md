@@ -56,11 +56,11 @@ Three principles follow — internalize them before writing a single test case:
 
 ## Related Documents
 
-| Document                                       | Description                                                         |
-| ---------------------------------------------- | ------------------------------------------------------------------- |
-| [AST_PATTERNS.md](../../AST_PATTERNS.md)       | AST traversal patterns, listeners, TypeChecker, reporting functions |
-| [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                              |
-| [QUICK_REFERENCE.md](../../QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist  |
+| Document                                 | Description                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------- |
+| [AST_PATTERNS.md](AST_PATTERNS.md)       | AST traversal patterns, listeners, TypeChecker, reporting functions |
+| [UTILS_REFERENCE.md](UTILS_REFERENCE.md) | Utility functions in `internal/utils/`                              |
+| [QUICK_REFERENCE.md](QUICK_REFERENCE.md) | Commands cheatsheet, file locations, naming conventions, checklist  |
 
 ---
 
@@ -248,16 +248,16 @@ Before starting, familiarize yourself with these key source locations:
    3. **Test cases**: Ensure the differing behavior is covered by a dedicated test — a green-path `ValidTestCase` or a case with an exact `Message` / position assertion — so that future refactors can't silently flip it.
 
    **B. Language-natural divergence** — a side effect of tsgo's AST or Go semantics that we don't actively choose (e.g. tsgo decimal-normalizes `NumericLiteral` at parse time, so a dynamic computed key `[0x1]` compares equal to `[1]` where ESLint's token-level comparison sees them as distinct). Usually more permissive than ESLint.
-   1. **Rule documentation** (or [AST_PATTERNS.md](../../AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
+   1. **Rule documentation** (or [AST_PATTERNS.md](AST_PATTERNS.md) if the quirk is general, not rule-specific): note the divergence under "Differences from ESLint" / the relevant AST-shape section.
    2. **Test cases**: Lock the current behavior in with a test — typically the ESLint-fails-but-we-pass case stays on the `valid` side with a comment pointing at the underlying quirk, so the behavior can't flip silently.
 
 ---
 
 ## Phase 2: Implementation (Go)
 
-> **AST note**: rslint is built on the tsgo AST, which is structurally different from ESLint's ESTree. Child-access patterns (`node.left`, `node.argument`, `node.callee`, …) do **not** correspond 1:1: parentheses are explicit nodes, optional chains are flag-based (no `ChainExpression` wrapper), `Literal` is split across several `Kind*Literal` kinds, and `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`. Review [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials) before implementing, and run the Alignment Audit (end of Step 2) before tests.
+> **AST note**: rslint is built on the tsgo AST, which is structurally different from ESLint's ESTree. Child-access patterns (`node.left`, `node.argument`, `node.callee`, …) do **not** correspond 1:1: parentheses are explicit nodes, optional chains are flag-based (no `ChainExpression` wrapper), `Literal` is split across several `Kind*Literal` kinds, and `AssignmentExpression` / `SequenceExpression` collapse into `BinaryExpression`. Review [AST_PATTERNS.md § AST Shape Essentials](AST_PATTERNS.md#ast-shape-essentials) before implementing, and run the Alignment Audit (end of Step 2) before tests.
 >
-> **If you discover a new tsgo↔ESTree shape difference during porting** (e.g. a kind that has no ESTree analog, an `.Text` field that's normalized at parse time when ESLint sees raw source, an access pattern that requires an extra unwrap), **append it to [AST_PATTERNS.md § AST Shape Essentials](../../AST_PATTERNS.md#ast-shape-essentials) as part of your PR**. That file is the living knowledge base; every new rule is a chance to grow it.
+> **If you discover a new tsgo↔ESTree shape difference during porting** (e.g. a kind that has no ESTree analog, an `.Text` field that's normalized at parse time when ESLint sees raw source, an access pattern that requires an extra unwrap), **append it to [AST_PATTERNS.md § AST Shape Essentials](AST_PATTERNS.md#ast-shape-essentials) as part of your PR**. That file is the living knowledge base; every new rule is a chance to grow it.
 
 ### Step 1: Directory Setup
 
@@ -295,7 +295,7 @@ For a worked example of large-rule splitting, see `internal/plugins/react_hooks/
 - Read `internal/rule/rule.go` to understand core definitions
 - Reference existing rules for the standard implementation pattern
 - Review AST node types in `shim/ast/shim.go`
-- See [AST_PATTERNS.md](../../AST_PATTERNS.md) for traversal patterns and examples
+- See [AST_PATTERNS.md](AST_PATTERNS.md) for traversal patterns and examples
 
 **Check plugin-local helpers FIRST** (before touching `internal/utils/`): grep the same plugin's neighbor rules for near-duplicates of the helper you're about to write:
 
@@ -316,9 +316,9 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries
 - `GetOptionsMap` — options parsing (handles both array and map inputs)
-- **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
+- **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
-See [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
+See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
 
 **Check for reusable shim utilities** (THIRD): If `internal/utils/` has nothing, check if the `shim/` packages already provide what you need:
 
@@ -368,7 +368,7 @@ var MyCoreRule = rule.Rule{
 - Each callback receives a `*ast.Node` and reports diagnostics via `ctx.ReportNode()`
 - Options parsing happens inside the `Run` function before returning listeners
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
-- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](../../AST_PATTERNS.md#using-typechecker)).
+- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
 
 **AST Shim API Warning**: In `github.com/microsoft/typescript-go/shim/ast`:
@@ -423,15 +423,15 @@ if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
 
 Before moving on, walk through each check. Each one targets a class of AST-shape bug that is not caught by compilation and may slip past narrowly-written unit tests. Skip a row when it doesn't apply to your rule.
 
-| If the rule …                                                                   | Audit                                                                                                                                                             | Reference                                                                                  |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Reads a child node (every rule)                                                 | Any `.Kind ==` / `.Kind !=` / `.As<Type>()` / `.Text` access on a child must go through `ast.SkipParentheses` first (directly or via a helper).                   | [AST_PATTERNS.md § ParenthesizedExpression](../../AST_PATTERNS.md#parenthesizedexpression) |
-| Handles `foo?.bar` / `foo?.()`                                                  | Use `ast.IsOptionalChain(node)`; don't hand-check node flags.                                                                                                     | [AST_PATTERNS.md § Optional Chain](../../AST_PATTERNS.md#optional-chain)                   |
-| Compares literal values                                                         | Match the precise `Kind*Literal`; normalize numeric text via `utils.NormalizeNumericLiteral` before value comparison.                                             | [AST_PATTERNS.md § Literal Kinds](../../AST_PATTERNS.md#literal-kinds)                     |
-| Has separate ESLint listeners for `AssignmentExpression` / `SequenceExpression` | Collapse into one `BinaryExpression` listener and branch on `OperatorToken.Kind`.                                                                                 | [AST_PATTERNS.md § Binary Operator Kinds](../../AST_PATTERNS.md#binary-operator-kinds)     |
-| Emits fix/suggestion text starting with an identifier                           | Guard against token fusion with the preceding character before emitting (otherwise e.g. `typeof` + `Number(foo)` becomes `typeofNumber(foo)`).                    | —                                                                                          |
-| Checks whether a name resolves to a global                                      | Use `utils.IsShadowed(node, name)`. Note: stricter than ESLint's scope manager on TS type-only bindings — document in the rule's `.md` if the difference matters. | —                                                                                          |
-| Reads source text for recommendation / fix                                      | Prefer `utils.TrimmedNodeText(sf, node)` (skips leading trivia) over raw `node.Pos()/End()`.                                                                      | [AST_PATTERNS.md § Node Text and Positions](../../AST_PATTERNS.md#node-text-and-positions) |
+| If the rule …                                                                   | Audit                                                                                                                                                             | Reference                                                                            |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Reads a child node (every rule)                                                 | Any `.Kind ==` / `.Kind !=` / `.As<Type>()` / `.Text` access on a child must go through `ast.SkipParentheses` first (directly or via a helper).                   | [AST_PATTERNS.md § ParenthesizedExpression](AST_PATTERNS.md#parenthesizedexpression) |
+| Handles `foo?.bar` / `foo?.()`                                                  | Use `ast.IsOptionalChain(node)`; don't hand-check node flags.                                                                                                     | [AST_PATTERNS.md § Optional Chain](AST_PATTERNS.md#optional-chain)                   |
+| Compares literal values                                                         | Match the precise `Kind*Literal`; normalize numeric text via `utils.NormalizeNumericLiteral` before value comparison.                                             | [AST_PATTERNS.md § Literal Kinds](AST_PATTERNS.md#literal-kinds)                     |
+| Has separate ESLint listeners for `AssignmentExpression` / `SequenceExpression` | Collapse into one `BinaryExpression` listener and branch on `OperatorToken.Kind`.                                                                                 | [AST_PATTERNS.md § Binary Operator Kinds](AST_PATTERNS.md#binary-operator-kinds)     |
+| Emits fix/suggestion text starting with an identifier                           | Guard against token fusion with the preceding character before emitting (otherwise e.g. `typeof` + `Number(foo)` becomes `typeofNumber(foo)`).                    | —                                                                                    |
+| Checks whether a name resolves to a global                                      | Use `utils.IsShadowed(node, name)`. Note: stricter than ESLint's scope manager on TS type-only bindings — document in the rule's `.md` if the difference matters. | —                                                                                    |
+| Reads source text for recommendation / fix                                      | Prefer `utils.TrimmedNodeText(sf, node)` (skips leading trivia) over raw `node.Pos()/End()`.                                                                      | [AST_PATTERNS.md § Node Text and Positions](AST_PATTERNS.md#node-text-and-positions) |
 
 ### Helper Extraction
 
@@ -803,11 +803,11 @@ Follow this **strict order** — each step depends on the previous one:
 
    **Disposition standard**: a non-empty diff is **not** automatically a failure. Every differing line must fall into exactly one of the three categories below — anything that cannot be confidently classified is treated as (c).
 
-   | Category                            | What it means                                                                                                                                                                                   | Action                                                                                                                        |
-   | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-   | **(a) Language-natural divergence** | tsgo AST or Go-semantic effect we don't actively choose (see Phase 1 Step 6.B — e.g. `NumericLiteral` parse-time normalization, normalized string cooked values).                               | Document under the rule's `.md` "Differences from ESLint" (or in [AST_PATTERNS.md](../../AST_PATTERNS.md) if general). Leave. |
-   | **(b) Scan-scope divergence**       | The two tools see different file sets (e.g., rslint respects `.gitignore` by default; ESLint does not; tsconfig `include` excludes a dir). Not a rule issue.                                    | No action. Optionally note in the PR description if a reviewer might be confused.                                             |
-   | **(c) Genuine bug**                 | Neither (a) nor (b). Rule logic, message text, or position is actually wrong on our side (or, rarely, ESLint's — but we align to ESLint unless we have a standing Phase 1 Step 6.A divergence). | **Must fix** before merging. Re-run the diff until it clears or reduces to (a)/(b) only.                                      |
+   | Category                            | What it means                                                                                                                                                                                   | Action                                                                                                                  |
+   | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+   | **(a) Language-natural divergence** | tsgo AST or Go-semantic effect we don't actively choose (see Phase 1 Step 6.B — e.g. `NumericLiteral` parse-time normalization, normalized string cooked values).                               | Document under the rule's `.md` "Differences from ESLint" (or in [AST_PATTERNS.md](AST_PATTERNS.md) if general). Leave. |
+   | **(b) Scan-scope divergence**       | The two tools see different file sets (e.g., rslint respects `.gitignore` by default; ESLint does not; tsconfig `include` excludes a dir). Not a rule issue.                                    | No action. Optionally note in the PR description if a reviewer might be confused.                                       |
+   | **(c) Genuine bug**                 | Neither (a) nor (b). Rule logic, message text, or position is actually wrong on our side (or, rarely, ESLint's — but we align to ESLint unless we have a standing Phase 1 Step 6.A divergence). | **Must fix** before merging. Re-run the diff until it clears or reduces to (a)/(b) only.                                |
 
 ---
 
@@ -972,6 +972,6 @@ If JS tests fail with 0 diagnostics found:
 
 ## See Also
 
-- [AST_PATTERNS.md](../../AST_PATTERNS.md) - AST traversal, listeners, reporting functions, fix helpers
-- [UTILS_REFERENCE.md](../../UTILS_REFERENCE.md) - Utility functions in `internal/utils/`
-- [QUICK_REFERENCE.md](../../QUICK_REFERENCE.md) - Commands, file locations, naming conventions, checklist
+- [AST_PATTERNS.md](AST_PATTERNS.md) - AST traversal, listeners, reporting functions, fix helpers
+- [UTILS_REFERENCE.md](UTILS_REFERENCE.md) - Utility functions in `internal/utils/`
+- [QUICK_REFERENCE.md](QUICK_REFERENCE.md) - Commands, file locations, naming conventions, checklist
