@@ -8,7 +8,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -1481,25 +1480,28 @@ func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[
 	}
 	walk(sourceFile)
 
-	// For JSX files with jsx: "preserve" or "react-native", TypeScript doesn't
-	// create references from JSX elements to the factory function (e.g., React).
-	// Detect JSX usage and mark the factory import as used.
+	// TypeScript only creates a reference from JSX to the factory function in
+	// the classic `jsx: "react"` runtime, and even then via an implicit
+	// `React.createElement` call that has no identifier node for the AST walk
+	// above to find. For every other mode (preserve, react-native, react-jsx)
+	// the factory import has no textual reference at all. Mark it as used,
+	// matching @typescript-eslint/parser's `jsxPragma` behavior (the factory
+	// is considered used whenever the file contains JSX, in any runtime).
 	markJsxFactoryUsed(ctx, sourceFile, usages)
 }
 
-// markJsxFactoryUsed checks if the source file contains JSX elements and,
-// when jsx is "preserve" or "react-native", marks the JSX factory and
-// fragment factory imports as used.
+// markJsxFactoryUsed checks if the source file contains JSX and, if so, marks
+// the JSX factory (and fragment factory) imports as used. This runs for every
+// jsx mode: TS never produces an AST identifier reference to the factory, so
+// without this an `import React` whose only "use" is JSX would be falsely
+// reported. Mirrors @typescript-eslint/parser, which treats the jsxPragma
+// (default "React") as used whenever JSX is present, regardless of runtime.
 func markJsxFactoryUsed(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
 	if ctx.Program == nil {
 		return
 	}
 	opts := ctx.Program.Options()
 	if opts == nil {
-		return
-	}
-	// Only needed for preserve/react-native modes where TS doesn't resolve the factory
-	if opts.Jsx != core.JsxEmitPreserve && opts.Jsx != core.JsxEmitReactNative {
 		return
 	}
 	firstJsx, firstFragment := findJsxNodes(sourceFile)
