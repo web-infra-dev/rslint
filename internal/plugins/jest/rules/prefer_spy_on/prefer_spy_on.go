@@ -5,7 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	rslintutils "github.com/web-infra-dev/rslint/internal/utils"
+	rslintUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildUseJestSpyOnMessage() rule.RuleMessage {
@@ -21,13 +21,13 @@ func findNodeObject(node *ast.Node) *ast.Node {
 	}
 
 	if jestUtils.IsMemberAccessNode(node) {
-		return rslintutils.AccessExpressionObject(node)
+		return rslintUtils.AccessExpressionObject(node)
 	}
 
 	if node.Kind == ast.KindCallExpression {
 		callee := ast.SkipParentheses(node.AsCallExpression().Expression)
 		if jestUtils.IsMemberAccessNode(callee) {
-			return rslintutils.AccessExpressionObject(callee)
+			return rslintUtils.AccessExpressionObject(callee)
 		}
 	}
 
@@ -90,14 +90,14 @@ func getAutoFixMockImplementation(jestFnCall *ast.Node, ctx rule.RuleContext) st
 	call := jestFnCall.AsCallExpression()
 	if call != nil && call.Arguments != nil && len(call.Arguments.Nodes) > 0 {
 		arg := call.Arguments.Nodes[0]
-		return ".mockImplementation(" + rslintutils.TrimmedNodeText(ctx.SourceFile, arg) + ")"
+		return ".mockImplementation(" + rslintUtils.TrimmedNodeText(ctx.SourceFile, arg) + ")"
 	}
 
 	return ".mockImplementation()"
 }
 
 func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node) []rule.RuleFix {
-	obj := rslintutils.AccessExpressionObject(left)
+	obj := rslintUtils.AccessExpressionObject(left)
 	prop := accessExpressionPropertyNode(left)
 	quote := leftPropQuote(left)
 	mockImplementation := getAutoFixMockImplementation(jestFnCall, ctx)
