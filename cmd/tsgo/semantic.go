@@ -102,6 +102,7 @@ type Semantic struct {
 	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
 	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
 	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
+	NodeFlags    map[NodeReference]uint32         `json:"node_flags"`
 	Primtypes    PrimTypes                        `json:"primtypes"`
 	TypeExtra    TypeExtra                        `json:"type_extra"`
 	FuncData     FunctionData                     `json:"func_data"`
@@ -118,6 +119,7 @@ func NewSemantic() Semantic {
 		AliasSymbols:     make(map[ast.SymbolId]ast.SymbolId),
 		Node2sym:         make(map[NodeReference]ast.SymbolId),
 		Node2type:        make(map[NodeReference]checker.TypeId),
+		NodeFlags:        make(map[NodeReference]uint32),
 		ShorthandSymbols: make(map[NodeReference]ast.SymbolId),
 		Primtypes:        PrimTypes{},
 		TypeExtra: TypeExtra{
@@ -219,6 +221,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				SourceFileId: sourceFileId,
 				Start:        utf16(node.Pos()),
 				End:          utf16(node.End()),
+			}
+			if node.Flags != 0 {
+				semantic.NodeFlags[key] = uint32(node.Flags)
 			}
 			// typescript will panic if we pass typeDeclaration to GetTypeAtLocation
 			if !ast.IsTypeDeclaration(node) {
