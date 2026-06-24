@@ -74,7 +74,7 @@ func getMemberCallName(node *ast.Node) string {
 	if !ast.IsCallExpression(node) {
 		return ""
 	}
-	callee := node.AsCallExpression().Expression
+	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
 	if ast.IsPropertyAccessExpression(callee) {
 		propName := callee.AsPropertyAccessExpression().Name()
 		if propName != nil && ast.IsIdentifier(propName) {
@@ -155,18 +155,21 @@ var NoCallbackInPromiseRule = rule.Rule{
 					// call (.then/.catch) whose first arg is a callback name, or handle
 					// the timeoutsErr path.
 					callExpr := node.AsCallExpression()
+					var firstArg *ast.Node
 					var firstArgName string
 					if callExpr.Arguments != nil && len(callExpr.Arguments.Nodes) > 0 {
-						firstArg := ast.SkipOuterExpressions(callExpr.Arguments.Nodes[0], skipTransparent)
+						firstArg = ast.SkipOuterExpressions(callExpr.Arguments.Nodes[0], skipTransparent)
 						if firstArg != nil && ast.IsIdentifier(firstArg) {
 							firstArgName = firstArg.AsIdentifier().Text
 						}
 					}
 
 					if isPromiseMemberCall(node) {
-						// Scenario A: a.then(cb) — callback passed directly as argument.
+						// Scenario A: a.then(cb) — callback passed directly as argument. Report the
+						// unwrapped identifier (firstArg) to match upstream's node.arguments[0]; the raw
+						// Nodes[0] would span the surrounding parens, e.g. `(cb)` instead of `cb`.
 						if firstArgName != "" && isCallbackName(firstArgName, exceptions) {
-							ctx.ReportNode(callExpr.Arguments.Nodes[0], buildCallbackMessage())
+							ctx.ReportNode(firstArg, buildCallbackMessage())
 						}
 						return
 					}

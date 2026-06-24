@@ -79,6 +79,10 @@ func TestNoCallbackInPromiseExtras(t *testing.T) {
 			{Code: `whatever.then((err) => { requestAnimationFrame(() => cb()) })`},
 			{Code: `whatever.then((err) => requestAnimationFrame(cb))`},
 
+			// Parenthesized whitelist callee — getMemberCallName must skip parens (like its
+			// sibling helpers) to still resolve "setTimeout", or the wrapped cb() is reported.
+			{Code: `promise.then(() => (setTimeout)(() => cb()))`},
+
 			// ---- Dimension 4: Graceful degradation — empty call, no args ----
 
 			// .then() with no args — no first argument, no report for Scenario A.
@@ -153,11 +157,11 @@ func TestNoCallbackInPromiseExtras(t *testing.T) {
 
 			// ---- Dimension 4: Parenthesized first arg to .then ----
 
-			// a.then((cb)) — in tsgo, Arguments.Nodes[0] is a ParenthesizedExpression.
-			// We skip outer expressions to reach the Identifier for the name check, but
-			// report the raw argument node (the ParenthesizedExpression).
+			// a.then((cb)) — in tsgo, Arguments.Nodes[0] is a ParenthesizedExpression. We
+			// skip outer expressions to reach the Identifier for both the name check and the
+			// reported node, so the report targets `cb` (column 9), not `(cb)` (column 8).
 			{Code: `a.then((cb))`,
-				Errors: []rule_tester.InvalidTestCaseError{e()}},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: callbackMsgId, Message: callbackMessage, Column: 9}}},
 
 			// ---- Dimension 4: "done" and "next" as callback names ----
 
