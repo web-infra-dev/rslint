@@ -3,6 +3,7 @@ package prefer_catch
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -58,8 +59,10 @@ var PreferCatchRule = rule.Rule{
 					// Get text of arg1 stripping outer parens to match ESLint's getText behavior
 					innerArg1 := ast.SkipOuterExpressions(args[1], skipTransparent)
 					catcherText := utils.TrimmedNodeText(sf, innerArg1)
-					// Remove from end of arg0 (comma position) to end of arg1
-					removeRange := core.NewTextRange(args[0].End(), args[1].End())
+					// Remove from the comma after arg0 to end of arg1, so trivia
+					// between arg0 and the comma (e.g. a trailing comment) is kept.
+					commaStart := scanner.GetRangeOfTokenAtPosition(sf, args[0].End()).Pos()
+					removeRange := core.NewTextRange(commaStart, args[1].End())
 					ctx.ReportNodeWithFixes(thenName, msg,
 						rule.RuleFixRemoveRange(removeRange),
 						rule.RuleFixInsertBefore(sf, thenName, "catch("+catcherText+")."),

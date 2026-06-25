@@ -1,7 +1,7 @@
 // TestPreferCatchExtras locks in branches and edge shapes that the upstream test
-// suite doesn't exercise. Each case carries an inline comment pointing at the
-// specific branch / Dimension 4 row / tsgo AST quirk it covers, so future
-// refactors can't silently regress them without breaking a named lock-in.
+// suite doesn't exercise. Each case carries an inline comment explaining the
+// specific branch it covers, so future refactors can't silently regress them
+// without breaking a named lock-in.
 package prefer_catch_test
 
 import (
@@ -19,33 +19,35 @@ func TestPreferCatchExtras(t *testing.T) {
 		t,
 		&prefer_catch.PreferCatchRule,
 		[]rule_tester.ValidTestCase{
-			// ---- Dimension 4: element-access form is not a PropertyAccessExpression ----
+			// ---- element-access form is not a PropertyAccessExpression ----
 			// N/A: ElementAccessExpression is never matched (callee must be PAE)
 			{Code: `prom['then'](fn1, fn2)`},
 
-			// ---- Dimension 4: wrong method name does not report ----
+			// ---- wrong method name does not report ----
 			// Locks in upstream name === 'then' check: .catch/.finally with 2 args must not fire
 			{Code: `prom.catch(fn1, fn2)`},
 			{Code: `prom.finally(fn1, fn2)`},
 
-			// ---- Dimension 4: single argument is valid ----
+			// ---- single argument is valid ----
 			// Locks in upstream arguments.length >= 2 check
 			{Code: `prom.then(fn)`},
 			{Code: `prom.then(null)`},
 			{Code: `prom.then(undefined)`},
 
-			// ---- Dimension 4: parenthesized callee is unwrapped ----
-			// (prom.then) is a ParenthesizedExpression wrapping the PAE; after
-			// SkipOuterExpressions the callee becomes the PAE and matches.
-			// This tests that calling (prom.then)(fn1, fn2) still is fine with no report
-			// since after skip it IS a PAE with name 'then' — actually this SHOULD report.
-			// N/A: there's no case where a parenthesized PAE callee should be excluded.
-
 			// ---- Real-user: computed-then is not dotted access ----
 			{Code: `promise[methodName](fn1, fn2)`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// ---- Dimension 4: parenthesized receiver object ----
+			// ---- parenthesized callee is unwrapped ----
+			// (prom.then) is a ParenthesizedExpression wrapping the PAE; after
+			// SkipOuterExpressions the callee becomes the PAE and matches.
+			{
+				Code:   `(prom.then)(fn1, fn2)`,
+				Output: []string{`(prom.catch(fn2).then)(fn1)`},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCatchToThen", Line: 1, Column: 7}},
+			},
+
+			// ---- parenthesized receiver object ----
 			// (prom).then(fn1, fn2): callee is PAE (name=then) on a paren-wrapped object.
 			// The rule listens on the PAE itself (not its Expression), so this matches.
 			{
@@ -54,7 +56,7 @@ func TestPreferCatchExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCatchToThen", Line: 1, Column: 8}},
 			},
 
-			// ---- Dimension 4: optional-chain .then ----
+			// ---- optional-chain .then ----
 			// prom?.then(fn1, fn2): upstream doesn't exclude optional chains.
 			{
 				Code:   `prom?.then(fn1, fn2)`,
@@ -62,7 +64,7 @@ func TestPreferCatchExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCatchToThen", Line: 1, Column: 7}},
 			},
 
-			// ---- Dimension 4: TS non-null assertion on receiver ----
+			// ---- TS non-null assertion on receiver ----
 			// prom!.then(fn1, fn2): callee is PAE on NonNullExpression — still matches.
 			{
 				Code:   `prom!.then(fn1, fn2)`,
@@ -70,14 +72,14 @@ func TestPreferCatchExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCatchToThen", Line: 1, Column: 7}},
 			},
 
-			// ---- Dimension 4: TS type-cast wrapper on receiver ----
+			// ---- TS type-cast wrapper on receiver ----
 			{
 				Code:   `(prom as any).then(fn1, fn2)`,
 				Output: []string{`(prom as any).catch(fn2).then(fn1)`},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCatchToThen", Line: 1, Column: 15}},
 			},
 
-			// ---- Dimension 4: parenthesized first arg (null) ----
+			// ---- parenthesized first arg (null) ----
 			// Locks in upstream isNullOrUndef check with paren-wrapped null.
 			{
 				Code:   `hey.then((null), fn2)`,
@@ -85,7 +87,7 @@ func TestPreferCatchExtras(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferCatchToThen", Line: 1, Column: 5}},
 			},
 
-			// ---- Dimension 4: parenthesized first arg (undefined) ----
+			// ---- parenthesized first arg (undefined) ----
 			{
 				Code:   `hey.then((undefined), fn2)`,
 				Output: []string{`hey.catch(fn2)`},
