@@ -26,9 +26,7 @@ prom.catch(handleErr)
 
 ## Differences from ESLint
 
-For the (unusual) 3-argument form `x.then(a, b, c)`, upstream's autofix produces
-invalid output (`x.catch(b).then(ac)`); this port produces valid output
-(`x.catch(b).then(a, c)`).
+Fixed an upstream autofix bug: `x.then(a, b, c)` now fixes to `x.catch(b).then(a, c)` instead of `x.catch(b).then(ac)`.
 
 ## Original Documentation
 
