@@ -274,15 +274,12 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			// Collect shorthand assignment value symbol
 			if valueSymbol := tc.GetShorthandAssignmentValueSymbol(node); valueSymbol != nil {
 				value_sym_id := ast.GetSymbolId(valueSymbol)
-				semantic.ShorthandSymbols[key] = value_sym_id
-
 				// Also record this symbol if not already recorded
 				if _, exists := semantic.Symtab[value_sym_id]; !exists {
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
-
 						declRef := nodeReference(valueSymbol.ValueDeclaration)
-
+						semantic.ShorthandSymbols[key] = value_sym_id
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
 							Name:       sanitizeSymbolName(valueSymbol.Name),
@@ -302,13 +299,11 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 						parameterSymbol, _ := tc.GetSymbolsOfParameterPropertyDeclaration(node, name.Text())
 						if parameterSymbol != nil {
 							parameterSymbolID := ast.GetSymbolId(parameterSymbol)
-							semantic.ParameterPropertySymbols[*nameKey] = parameterSymbolID
 							if _, exists := semantic.Symtab[parameterSymbolID]; !exists {
 								if ty := tc.GetTypeOfSymbol(parameterSymbol); ty != nil {
 									typeID := recordType(ty)
-
 									declRef := nodeReference(parameterSymbol.ValueDeclaration)
-
+									semantic.ParameterPropertySymbols[*nameKey] = parameterSymbolID
 									semantic.Symtab[parameterSymbolID] = SymbolInfo{
 										Id:         parameterSymbolID,
 										Name:       sanitizeSymbolName(parameterSymbol.Name),
