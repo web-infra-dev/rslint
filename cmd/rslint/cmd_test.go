@@ -213,7 +213,7 @@ func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePa
 func TestPrintDiagnosticFold(t *testing.T) {
 	// Generate a source file with many lines
 	var sb strings.Builder
-	sb.WriteString("const a = 1;\n")                // line 1
+	sb.WriteString("const a = 1;\n") // line 1
 	for i := 2; i <= 20; i++ {
 		fmt.Fprintf(&sb, "const v%d = %d;\n", i, i) // lines 2-20
 	}

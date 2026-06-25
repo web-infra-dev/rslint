@@ -260,8 +260,8 @@ func printDiagnosticGitLab(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 		Location    gitlabLocation `json:"location"`
 	}
 
-	beginLine, beginColumn := int(startLine)+1, int(startColumn)+1
-	endLineNum, endColumnNum := int(endLine)+1, int(endColumn)+1
+	beginLine, beginColumn := startLine+1, int(startColumn)+1
+	endLineNum, endColumnNum := endLine+1, int(endColumn)+1
 
 	issue := gitlabIssue{
 		Description: d.Message.Description,
