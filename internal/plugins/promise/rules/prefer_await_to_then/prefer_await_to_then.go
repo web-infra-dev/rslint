@@ -38,7 +38,8 @@ func createsScope(node *ast.Node) bool {
 		ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
 		ast.KindSwitchStatement, ast.KindCatchClause,
 		ast.KindClassDeclaration, ast.KindClassExpression,
-		ast.KindWithStatement, ast.KindClassStaticBlockDeclaration:
+		ast.KindWithStatement, ast.KindClassStaticBlockDeclaration,
+		ast.KindModuleDeclaration:
 		return true
 	}
 	return false

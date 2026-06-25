@@ -163,6 +163,20 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
 				},
 			},
+			// Top-level inside a TS namespace body
+			{
+				Code: `namespace N { Promise.resolve().then(() => {}) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 33, EndLine: 1, EndColumn: 37},
+				},
+			},
+			// Top-level inside a legacy TS module body
+			{
+				Code: `module M { Promise.resolve().then(() => {}) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 30, EndLine: 1, EndColumn: 34},
+				},
+			},
 			// Inside class method (not constructor)
 			{
 				Code: `class C { method() { hey.then(x => {}) } }`,
