@@ -78,6 +78,9 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 			// Locks in isCypress deeply-nested branch: 3-level cy chain
 			{Code: `function f() { cy.get("button").click().then() }`},
 
+			// Locks in isCypress element-access branch: cy['get']() chain
+			{Code: `function f() { cy['get']('x').then(go) }`},
+
 			// Locks in propName guard: non-then/catch/finally method call
 			{Code: `function f() { p.resolve() }`},
 			{Code: `function f() { p.thenSomething() }`},
@@ -109,6 +112,55 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 				Code: `const f = () => { hey.then(x => {}) }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 23, EndLine: 1, EndColumn: 27},
+				},
+			},
+			// Top-level bare block: still a Program-level scope per eslint-scope, so reported
+			{
+				Code: `{ thing.then(cb) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 9, EndLine: 1, EndColumn: 13},
+				},
+			},
+			// Top-level if-block
+			{
+				Code: `if (x) { thing.then(cb) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 16, EndLine: 1, EndColumn: 20},
+				},
+			},
+			// Top-level for-of loop
+			{
+				Code: `for (const a of xs) { thing.then(cb) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 29, EndLine: 1, EndColumn: 33},
+				},
+			},
+			// Top-level switch/case
+			{
+				Code: `switch (x) { case 1: thing.then(cb) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 28, EndLine: 1, EndColumn: 32},
+				},
+			},
+			// Top-level try/catch
+			{
+				Code: `try { x() } catch (e) { thing.then(cb) }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 31, EndLine: 1, EndColumn: 35},
+				},
+			},
+			// Class field initializer at top level
+			{
+				Code: `class C { x = p.then() }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 17, EndLine: 1, EndColumn: 21},
+				},
+			},
+			// Class static block at top level
+			{
+				Code: `class C { static { p.then() } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
 				},
 			},
 			// Inside class method (not constructor)

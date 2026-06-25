@@ -76,10 +76,6 @@ async function foo() {
 }
 ```
 
-## Differences from ESLint
-
-- Code inside class property initializers (`class C { x = p.then() }`) and class static blocks (`class C { static { p.then() } }`) is treated as top-level and not reported, whereas ESLint reports it. This follows from rslint's simpler scope model (function-ancestor walk vs ESLint's full scope tree).
-
 ## Original Documentation
 
 https://github.com/eslint-community/eslint-plugin-promise/blob/main/docs/rules/prefer-await-to-then.md

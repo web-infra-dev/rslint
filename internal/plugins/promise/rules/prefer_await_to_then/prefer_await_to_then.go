@@ -28,11 +28,27 @@ var preferAwaitToCallbackMessage = rule.RuleMessage{
 	Description: "Prefer await to then()/catch()/finally().",
 }
 
-// isTopLevelScoped reports whether node is outside any function-like scope,
+// createsScope reports whether node opens a new eslint-scope scope.
+func createsScope(node *ast.Node) bool {
+	if ast.IsFunctionLike(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindBlock,
+		ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
+		ast.KindSwitchStatement, ast.KindCatchClause,
+		ast.KindClassDeclaration, ast.KindClassExpression,
+		ast.KindWithStatement, ast.KindClassStaticBlockDeclaration:
+		return true
+	}
+	return false
+}
+
+// isTopLevelScoped reports whether node is outside any scope-creating ancestor,
 // mirroring ESLint's getScope().block.type === 'Program' check.
 func isTopLevelScoped(node *ast.Node) bool {
 	for cur := node.Parent; cur != nil; cur = cur.Parent {
-		if ast.IsFunctionLike(cur) {
+		if createsScope(cur) {
 			return false
 		}
 	}
@@ -67,10 +83,19 @@ func isCypress(node *ast.Node) bool {
 		return false
 	}
 	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
-	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+	if callee == nil {
 		return false
 	}
-	obj := ast.SkipOuterExpressions(callee.AsPropertyAccessExpression().Expression, skipTransparent)
+	var rawObj *ast.Node
+	switch {
+	case ast.IsPropertyAccessExpression(callee):
+		rawObj = callee.AsPropertyAccessExpression().Expression
+	case ast.IsElementAccessExpression(callee):
+		rawObj = callee.AsElementAccessExpression().Expression
+	default:
+		return false
+	}
+	obj := ast.SkipOuterExpressions(rawObj, skipTransparent)
 	if obj == nil {
 		return false
 	}
