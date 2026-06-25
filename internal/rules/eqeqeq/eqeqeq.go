@@ -108,7 +108,7 @@ func reportEqeqeq(ctx rule.RuleContext, operatorToken *ast.Node, left, right *as
 // https://eslint.org/docs/latest/rules/eqeqeq
 var EqeqeqRule = rule.Rule{
 	Name: "eqeqeq",
-	Schema0: rule.Enum("always", "smart", "allow-null").Default("always"),
+	Schema0: rule.Enum("always", "smart").Default("always"),
 	Schema1: rule.Object(map[string]rule.Schema{
 		"null": rule.Enum("always", "never", "ignore").Default("always"),
 	}),
@@ -117,11 +117,6 @@ var EqeqeqRule = rule.Rule{
 		mode, _ := opts[0].(string)
 		optsMap, _ := opts[1].(map[string]any)
 		nullOption, _ := optsMap["null"].(string)
-
-		if mode == "allow-null" {
-			mode = "always"
-			nullOption = "ignore"
-		}
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {

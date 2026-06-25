@@ -18,10 +18,6 @@ ruleTester.run('eqeqeq', {
     { code: 'null == a', options: ['smart'] as any },
     { code: 'a == null', options: ['smart'] as any },
 
-    // ── "allow-null" mode ──
-    { code: 'null == a', options: ['allow-null'] as any },
-    { code: 'a == null', options: ['allow-null'] as any },
-
     // ── "always" with null:"ignore" ──
     { code: 'a == null', options: ['always', { null: 'ignore' }] as any },
     { code: 'a != null', options: ['always', { null: 'ignore' }] as any },
@@ -97,28 +93,6 @@ ruleTester.run('eqeqeq', {
     {
       code: '0 != "1"',
       options: ['smart'] as any,
-      errors: [{ messageId: 'unexpected' }],
-    },
-
-    // ── "allow-null" mode ──
-    {
-      code: 'typeof a == "number"',
-      options: ['allow-null'] as any,
-      errors: [{ messageId: 'unexpected' }],
-    },
-    {
-      code: '"hello" != "world"',
-      options: ['allow-null'] as any,
-      errors: [{ messageId: 'unexpected' }],
-    },
-    {
-      code: '2 == 3',
-      options: ['allow-null'] as any,
-      errors: [{ messageId: 'unexpected' }],
-    },
-    {
-      code: 'true == true',
-      options: ['allow-null'] as any,
       errors: [{ messageId: 'unexpected' }],
     },
 

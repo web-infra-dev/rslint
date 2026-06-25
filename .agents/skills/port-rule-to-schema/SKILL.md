@@ -110,7 +110,7 @@ For a rule taking a string enum as the first option and a configuration object a
 ```go
 var EqeqeqRule = rule.Rule{
 	Name: "eqeqeq",
-	Schema0: rule.Enum("always", "smart", "allow-null").Default("always"),
+	Schema0: rule.Enum("always", "smart").Default("always"),
 	Schema1: rule.Object(map[string]rule.Schema{
 		"null": rule.Enum("always", "never", "ignore").Default("always"),
 	}),

@@ -35,13 +35,6 @@ func TestEqeqeqRule(t *testing.T) {
 			{Code: `null == null`, Options: "smart"},
 			{Code: `a === b`, Options: "smart"},
 
-			// "allow-null" (same as ["always", {"null": "ignore"}])
-			{Code: `a == null`, Options: "allow-null"},
-			{Code: `null == a`, Options: "allow-null"},
-			{Code: `a != null`, Options: "allow-null"},
-			{Code: `null != a`, Options: "allow-null"},
-			{Code: `a === b`, Options: "allow-null"},
-
 			// "always" with null:"ignore"
 			{Code: `a == null`, Options: []interface{}{"always", map[string]interface{}{"null": "ignore"}}},
 			{Code: `null == a`, Options: []interface{}{"always", map[string]interface{}{"null": "ignore"}}},
@@ -199,49 +192,6 @@ func TestEqeqeqRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceOperator", Output: `0 !== '1'`},
 					}},
-				},
-			},
-
-			// "allow-null" - non-null loose equality (typeof gets autofix, others get suggestions)
-			{
-				Code:    `a == b`,
-				Options: "allow-null",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "replaceOperator", Output: `a === b`},
-					}},
-				},
-			},
-			{
-				Code:    `typeof a == 'number'`,
-				Options: "allow-null",
-				Output:  []string{`typeof a === 'number'`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 10},
-				},
-			},
-			{
-				Code:    `'hello' != 'world'`,
-				Options: "allow-null",
-				Output:  []string{`'hello' !== 'world'`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 9},
-				},
-			},
-			{
-				Code:    `2 == 3`,
-				Options: "allow-null",
-				Output:  []string{`2 === 3`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 3},
-				},
-			},
-			{
-				Code:    `true == true`,
-				Options: "allow-null",
-				Output:  []string{`true === true`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 6},
 				},
 			},
 
