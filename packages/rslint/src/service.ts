@@ -98,12 +98,11 @@ export class RSLintService {
    * Close the service
    */
   async close(): Promise<void> {
-    return new Promise((resolve) => {
-      this.service.sendMessage('exit', {}).finally(() => {
-        this.service.terminate();
-        resolve();
-      });
-    });
+    try {
+      await this.service.sendMessage('exit', {});
+    } finally {
+      this.service.terminate();
+    }
   }
 }
 
@@ -118,6 +117,12 @@ export type {
   ParserOptions,
   RSlintOptions,
   RslintServiceInterface,
+  // IPC protocol types
+  MessageKind,
+  RslintMessageMap,
+  HandshakeRequest,
+  HandshakeResponse,
+  ErrorResponseData,
   // AST Info types
   GetAstInfoRequest,
   GetAstInfoResponse,

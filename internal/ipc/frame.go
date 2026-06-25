@@ -35,6 +35,9 @@ const maxFrameSize = 256 * 1024 * 1024 // 256 MiB
 // protocol-level kinds below; application kinds (e.g. task dispatch,
 // output, log) are declared by the layers above and travel through the
 // same opaque envelope.
+//
+// NOTE: mirrored by the `MessageKind`/`RslintMessageMap` union in
+// packages/rslint/src/types.ts; keep both sides in sync.
 type MessageKind string
 
 const (
@@ -68,8 +71,8 @@ func (m *Message) Decode(v any) error {
 	return nil
 }
 
-// ErrorResponseData is the canonical body of an `error` frame. Mirrors the
-// Node side's ErrorResponseData.
+// ErrorResponseData is the canonical body of an `error` frame. Mirrors
+// ErrorResponseData in packages/rslint/src/types.ts — keep in sync.
 type ErrorResponseData struct {
 	Message string `json:"message"`
 }

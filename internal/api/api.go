@@ -49,6 +49,9 @@ func NewAstInfoBuilder(c *checker.Checker, sf *ast.SourceFile) *AstInfoBuilder {
 
 // Application-level message kinds handled by this service. The transport-
 // level kinds (response/error/handshake/exit) live in internal/ipc.
+//
+// NOTE: these structs mirror RslintMessageMap in packages/rslint/src/types.ts;
+// keep both sides in sync when changing a field or adding a Kind*.
 const (
 	// KindLint is sent from JS to Go to request linting.
 	KindLint ipc.MessageKind = "lint"
@@ -61,18 +64,18 @@ const (
 // Version is the IPC protocol version.
 const Version = "1.0.0"
 
-// HandshakeRequest represents a handshake request
+// HandshakeRequest represents a handshake request.
 type HandshakeRequest struct {
 	Version string `json:"version"`
 }
 
-// HandshakeResponse represents a handshake response
+// HandshakeResponse represents a handshake response.
 type HandshakeResponse struct {
 	Version string `json:"version"`
 	OK      bool   `json:"ok"`
 }
 
-// LintRequest represents a lint request from JS to Go
+// LintRequest represents a lint request from JS to Go.
 type LintRequest struct {
 	Files            []string `json:"files,omitempty"`
 	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
@@ -118,7 +121,7 @@ type ParserOptions struct {
 }
 type ByteArray []byte
 
-// LintResponse represents a lint response from Go to JS
+// LintResponse represents a lint response from Go to JS.
 type LintResponse struct {
 	Diagnostics        []Diagnostic         `json:"diagnostics"`
 	ErrorCount         int                  `json:"errorCount"`
@@ -127,13 +130,13 @@ type LintResponse struct {
 	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
 }
 
-// ApplyFixesRequest represents a request to apply fixes from JS to Go
+// ApplyFixesRequest represents a request to apply fixes from JS to Go.
 type ApplyFixesRequest struct {
 	FileContent string       `json:"fileContent"` // Current content of the file
 	Diagnostics []Diagnostic `json:"diagnostics"` // Diagnostics with fixes to apply
 }
 
-// ApplyFixesResponse represents a response after applying fixes
+// ApplyFixesResponse represents a response after applying fixes.
 type ApplyFixesResponse struct {
 	FixedContent   []string `json:"fixedContent"`   // The content after applying fixes (array of intermediate versions)
 	WasFixed       bool     `json:"wasFixed"`       // Whether any fixes were actually applied

@@ -72,6 +72,12 @@ export {
   type ParserOptions,
   type RSlintOptions,
   type RslintServiceInterface,
+  // IPC protocol types
+  type MessageKind,
+  type RslintMessageMap,
+  type HandshakeRequest,
+  type HandshakeResponse,
+  type ErrorResponseData,
   // AST Info types
   type GetAstInfoRequest,
   type GetAstInfoResponse,

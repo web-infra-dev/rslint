@@ -5,7 +5,11 @@ package inspector
 // Request/Response Types
 // ============================================================================
 
-// GetAstInfoRequest represents a request for AST info at a specific position
+// GetAstInfoRequest represents a request for AST info at a specific position.
+//
+// NOTE: this struct and the types below it (GetAstInfoResponse, NodeInfo,
+// TypeInfo, SymbolInfo, SignatureInfo, FlowInfo) mirror their namesakes in
+// packages/rslint/src/types.ts; keep both sides in sync.
 type GetAstInfoRequest struct {
 	FileContent     string         `json:"fileContent"`               // Source code content
 	Position        int            `json:"position"`                  // Start position (pos)

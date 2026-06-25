@@ -66,20 +66,63 @@ export interface RSlintOptions {
   workingDirectory?: string;
 }
 
-export interface PendingMessage {
-  resolve: (data: any) => void;
+export interface PendingMessage<T = unknown> {
+  resolve: (data: T) => void;
   reject: (error: Error) => void;
 }
 
+// ============================================================================
+// IPC protocol - request/response payloads for each `sendMessage` kind
+// Mirrors the Go side: internal/ipc, internal/api, internal/inspector.
+// NOTE: not type-checked against the Go structs — keep both sides in sync.
+// ============================================================================
+
+export interface HandshakeRequest {
+  version: string;
+}
+
+export interface HandshakeResponse {
+  version: string;
+  ok: boolean;
+}
+
+// LintOptions plus the wire-only `format` field service.ts attaches to every
+// lint request (ignored by the Go handler, which always returns structured data).
+export interface LintRequestData extends LintOptions {
+  format?: string;
+}
+
+export type ExitRequest = Record<string, never>;
+
+export interface ErrorResponseData {
+  message: string;
+}
+
+/** Maps each `sendMessage` kind to its request/response payload shapes. */
+export interface RslintMessageMap {
+  handshake: { request: HandshakeRequest; response: HandshakeResponse };
+  lint: { request: LintRequestData; response: LintResponse };
+  applyFixes: { request: ApplyFixesRequest; response: ApplyFixesResponse };
+  getAstInfo: { request: GetAstInfoRequest; response: GetAstInfoResponse };
+  exit: { request: ExitRequest; response: null };
+}
+
+export type MessageKind = keyof RslintMessageMap;
+
+// The wire envelope: outbound messages carry a MessageKind; inbound replies
+// carry 'response' or 'error' (see internal/ipc.KindResponse/KindError).
 export interface IpcMessage {
   id: number;
-  kind: string;
-  data: any;
+  kind: MessageKind | 'response' | 'error';
+  data: unknown;
 }
 
 // Service interface that all implementations must follow
 export interface RslintServiceInterface {
-  sendMessage(kind: string, data: any): Promise<any>;
+  sendMessage<K extends MessageKind>(
+    kind: K,
+    data: RslintMessageMap[K]['request'],
+  ): Promise<RslintMessageMap[K]['response']>;
   terminate(): void;
 }
 

@@ -5,6 +5,9 @@ import type {
   RSlintOptions,
   PendingMessage,
   IpcMessage,
+  MessageKind,
+  RslintMessageMap,
+  ErrorResponseData,
 } from './types.js';
 
 /**
@@ -35,7 +38,7 @@ export class BrowserRslintService implements RslintServiceInterface {
   /**
    * Initialize the web worker
    */
-  private async ensureWorker(wasmUrl: string): Promise<Worker> {
+  private ensureWorker(wasmUrl: string): Worker {
     if (!this.worker) {
       this.worker = new Worker(this.workerUrl, { name: 'rslint-worker.js' });
 
@@ -135,13 +138,19 @@ export class BrowserRslintService implements RslintServiceInterface {
   /**
    * Send a message to the worker
    */
-  async sendMessage(kind: string, data: any): Promise<any> {
+  async sendMessage<K extends MessageKind>(
+    kind: K,
+    data: RslintMessageMap[K]['request'],
+  ): Promise<RslintMessageMap[K]['response']> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
       const message: IpcMessage = { id, kind, data };
 
-      // Register promise callbacks
-      this.pendingMessages.set(id, { resolve, reject });
+      // Register promise callbacks. The map is keyed by id, not kind, so it
+      // can't carry K through to storage; resolve/reject are paired with the
+      // correct response type at the call site above, which is what matters.
+      // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      this.pendingMessages.set(id, { resolve, reject } as PendingMessage);
 
       // Send message to worker
       this.worker!.postMessage(message);
@@ -159,7 +168,8 @@ export class BrowserRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
-      pending.reject(new Error(data.message));
+      // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      pending.reject(new Error((data as ErrorResponseData).message));
     } else {
       pending.resolve(data);
     }

@@ -5,6 +5,9 @@ import type {
   RSlintOptions,
   PendingMessage,
   IpcMessage,
+  MessageKind,
+  RslintMessageMap,
+  ErrorResponseData,
 } from './types.js';
 
 const require = createRequire(import.meta.url);
@@ -73,13 +76,19 @@ export class NodeRslintService implements RslintServiceInterface {
   /**
    * Send a message to the rslint process
    */
-  async sendMessage(kind: string, data: any): Promise<any> {
+  async sendMessage<K extends MessageKind>(
+    kind: K,
+    data: RslintMessageMap[K]['request'],
+  ): Promise<RslintMessageMap[K]['response']> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
       const message: IpcMessage = { id, kind, data };
 
-      // Register promise callbacks
-      this.pendingMessages.set(id, { resolve, reject });
+      // Register promise callbacks. The map is keyed by id, not kind, so it
+      // can't carry K through to storage; resolve/reject are paired with the
+      // correct response type at the call site above, which is what matters.
+      // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      this.pendingMessages.set(id, { resolve, reject } as PendingMessage);
 
       // Write message length as 4 bytes in little endian
       const json = JSON.stringify(message);
@@ -147,7 +156,8 @@ export class NodeRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
-      pending.reject(new Error(data.message));
+      // rslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+      pending.reject(new Error((data as ErrorResponseData).message));
     } else {
       pending.resolve(data);
     }
