@@ -100,6 +100,9 @@ export class RSLintService {
   async close(): Promise<void> {
     try {
       await this.service.sendMessage('exit', {});
+    } catch {
+      // The exit handshake is best-effort cleanup; a failure here (e.g. the
+      // process already exited) shouldn't fail an otherwise-successful call.
     } finally {
       this.service.terminate();
     }

@@ -104,7 +104,7 @@ export interface RslintMessageMap {
   lint: { request: LintRequestData; response: LintResponse };
   applyFixes: { request: ApplyFixesRequest; response: ApplyFixesResponse };
   getAstInfo: { request: GetAstInfoRequest; response: GetAstInfoResponse };
-  exit: { request: ExitRequest; response: null };
+  exit: { request: ExitRequest; response: undefined };
 }
 
 export type MessageKind = keyof RslintMessageMap;
