@@ -75,14 +75,14 @@ func isAllowedPromiseTermination(expression *ast.Node, opts Options) bool {
 
 var CatchOrReturnRule = rule.Rule{
 	Name: "promise/catch-or-return",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"allowThen":         rule.Bool().Default(false),
 		"allowThenStrict":   rule.Bool().Default(false),
 		"allowFinally":      rule.Bool().Default(false),
 		"terminationMethod": rule.Union(rule.String(), rule.Array(rule.String())).Default("catch"),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap, _ := options.(map[string]any)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap, _ := options[0].(map[string]any)
 
 		var terminationMethod []string
 		if t, ok := optsMap["terminationMethod"].(string); ok {

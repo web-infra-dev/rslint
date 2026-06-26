@@ -51,7 +51,7 @@ func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
 }
 
 // TestHandleLint_RuleOptionsWithSchemaDrivenRule guards against a regression
-// where rules migrated to Schema0/Schema1 + RunWithOptions panicked with a
+// where schema-driven rules (Schema + RunWithOptions) panicked with a
 // nil-pointer dereference when invoked through the req.RuleOptions path
 // (used by packages/rslint-test-tools rule-tester harnesses): that path
 // called the now-nil legacy Run callback directly instead of dispatching to

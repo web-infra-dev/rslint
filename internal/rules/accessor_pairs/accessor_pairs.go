@@ -363,14 +363,14 @@ func checkTypeMembers(ctx rule.RuleContext, members []*ast.Node, opts Options) {
 // https://eslint.org/docs/latest/rules/accessor-pairs
 var AccessorPairsRule = rule.Rule{
 	Name: "accessor-pairs",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"getWithoutSet":          rule.Bool().Default(false),
 		"setWithoutGet":          rule.Bool().Default(true),
 		"enforceForClassMembers": rule.Bool().Default(true),
 		"enforceForTSTypes":      rule.Bool().Default(false),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap, _ := options.(map[string]any)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap, _ := options[0].(map[string]any)
 		getWithoutSet, _ := optsMap["getWithoutSet"].(bool)
 		setWithoutGet, _ := optsMap["setWithoutGet"].(bool)
 		enforceForClassMembers, _ := optsMap["enforceForClassMembers"].(bool)

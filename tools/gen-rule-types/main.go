@@ -29,25 +29,11 @@ func main() {
 	for _, name := range ruleNames {
 		r := rulesMap[name]
 		if r.RunWithOptions != nil {
-			type0 := "never"
-			if r.Schema0 != nil {
-				type0 = r.Schema0.TSType()
-			}
-
-			type1 := "never"
-			if r.Schema1 != nil {
-				type1 = r.Schema1.TSType()
-			}
-
 			var line string
-			if type1 == "never" {
-				if type0 == "never" {
-					line = fmt.Sprintf("    %q?: RuleEntry;", name)
-				} else {
-					line = fmt.Sprintf("    %q?: RuleEntry<%s>;", name, type0)
-				}
+			if r.Schema != nil {
+				line = fmt.Sprintf("    %q?: RuleEntry<%s>;", name, r.Schema.TSType())
 			} else {
-				line = fmt.Sprintf("    %q?: RuleEntry<%s, %s>;", name, type0, type1)
+				line = fmt.Sprintf("    %q?: RuleEntry;", name)
 			}
 			lines = append(lines, line)
 			typedCount++

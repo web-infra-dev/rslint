@@ -8,11 +8,11 @@ import (
 // https://eslint.org/docs/latest/rules/no-console
 var NoConsoleRule = rule.Rule{
 	Name: "no-console",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"allow": rule.Array(rule.String()),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options[0])
 
 		reportIfConsole := func(node *ast.Node, consoleIdent *ast.Node, propertyName string) {
 			// Check if this property is allowed

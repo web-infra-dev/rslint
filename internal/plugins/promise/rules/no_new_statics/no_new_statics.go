@@ -35,7 +35,7 @@ func buildMessage(name string) rule.RuleMessage {
 
 var NoNewStaticsRule = rule.Rule{
 	Name: "promise/no-new-statics",
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				callee := ast.SkipOuterExpressions(node.AsNewExpression().Expression, skipTransparent)

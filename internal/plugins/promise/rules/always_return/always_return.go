@@ -177,12 +177,12 @@ func rootObjectName(node *ast.Node) string {
 
 var AlwaysReturnRule = rule.Rule{
 	Name: "promise/always-return",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"ignoreLastCallback":       rule.Bool().Default(false),
 		"ignoreAssignmentVariable": rule.Union(rule.Array(rule.String())).Default([]any{"globalThis"}),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap, _ := options.(map[string]any)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap, _ := options[0].(map[string]any)
 
 		var ignoreAssignmentVariable []string
 		if arr, ok := optsMap["ignoreAssignmentVariable"].([]any); ok {

@@ -67,12 +67,12 @@ func regexMatch(re *regexp2.Regexp, s string) bool {
 
 var ParamNamesRule = rule.Rule{
 	Name: "promise/param-names",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"resolvePattern": rule.String().Default("^_?resolve$"),
 		"rejectPattern":  rule.String().Default("^_?reject$"),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap, _ := options.(map[string]any)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap, _ := options[0].(map[string]any)
 		resolvePattern, _ := optsMap["resolvePattern"].(string)
 		rejectPattern, _ := optsMap["rejectPattern"].(string)
 		opts := Options{

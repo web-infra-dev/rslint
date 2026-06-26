@@ -71,7 +71,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 				finalOptions := ruleConfigCopy.Options
 
 				if ruleImpl.RunWithOptions != nil {
-					validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema0, ruleImpl.Schema1, ruleImpl.Name, ruleConfigCopy.Options)
+					validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, ruleConfigCopy.Options)
 					if err != nil {
 						fmt.Fprintf(os.Stderr, "[rslint] Error validating options for rule %q: %v\n", ruleName, err)
 						continue
@@ -157,7 +157,7 @@ func (r *RuleRegistry) ValidateConfig(config RslintConfig) []error {
 			if isEnabled {
 				if ruleImpl, exists := r.rules[ruleName]; exists {
 					if ruleImpl.RunWithOptions != nil {
-						_, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema0, ruleImpl.Schema1, ruleImpl.Name, rawOptions)
+						_, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, rawOptions)
 						if err != nil {
 							errs = append(errs, err)
 						}

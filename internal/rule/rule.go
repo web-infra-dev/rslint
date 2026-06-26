@@ -92,74 +92,39 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	// Schema0 represents the declarative schema for validating the first options argument.
-	Schema0 Schema
-	// Schema1 represents the declarative schema for validating the second options argument (if any).
-	Schema1 Schema
+	// Schema declares the options validator for this rule. Use Tuple(...) for rules
+	// with multiple positional arguments; use Object/Enum/etc. for a single option.
+	Schema Schema
 	// Run is the legacy, non-validated rule execution callback. Receives the raw configuration object.
 	Run func(ctx RuleContext, options any) RuleListeners
 	// RunWithOptions is the schema-driven rule execution callback. Receives parsed, validated,
-	// and default-hydrated options matching the declared schemas.
-	RunWithOptions func(ctx RuleContext, options any) RuleListeners
+	// and default-hydrated options as a []any slice matching the declared Tuple schema.
+	RunWithOptions func(ctx RuleContext, options []any) RuleListeners
 }
 
-// ValidateAndHydrateOptions decodes raw config options against the rule's Schema0 and Schema1,
-// applying defaults and returning the validated typed options.
-func ValidateAndHydrateOptions(schema0 Schema, schema1 Schema, ruleName string, raw any) (any, error) {
-	if schema0 == nil {
-		return nil, nil //nolint:nilnil // no Schema0 means no options to validate, not an error
+// ValidateAndHydrateOptions decodes raw config options against the rule's Schema,
+// applying defaults and returning the validated options as a []any slice.
+// The top-level Schema must be a Tuple or Array — both produce []any from Validate.
+func ValidateAndHydrateOptions(schema Schema, ruleName string, raw any) ([]any, error) {
+	if schema == nil {
+		return nil, nil //nolint:nilnil // no Schema means no options to validate, not an error
 	}
-
-	// Normalize raw config into a slice of 2 option elements
-	var raw0, raw1 any
-	if raw != nil {
-		if arr, ok := raw.([]any); ok {
-			if len(arr) > 0 {
-				raw0 = arr[0]
-			}
-			if len(arr) > 1 {
-				raw1 = arr[1]
-			}
-		} else if arrInterface, ok := raw.([]interface{}); ok {
-			if len(arrInterface) > 0 {
-				raw0 = arrInterface[0]
-			}
-			if len(arrInterface) > 1 {
-				raw1 = arrInterface[1]
-			}
-		} else {
-			// Single option value passed directly
-			raw0 = raw
-		}
-	}
-
-	// Validate Option 0
-	val0, err := schema0.Validate(raw0)
+	val, err := schema.Validate(raw)
 	if err != nil {
-		return nil, fmt.Errorf("configuration validation failed for rule %q (option 0): %w", ruleName, err)
+		return nil, fmt.Errorf("configuration validation failed for rule %q: %w", ruleName, err)
 	}
-
-	// If there's no Option 1 schema, just return the validated Option 0
-	if schema1 == nil {
-		return val0, nil
+	result, ok := val.([]any)
+	if !ok {
+		return nil, fmt.Errorf("rule %q: top-level Schema must be Tuple or Array (got %T); wrap the schema in rule.Tuple(...)", ruleName, val)
 	}
-
-	// Validate Option 1
-	val1, err := schema1.Validate(raw1)
-	if err != nil {
-		return nil, fmt.Errorf("configuration validation failed for rule %q (option 1): %w", ruleName, err)
-	}
-
-	// Return as a slice containing both validated options
-	return []any{val0, val1}, nil
+	return result, nil
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
-		Schema0:          r.Schema0,
-		Schema1:          r.Schema1,
+		Schema:           r.Schema,
 		Run:              r.Run,
 		RunWithOptions:   r.RunWithOptions,
 	}

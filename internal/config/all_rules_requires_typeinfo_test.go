@@ -59,8 +59,8 @@ func TestAllRules_NilTypeCheckerEarlyReturnImpliesRequiresTypeInfo(t *testing.T)
 		if impl.RequiresTypeInfo {
 			continue
 		}
-		runFn := impl.Run
-		if runFn == nil {
+		var runFn any = impl.Run
+		if impl.Run == nil {
 			runFn = impl.RunWithOptions
 		}
 		body, file, err := parser.runBodyFor(runFn)

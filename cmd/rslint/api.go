@@ -173,7 +173,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 					continue
 				}
 				if r.RunWithOptions != nil {
-					validated, err := rule.ValidateAndHydrateOptions(r.Schema0, r.Schema1, r.Name, option)
+					validated, err := rule.ValidateAndHydrateOptions(r.Schema, r.Name, option)
 					if err != nil {
 						return nil, fmt.Errorf("invalid options for rule %q: %w", r.Name, err)
 					}
@@ -302,7 +302,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				}
 				if r.rule.RunWithOptions != nil {
 					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.rule.RunWithOptions(ctx, r.option)
+						opts, _ := r.option.([]any)
+						return r.rule.RunWithOptions(ctx, opts)
 					}
 				}
 				return linter.ConfiguredRule{

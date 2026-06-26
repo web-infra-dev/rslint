@@ -63,19 +63,29 @@ export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
  */
 export type RuleOptions = Record<string, any>;
 
+// Makes each element of a tuple optional, e.g. [A, B] → [A?, B?].
+type PartialTuple<T extends any[]> = T extends [infer H, ...infer R]
+  ? [H?, ...PartialTuple<R>]
+  : [];
+
 /**
  * Configuration value accepted for a single rule.
  *
- * - `RuleSeverity` — just toggle the rule.
- * - `[RuleSeverity, T0?, T1?]` — ESLint-style array form. Most rules take a
- *   single options object (`[severity, options]`); some accept positional
- *   arguments (`[severity, option0, option1]`).
- * - `{ level, options }` — object form supported by the loader.
+ * `Options` is always a tuple of positional option types, matching the rule's
+ * schema declaration (e.g. `[{ allow?: string[] }]` for a single-options rule,
+ * or `["always" | "smart", { null?: string }]` for a multi-positional rule).
+ *
+ * - `RuleSeverity` — just toggle the rule on/off.
+ * - `[RuleSeverity, ...options]` — ESLint-style array form with optional positional args.
+ * - `{ level, options }` — object form; `options` maps to the first positional arg.
  */
-export type RuleEntry<T0 = never, T1 = never> =
+export type RuleEntry<Options extends any[] = []> =
   | RuleSeverity
-  | readonly [RuleSeverity, T0?, T1?]
-  | { level: RuleSeverity; options?: T0 };
+  | readonly [RuleSeverity, ...PartialTuple<Options>]
+  | {
+      level: RuleSeverity;
+      options?: Options extends [infer T, ...any[]] ? T : never;
+    };
 
 /**
  * Map of rule name → rule configuration. The value shape is what gives editors
@@ -83,7 +93,7 @@ export type RuleEntry<T0 = never, T1 = never> =
  */
 export interface RulesRecord {
   /** @__RULE_OPTIONS__ */
-  [key: string]: RuleEntry<any, any> | undefined;
+  [key: string]: RuleEntry<any[]> | undefined;
 }
 
 /**

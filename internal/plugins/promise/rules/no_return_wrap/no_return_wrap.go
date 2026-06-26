@@ -128,11 +128,11 @@ func isExpressionBodyArrowCall(node *ast.Node) bool {
 
 var NoReturnWrapRule = rule.Rule{
 	Name: "promise/no-return-wrap",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"allowReject": rule.Bool().Default(false),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap, _ := options.(map[string]any)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap, _ := options[0].(map[string]any)
 		allowReject, _ := optsMap["allowReject"].(bool)
 		opts := Options{
 			AllowReject: allowReject,

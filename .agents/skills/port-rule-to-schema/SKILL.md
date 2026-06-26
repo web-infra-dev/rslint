@@ -1,6 +1,6 @@
 ---
 name: port-rule-to-schema
-description: Port a legacy rslint rule to the new schema-driven options validation framework. Use this skill when you need to refactor a rule implementation to define declarative options schemas (Schema0, Schema1) and consume typed options in RunWithOptions.
+description: Port a legacy rslint rule to the new schema-driven options validation framework. Use this skill when you need to refactor a rule implementation to define a declarative Schema (always a Tuple) and consume typed options in RunWithOptions.
 ---
 
 # Porting Rules to the Schema-Driven Options Framework
@@ -34,9 +34,9 @@ Inspect how `ctx.Rule().Options` is parsed, checked, and converted. Cross-refere
 - The default values used when option fields are missing.
 - Positional structures (e.g., option index `0` vs. index `1`).
 
-### 3. Define the Declarative Schemas
+### 3. Define the Declarative Schema
 
-Add `Schema0` (and optionally `Schema1` if the rule takes a second positional option) to the `rule.Rule` declaration using the schema combinators defined in [internal/rule/schema.go](file:///home/swwind/rslint/internal/rule/schema.go):
+Add a `Schema` field to the `rule.Rule` declaration. **The top-level schema must always be `rule.Tuple(...)`**, even for rules with a single option — this ensures `RunWithOptions` always receives a `[]any` slice. Use the schema combinators defined in [internal/rule/schema.go](file:///home/swwind/rslint/internal/rule/schema.go) as the Tuple elements:
 
 - `rule.Bool()`
 - `rule.Int()`
@@ -44,27 +44,30 @@ Add `Schema0` (and optionally `Schema1` if the rule takes a second positional op
 - `rule.Enum("option1", "option2")`
 - `rule.Object(map[string]rule.Schema{ ... })`
 - `rule.Array(itemSchema)`
-- `rule.Tuple(schemas...)`
 - `rule.Union(schemas...)`
 
 _Always specify `.Default(value)` on your schemas to let the framework handle missing values._
 
 ### 4. Implement `RunWithOptions`
 
-Replace or supplement `Run` with `RunWithOptions`:
+Replace or supplement `Run` with `RunWithOptions`. The `options` parameter is always `[]any` — one element per positional schema in the `Tuple`:
 
 ```go
-RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners { ... }
+RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners { ... }
 ```
 
-Within `RunWithOptions`, cast the `options` parameter to the expected Go types guaranteed by your schema:
+Access elements by index:
 
-- **Single Option Rules** (`Schema1 == nil`): `options` corresponds directly to `Schema0`.
-  - If `Schema0` is a `rule.Object`, cast `options` to `map[string]any`.
-  - If `Schema0` is a `rule.Enum`, cast `options` to `string`.
-- **Double Option Rules** (`Schema1 != nil`): `options` is guaranteed to be a flat slice of exactly 2 elements (`[]any`).
-  - Cast `options` to `[]any`.
-  - Access the elements via `options.([]any)[0]` (validated by `Schema0`) and `options.([]any)[1]` (validated by `Schema1`).
+- `options[0]` → first positional arg (guaranteed by `Tuple` element 0)
+- `options[1]` → second positional arg (guaranteed by `Tuple` element 1)
+- etc.
+
+Type-assert each element to the Go type that corresponds to its schema:
+
+- `rule.Object` → `map[string]any`
+- `rule.Enum` / `rule.String` → `string`
+- `rule.Bool` → `bool`
+- `rule.Array(rule.String())` → `[]any` (elements are `string`)
 
 ### 5. Update Tests and Custom Call Sites
 
@@ -78,7 +81,7 @@ Within `RunWithOptions`, cast the `options` parameter to the expected Go types g
 
 ### A. Single Option Rule (`accessor-pairs`)
 
-For a rule taking a single configuration object:
+For a rule taking a single configuration object, wrap it in `Tuple`:
 
 ```go
 type Options struct {
@@ -88,12 +91,12 @@ type Options struct {
 
 var AccessorPairsRule = rule.Rule{
 	Name: "accessor-pairs",
-	Schema0: rule.Object(map[string]rule.Schema{
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"getWithoutSet": rule.Bool().Default(false),
 		"setWithoutGet": rule.Bool().Default(true),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		optsMap := options.(map[string]any)
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap, _ := options[0].(map[string]any)
 		opts := Options{
 			GetWithoutSet: optsMap["getWithoutSet"].(bool),
 			SetWithoutGet: optsMap["setWithoutGet"].(bool),
@@ -103,22 +106,23 @@ var AccessorPairsRule = rule.Rule{
 }
 ```
 
-### B. Double Option Rule (`eqeqeq`)
+### B. Multi-Positional Rule (`eqeqeq`)
 
-For a rule taking a string enum as the first option and a configuration object as the second option:
+For a rule taking multiple positional arguments, list them as Tuple elements:
 
 ```go
 var EqeqeqRule = rule.Rule{
 	Name: "eqeqeq",
-	Schema0: rule.Enum("always", "smart").Default("always"),
-	Schema1: rule.Object(map[string]rule.Schema{
-		"null": rule.Enum("always", "never", "ignore").Default("always"),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := options.([]any)
-		mode := opts[0].(string)
-		optsMap := opts[1].(map[string]any)
-		nullOption := optsMap["null"].(string)
+	Schema: rule.Tuple(
+		rule.Enum("always", "smart").Default("always"),
+		rule.Object(map[string]rule.Schema{
+			"null": rule.Enum("always", "never", "ignore").Default("always"),
+		}),
+	),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		mode, _ := options[0].(string)
+		optsMap, _ := options[1].(map[string]any)
+		nullOption, _ := optsMap["null"].(string)
 
 		// ... rule logic using mode & nullOption
 	},

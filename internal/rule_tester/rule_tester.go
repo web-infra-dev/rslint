@@ -144,7 +144,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				finalOptions := options
 
 				if r.RunWithOptions != nil {
-					validated, err := rule.ValidateAndHydrateOptions(r.Schema0, r.Schema1, r.Name, options)
+					validated, err := rule.ValidateAndHydrateOptions(r.Schema, r.Name, options)
 					if err != nil {
 						t.Fatalf("options validation failed for rule %q in test case: %v", r.Name, err)
 					}

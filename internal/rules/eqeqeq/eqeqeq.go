@@ -108,14 +108,15 @@ func reportEqeqeq(ctx rule.RuleContext, operatorToken *ast.Node, left, right *as
 // https://eslint.org/docs/latest/rules/eqeqeq
 var EqeqeqRule = rule.Rule{
 	Name: "eqeqeq",
-	Schema0: rule.Enum("always", "smart").Default("always"),
-	Schema1: rule.Object(map[string]rule.Schema{
-		"null": rule.Enum("always", "never", "ignore").Default("always"),
-	}),
-	RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts, _ := options.([]any)
-		mode, _ := opts[0].(string)
-		optsMap, _ := opts[1].(map[string]any)
+	Schema: rule.Tuple(
+		rule.Enum("always", "smart").Default("always"),
+		rule.Object(map[string]rule.Schema{
+			"null": rule.Enum("always", "never", "ignore").Default("always"),
+		}),
+	),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		mode, _ := options[0].(string)
+		optsMap, _ := options[1].(map[string]any)
 		nullOption, _ := optsMap["null"].(string)
 
 		return rule.RuleListeners{
