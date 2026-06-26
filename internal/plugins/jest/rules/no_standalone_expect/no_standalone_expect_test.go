@@ -49,9 +49,7 @@ func TestNoStandaloneExpectRule(t *testing.T) {
           t('testing', () => expect(true));
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"t"}},
-				},
+				Options: map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"t"}},
 			},
 			{
 				Code: `
@@ -63,9 +61,7 @@ func TestNoStandaloneExpectRule(t *testing.T) {
           expect(a + b).toBe(expected);
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"each.test"}},
-				},
+				Options: map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"each.test"}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -105,9 +101,7 @@ func TestNoStandaloneExpectRule(t *testing.T) {
           t('testing', () => expect(true).toBe(false));
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"additionalTestBlockFunctions": nil},
-				},
+				Options: map[string]interface{}{"additionalTestBlockFunctions": nil},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedExpect", Line: 4, Column: 30, EndColumn: 54},
 				},
@@ -136,9 +130,7 @@ func TestNoStandaloneExpectRule(t *testing.T) {
           expect(a + b).toBe(expected);
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"each"}},
-				},
+				Options: map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"each"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedExpect", Line: 7, Column: 11, EndColumn: 39},
 				},
@@ -153,9 +145,7 @@ func TestNoStandaloneExpectRule(t *testing.T) {
           expect(a + b).toBe(expected);
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"test"}},
-				},
+				Options: map[string]interface{}{"additionalTestBlockFunctions": []interface{}{"test"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedExpect", Line: 7, Column: 11, EndColumn: 39},
 				},
