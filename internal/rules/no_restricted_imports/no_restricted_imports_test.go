@@ -19,6 +19,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 			{Code: `import os from "os";`},
 			{Code: `import async from "async";`},
 			{Code: `import os from "os";`, Options: []interface{}{"osx"}},
+			{Code: `import os from "os";`, Options: "osx"},
 			{Code: `import fs from "fs";`, Options: []interface{}{"crypto"}},
 			{Code: `import path from "path";`, Options: []interface{}{"crypto", "stream", "os"}},
 			// Side-effect import not matching
@@ -349,6 +350,10 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 			// --- Basic string restriction ---
 			{
 				Code: `import "fs"`, Options: []interface{}{"fs"},
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "path", Line: 1, Column: 1}},
+			},
+			{
+				Code: `import "fs"`, Options: "fs",
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "path", Line: 1, Column: 1}},
 			},
 			{

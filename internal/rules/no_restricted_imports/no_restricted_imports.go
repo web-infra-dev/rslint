@@ -310,8 +310,10 @@ func parseOptions(options any) (groupedPaths map[string][]restrictedPathEntry, p
 	groupedPaths = make(map[string][]restrictedPathEntry)
 
 	// Handle the case where the config parser unwraps a single-element array,
-	// delivering a map directly instead of [map]. Wrap it back into an array.
-	if obj, ok := options.(map[string]interface{}); ok {
+	// delivering a string or map directly instead of [string] or [map]. Wrap it back into an array.
+	if str, ok := options.(string); ok {
+		options = []interface{}{str}
+	} else if obj, ok := options.(map[string]interface{}); ok {
 		options = []interface{}{obj}
 	}
 
