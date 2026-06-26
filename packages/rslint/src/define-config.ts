@@ -57,18 +57,6 @@ export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Rule-specific options object. Each rule defines its own shape; for rules with
- * declarative schemas, their specific options shapes are typed in RulesRecord,
- * while other rules fallback to this open record.
- */
-export type RuleOptions = Record<string, any>;
-
-// Makes each element of a tuple optional, e.g. [A, B] → [A?, B?].
-type PartialTuple<T extends any[]> = T extends [infer H, ...infer R]
-  ? [H?, ...PartialTuple<R>]
-  : [];
-
-/**
  * Configuration value accepted for a single rule.
  *
  * `Options` is always a tuple of positional option types, matching the rule's
@@ -77,15 +65,10 @@ type PartialTuple<T extends any[]> = T extends [infer H, ...infer R]
  *
  * - `RuleSeverity` — just toggle the rule on/off.
  * - `[RuleSeverity, ...options]` — ESLint-style array form with optional positional args.
- * - `{ level, options }` — object form; `options` maps to the first positional arg.
  */
 export type RuleEntry<Options extends any[] = []> =
   | RuleSeverity
-  | readonly [RuleSeverity, ...PartialTuple<Options>]
-  | {
-      level: RuleSeverity;
-      options?: Options extends [infer T, ...any[]] ? T : never;
-    };
+  | readonly [RuleSeverity, ...Options];
 
 /**
  * Map of rule name → rule configuration. The value shape is what gives editors

@@ -200,7 +200,7 @@ func (s *EnumSchema) TSType() string {
 	for _, a := range s.allowed {
 		parts = append(parts, fmt.Sprintf("%q", a))
 	}
-	return strings.Join(parts, " | ")
+	return "(" + strings.Join(parts, " | ") + ")"
 }
 
 // ArraySchema validates slices of values
@@ -336,7 +336,7 @@ func (s *TupleSchema) Validate(raw any) (any, error) {
 func (s *TupleSchema) TSType() string {
 	var parts []string
 	for _, item := range s.items {
-		parts = append(parts, item.TSType())
+		parts = append(parts, item.TSType() + "?")
 	}
 	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 }

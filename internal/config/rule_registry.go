@@ -148,10 +148,6 @@ func (r *RuleRegistry) ValidateConfig(config RslintConfig) []error {
 					isEnabled = rc.IsEnabled()
 					rawOptions = rc.Options
 				}
-			case map[string]interface{}:
-				level, _ := v["level"].(string)
-				isEnabled = level != "off" && level != ""
-				rawOptions = v["options"]
 			}
 
 			if isEnabled {

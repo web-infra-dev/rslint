@@ -263,7 +263,7 @@ func TestEnumSchema(t *testing.T) {
 
 	t.Run("TSType", func(t *testing.T) {
 		s := Enum("a", "b")
-		expected := `"a" | "b"`
+		expected := `("a" | "b")`
 		if s.TSType() != expected {
 			t.Errorf("expected %q, got %q", expected, s.TSType())
 		}
@@ -463,7 +463,7 @@ func TestTupleSchema(t *testing.T) {
 
 	t.Run("TSType", func(t *testing.T) {
 		s := Tuple(String(), Int(), Bool())
-		expected := "[string, number, boolean]"
+		expected := "[string?, number?, boolean?]"
 		if s.TSType() != expected {
 			t.Errorf("expected %q, got %q", expected, s.TSType())
 		}

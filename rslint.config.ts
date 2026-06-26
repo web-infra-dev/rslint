@@ -72,7 +72,7 @@ export default defineConfig([
       '@typescript-eslint/prefer-includes': 'error',
       '@typescript-eslint/prefer-regexp-exec': 'error',
       '@typescript-eslint/prefer-ts-expect-error': 'error',
-      'no-console': ['error', { allow: ['warn', 'error'] }],
+      'no-console': { level: 'error', options: { allow: ['warn', 'error'] } },
     },
   },
 ]);
