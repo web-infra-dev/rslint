@@ -262,6 +262,100 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
+  test('should output in gitlab code quality format when --format gitlab is used', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
+          },
+        },
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-explicit-any': 'warn',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+        },
+        include: ['**/*.ts'],
+      }),
+      'test.ts': `
+        let a: any = 10;
+        a.b = 20;
+      `,
+    });
+
+    try {
+      const result = await runRslint(['--format', 'gitlab'], tempDir);
+
+      const issues = JSON.parse(result.stdout);
+      expect(Array.isArray(issues)).toBe(true);
+      expect(issues).toHaveLength(2);
+
+      expect(issues[0]).toMatchObject({
+        check_name: '@typescript-eslint/no-explicit-any',
+        severity: 'minor',
+        location: {
+          path: 'test.ts',
+          lines: { begin: 2, end: 2 },
+        },
+      });
+      expect(issues[1]).toMatchObject({
+        check_name: '@typescript-eslint/no-unsafe-member-access',
+        severity: 'major',
+        location: {
+          path: 'test.ts',
+          lines: { begin: 3, end: 3 },
+        },
+      });
+
+      // Fingerprints must be present and distinct.
+      expect(issues[0].fingerprint).toBeTruthy();
+      expect(issues[0].fingerprint).not.toBe(issues[1].fingerprint);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('should output an empty array for --format gitlab with no diagnostics', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
+          },
+        },
+        rules: {},
+      })}];`,
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+        },
+        include: ['**/*.ts'],
+      }),
+      'test.ts': `export const a = 1;\n`,
+    });
+
+    try {
+      const result = await runRslint(['--format', 'gitlab'], tempDir);
+      expect(JSON.parse(result.stdout)).toEqual([]);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('should only report errors when --quiet flag is used', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': `export default [${JSON.stringify({

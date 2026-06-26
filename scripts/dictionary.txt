@@ -78,6 +78,7 @@ co-locate
 codemod
 codemods
 codepoint
+codequality
 codspeed
 CODSPEED
 colcount
@@ -191,6 +192,7 @@ gojs
 golangci
 GOMAXPROCS
 goroutines
+gosec
 gotest
 graphlib
 handl
