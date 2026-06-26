@@ -81,7 +81,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 						return ruleImpl.RunWithOptions(ctx, validated)
 					}
 				} else {
-					var runOpts any = ruleConfigCopy.Options
+					runOpts := ruleConfigCopy.Options
 					if optsSlice, ok := runOpts.([]any); ok && len(optsSlice) == 1 {
 						runOpts = optsSlice[0]
 					}
