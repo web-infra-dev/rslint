@@ -71,17 +71,12 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 		opts, ok := options.(NoConfusingVoidExpressionOptions)
 
 		if !ok {
-			// try convert options to JSON and back to struct
 			opts = NoConfusingVoidExpressionOptions{}
-			// get first element of options
-			options_array, _ := options.([]interface{})
-			// if options_array has at least one element, try to unmarshal it
-			if len(options_array) > 0 {
-				optsJSON, err := json.Marshal(options_array[0])
+			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+				optsJSON, err := json.Marshal(optsMap)
 				if err == nil {
 					json.Unmarshal(optsJSON, &opts)
 				}
-
 			}
 		}
 
