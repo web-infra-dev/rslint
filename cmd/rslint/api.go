@@ -298,11 +298,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			}
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 				runFunc := func(ctx rule.RuleContext) rule.RuleListeners {
-					runOpts := r.option
-					if optsSlice, ok := runOpts.([]any); ok && len(optsSlice) == 1 {
-						runOpts = optsSlice[0]
-					}
-					return r.rule.Run(ctx, runOpts)
+					return r.rule.Run(ctx, r.option)
 				}
 				if r.rule.RunWithOptions != nil {
 					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
