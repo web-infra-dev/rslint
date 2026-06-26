@@ -164,5 +164,83 @@ ruleTester.run('prefer-spy-on', {} as never, {
         },
       ],
     },
+    {
+      code: 'foo.bar = (jest.fn()).mockImplementation(baz => baz)',
+      output: "jest.spyOn(foo, 'bar').mockImplementation(baz => baz)",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 53,
+        },
+      ],
+    },
+    {
+      code: 'foo.bar = (jest.fn(a => b)).mockImplementation(baz => baz)',
+      output: "jest.spyOn(foo, 'bar').mockImplementation(baz => baz)",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 59,
+        },
+      ],
+    },
+    {
+      code: 'obj.a = (jest.fn())',
+      output: "jest.spyOn(obj, 'a').mockImplementation()",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 20,
+        },
+      ],
+    },
+    {
+      code: 'obj.a = ((jest.fn()))',
+      output: "jest.spyOn(obj, 'a').mockImplementation()",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 22,
+        },
+      ],
+    },
+    {
+      code: 'obj.a = (jest.fn(() => 10))',
+      output: "jest.spyOn(obj, 'a').mockImplementation(() => 10)",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 28,
+        },
+      ],
+    },
+    {
+      code: 'obj.a = (jest.fn()).one.two()',
+      output: "jest.spyOn(obj, 'a').mockImplementation().one.two()",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 30,
+        },
+      ],
+    },
   ],
 });

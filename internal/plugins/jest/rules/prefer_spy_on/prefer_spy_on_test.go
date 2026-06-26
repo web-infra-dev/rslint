@@ -103,6 +103,48 @@ func TestPreferSpyOnRule(t *testing.T) {
 					{MessageId: "useJestSpyOn", Line: 3, Column: 9, EndLine: 3, EndColumn: 65},
 				},
 			},
+			{
+				Code:   `foo.bar = (jest.fn()).mockImplementation(baz => baz)`,
+				Output: []string{`jest.spyOn(foo, 'bar').mockImplementation(baz => baz)`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 53},
+				},
+			},
+			{
+				Code:   `foo.bar = (jest.fn(a => b)).mockImplementation(baz => baz)`,
+				Output: []string{`jest.spyOn(foo, 'bar').mockImplementation(baz => baz)`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 59},
+				},
+			},
+			{
+				Code:   `obj.a = (jest.fn())`,
+				Output: []string{`jest.spyOn(obj, 'a').mockImplementation()`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 20},
+				},
+			},
+			{
+				Code:   `obj.a = ((jest.fn()))`,
+				Output: []string{`jest.spyOn(obj, 'a').mockImplementation()`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 22},
+				},
+			},
+			{
+				Code:   `obj.a = (jest.fn(() => 10))`,
+				Output: []string{`jest.spyOn(obj, 'a').mockImplementation(() => 10)`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 28},
+				},
+			},
+			{
+				Code:   `obj.a = (jest.fn()).one.two()`,
+				Output: []string{`jest.spyOn(obj, 'a').mockImplementation().one.two()`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 30},
+				},
+			},
 		},
 	)
 }
