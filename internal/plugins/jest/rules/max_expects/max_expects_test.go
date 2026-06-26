@@ -278,9 +278,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 10},
-				},
+				Options: map[string]interface{}{"max": 10},
 			},
 			{
 				Code: `
@@ -298,7 +296,7 @@ func TestMaxExpectsRule(t *testing.T) {
           }))
         })
       `,
-				Options: []interface{}{map[string]interface{}{"max": 5}},
+				Options: map[string]interface{}{"max": 5},
 			},
 			{
 				Code: `
@@ -310,7 +308,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 0}},
+				Options: map[string]interface{}{"max": 0},
 			},
 			{
 				Code: `
@@ -322,7 +320,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": -1}},
+				Options: map[string]interface{}{"max": -1},
 			},
 			{
 				Code: `
@@ -334,7 +332,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 1.5}},
+				Options: map[string]interface{}{"max": 1.5},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -438,7 +436,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 1}},
+				Options: map[string]interface{}{"max": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 5, Column: 13},
 					{MessageId: "exceededMaxAssertion", Line: 12, Column: 11},
@@ -461,7 +459,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 2}},
+				Options: map[string]interface{}{"max": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 13, Column: 11},
 				},
@@ -483,7 +481,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 2}},
+				Options: map[string]interface{}{"max": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 14, Column: 11},
 				},
@@ -504,7 +502,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 1}},
+				Options: map[string]interface{}{"max": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 5, Column: 13},
 					{MessageId: "exceededMaxAssertion", Line: 12, Column: 11},
@@ -527,7 +525,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{map[string]interface{}{"max": 2}},
+				Options: map[string]interface{}{"max": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 13, Column: 11},
 				},
@@ -550,7 +548,7 @@ func TestMaxExpectsRule(t *testing.T) {
           }))
         })
       `,
-				Options: []interface{}{map[string]interface{}{"max": 3}},
+				Options: map[string]interface{}{"max": 3},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 13, Column: 13},
 					{MessageId: "exceededMaxAssertion", Line: 14, Column: 13},
@@ -595,9 +593,7 @@ func TestMaxExpectsRule(t *testing.T) {
           expect(true).toBeDefined();
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 1},
-				},
+				Options: map[string]interface{}{"max": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxAssertion", Line: 4, Column: 11},
 				},
