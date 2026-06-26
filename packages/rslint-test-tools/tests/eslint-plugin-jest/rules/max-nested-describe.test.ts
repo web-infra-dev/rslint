@@ -56,7 +56,7 @@ ruleTester.run('max-nested-describe', {} as never, {
           });
         });
     `,
-      options: [{ max: 3 }],
+      options: { max: 3 },
     },
     {
       code: `
@@ -64,7 +64,7 @@ ruleTester.run('max-nested-describe', {} as never, {
           expect('something').toBe('something');
         });
     `,
-      options: [{ max: 0 }],
+      options: { max: 0 },
     },
     {
       code: `
@@ -164,7 +164,7 @@ ruleTester.run('max-nested-describe', {} as never, {
           });
         });
       `,
-      options: [{ max: 2 }],
+      options: { max: 2 },
       errors: [
         { messageId: 'exceededMaxDepth', line: 3, column: 5 },
         { messageId: 'exceededMaxDepth', line: 9, column: 5 },
@@ -178,7 +178,7 @@ ruleTester.run('max-nested-describe', {} as never, {
           });
         });
       `,
-      options: [{ max: 0 }],
+      options: { max: 0 },
       errors: [{ messageId: 'exceededMaxDepth', line: 1, column: 1 }],
     },
     {
@@ -187,7 +187,7 @@ ruleTester.run('max-nested-describe', {} as never, {
           describe.each(['hello', 'world'])("%s", (a) => {});
         });
       `,
-      options: [{ max: 1 }],
+      options: { max: 1 },
       errors: [{ messageId: 'exceededMaxDepth', line: 2, column: 3 }],
     },
     {
@@ -199,7 +199,7 @@ ruleTester.run('max-nested-describe', {} as never, {
           \`('$foo $bar', ({ foo, bar }) => {});
         });
       `,
-      options: [{ max: 1 }],
+      options: { max: 1 },
       errors: [{ messageId: 'exceededMaxDepth', line: 2, column: 3 }],
     },
   ],

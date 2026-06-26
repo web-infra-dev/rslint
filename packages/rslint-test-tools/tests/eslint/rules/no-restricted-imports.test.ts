@@ -8,7 +8,9 @@ ruleTester.run('no-restricted-imports', {
     'import os from "os";',
     // String option — different module
     { code: 'import os from "os";', options: ['osx'] as any },
+    { code: 'import os from "os";', options: 'osx' as any },
     { code: 'import fs from "fs";', options: ['crypto'] as any },
+    { code: 'import fs from "fs";', options: 'crypto' as any },
     {
       code: 'import path from "path";',
       options: ['crypto', 'stream', 'os'] as any,
@@ -253,6 +255,11 @@ ruleTester.run('no-restricted-imports', {
     {
       code: 'import "fs"',
       options: ['fs'] as any,
+      errors: [{ messageId: 'path' }],
+    },
+    {
+      code: 'import "fs"',
+      options: 'fs' as any,
       errors: [{ messageId: 'path' }],
     },
     {

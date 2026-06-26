@@ -143,51 +143,43 @@ function fun<T extends Error>(t: T): void {
       code: `
 throw undefined;
       `,
-      options: [
-        {
+      options: {
           allow: [{ from: 'lib', name: 'undefined' }],
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
 class CustomError implements Error {}
 throw new CustomError();
       `,
-      options: [
-        {
+      options: {
           allow: [{ from: 'file', name: 'CustomError' }],
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
 throw new Map();
       `,
-      options: [
-        {
+      options: {
           allow: [{ from: 'lib', name: 'Map' }],
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
         import { createError } from 'errors';
         throw createError();
       `,
-      options: [
-        {
+      options: {
           allow: [{ from: 'package', name: 'ErrorLike', package: 'errors' }],
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -196,13 +188,11 @@ try {
   throw e;
 }
       `,
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -221,13 +211,11 @@ try {
   }
 }
       `,
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -235,13 +223,11 @@ Promise.reject('foo').catch(e => {
   throw e;
 });
       `,
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -250,11 +236,9 @@ function func<T1, T2>() {
   throw err;
 }
       `,
-      options: [
-        {
+      options: {
           allow: ['Promise'],
         },
-      ],
     },
     {
       code: `
@@ -262,11 +246,9 @@ async function foo() {
   throw await Promise.resolve(new Error('error'));
 }
       `,
-      options: [
-        {
+      options: {
           allowThrowingAny: false,
         },
-      ],
     },
     {
       code: `
@@ -274,11 +256,9 @@ function* foo(): Generator<number, void, Error> {
   throw yield 303;
 }
       `,
-      options: [
-        {
+      options: {
           allowThrowingAny: false,
         },
-      ],
     },
   ],
   invalid: [
@@ -591,11 +571,9 @@ function fun(value: any) {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowThrowingAny: false,
         },
-      ],
     },
     {
       code: `
@@ -608,11 +586,9 @@ function fun(value: unknown) {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -636,13 +612,11 @@ throw new UnknownError();
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allow: [{ from: 'file', name: 'CustomError' }],
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -656,13 +630,11 @@ Promise.reject('foo').catch(e => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -675,13 +647,11 @@ Promise.reject('foo').catch((...e) => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -695,13 +665,11 @@ Promise.reject('foo').catch(...x, e => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -715,13 +683,11 @@ Promise.reject('foo').then(...x, e => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -736,13 +702,11 @@ Promise.reject('foo').then(onFulfilled, ...x, e => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -755,13 +719,11 @@ Promise.reject('foo').then((...e) => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -774,13 +736,11 @@ Promise.reject('foo').then(e => {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowRethrowing: true,
           allowThrowingAny: false,
           allowThrowingUnknown: false,
         },
-      ],
     },
     {
       code: `
@@ -794,11 +754,9 @@ function func<T1, T2>() {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allow: ['Promise'],
         },
-      ],
     },
     {
       code: `
@@ -811,11 +769,9 @@ async function foo() {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowThrowingAny: false,
         },
-      ],
     },
     {
       code: `
@@ -828,11 +784,9 @@ async function foo() {
           messageId: 'object',
         },
       ],
-      options: [
-        {
+      options: {
           allowThrowingAny: false,
         },
-      ],
     },
   ],
 });

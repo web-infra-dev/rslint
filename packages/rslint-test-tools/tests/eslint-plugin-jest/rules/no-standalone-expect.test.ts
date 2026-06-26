@@ -64,7 +64,7 @@ ruleTester.run('no-standalone-expect', {} as never, {
           t('testing', () => expect(true));
         });
       `,
-      options: [{ additionalTestBlockFunctions: ['t'] }],
+      options: { additionalTestBlockFunctions: ['t'] },
     },
     {
       code: `
@@ -76,7 +76,7 @@ ruleTester.run('no-standalone-expect', {} as never, {
           expect(a + b).toBe(expected);
         });
       `,
-      options: [{ additionalTestBlockFunctions: ['each.test'] }],
+      options: { additionalTestBlockFunctions: ['each.test'] },
     },
   ],
   invalid: [
@@ -108,7 +108,7 @@ ruleTester.run('no-standalone-expect', {} as never, {
           t('testing', () => expect(true).toBe(false));
         });
       `,
-      options: [{ additionalTestBlockFunctions: undefined }],
+      options: { additionalTestBlockFunctions: undefined },
       errors: [{ endColumn: 46, column: 22, messageId: 'unexpectedExpect' }],
     },
     {
@@ -133,7 +133,7 @@ ruleTester.run('no-standalone-expect', {} as never, {
           expect(a + b).toBe(expected);
         });
       `,
-      options: [{ additionalTestBlockFunctions: ['each'] }],
+      options: { additionalTestBlockFunctions: ['each'] },
       errors: [{ endColumn: 31, column: 3, messageId: 'unexpectedExpect' }],
     },
     {
@@ -146,7 +146,7 @@ ruleTester.run('no-standalone-expect', {} as never, {
           expect(a + b).toBe(expected);
         });
       `,
-      options: [{ additionalTestBlockFunctions: ['test'] }],
+      options: { additionalTestBlockFunctions: ['test'] },
       errors: [{ endColumn: 31, column: 3, messageId: 'unexpectedExpect' }],
     },
     {

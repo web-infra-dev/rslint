@@ -305,11 +305,9 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [
-        {
-          max: 10,
-        },
-      ],
+      options: {
+        max: 10,
+      },
     },
     {
       code: `
@@ -327,7 +325,7 @@ ruleTester.run('max-expects', {} as never, {
           }))
         })
       `,
-      options: [{ max: 5 }],
+      options: { max: 5 },
     },
   ],
   invalid: [
@@ -455,7 +453,7 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [{ max: 1 }],
+      options: { max: 1 },
       errors: [
         {
           messageId: 'exceededMaxAssertion',
@@ -490,7 +488,7 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [{ max: 2 }],
+      options: { max: 2 },
       errors: [
         {
           messageId: 'exceededMaxAssertion',
@@ -516,7 +514,7 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [{ max: 2 }],
+      options: { max: 2 },
       errors: [
         {
           messageId: 'exceededMaxAssertion',
@@ -541,7 +539,7 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [{ max: 1 }],
+      options: { max: 1 },
       errors: [
         {
           messageId: 'exceededMaxAssertion',
@@ -576,7 +574,7 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [{ max: 2 }],
+      options: { max: 2 },
       errors: [
         {
           messageId: 'exceededMaxAssertion',
@@ -603,7 +601,7 @@ ruleTester.run('max-expects', {} as never, {
           }))
         })
       `,
-      options: [{ max: 3 }],
+      options: { max: 3 },
       errors: [
         {
           messageId: 'exceededMaxAssertion',
@@ -664,11 +662,9 @@ ruleTester.run('max-expects', {} as never, {
           expect(true).toBeDefined();
         });
       `,
-      options: [
-        {
-          max: 1,
-        },
-      ],
+      options: {
+        max: 1,
+      },
       errors: [
         {
           messageId: 'exceededMaxAssertion',

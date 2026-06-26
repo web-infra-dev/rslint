@@ -13,39 +13,40 @@ ruleTester.run('valid-title', {} as never, {
     // disallowedWords
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [
-        { ignoreTypeOfDescribeName: false, disallowedWords: ['correct'] },
-      ],
+      options: {
+        ignoreTypeOfDescribeName: false,
+        disallowedWords: ['correct'],
+      },
     },
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [{ disallowedWords: undefined }],
+      options: { disallowedWords: undefined },
     },
 
     // mustMatch (valid)
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [{ mustMatch: {} }],
+      options: { mustMatch: {} },
     },
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [{ mustMatch: / /u.source }],
+      options: { mustMatch: / /u.source },
     },
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [{ mustMatch: [/ /u.source] }],
+      options: { mustMatch: [/ /u.source] },
     },
     {
       code: 'it("correctly sets the value #unit", () => {});',
-      options: [{ mustMatch: `#(?:unit|integration|e2e)` }],
+      options: { mustMatch: `#(?:unit|integration|e2e)` },
     },
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [{ mustMatch: `^[^#]+$|(?:#(?:unit|e2e))` }],
+      options: { mustMatch: `^[^#]+$|(?:#(?:unit|e2e))` },
     },
     {
       code: 'it("correctly sets the value", () => {});',
-      options: [{ mustMatch: { test: `#(?:unit|integration|e2e)` } }],
+      options: { mustMatch: { test: `#(?:unit|integration|e2e)` } },
     },
     {
       code: `
@@ -61,7 +62,7 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [{ mustMatch: { test: `^[^#]+$|(?:#(?:unit|e2e))` } }],
+      options: { mustMatch: { test: `^[^#]+$|(?:#(?:unit|e2e))` } },
     },
 
     // Title must be a string
@@ -77,23 +78,23 @@ ruleTester.run('valid-title', {} as never, {
     { code: 'fdescribe("is a string", () => {});' },
     {
       code: 'describe(String(/.+/), () => {});',
-      options: [{ ignoreTypeOfDescribeName: true }],
+      options: { ignoreTypeOfDescribeName: true },
     },
     {
       code: 'it(String(/.+/), () => {});',
-      options: [{ ignoreTypeOfTestName: true }],
+      options: { ignoreTypeOfTestName: true },
     },
     {
       code: 'const foo = "my-title"; it(foo, () => {});',
-      options: [{ ignoreTypeOfTestName: true }],
+      options: { ignoreTypeOfTestName: true },
     },
     {
       code: 'describe(myFunction, () => {});',
-      options: [{ ignoreTypeOfDescribeName: true }],
+      options: { ignoreTypeOfDescribeName: true },
     },
     {
       code: 'xdescribe(skipFunction, () => {});',
-      options: [{ ignoreTypeOfDescribeName: true, disallowedWords: [] }],
+      options: { ignoreTypeOfDescribeName: true, disallowedWords: [] },
     },
 
     // No empty title
@@ -141,7 +142,7 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: 'it(`GIVEN... \\n  `, () => {});',
-      options: [{ ignoreSpaces: true }],
+      options: { ignoreSpaces: true },
     },
 
     // Duplicate-prefix valid (extras not listed above)
@@ -315,39 +316,40 @@ ruleTester.run('valid-title', {} as never, {
     // disallowedWords
     {
       code: `test("the correct way to properly handle all things", () => {});`,
-      options: [{ disallowedWords: ['correct', 'properly', 'all'] }],
+      options: { disallowedWords: ['correct', 'properly', 'all'] },
       errors: [{ messageId: 'disallowedWord' }],
     },
     {
       code: `describe("the correct way to do things", function () {})`,
-      options: [{ disallowedWords: ['correct'] }],
+      options: { disallowedWords: ['correct'] },
       errors: [{ messageId: 'disallowedWord' }],
     },
     {
       code: `it("has ALL the things", () => {})`,
-      options: [{ disallowedWords: ['all'] }],
+      options: { disallowedWords: ['all'] },
       errors: [{ messageId: 'disallowedWord' }],
     },
     {
       code: `xdescribe("every single one of them", function () {})`,
-      options: [{ disallowedWords: ['every'] }],
+      options: { disallowedWords: ['every'] },
       errors: [{ messageId: 'disallowedWord' }],
     },
     {
       code: `describe('Very Descriptive Title Goes Here', function () {})`,
-      options: [{ disallowedWords: ['descriptive'] }],
+      options: { disallowedWords: ['descriptive'] },
       errors: [{ messageId: 'disallowedWord' }],
     },
     {
       code: 'test(`that the value is set properly`, function () {})',
-      options: [{ disallowedWords: ['properly'] }],
+      options: { disallowedWords: ['properly'] },
       errors: [{ messageId: 'disallowedWord' }],
     },
     {
       code: `it("it foo", () => {});`,
-      options: [
-        { disallowedWords: ['ok', '(unterminated'], mustMatch: '^should ' },
-      ],
+      options: {
+        disallowedWords: ['ok', '(unterminated'],
+        mustMatch: '^should ',
+      },
       errors: [{ messageId: 'invalidPattern' }],
     },
 
@@ -366,12 +368,10 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: /(?:#(?!unit|e2e))\w+/u.source,
-          mustMatch: `^[^#]+$|(?:#(?:unit|e2e))`,
-        },
-      ],
+      options: {
+        mustNotMatch: /(?:#(?!unit|e2e))\w+/u.source,
+        mustMatch: `^[^#]+$|(?:#(?:unit|e2e))`,
+      },
       errors: [{ messageId: 'mustNotMatch' }, { messageId: 'mustNotMatch' }],
     },
     {
@@ -390,12 +390,10 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: /(?:#(?!unit|e2e))\w+/u.source,
-          mustMatch: `^[^#]+$|(?:#(?:unit|e2e))`,
-        },
-      ],
+      options: {
+        mustNotMatch: /(?:#(?!unit|e2e))\w+/u.source,
+        mustMatch: `^[^#]+$|(?:#(?:unit|e2e))`,
+      },
       errors: [{ messageId: 'mustNotMatch' }, { messageId: 'mustNotMatch' }],
     },
     {
@@ -412,18 +410,16 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: [
-            /(?:#(?!unit|e2e))\w+/u.source,
-            'Please include "#unit" or "#e2e" in titles',
-          ],
-          mustMatch: [
-            `^[^#]+$|(?:#(?:unit|e2e))`,
-            'Please include "#unit" or "#e2e" in titles',
-          ],
-        },
-      ],
+      options: {
+        mustNotMatch: [
+          /(?:#(?!unit|e2e))\w+/u.source,
+          'Please include "#unit" or "#e2e" in titles',
+        ],
+        mustMatch: [
+          `^[^#]+$|(?:#(?:unit|e2e))`,
+          'Please include "#unit" or "#e2e" in titles',
+        ],
+      },
       errors: [
         { messageId: 'mustNotMatchCustom' },
         { messageId: 'mustNotMatchCustom' },
@@ -443,12 +439,10 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: { describe: [/(?:#(?!unit|e2e))\w+/u.source] },
-          mustMatch: { describe: `^[^#]+$|(?:#(?:unit|e2e))` },
-        },
-      ],
+      options: {
+        mustNotMatch: { describe: [/(?:#(?!unit|e2e))\w+/u.source] },
+        mustMatch: { describe: `^[^#]+$|(?:#(?:unit|e2e))` },
+      },
       errors: [{ messageId: 'mustNotMatch' }],
     },
     {
@@ -465,17 +459,15 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: {
-            describe: [
-              /(?:#(?!unit|e2e))\w+/u.source,
-              'Please include "#unit" or "#e2e" in describe titles',
-            ],
-          },
-          mustMatch: { describe: `^[^#]+$|(?:#(?:unit|e2e))` },
+      options: {
+        mustNotMatch: {
+          describe: [
+            /(?:#(?!unit|e2e))\w+/u.source,
+            'Please include "#unit" or "#e2e" in describe titles',
+          ],
         },
-      ],
+        mustMatch: { describe: `^[^#]+$|(?:#(?:unit|e2e))` },
+      },
       errors: [{ messageId: 'mustNotMatchCustom' }],
     },
     {
@@ -492,12 +484,10 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: { describe: /(?:#(?!unit|e2e))\w+/u.source },
-          mustMatch: { it: `^[^#]+$|(?:#(?:unit|e2e))` },
-        },
-      ],
+      options: {
+        mustNotMatch: { describe: /(?:#(?!unit|e2e))\w+/u.source },
+        mustMatch: { it: `^[^#]+$|(?:#(?:unit|e2e))` },
+      },
       errors: [{ messageId: 'mustNotMatch' }],
     },
     {
@@ -514,22 +504,20 @@ ruleTester.run('valid-title', {} as never, {
           });
         });
       `,
-      options: [
-        {
-          mustNotMatch: {
-            describe: [
-              /(?:#(?!unit|e2e))\w+/u.source,
-              'Please include "#unit" or "#e2e" in describe titles',
-            ],
-          },
-          mustMatch: {
-            it: [
-              `^[^#]+$|(?:#(?:unit|e2e))`,
-              'Please include "#unit" or "#e2e" in it titles',
-            ],
-          },
+      options: {
+        mustNotMatch: {
+          describe: [
+            /(?:#(?!unit|e2e))\w+/u.source,
+            'Please include "#unit" or "#e2e" in describe titles',
+          ],
         },
-      ],
+        mustMatch: {
+          it: [
+            `^[^#]+$|(?:#(?:unit|e2e))`,
+            'Please include "#unit" or "#e2e" in it titles',
+          ],
+        },
+      },
       errors: [
         { messageId: 'mustMatchCustom' },
         { messageId: 'mustNotMatchCustom' },
@@ -537,22 +525,22 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: `test("the correct way to properly handle all things", () => {});`,
-      options: [{ mustMatch: `#(?:unit|integration|e2e)` }],
+      options: { mustMatch: `#(?:unit|integration|e2e)` },
       errors: [{ messageId: 'mustMatch' }],
     },
     {
       code: `describe("the test", () => {});`,
-      options: [{ mustMatch: { describe: `#(?:unit|integration|e2e)` } }],
+      options: { mustMatch: { describe: `#(?:unit|integration|e2e)` } },
       errors: [{ messageId: 'mustMatch' }],
     },
     {
       code: `xdescribe("the test", () => {});`,
-      options: [{ mustMatch: { describe: `#(?:unit|integration|e2e)` } }],
+      options: { mustMatch: { describe: `#(?:unit|integration|e2e)` } },
       errors: [{ messageId: 'mustMatch' }],
     },
     {
       code: `describe.skip("the test", () => {});`,
-      options: [{ mustMatch: { describe: `#(?:unit|integration|e2e)` } }],
+      options: { mustMatch: { describe: `#(?:unit|integration|e2e)` } },
       errors: [{ messageId: 'mustMatch' }],
     },
 
@@ -563,12 +551,12 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: `it(String(/.+/), () => {});`,
-      options: [{ ignoreTypeOfTestName: false }],
+      options: { ignoreTypeOfTestName: false },
       errors: [{ messageId: 'titleMustBeString' }],
     },
     {
       code: `const foo = "my-title"; it(foo, () => {});`,
-      options: [{ ignoreTypeOfTestName: false }],
+      options: { ignoreTypeOfTestName: false },
       errors: [{ messageId: 'titleMustBeString' }],
     },
     {
@@ -617,7 +605,7 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: `test.skip(123, () => {});`,
-      options: [{ ignoreTypeOfDescribeName: true }],
+      options: { ignoreTypeOfDescribeName: true },
       errors: [{ messageId: 'titleMustBeString' }],
     },
     {
@@ -626,7 +614,7 @@ ruleTester.run('valid-title', {} as never, {
     },
     {
       code: `describe(myFunction, () => 1);`,
-      options: [{ ignoreTypeOfDescribeName: false }],
+      options: { ignoreTypeOfDescribeName: false },
       errors: [{ messageId: 'titleMustBeString' }],
     },
     {

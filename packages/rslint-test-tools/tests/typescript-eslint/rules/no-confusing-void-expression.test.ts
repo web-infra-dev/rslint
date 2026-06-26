@@ -26,86 +26,86 @@ ruleTester.run('no-confusing-void-expression', {
       code: `
         () => console.log('foo');
       `,
-      options: [{ ignoreArrowShorthand: true }],
+      options: { ignoreArrowShorthand: true },
     },
     {
       code: `
         foo => foo && console.log(foo);
       `,
-      options: [{ ignoreArrowShorthand: true }],
+      options: { ignoreArrowShorthand: true },
     },
     {
       code: `
         foo => foo || console.log(foo);
       `,
-      options: [{ ignoreArrowShorthand: true }],
+      options: { ignoreArrowShorthand: true },
     },
     {
       code: `
         foo => (foo ? console.log(true) : console.log(false));
       `,
-      options: [{ ignoreArrowShorthand: true }],
+      options: { ignoreArrowShorthand: true },
     },
 
     {
       code: `
         !void console.log('foo');
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         +void (foo && console.log(foo));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         -void (foo || console.log(foo));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         () => void ((foo && void console.log(true)) || console.log(false));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         const x = void (foo ? console.log(true) : console.log(false));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         !(foo && void console.log(foo));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         !!(foo || void console.log(foo));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         const x = (foo && void console.log(true)) || void console.log(false);
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         () => (foo ? void console.log(true) : void console.log(false));
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
     {
       code: `
         return void console.log('foo');
       `,
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
     },
 
     `
@@ -128,7 +128,7 @@ function test(): void {
   return console.log('bar');
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -136,13 +136,13 @@ const test = (): void => {
   return console.log('bar');
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 const test = (): void => console.log('bar');
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -152,7 +152,7 @@ function test(): void {
   }
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -162,7 +162,7 @@ const obj = {
   },
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -172,7 +172,7 @@ class Foo {
   }
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -182,14 +182,14 @@ function test() {
   }
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 type Foo = () => void;
 const test = (() => console.log()) as Foo;
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -200,7 +200,7 @@ const test: Foo = {
   foo: () => console.log(),
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -210,7 +210,7 @@ const test = {
   foo: () => void;
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -220,7 +220,7 @@ const test: {
   foo: () => console.log(),
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -232,7 +232,7 @@ const test = {
   foo: { bar: () => console.log() },
 } as Foo;
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -244,7 +244,7 @@ const test: Foo = {
   foo: { bar: () => console.log() },
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -254,7 +254,7 @@ class App {
   private method: MethodType = () => console.log();
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -268,14 +268,14 @@ function bar(): Foo {
   };
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 type Foo = () => () => () => void;
 const x: Foo = () => () => () => console.log();
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -287,14 +287,14 @@ const test = {
   foo: () => console.log(),
 } as Foo;
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 type Foo = () => void;
 const test: Foo = () => console.log('foo');
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: 'const foo = <button onClick={() => console.log()} />;',
@@ -305,42 +305,42 @@ const test: Foo = () => console.log('foo');
           },
         },
       },
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 declare function foo(arg: () => void): void;
 foo(() => console.log());
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 declare function foo(arg: (() => void) | (() => string)): void;
 foo(() => console.log());
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 declare function foo(arg: (() => void) | (() => string) | string): void;
 foo(() => console.log());
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 declare function foo(arg: () => void | string): void;
 foo(() => console.log());
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 declare function foo(options: { cb: () => void }): void;
 foo({ cb: () => console.log() });
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -350,7 +350,7 @@ const obj = {
   foo: { bar: () => void };
 };
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -358,7 +358,7 @@ function test(): void & void {
   return console.log('foo');
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -370,20 +370,20 @@ function test(): Foo {
   return foo();
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 type Foo = void;
 const test = (): Foo => console.log('err');
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
 const test: () => any = (): void => console.log();
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -391,7 +391,7 @@ function test(): void | string {
   return console.log('bar');
 }
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
     {
       code: `
@@ -410,7 +410,7 @@ test((() => {
   return console.log('123');
 }) as typeof makeDate | (() => string));
       `,
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
     },
   ],
 
@@ -703,7 +703,7 @@ function notcool(input: string) {
       errors: [
         { column: 8, line: 1, messageId: 'invalidVoidExprReturnWrapVoid' },
       ],
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
       output: "return void console.log('foo');",
     },
     {
@@ -721,7 +721,7 @@ function notcool(input: string) {
           ],
         },
       ],
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
       output: null,
     },
     {
@@ -739,7 +739,7 @@ function notcool(input: string) {
           ],
         },
       ],
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
       output: null,
     },
     {
@@ -757,7 +757,7 @@ function notcool(input: string) {
           ],
         },
       ],
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
       output: null,
     },
     {
@@ -765,7 +765,7 @@ function notcool(input: string) {
       errors: [
         { column: 15, line: 1, messageId: 'invalidVoidExprArrowWrapVoid' },
       ],
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
       output: 'foo => foo || void console.log(foo);',
     },
     {
@@ -783,7 +783,7 @@ function notcool(input: string) {
           ],
         },
       ],
-      options: [{ ignoreVoidOperator: true }],
+      options: { ignoreVoidOperator: true },
       output: null,
     },
     {
@@ -799,7 +799,7 @@ function test() {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test() {
   console.log('foo');
@@ -815,7 +815,7 @@ function test() {
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: "const test = () => { console.log('foo'); };",
     },
     {
@@ -831,7 +831,7 @@ const test = () => {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 const test = () => {
   console.log('foo');
@@ -853,7 +853,7 @@ function foo(): void {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function foo(): void {
   const bar = () => {
@@ -873,7 +873,7 @@ function foo(): void {
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
         (): any => { console.log('foo'); };
       `,
@@ -889,7 +889,7 @@ function foo(): void {
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
         (): unknown => { console.log('foo'); };
       `,
@@ -907,7 +907,7 @@ function test(): void {
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test(): void {
   () => () => { console.log(); };
@@ -926,7 +926,7 @@ type Foo = any;
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = any;
 (): Foo => { console.log(); };
@@ -944,7 +944,7 @@ type Foo = unknown;
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = unknown;
 (): Foo => { console.log(); };
@@ -963,7 +963,7 @@ function test(): any {
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test(): any {
   () => () => { console.log(); };
@@ -983,7 +983,7 @@ function test(): unknown {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test(): unknown {
   console.log();
@@ -1003,7 +1003,7 @@ function test(): any {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test(): any {
   console.log();
@@ -1022,7 +1022,7 @@ type Foo = () => any;
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = () => any;
 (): Foo => () => { console.log(); };
@@ -1040,7 +1040,7 @@ type Foo = () => unknown;
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = () => unknown;
 (): Foo => () => { console.log(); };
@@ -1058,7 +1058,7 @@ const test: Foo = () => console.log();
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = () => any;
 const test: Foo = () => { console.log(); };
@@ -1076,7 +1076,7 @@ const test: Foo = () => console.log();
           messageId: 'invalidVoidExprArrow',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = () => unknown;
 const test: Foo = () => { console.log(); };
@@ -1099,7 +1099,7 @@ const foo: Foo = function () {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 type Foo = () => void;
 
@@ -1125,7 +1125,7 @@ const foo = function () {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 const foo = function () {
   function bar() {
@@ -1145,7 +1145,7 @@ return console.log('foo');
           messageId: 'invalidVoidExprReturn',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 { console.log('foo'); return; }
       `,
@@ -1168,7 +1168,7 @@ function test(arg?: string): any | void {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test(): void;
 function test(arg: string): any;
@@ -1198,7 +1198,7 @@ function test(arg?: string): any | void {
           messageId: 'invalidVoidExprReturnLast',
         },
       ],
-      options: [{ ignoreVoidReturningFunctions: true }],
+      options: { ignoreVoidReturningFunctions: true },
       output: `
 function test(arg: string): any;
 function test(): void;
