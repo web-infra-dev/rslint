@@ -63,9 +63,7 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           });
         });
     `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 3},
-				},
+				Options: map[string]interface{}{"max": 3},
 			},
 			{
 				Code: `
@@ -73,9 +71,7 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           expect('something').toBe('something');
         });
     `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 0},
-				},
+				Options: map[string]interface{}{"max": 0},
 			},
 			{
 				Code: `
@@ -93,9 +89,7 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           });
         });
     `,
-				Options: []interface{}{
-					map[string]interface{}{"max": -1},
-				},
+				Options: map[string]interface{}{"max": -1},
 			},
 			{
 				Code: `
@@ -113,9 +107,7 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           });
         });
     `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 1.5},
-				},
+				Options: map[string]interface{}{"max": 1.5},
 			},
 			{Code: `
       describe('foo', () => {
@@ -133,9 +125,7 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           });
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 0},
-				},
+				Options: map[string]interface{}{"max": 0},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxDepth", Line: 2, Column: 9},
 				},
@@ -221,9 +211,7 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           });
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 2},
-				},
+				Options: map[string]interface{}{"max": 2},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxDepth", Line: 4, Column: 13},
 					{MessageId: "exceededMaxDepth", Line: 10, Column: 13},
@@ -235,18 +223,14 @@ func TestMaxNestedDescribeRule(t *testing.T) {
           describe.each(['hello', 'world'])("%s", (a) => {});
         });
       `,
-				Options: []interface{}{
-					map[string]interface{}{"max": 1},
-				},
+				Options: map[string]interface{}{"max": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxDepth", Line: 3, Column: 11},
 				},
 			},
 			{
 				Code: "describe('foo', () => {\n  describe.each`\n  foo  | bar\n  ${'1'} | ${'2'}\n  `('$foo $bar', ({ foo, bar }) => {});\n});",
-				Options: []interface{}{
-					map[string]interface{}{"max": 1},
-				},
+				Options: map[string]interface{}{"max": 1},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "exceededMaxDepth", Line: 2, Column: 3},
 				},
