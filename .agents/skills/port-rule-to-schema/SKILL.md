@@ -1,6 +1,6 @@
 ---
 name: port-rule-to-schema
-description: Port a legacy rslint rule to the new schema-driven options validation framework. Use this skill when you need to refactor a rule implementation to define a declarative Schema (always a Tuple) and consume typed options in RunWithOptions.
+description: Port a legacy rslint rule to the new schema-driven options validation framework. Use this skill when you need to refactor a rule implementation to define a declarative Schema (a Tuple or Array) and consume typed options in RunWithOptions.
 ---
 
 # Porting Rules to the Schema-Driven Options Framework
@@ -36,7 +36,12 @@ Inspect how `ctx.Rule().Options` is parsed, checked, and converted. Cross-refere
 
 ### 3. Define the Declarative Schema
 
-Add a `Schema` field to the `rule.Rule` declaration. **The top-level schema must always be `rule.Tuple(...)`**, even for rules with a single option — this ensures `RunWithOptions` always receives a `[]any` slice. Use the schema combinators defined in [internal/rule/schema.go](file:///home/swwind/rslint/internal/rule/schema.go) as the Tuple elements:
+Add a `Schema` field to the `rule.Rule` declaration. **The top-level schema must be either `rule.Tuple(...)` or `rule.Array(...)`** — both produce `[]any` from `Validate`, which is what `RunWithOptions` always receives. Use the schema combinators defined in [internal/rule/schema.go](file:///home/swwind/rslint/internal/rule/schema.go):
+
+- Use **`rule.Tuple(...)`** when the rule has a fixed number of positional arguments with potentially different types (e.g., a severity string followed by an options object).
+- Use **`rule.Array(...)`** when the rule takes a variable-length list of homogeneous values (e.g., a list of allowed patterns or keywords).
+
+Available element schemas:
 
 - `rule.Bool()`
 - `rule.Int()`
@@ -50,17 +55,25 @@ _Always specify `.Default(value)` on your schemas to let the framework handle mi
 
 ### 4. Implement `RunWithOptions`
 
-Replace or supplement `Run` with `RunWithOptions`. The `options` parameter is always `[]any` — one element per positional schema in the `Tuple`:
+Replace or supplement `Run` with `RunWithOptions`. The `options` parameter is always `[]any`:
 
 ```go
 RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners { ... }
 ```
 
-Access elements by index:
+**When the top-level schema is `Tuple`**, access elements by index:
 
 - `options[0]` → first positional arg (guaranteed by `Tuple` element 0)
 - `options[1]` → second positional arg (guaranteed by `Tuple` element 1)
 - etc.
+
+**When the top-level schema is `Array`**, iterate over all elements — the length is variable:
+
+```go
+for _, item := range options {
+    s, _ := item.(string) // or whatever the element type is
+}
+```
 
 Type-assert each element to the Go type that corresponds to its schema:
 
@@ -79,7 +92,7 @@ Type-assert each element to the Go type that corresponds to its schema:
 
 ## Code Examples
 
-### A. Single Option Rule (`accessor-pairs`)
+### A. Single-Object Rule (`accessor-pairs`)
 
 For a rule taking a single configuration object, wrap it in `Tuple`:
 
@@ -106,7 +119,39 @@ var AccessorPairsRule = rule.Rule{
 }
 ```
 
-### B. Multi-Positional Rule (`eqeqeq`)
+### B. Variable-Length Rule (Array top-level)
+
+For a rule that accepts a variable list of homogeneous values (e.g., allowed identifiers):
+
+```go
+var NoRestrictedGlobalsRule = rule.Rule{
+	Name:   "no-restricted-globals",
+	Schema: rule.Array(rule.Union(
+		rule.String(),
+		rule.Object(map[string]rule.Schema{
+			"name":    rule.String(),
+			"message": rule.String().Default(""),
+		}),
+	)),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		// options is a []any — one entry per restricted global
+		for _, item := range options {
+			switch v := item.(type) {
+			case string:
+				// plain name
+			case map[string]any:
+				name, _ := v["name"].(string)
+				msg, _ := v["message"].(string)
+				_ = name
+				_ = msg
+			}
+		}
+		// ... rule logic
+	},
+}
+```
+
+### C. Multi-Positional Rule (`eqeqeq`)
 
 For a rule taking multiple positional arguments, list them as Tuple elements:
 
