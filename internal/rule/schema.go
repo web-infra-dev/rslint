@@ -376,5 +376,5 @@ func (s *UnionSchema) TSType() string {
 	for _, schema := range s.schemas {
 		parts = append(parts, schema.TSType())
 	}
-	return strings.Join(parts, " | ")
+	return "(" + strings.Join(parts, " | ") + ")"
 }

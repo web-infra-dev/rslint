@@ -509,7 +509,7 @@ func TestUnionSchema(t *testing.T) {
 
 	t.Run("TSType", func(t *testing.T) {
 		s := Union(String(), Int())
-		expected := "string | number"
+		expected := "(string | number)"
 		if s.TSType() != expected {
 			t.Errorf("expected %q, got %q", expected, s.TSType())
 		}
