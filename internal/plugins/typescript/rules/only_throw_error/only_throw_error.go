@@ -138,9 +138,8 @@ var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 		opts, ok := options.(OnlyThrowErrorOptions)
 		if !ok {
 			opts = OnlyThrowErrorOptions{}
-			// When options come from JSON (API/TS tests), they arrive as []interface{}
-			if optionsArray, arrayOk := options.([]interface{}); arrayOk && len(optionsArray) > 0 {
-				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
+			if optsMap := utils.GetOptionsMap(options); optsMap != nil {
+				if optsJSON, err := json.Marshal(optsMap); err == nil {
 					json.Unmarshal(optsJSON, &opts)
 				}
 			}
