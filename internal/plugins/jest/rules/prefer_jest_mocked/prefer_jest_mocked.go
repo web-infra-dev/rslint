@@ -45,7 +45,7 @@ func isJestMockType(typeNode *ast.Node) bool {
 }
 
 func reportJestMockedAssertion(ctx rule.RuleContext, assertionNode *ast.Node, expression *ast.Node) {
-	innerExpression := ast.SkipOuterExpressions(expression, ast.OEKTypeAssertions)
+	innerExpression := ast.SkipOuterExpressions(expression, ast.OEKParentheses|ast.OEKTypeAssertions)
 	fnName := utils.TrimmedNodeText(ctx.SourceFile, innerExpression)
 
 	ctx.ReportNodeWithFixes(
@@ -57,7 +57,7 @@ func reportJestMockedAssertion(ctx rule.RuleContext, assertionNode *ast.Node, ex
 
 func checkJestMockAssertion(ctx rule.RuleContext, node *ast.Node, typeNode, expression *ast.Node) {
 	if node.Kind == ast.KindAsExpression {
-		if parent := node.Parent; parent != nil && parent.Kind == ast.KindAsExpression {
+		if parent := ast.WalkUpParenthesizedExpressions(node.Parent); parent != nil && parent.Kind == ast.KindAsExpression {
 			return
 		}
 	}

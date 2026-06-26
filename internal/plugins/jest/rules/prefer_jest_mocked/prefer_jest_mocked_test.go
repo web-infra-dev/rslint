@@ -31,6 +31,7 @@ func TestPreferJestMockedRule(t *testing.T) {
       const mockFn = jest.fn();
       (mockFn as MockType).mockReturnValue(1);
     `},
+			{Code: `((foo as jest.Mock) as unknown).mockReturnValue(1);`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -48,6 +49,13 @@ func TestPreferJestMockedRule(t *testing.T) {
 				},
 			},
 			{
+				Code:   `((foo as unknown) as jest.Mock).mockReturnValue(1);`,
+				Output: []string{`(jest.mocked(foo)).mockReturnValue(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestMocked", Line: 1, Column: 2, EndLine: 1, EndColumn: 31},
+				},
+			},
+			{
 				Code:   `(foo as unknown as jest.Mock as unknown as jest.Mock).mockReturnValue(1);`,
 				Output: []string{`(jest.mocked(foo)).mockReturnValue(1);`},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -59,6 +67,13 @@ func TestPreferJestMockedRule(t *testing.T) {
 				Output: []string{`(jest.mocked(foo)).mockReturnValue(1);`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useJestMocked", Line: 1, Column: 2, EndLine: 1, EndColumn: 16},
+				},
+			},
+			{
+				Code:   `(((foo)) as jest.Mock).mockReturnValue(1);`,
+				Output: []string{`(jest.mocked(foo)).mockReturnValue(1);`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestMocked", Line: 1, Column: 2, EndLine: 1, EndColumn: 22},
 				},
 			},
 			{
