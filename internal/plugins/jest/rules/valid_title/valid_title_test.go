@@ -21,64 +21,48 @@ func TestValidTitleRule(t *testing.T) {
 		{Code: `test("that all is as it should be", () => {});`},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"ignoreTypeOfDescribeName": false,
 					"disallowedWords":          []interface{}{"correct"},
 				},
-			},
 		},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"disallowedWords": nil},
-			},
+			Options: map[string]interface{}{"disallowedWords": nil},
 		},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": map[string]interface{}{},
 				},
-			},
 		},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": ` `,
 				},
-			},
 		},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": []interface{}{` `},
 				},
-			},
 		},
 		{
 			Code: `it("correctly sets the value #unit", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": patHashTag,
 				},
-			},
 		},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": patMustMatchHash,
 				},
-			},
 		},
 		{
 			Code: `it("correctly sets the value", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"mustMatch": map[string]interface{}{"test": patHashTag}},
-			},
+			Options: map[string]interface{}{"mustMatch": map[string]interface{}{"test": patHashTag}},
 		},
 		{
 			Code: `
@@ -94,9 +78,7 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{
-				map[string]interface{}{"mustMatch": map[string]interface{}{"test": patMustMatchHash}},
-			},
+			Options: map[string]interface{}{"mustMatch": map[string]interface{}{"test": patMustMatchHash}},
 		},
 
 		{Code: `it("is a string", () => {});`},
@@ -113,36 +95,26 @@ func TestValidTitleRule(t *testing.T) {
 		{Code: `fdescribe("is a string", () => {});`},
 		{
 			Code: `describe(String(/.+/), () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"ignoreTypeOfDescribeName": true},
-			},
+			Options: map[string]interface{}{"ignoreTypeOfDescribeName": true},
 		},
 		{
 			Code: `it(String(/.+/), () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"ignoreTypeOfTestName": true},
-			},
+			Options: map[string]interface{}{"ignoreTypeOfTestName": true},
 		},
 		{
 			Code: `const foo = "my-title"; it(foo, () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"ignoreTypeOfTestName": true},
-			},
+			Options: map[string]interface{}{"ignoreTypeOfTestName": true},
 		},
 		{
 			Code: `describe(myFunction, () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"ignoreTypeOfDescribeName": true},
-			},
+			Options: map[string]interface{}{"ignoreTypeOfDescribeName": true},
 		},
 		{
 			Code: `xdescribe(skipFunction, () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"ignoreTypeOfDescribeName": true,
 					"disallowedWords":          []interface{}{},
 				},
-			},
 		},
 
 		{Code: `describe()`},
@@ -185,9 +157,7 @@ func TestValidTitleRule(t *testing.T) {
     `},
 		{
 			Code: "it(`GIVEN... \\n  `, () => {});",
-			Options: []interface{}{
-				map[string]interface{}{"ignoreSpaces": true},
-			},
+			Options: map[string]interface{}{"ignoreSpaces": true},
 		},
 
 		{Code: "xdescribe(`foo`, function () {})"},
@@ -307,19 +277,19 @@ func TestValidTitleRule(t *testing.T) {
 	invalid := []rule_tester.InvalidTestCase{
 		{
 			Code:    `test("the correct way to properly handle all things", () => {});`,
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"correct", "properly", "all"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"correct", "properly", "all"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
 			Code:    `it("is correct", () => {});`,
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"correct|properly"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"correct|properly"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
 			Code: `it("it foo", () => {});`,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustMatch": "(unclosed",
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "invalidPattern",
 				Message:   "Invalid regular expression in `mustMatch` option: `(unclosed`: error parsing regexp: missing closing ) in `(unclosed`",
@@ -329,9 +299,9 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code: `it("it foo", () => {});`,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustNotMatch": map[string]interface{}{"describe": "(unterminated"},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "invalidPattern",
 				Message:   "Invalid regular expression in `mustNotMatch.describe` option: `(unterminated`: error parsing regexp: missing closing ) in `(unterminated`",
@@ -341,9 +311,9 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code: `it("it foo", () => {});`,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"disallowedWords": []interface{}{"ok", "(unterminated"},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "invalidPattern",
 				Message:   "Invalid regular expression in `disallowedWords` option: `(?i)\\b(ok|(unterminated)\\b`: error parsing regexp: missing closing ) in `(?i)\\b(ok|(unterminated)\\b`",
@@ -353,10 +323,10 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code: `it("it foo", () => {});`,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"disallowedWords": []interface{}{"ok", "(unterminated"},
 				"mustMatch":       "^should ",
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "invalidPattern",
 				Message:   "Invalid regular expression in `disallowedWords` option: `(?i)\\b(ok|(unterminated)\\b`: error parsing regexp: missing closing ) in `(?i)\\b(ok|(unterminated)\\b`",
@@ -366,27 +336,27 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code:    `describe("the correct way to do things", function () {})`,
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"correct"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"correct"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
 			Code:    `it("has ALL the things", () => {})`,
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"all"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"all"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
 			Code:    `xdescribe("every single one of them", function () {})`,
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"every"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"every"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
 			Code:    `describe('Very Descriptive Title Goes Here', function () {})`,
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"descriptive"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"descriptive"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
 			Code:    "test(`that the value is set properly`, function () {})",
-			Options: []interface{}{map[string]interface{}{"disallowedWords": []interface{}{"properly"}}},
+			Options: map[string]interface{}{"disallowedWords": []interface{}{"properly"}},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "disallowedWord"}},
 		},
 		{
@@ -403,7 +373,7 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{"mustNotMatch": patMustNotHashBad, "mustMatch": patMustMatchHash}},
+			Options: map[string]interface{}{"mustNotMatch": patMustNotHashBad, "mustMatch": patMustMatchHash},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustNotMatch"},
 				{MessageId: "mustNotMatch"},
@@ -425,7 +395,7 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{"mustNotMatch": patMustNotHashBad, "mustMatch": patMustMatchHash}},
+			Options: map[string]interface{}{"mustNotMatch": patMustNotHashBad, "mustMatch": patMustMatchHash},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustNotMatch"},
 				{MessageId: "mustNotMatch"},
@@ -445,10 +415,10 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustNotMatch": []interface{}{patMustNotHashBad, `Please include "#unit" or "#e2e" in titles`},
 				"mustMatch":    []interface{}{patMustMatchHash, `Please include "#unit" or "#e2e" in titles`},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustNotMatchCustom"},
 				{MessageId: "mustNotMatchCustom"},
@@ -468,10 +438,10 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustNotMatch": map[string]interface{}{"describe": []interface{}{patMustNotHashBad}},
 				"mustMatch":    map[string]interface{}{"describe": patMustMatchHash},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustNotMatch"},
 			},
@@ -490,12 +460,12 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustNotMatch": map[string]interface{}{
 					"describe": []interface{}{patMustNotHashBad, `Please include "#unit" or "#e2e" in describe titles`},
 				},
 				"mustMatch": map[string]interface{}{"describe": patMustMatchHash},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustNotMatchCustom"},
 			},
@@ -514,10 +484,10 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustNotMatch": map[string]interface{}{"describe": patMustNotHashBad},
 				"mustMatch":    map[string]interface{}{"it": patMustMatchHash},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustNotMatch"},
 			},
@@ -536,14 +506,14 @@ func TestValidTitleRule(t *testing.T) {
 	          });
 	        });
 	      `,
-			Options: []interface{}{map[string]interface{}{
+			Options: map[string]interface{}{
 				"mustNotMatch": map[string]interface{}{
 					"describe": []interface{}{patMustNotHashBad, `Please include "#unit" or "#e2e" in describe titles`},
 				},
 				"mustMatch": map[string]interface{}{
 					"it": []interface{}{patMustMatchHash, `Please include "#unit" or "#e2e" in it titles`},
 				},
-			}},
+			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "mustMatchCustom"},
 				{MessageId: "mustNotMatchCustom"},
@@ -551,9 +521,7 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code: `test("the correct way to properly handle all things", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{"mustMatch": patHashTag},
-			},
+			Options: map[string]interface{}{"mustMatch": patHashTag},
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "mustMatch",
 				Message:   `test should match /#(?:unit|integration|e2e)/u`,
@@ -561,29 +529,23 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code: `describe("the test", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": map[string]interface{}{"describe": patHashTag},
 				},
-			},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "mustMatch"}},
 		},
 		{
 			Code: `xdescribe("the test", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": map[string]interface{}{"describe": patHashTag},
 				},
-			},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "mustMatch"}},
 		},
 		{
 			Code: `describe.skip("the test", () => {});`,
-			Options: []interface{}{
-				map[string]interface{}{
+			Options: map[string]interface{}{
 					"mustMatch": map[string]interface{}{"describe": patHashTag},
 				},
-			},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "mustMatch"}},
 		},
 		{
@@ -592,12 +554,12 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code:    `it(String(/.+/), () => {});`,
-			Options: []interface{}{map[string]interface{}{"ignoreTypeOfTestName": false}},
+			Options: map[string]interface{}{"ignoreTypeOfTestName": false},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
 		},
 		{
 			Code:    `const foo = "my-title"; it(foo, () => {});`,
-			Options: []interface{}{map[string]interface{}{"ignoreTypeOfTestName": false}},
+			Options: map[string]interface{}{"ignoreTypeOfTestName": false},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
 		},
 		{
@@ -646,7 +608,7 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code:    `test.skip(123, () => {});`,
-			Options: []interface{}{map[string]interface{}{"ignoreTypeOfDescribeName": true}},
+			Options: map[string]interface{}{"ignoreTypeOfDescribeName": true},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
 		},
 		{
@@ -655,7 +617,7 @@ func TestValidTitleRule(t *testing.T) {
 		},
 		{
 			Code:    `describe(myFunction, () => 1);`,
-			Options: []interface{}{map[string]interface{}{"ignoreTypeOfDescribeName": false}},
+			Options: map[string]interface{}{"ignoreTypeOfDescribeName": false},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "titleMustBeString"}},
 		},
 		{
