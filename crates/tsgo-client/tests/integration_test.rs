@@ -286,3 +286,136 @@ fn test_get_shorthand_assignment_value_symbol() {
     // Generate snapshot
     insta::assert_json_snapshot!(shorthand_mappings);
 }
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+struct ParameterPropertySymbolMapping {
+    source_node_span: String,
+    primary_symbol_name: String,
+    extra_symbol_name: String,
+    primary_decl_span: String,
+    extra_decl_span: String,
+}
+
+#[test]
+fn test_get_parameter_property_symbols() {
+    let tsgo_path = get_tsgo_path().expect(
+        "Could not find tsgo executable. \
+         Please build tsgo first or ensure it's in your PATH.",
+    );
+
+    let fixture_dir = get_fixtures_dir().join("simple-project");
+    let config_file = fixture_dir.join("tsconfig.json");
+
+    let options = Options {
+        cwd: Some(fixture_dir.clone()),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+
+    let uninitialized_client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+
+    let api =
+        Api::with_uninitialized_client(uninitialized_client).expect("Failed to initialize API");
+
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+
+    let semantic = &project.semantic;
+    let mut mappings = Vec::new();
+
+    for (node_ref, extra_symbol_id) in &semantic.parameter_property_symbols {
+        let Some(extra_symbol_id_from_lookup) = semantic.get_parameter_property_symbol(node_ref)
+        else {
+            panic!("parameter property lookup should find the recorded location");
+        };
+
+        assert_eq!(*extra_symbol_id, extra_symbol_id_from_lookup);
+
+        let Some((_, primary_symbol_id)) = semantic.node2sym.iter().find(|(location, _)| {
+            location.sourcefile_id == node_ref.sourcefile_id
+                && location.start == node_ref.start
+                && location.end == node_ref.end
+        }) else {
+            panic!("primary parameter property symbol should be present in node2sym");
+        };
+        let primary_symbol_id = *primary_symbol_id;
+        let extra_symbol_id = *extra_symbol_id;
+
+        assert_ne!(
+            primary_symbol_id, extra_symbol_id,
+            "extra parameter property symbol should differ from node2sym"
+        );
+
+        let Some((_, primary_symbol_data)) = semantic
+            .symtab
+            .iter()
+            .find(|(id, _)| *id == primary_symbol_id)
+        else {
+            panic!("primary symbol should be present in symtab");
+        };
+
+        let Some((_, extra_symbol_data)) = semantic
+            .symtab
+            .iter()
+            .find(|(id, _)| *id == extra_symbol_id)
+        else {
+            panic!("extra symbol should be present in symtab");
+        };
+
+        let primary_flags = SymbolFlags::from_bits_truncate(primary_symbol_data.flags);
+        let extra_flags = SymbolFlags::from_bits_truncate(extra_symbol_data.flags);
+        assert!(
+            primary_flags.intersects(SymbolFlags::PROPERTY | SymbolFlags::CLASS_MEMBER),
+            "node2sym for parameter property should be the property symbol, got: {primary_flags:?}"
+        );
+        assert!(
+            extra_flags.contains(SymbolFlags::FUNCTION_SCOPED_VARIABLE),
+            "extra parameter property symbol should be the parameter symbol, got: {extra_flags:?}"
+        );
+
+        let primary_symbol_name = String::from_utf8_lossy(&primary_symbol_data.name).to_string();
+        let extra_symbol_name = String::from_utf8_lossy(&extra_symbol_data.name).to_string();
+
+        if ["testType", "count", "enabled"].contains(&primary_symbol_name.as_str()) {
+            assert_eq!(primary_symbol_name, extra_symbol_name);
+
+            let source_node_span = format!(
+                "{}:{}..{}",
+                node_ref.sourcefile_id, node_ref.start, node_ref.end
+            );
+            let primary_decl_span = if let Some(decl) = &primary_symbol_data.decl {
+                format!("{}:{}..{}", decl.sourcefile_id, decl.start, decl.end)
+            } else {
+                "unknown".to_string()
+            };
+            let extra_decl_span = if let Some(decl) = &extra_symbol_data.decl {
+                format!("{}:{}..{}", decl.sourcefile_id, decl.start, decl.end)
+            } else {
+                "unknown".to_string()
+            };
+
+            mappings.push(ParameterPropertySymbolMapping {
+                source_node_span,
+                primary_symbol_name,
+                extra_symbol_name,
+                primary_decl_span,
+                extra_decl_span,
+            });
+        }
+    }
+
+    mappings.sort();
+
+    assert_eq!(
+        mappings.len(),
+        3,
+        "Expected 3 parameter property mappings, found {}",
+        mappings.len()
+    );
+
+    insta::assert_json_snapshot!(mappings);
+}

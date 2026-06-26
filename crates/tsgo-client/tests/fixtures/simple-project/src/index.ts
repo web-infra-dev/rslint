@@ -25,5 +25,17 @@ export class Calculator {
   }
 }
 
+export class ParameterPropertyExample {
+  constructor(
+    private testType: string,
+    public readonly count: number,
+    protected enabled: boolean,
+  ) {}
+
+  getTestType() {
+    return this.testType;
+  }
+}
+
 const message = greet('World');
 console.log(message);
