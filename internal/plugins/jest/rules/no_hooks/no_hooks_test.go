@@ -20,9 +20,7 @@ func TestNoHooksRule(t *testing.T) {
 			{Code: "test(\"foo\", () => { expect(subject.beforeEach()).toBe(true) })"},
 			{
 				Code: "afterEach(() => {}); afterAll(() => {});",
-				Options: []interface{}{
-					map[string]interface{}{"allow": []interface{}{"afterEach", "afterAll"}},
-				},
+				Options: map[string]interface{}{"allow": []interface{}{"afterEach", "afterAll"}},
 			},
 		},
 		[]rule_tester.InvalidTestCase{
@@ -62,9 +60,7 @@ func TestNoHooksRule(t *testing.T) {
 			},
 			{
 				Code: "beforeEach(() => {}); afterEach(() => { jest.resetModules() });",
-				Options: []interface{}{
-					map[string]interface{}{"allow": []interface{}{"afterEach"}},
-				},
+				Options: map[string]interface{}{"allow": []interface{}{"afterEach"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedHook", Line: 1, Column: 1},
 				},
@@ -76,9 +72,7 @@ func TestNoHooksRule(t *testing.T) {
 			        afterEach(() => {});
 			        beforeEach(() => { jest.resetModules() });
 			    `,
-				Options: []interface{}{
-					map[string]interface{}{"allow": []interface{}{"afterEach"}},
-				},
+				Options: map[string]interface{}{"allow": []interface{}{"afterEach"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedHook", Line: 4, Column: 12},
 				},

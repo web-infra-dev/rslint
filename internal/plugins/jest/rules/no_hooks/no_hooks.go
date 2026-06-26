@@ -50,11 +50,7 @@ func parseOptions(options any) Options {
 		return opts
 	}
 
-	optArray, isArray := options.([]interface{})
-	if !isArray || len(optArray) == 0 {
-		return opts
-	}
-	optsMap, ok := optArray[0].(map[string]interface{})
+	optsMap, ok := options.(map[string]interface{})
 	if !ok {
 		return opts
 	}
