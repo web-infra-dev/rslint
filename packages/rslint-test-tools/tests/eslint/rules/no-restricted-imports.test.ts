@@ -258,11 +258,6 @@ ruleTester.run('no-restricted-imports', {
       errors: [{ messageId: 'path' }],
     },
     {
-      code: 'import "fs"',
-      options: 'fs' as any,
-      errors: [{ messageId: 'path' }],
-    },
-    {
       code: 'import os from "os ";',
       options: ['fs', 'crypto ', 'stream', 'os'] as any,
       errors: [{ messageId: 'path' }],
@@ -766,6 +761,12 @@ ruleTester.run('no-restricted-imports', {
         ],
       },
       errors: [{ messageId: 'patternWithCustomMessage' }],
+    },
+    // Bare string option
+    {
+      code: 'import "fs"',
+      options: 'fs' as any,
+      errors: [{ messageId: 'path' }],
     },
   ],
 });

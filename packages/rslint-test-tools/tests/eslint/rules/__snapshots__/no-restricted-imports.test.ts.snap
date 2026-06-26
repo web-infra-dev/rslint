@@ -1503,3 +1503,29 @@ exports[`no-restricted-imports > invalid 56`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-restricted-imports > invalid 57`] = `
+{
+  "code": "import \"fs\"",
+  "diagnostics": [
+    {
+      "message": "'fs' import is restricted from being used.",
+      "messageId": "path",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-restricted-imports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
