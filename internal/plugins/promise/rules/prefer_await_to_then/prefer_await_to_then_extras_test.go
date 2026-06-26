@@ -85,6 +85,15 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 			{Code: `function f() { p.resolve() }`},
 			{Code: `function f() { p.thenSomething() }`},
 			{Code: `function f() { p.catchError() }`},
+
+			// ---- For-loop scoping: var / no-decl heads create no scope (Comment 4 fix) ----
+			// eslint-scope does not open a scope unless the head is let/const/using.
+			// Without a block body there is no KindBlock ancestor either, so these stay top-level.
+			{Code: `for(;;) thing.then(cb)`},
+			{Code: `for(var i=0;;) thing.then(cb)`},
+			{Code: `for(var a of xs) thing.then(cb)`},
+			{Code: `for(a of xs) thing.then(cb)`},
+			{Code: `for(var k in o) thing.then(cb)`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 1: AST node types ----
@@ -128,11 +137,30 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 16, EndLine: 1, EndColumn: 20},
 				},
 			},
-			// Top-level for-of loop
+			// Top-level for-of loop (braced body — KindBlock catches it regardless)
 			{
 				Code: `for (const a of xs) { thing.then(cb) }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 29, EndLine: 1, EndColumn: 33},
+				},
+			},
+			// Top-level for-loops with let/const but no braces — scope comes from the for-head
+			{
+				Code: `for(let i=0;;) thing.then(cb)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 22, EndLine: 1, EndColumn: 26},
+				},
+			},
+			{
+				Code: `for(const a of xs) thing.then(cb)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 26, EndLine: 1, EndColumn: 30},
+				},
+			},
+			{
+				Code: `for(const k in o) thing.then(cb)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 25, EndLine: 1, EndColumn: 29},
 				},
 			},
 			// Top-level switch/case

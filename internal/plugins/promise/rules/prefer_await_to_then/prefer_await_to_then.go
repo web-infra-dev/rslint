@@ -34,8 +34,19 @@ func createsScope(node *ast.Node) bool {
 		return true
 	}
 	switch node.Kind {
+	case ast.KindForStatement:
+		// eslint-scope only opens a for-scope when the loop head binds with let/const/using.
+		fs := node.AsForStatement()
+		return fs != nil && fs.Initializer != nil &&
+			ast.IsVariableDeclarationList(fs.Initializer) &&
+			fs.Initializer.Flags&ast.NodeFlagsBlockScoped != 0
+	case ast.KindForInStatement, ast.KindForOfStatement:
+		// Same rule as KindForStatement: scope only when let/const/using.
+		fs := node.AsForInOrOfStatement()
+		return fs != nil && fs.Initializer != nil &&
+			ast.IsVariableDeclarationList(fs.Initializer) &&
+			fs.Initializer.Flags&ast.NodeFlagsBlockScoped != 0
 	case ast.KindBlock,
-		ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
 		ast.KindSwitchStatement, ast.KindCatchClause,
 		ast.KindClassDeclaration, ast.KindClassExpression,
 		ast.KindWithStatement, ast.KindClassStaticBlockDeclaration,
@@ -51,6 +62,9 @@ func isTopLevelScoped(node *ast.Node) bool {
 	for cur := node.Parent; cur != nil; cur = cur.Parent {
 		if createsScope(cur) {
 			return false
+		}
+		if cur.Kind == ast.KindSourceFile {
+			return true
 		}
 	}
 	return true
