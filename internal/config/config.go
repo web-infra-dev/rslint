@@ -241,26 +241,9 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 	ruleConfig := &RuleConfig{Level: level}
 
 	// Remaining elements are rule options — pass them through to the rule's
-	// option parser which knows how to interpret its own format.
+	// option parser as an array by default.
 	if len(ruleArray) > 1 {
-		remaining := ruleArray[1:]
-		if len(remaining) == 1 {
-			if _, isArray := remaining[0].([]interface{}); isArray {
-				// A lone option that is itself an array (e.g. ["error",
-				// ["a","b"]]): keep the outer wrapper so it stays distinguishable
-				// from a multi-element option list and maps to context.options ==
-				// [["a","b"]]. Unwrapping would collapse it to ["a","b"],
-				// indistinguishable from ["error","a","b"] — and the eslint-plugin
-				// dispatch would then drop a nesting level.
-				ruleConfig.Options = remaining
-			} else {
-				// Single non-array option: pass the value directly (string, map).
-				ruleConfig.Options = remaining[0]
-			}
-		} else {
-			// Multiple option elements: pass as array (e.g. ["both", {blockScopedFunctions: "disallow"}])
-			ruleConfig.Options = remaining
-		}
+		ruleConfig.Options = ruleArray[1:]
 	}
 
 	return ruleConfig
@@ -462,6 +445,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			case []interface{}:
 				if rc := parseArrayRuleConfig(v); rc != nil {
 					merged.Rules[ruleName] = rc
+				}
 			}
 		}
 

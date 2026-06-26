@@ -18,14 +18,14 @@ func TestParseArrayRuleConfig_OptionShapes(t *testing.T) {
 		want interface{}
 	}{
 		{
-			name: "single string option unwraps to the value",
+			name: "single string option remains in slice",
 			in:   []interface{}{"error", "both"},
-			want: "both",
+			want: []interface{}{"both"},
 		},
 		{
-			name: "single object option unwraps to the value",
+			name: "single object option remains in slice",
 			in:   []interface{}{"error", map[string]interface{}{"k": float64(1)}},
-			want: map[string]interface{}{"k": float64(1)},
+			want: []interface{}{map[string]interface{}{"k": float64(1)}},
 		},
 		{
 			name: "single array option keeps its wrapper",
