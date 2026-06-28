@@ -4,8 +4,13 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// enableVirtualTerminalProcessing arms ANSI rendering on the inherited
+// console stderr. Under IPC mode — the only native lint mode — this process's
+// stdout is Node's pipe (lint output renders in the Node parent, whose tty
+// layer owns VT processing there), so stderr is the only handle this process
+// still writes ANSI to directly (the syntactic-error pretty report).
 func enableVirtualTerminalProcessing() {
-	h, err := windows.GetStdHandle(windows.STD_OUTPUT_HANDLE)
+	h, err := windows.GetStdHandle(windows.STD_ERROR_HANDLE)
 	if err != nil || h == windows.InvalidHandle {
 		return
 	}

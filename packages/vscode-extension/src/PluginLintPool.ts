@@ -10,14 +10,20 @@
  * (`buildPluginLintTasks` / `buildPluginLintResult`), shared with the CLI
  * engine so the two paths never drift.
  *
- * `@rslint/core/eslint-plugin` is loaded via a dynamic `import()` (not a
- * static import): it is ESM (uses `import.meta.url` to resolve its sibling
- * `lint-worker.js`) while this extension is bundled to CJS, and esbuild
- * keeps it external (see scripts/build.js) so the worker file stays next to
- * `index.js` inside the installed package. A static `require` of an ESM
- * module would fail; a dynamic `import()` loads it correctly.
+ * The host is loaded via a dynamic `import()` of the RELATIVE specifier
+ * `./eslint-plugin/index.js` (not the bare `@rslint/core/eslint-plugin`):
+ * relative to the built `dist/main.js` it resolves to the extension's OWN
+ * `dist/eslint-plugin/index.js`, which `scripts/build.js` stages into the
+ * package (worker bundle + nested `@rslint/native-<tuple>` platform pkg). The bare
+ * specifier only resolves in dev (workspace `node_modules`); the packaged
+ * vsix ships no `@rslint/core`, so it must be the relative sibling. The host
+ * is ESM (uses `import.meta.url` to spawn its sibling `lint-worker.js`) while
+ * this extension is bundled to CJS — a static `require` of an ESM module
+ * would fail, a dynamic `import()` loads it correctly. esbuild keeps the
+ * specifier external (see scripts/build.js) so it is emitted verbatim.
  */
 
+import { window } from 'vscode';
 import type { CancellationToken } from 'vscode';
 import type { Logger } from './logger';
 import type {
@@ -38,16 +44,36 @@ interface EslintPluginModule {
 let modPromise: Promise<EslintPluginModule> | undefined;
 
 /**
- * Load the ESM `@rslint/core/eslint-plugin` entry once. esbuild preserves
- * this dynamic import verbatim in its CJS output (verified) because the
- * specifier is external — so it resolves to the installed package's ESM
- * `dist/eslint-plugin/index.js` at runtime.
+ * Load the ESM host entry once. The specifier is RELATIVE
+ * (`./eslint-plugin/index.js`): esbuild keeps it external so it survives
+ * verbatim into `dist/main.js`, where it resolves to the sibling
+ * `dist/eslint-plugin/index.js` staged by `scripts/build.js` — the same path
+ * in dev and in the packaged vsix, so the dev test exercises the packaged
+ * mechanism rather than a dev-only one.
  */
 async function loadModule(): Promise<EslintPluginModule> {
-  modPromise ??=
-    import('@rslint/core/eslint-plugin') as Promise<EslintPluginModule>;
+  // The host entry exists only in the built `dist/` (staged by build.js), never
+  // under `src/`, so it is intentionally unresolvable at compile time; its
+  // module shape is supplied by `modPromise`'s declared type (no cast needed —
+  // the suppressed import is `any`, assignable straight into the typed slot).
+  // @ts-expect-error -- runtime-only path, resolved relative to dist/main.js
+  modPromise ??= import('./eslint-plugin/index.js').catch((err: unknown) => {
+    // Don't cache a rejected load: a transient failure (e.g. a mid-rebuild
+    // dist in the dev watch window) must stay retryable on the next ensure(),
+    // which is the recovery ensure()'s catch documents.
+    modPromise = undefined;
+    throw err;
+  });
   return modPromise;
 }
+
+/**
+ * Latches the one-shot "host failed to load" warning at MODULE scope (not
+ * per-instance) so a persistent failure (e.g. a broken vsix that didn't ship
+ * the worker payload) surfaces once per session — not once per workspace folder
+ * in a multi-root window, where each folder owns its own PluginLintPool.
+ */
+let warnedOnce = false;
 
 export class PluginLintPool {
   private readonly logger: Logger;
@@ -123,12 +149,24 @@ export class PluginLintPool {
         this.host = host;
         this.fingerprint = fingerprint;
       } catch (err: unknown) {
-        // Init failed (e.g. a referenced plugin failed to import). Leave host
+        // Init failed: either the host module couldn't be loaded (a packaging
+        // regression — the vsix didn't ship `dist/eslint-plugin/` or its
+        // native `.node`), or a referenced plugin failed to import. Leave host
         // unset so we serve empty until the next config change retries, rather
         // than wedging diagnostics.
         this.host = undefined;
         this.fingerprint = undefined;
         this.logger.error('Failed to initialize ESLint-plugin host', err);
+        // Make the failure visible — but ONLY when a config actually mounted
+        // plugins (an empty-descriptor host builds no worker and failing is
+        // not a user-facing problem), and only once per session so a
+        // persistent failure doesn't re-warn on every reload.
+        if (descriptors.length > 0 && !warnedOnce) {
+          warnedOnce = true;
+          void window.showWarningMessage(
+            'Rslint: failed to load the ESLint-plugin host; rules mounted via a config’s `plugins` will report no diagnostics. See the Rslint output channel for details.',
+          );
+        }
       }
     });
   }

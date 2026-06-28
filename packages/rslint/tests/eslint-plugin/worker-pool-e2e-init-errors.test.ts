@@ -2,6 +2,7 @@ import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
+import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 
 /**
  * WorkerPool end-to-end — init-error paths: a failing config surfaces a
@@ -11,12 +12,9 @@ import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
  * respawns before throwing (symmetric with shutdown).
  */
 
-// Skipped on windows: tearing down a worker that has oxc (a napi addon)
-// loaded aborts below the JS layer there (nodejs/node#34567) and crashes
-// the rstest worker running this file. These e2e tests spawn real
-// workers and tear them down, so they are windows-skipped; they still
-// run on linux/macOS.
-describe.skipIf(process.platform === 'win32')(
+// win32 teardown is gated by SKIP_WIN32_NAPI_TEARDOWN (see that file for the
+// nodejs/node#34567 rationale); the flag is false so these run on win32 too.
+describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
     test('init failure surfaces with helpful error', async () => {

@@ -24,6 +24,26 @@ var indexParamPositions = map[string]int{
 	"some":        1,
 }
 
+// isLogicalBinary reports whether a tsgo KindBinaryExpression is what ESTree
+// models as a LogicalExpression — operator `&&`, `||`, or `??` — rather than a
+// BinaryExpression. upstream eslint-plugin-react's `checkPropValue` and
+// `getIdentifiersFromBinaryExpression` only ever handle an ESTree
+// `BinaryExpression` (arithmetic / comparison operators); a LogicalExpression
+// matches none of their branches and is left untouched. tsgo collapses both
+// ESTree shapes into KindBinaryExpression, so logical-operator nodes must be
+// treated as opaque here — otherwise `key={foo || index}`, `key={foo ?? index}`
+// and friends report an index reference that upstream never flags.
+func isLogicalBinary(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	switch node.AsBinaryExpression().OperatorToken.Kind {
+	case ast.KindAmpersandAmpersandToken, ast.KindBarBarToken, ast.KindQuestionQuestionToken:
+		return true
+	}
+	return false
+}
+
 // isImportSpecifierFromReact reports whether `ident` resolves to a binding
 // introduced by `import { <anything> } from 'react'`. Mirrors upstream
 // `eslint-plugin-react`'s `isCreateCloneElement` Identifier branch
@@ -288,7 +308,11 @@ var NoArrayIndexKeyRule = rule.Rule{
 			if node.Kind == ast.KindIdentifier {
 				return []*ast.Node{node}
 			}
-			if node.Kind == ast.KindBinaryExpression {
+			// upstream's getIdentifiersFromBinaryExpression recurses ONLY through
+			// an ESTree BinaryExpression; a LogicalExpression (`&&` / `||` / `??`)
+			// returns null. Mirror that — logical-operator nodes are opaque, so a
+			// tracked index buried inside `foo || index` is never collected.
+			if node.Kind == ast.KindBinaryExpression && !isLogicalBinary(node) {
 				be := node.AsBinaryExpression()
 				return append(collectIdentifiersFromBinary(be.Left), collectIdentifiersFromBinary(be.Right)...)
 			}
@@ -338,7 +362,12 @@ var NoArrayIndexKeyRule = rule.Rule{
 				return
 			}
 
-			if node.Kind == ast.KindBinaryExpression {
+			// Only an ESTree BinaryExpression reaches upstream's binary branch; a
+			// LogicalExpression (`&&` / `||` / `??`) matches no branch of
+			// checkPropValue and is never reported. tsgo represents both as
+			// KindBinaryExpression, so exclude logical operators to keep
+			// `key={foo || index}` valid, exactly as upstream leaves it.
+			if node.Kind == ast.KindBinaryExpression && !isLogicalBinary(node) {
 				for _, id := range collectIdentifiersFromBinary(node) {
 					if isArrayIndex(id) {
 						report(node)

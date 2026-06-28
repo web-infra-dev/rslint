@@ -72,6 +72,12 @@ export const ALIASES: Record<string, string> = {
   'eslint-plugin-sonarjs': 's',
   'eslint-plugin-promise': 'p',
   '@stylistic/eslint-plugin': 'st',
+  'eslint-plugin-simple-import-sort': 'sis',
+  '@eslint-community/eslint-plugin-eslint-comments': 'ec',
+  'eslint-plugin-security': 'sec',
+  'eslint-plugin-es-x': 'esx',
+  'eslint-plugin-cypress': 'cy',
+  'eslint-plugin-playwright': 'pw',
 };
 
 /** Resolve + dynamically import a plugin package's live default export. */

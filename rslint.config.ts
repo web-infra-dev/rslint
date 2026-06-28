@@ -6,6 +6,11 @@ export default defineConfig([
     '**/dist/**',
     'typescript-go/**',
 
+    // Release CI artifacts (downloaded binaries + tsgo lib files copied
+    // into the npm publish shells) — keep in sync with .prettierignore
+    'binaries/**',
+    'npm/**',
+
     // Test fixtures — not real source code
     '**/fixtures/**',
     'packages/rslint-test-tools/tests/**',

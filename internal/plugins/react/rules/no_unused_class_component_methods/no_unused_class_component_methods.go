@@ -60,22 +60,13 @@ func newClassInfo(isClass bool, className string) *classInfo {
 	}
 }
 
-// skipAssertionsAndParens strips parentheses and TS assertion wrappers,
-// matching ESLint's `uncast` which peels TypeCastExpression wrappers.
-func skipAssertionsAndParens(node *ast.Node) *ast.Node {
-	if node == nil {
-		return nil
-	}
-	return ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
-}
-
 // isThisExpression reports whether `node` (after unwrapping assertions /
 // parens) is a bare `this`.
 func isThisExpression(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	return skipAssertionsAndParens(node).Kind == ast.KindThisKeyword
+	return utils.SkipAssertionsAndParens(node).Kind == ast.KindThisKeyword
 }
 
 // resolveLiteralKey extracts the static name from a property-key / member-name
@@ -100,7 +91,7 @@ func resolveLiteralKey(nameNode *ast.Node) (string, *ast.Node) {
 		return "", nil
 	}
 	if nameNode.Kind == ast.KindComputedPropertyName {
-		return name, skipAssertionsAndParens(nameNode.AsComputedPropertyName().Expression)
+		return name, utils.SkipAssertionsAndParens(nameNode.AsComputedPropertyName().Expression)
 	}
 	return name, nameNode
 }
@@ -115,7 +106,7 @@ func resolveLiteralAccessKey(keyExpr *ast.Node) (string, *ast.Node) {
 	if keyExpr == nil {
 		return "", nil
 	}
-	keyExpr = skipAssertionsAndParens(keyExpr)
+	keyExpr = utils.SkipAssertionsAndParens(keyExpr)
 	switch keyExpr.Kind {
 	case ast.KindStringLiteral:
 		return keyExpr.AsStringLiteral().Text, keyExpr

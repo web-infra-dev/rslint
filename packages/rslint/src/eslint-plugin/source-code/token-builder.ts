@@ -1,6 +1,6 @@
 /**
  * Rebuild ESLint-shape `Token[]` from the native parser's columnar token stream
- * (`@rslint/native`'s `parse()` returns `tokenTypes`/`tokenStarts`/`tokenEnds`,
+ * (the napi parser's `parse()` returns `tokenTypes`/`tokenStarts`/`tokenEnds`,
  * all UTF-16 offsets). This is the JS half of the token path: the Rust
  * side already mapped each oxc `Kind` to an ESLint token *type* (parser-driven, so regex-vs-
  * division / template / JSX / TS `<` are correct); here we attach `value` (sliced from the

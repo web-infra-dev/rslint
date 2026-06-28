@@ -96,19 +96,10 @@ jobs:
 
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
-      # @rslint/native ships index.js (the napi loader) + index.d.ts. Both are
-      # checked in (the website deploy env has no Rust to regenerate them), but
-      # `napi build` below regenerates them so the published package always
-      # matches the current source. core's build:js dts bundle also needs
-      # index.d.ts. The per-platform .node binaries ship in the
-      # @rslint/native-{tuple} subpackages, populated from the napi-build
-      # artifacts by move-artifacts above.
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          cache: 'false'
-      - name: Build napi parser (index.js + index.d.ts)
-        run: pnpm --filter @rslint/native build
+      # The per-platform .node parser binaries ship in the @rslint/native-{tuple}
+      # subpackages, populated from the napi-build artifacts by move-artifacts
+      # above. core's loader resolves them at runtime, so no napi build / Rust is
+      # needed here — build:js just bundles the worker (loader + types live in core).
       - name: Build @rslint/core dist
         run: pnpm --filter @rslint/core build:js
       - name: Publish npm packages
@@ -124,7 +115,10 @@ jobs:
   publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
-    needs: [build]
+    # napi-build supplies the per-platform parser `.node` (downloaded into
+    # `binaries/native-<tuple>/`) that publish-marketplace.mjs stages into the
+    # eslint-plugin worker payload; without it the packaged plugin host can't load.
+    needs: [build, napi-build]
     runs-on: rspack-ubuntu-22.04-large
     environment: release
     steps:
@@ -169,7 +163,8 @@ jobs:
   publish-extension-open-vsx:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
-    needs: [build]
+    # Same as publish-extension-vscode: needs the per-platform parser `.node`.
+    needs: [build, napi-build]
     runs-on: ubuntu-22.04
     environment: release
     steps:
@@ -257,8 +252,8 @@ jobs:
       - name: Format code
         run: pnpm format:check
 
-      # napi build produces index.d.ts (core build:js dts) + host .node
-      # (runner tests at the Test step run the worker, which loads it).
+      # napi build drops the host .node into its @rslint/native-{tuple} package;
+      # the Test step's worker loads it at runtime.
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
@@ -454,7 +449,7 @@ jobs:
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
 
       - name: Build napi
-        run: pnpm --filter @rslint/native exec napi build --platform --release --target ${{ matrix.settings.target }} ${{ matrix.settings.cross || '' }}
+        run: pnpm --filter @rslint/native exec napi build --platform --release --no-js --target ${{ matrix.settings.target }} ${{ matrix.settings.cross || '' }}
 
       - name: Upload napi artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

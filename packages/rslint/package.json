@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.5.3",
+  "version": "0.6.3",
   "exports": {
     ".": {
       "@typescript/source": "./src/index.ts",
@@ -31,8 +31,8 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build:bin": "go build -v -o bin/ ../../cmd/rslint",
-    "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o bin/ ../../cmd/rslint ",
+    "build:bin": "node ../../scripts/place-host-build.mjs bin",
+    "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
     "build:js": "rslib build",
     "dev": "rslib build --watch",
     "build": "pnpm build:bin && pnpm build:js",
@@ -61,8 +61,8 @@
     "webworker"
   ],
   "devDependencies": {
-    "@eslint/plugin-kit": "0.3.5",
-    "@rslib/core": "0.22.0",
+    "@eslint/plugin-kit": "0.7.2",
+    "@rslib/core": "0.23.0",
     "@rslint/api": "workspace:*",
     "@types/node": "24.0.14",
     "@types/picomatch": "4.0.2",
@@ -96,7 +96,6 @@
     "@rslint/native-win32-x64-msvc": "workspace:*"
   },
   "dependencies": {
-    "@rslint/native": "workspace:*",
     "picomatch": "4.0.4"
   }
 }

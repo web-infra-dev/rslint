@@ -107,6 +107,19 @@ oldValue;
 				},
 			},
 		},
+		{
+			// Regression: referencing a catch-clause binding must not panic.
+			// The binding is a VariableDeclaration whose parent is a
+			// CatchClause, not a VariableDeclarationList.
+			Code: `
+declare function log(x: unknown): void;
+try {
+  log(1);
+} catch (error) {
+  log(error);
+}
+`,
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `/** @deprecated */ const oldValue = 1; oldValue;`,

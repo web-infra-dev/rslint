@@ -189,6 +189,18 @@ func TestNoReturnWrap(t *testing.T) {
 			{Code: `doThing().catch((function() { return Promise.reject(4) }))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "reject", Message: rejectMessage}}},
 			// Chained bind + outer parens.
 			{Code: `doThing().then(((function() { return Promise.resolve(4) }).bind(this).bind(this)))`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage}}},
+
+			// ---- Regression: nested FunctionDeclaration must not be treated as the
+			// boundary; upstream filters ancestors to arrow/function expressions only,
+			// so this still resolves to the promise callback and reports. ----
+			{Code: `
+      Promise.resolve().then(function () {
+        function helper() {
+          return Promise.resolve(4);
+        }
+        return helper();
+      });
+      `, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "resolve", Message: resolveMessage, Line: 4}}},
 		},
 	)
 }

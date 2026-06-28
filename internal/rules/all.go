@@ -4,8 +4,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/accessor_pairs"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
+	"github.com/web-infra-dev/rslint/internal/rules/arrow_body_style"
 	"github.com/web-infra-dev/rslint/internal/rules/complexity"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
+	"github.com/web-infra-dev/rslint/internal/rules/curly"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
@@ -133,8 +135,10 @@ func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		accessor_pairs.AccessorPairsRule,
 		array_callback_return.ArrayCallbackReturnRule,
+		arrow_body_style.ArrowBodyStyleRule,
 		complexity.ComplexityRule,
 		constructor_super.ConstructorSuperRule,
+		curly.CurlyRule,
 		default_case.DefaultCaseRule,
 		default_case_last.DefaultCaseLastRule,
 		for_direction.ForDirectionRule,

@@ -93,9 +93,11 @@ function checkDiagnosticEqual(
   for (let i = 0; i < rslintDiagnostic.length; i++) {
     const rslintDiag = rslintDiagnostic[i];
     const tsDiag = tsDiagnostic[i];
-    // check rule match
+    // check rule match. Normalize both sides: some messageIds are kebab-case
+    // (e.g. `angle-bracket`) and toCamelCase must apply to the expected side
+    // too, otherwise a hyphenated id can never match.
     assert(
-      toCamelCase(rslintDiag.messageId) === tsDiag.messageId,
+      toCamelCase(rslintDiag.messageId) === toCamelCase(tsDiag.messageId ?? ''),
       `Message mismatch: ${rslintDiag.messageId} !== ${tsDiag.messageId}`,
     );
 

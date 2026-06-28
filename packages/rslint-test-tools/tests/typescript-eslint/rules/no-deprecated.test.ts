@@ -615,6 +615,17 @@ exists('/foo');
       `,
       languageOptions: jsxLanguageOptions,
     },
+    // Regression: referencing a catch-clause binding must not crash. The
+    // binding is a VariableDeclaration whose parent is a CatchClause, not a
+    // VariableDeclarationList.
+    `
+declare function log(x: unknown): void;
+try {
+  log(1);
+} catch (error) {
+  log(error);
+}
+    `,
   ],
   invalid: [
     {

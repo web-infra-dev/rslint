@@ -29,7 +29,7 @@
 
 import { describe, test, expect } from '@rstest/core';
 
-import { parse as nativeParse } from '@rslint/native';
+import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 
 import { createSourceCode } from '../../../src/eslint-plugin/source-code/source-code.js';
 import type { ESTreeNode } from '../../../src/eslint-plugin/source-code/source-code.js';

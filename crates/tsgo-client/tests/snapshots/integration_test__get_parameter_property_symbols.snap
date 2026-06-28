@@ -1,0 +1,28 @@
+---
+source: crates/tsgo-client/tests/integration_test.rs
+assertion_line: 423
+expression: mappings
+---
+[
+  {
+    "source_node_span": "51:538..547",
+    "primary_symbol_name": "testType",
+    "extra_symbol_name": "testType",
+    "primary_decl_span": "51:526..555",
+    "extra_decl_span": "51:526..555"
+  },
+  {
+    "source_node_span": "51:576..582",
+    "primary_symbol_name": "count",
+    "extra_symbol_name": "count",
+    "primary_decl_span": "51:556..590",
+    "extra_decl_span": "51:556..590"
+  },
+  {
+    "source_node_span": "51:605..613",
+    "primary_symbol_name": "enabled",
+    "extra_symbol_name": "enabled",
+    "primary_decl_span": "51:591..622",
+    "extra_decl_span": "51:591..622"
+  }
+]

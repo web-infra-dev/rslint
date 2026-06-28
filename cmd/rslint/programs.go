@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"sync"
 
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -40,6 +39,7 @@ func parallelGitignoreAndPrograms(
 	fsys vfs.FS,
 	singleThreaded bool,
 	seenTsConfigs map[string]struct{},
+	parseCache *utils.ParseCache,
 ) (rslintconfig.RslintConfig, []*compiler.Program, int) {
 	configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
 
@@ -48,22 +48,18 @@ func parallelGitignoreAndPrograms(
 		progs    []*compiler.Program
 		exitCode int
 	)
-	if singleThreaded {
+	// gitignore reading and program creation are independent
+	// (createProgramsForConfig only reads parserOptions.project, never Ignores),
+	// so run them on the shared WorkGroup — which honors --singleThreaded the
+	// same way the lint and type-check phases do.
+	wg := core.NewWorkGroup(singleThreaded)
+	wg.Queue(func() {
 		gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
-		progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs)
-	} else {
-		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
-		}()
-		go func() {
-			defer wg.Done()
-			progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs)
-		}()
-		wg.Wait()
-	}
+	})
+	wg.Queue(func() {
+		progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs, parseCache)
+	})
+	wg.RunAndWait()
 
 	if exitCode != 0 {
 		return rslintConfig, nil, exitCode
@@ -87,6 +83,7 @@ func createProgramsForConfig(
 	singleThreaded bool,
 	fsys vfs.FS,
 	seenTsConfigs map[string]struct{},
+	parseCache *utils.ParseCache,
 ) ([]*compiler.Program, int) {
 	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, configDir, fsys)
 	if err != nil {
@@ -95,7 +92,7 @@ func createProgramsForConfig(
 	}
 
 	var programs []*compiler.Program
-	host := utils.CreateCompilerHost(configDir, fsys)
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 
 	if len(tsConfigs) > 0 {
 		for _, tc := range tsConfigs {
@@ -154,8 +151,9 @@ func createFallbackProgram(
 	singleThreaded bool,
 	configDir string,
 	fsys vfs.FS,
+	parseCache *utils.ParseCache,
 ) (*compiler.Program, int) {
-	host := utils.CreateCompilerHost(configDir, fsys)
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
 		Target:  core.ScriptTargetESNext,
 		Module:  core.ModuleKindESNext,

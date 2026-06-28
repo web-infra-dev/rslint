@@ -4,7 +4,7 @@
 // gate, helper short-circuits, or schema-default fallbacks. Each case is a
 // minimal snippet aimed at a single upstream branch.
 //
-// Coverage axes (mirrors agents/port-rule Dimension 1–4 + upstream
+// Coverage axes (mirrors .agents/skills/port-rule Dimension 1–4 + upstream
 // semantic-walk lock-ins):
 //
 //   - Dimension 1 (tsgo AST shape): self-closing vs paired label root;
