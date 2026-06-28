@@ -15,7 +15,7 @@ func TestNoNativeExtras(t *testing.T) {
 		t,
 		&no_native.NoNativeRule,
 		[]rule_tester.ValidTestCase{
-			// ---- Local/source declarations are allowed ----
+			// ---- Local/source value declarations satisfy a value reference ----
 			{Code: `const Promise = require("bluebird"); Promise.resolve(1);`},
 			{Code: `let Promise = getPromiseCtor(); new Promise(function(resolve) { resolve(1); });`},
 			{Code: `function f(Promise) { return Promise.resolve(1); }`},
@@ -28,11 +28,14 @@ func TestNoNativeExtras(t *testing.T) {
 			// ---- Non-reference identifiers named Promise are ignored ----
 			{Code: `const obj = { Promise: 1 }; obj.Promise;`},
 			{Code: `const obj = { Promise() { return 1; } }; obj.Promise();`},
-			{Code: `type Promise = string; let x: Promise;`},
-			{Code: `type T = typeof Promise;`},
-			{Code: `interface Promise { then(): void }`},
 			{Code: `namespace Promise { export const value = 1 }`},
 			{Code: `Promise: for (;;) { break Promise; }`},
+
+			// ---- Type references resolved against a local type binding ----
+			{Code: `type Promise = string; let x: Promise;`},
+			{Code: `interface Promise { then(): void } let x: Promise;`},
+			{Code: `import { Promise } from "bluebird"; let x: Promise;`},
+			{Code: `function f<Promise>(x: Promise) { return x; }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -49,6 +52,38 @@ func TestNoNativeExtras(t *testing.T) {
 			{
 				Code:   `function f() { return Promise.resolve(1); }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 23, EndLine: 1, EndColumn: 30}},
+			},
+
+			// ---- typeof operand references the value, so the lib Promise reports ----
+			{
+				Code:   `type T = typeof Promise;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 17, EndLine: 1, EndColumn: 24}},
+			},
+
+			// ---- A type-only declaration does not satisfy a value reference ----
+			{
+				Code:   `interface Promise {} Promise.resolve(1);`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 22, EndLine: 1, EndColumn: 29}},
+			},
+
+			// ---- A value declaration does not shadow a type reference ----
+			{
+				Code:   `var Promise = 1; let y: Promise;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 25, EndLine: 1, EndColumn: 32}},
+			},
+
+			// ---- Type references with no local type binding report ----
+			{
+				Code:   `let x: Promise;`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 8, EndLine: 1, EndColumn: 15}},
+			},
+			{
+				Code:   `class C extends Promise {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 17, EndLine: 1, EndColumn: 24}},
+			},
+			{
+				Code:   `class C implements Promise<number> {}`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "name", Message: msgPromiseNotDefined, Line: 1, Column: 20, EndLine: 1, EndColumn: 27}},
 			},
 		},
 	)

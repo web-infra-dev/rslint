@@ -30,10 +30,10 @@ const x = Promise.reject(new Error('good'))
 
 ## Differences from ESLint
 
-`env` and `globals` options are not modeled by rslint's native Go rule tester.
-The rule still treats the TypeScript default-library `Promise` symbol as native
-and reports it, matching eslint-plugin-promise's behavior for ES6/native/global
-Promise.
+In TypeScript, a `Promise` reference is checked against its own namespace: value
+references (including `typeof Promise`) require a local value declaration, and
+type references require a local type declaration. The runtime's native `Promise`
+is always reported.
 
 ## Original Documentation
 

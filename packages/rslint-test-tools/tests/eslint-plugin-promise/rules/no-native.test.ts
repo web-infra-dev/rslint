@@ -14,6 +14,8 @@ ruleTester.run('no-native', {} as never, {
     },
     { code: 'import Promise from "bluebird"; var x = Promise.reject();' },
     { code: 'function f(Promise) { return Promise.resolve(1); }' },
+    // a type reference resolved against a local type declaration
+    { code: 'type Promise = string; let x: Promise;' },
   ],
 
   invalid: [
@@ -28,6 +30,16 @@ ruleTester.run('no-native', {} as never, {
     {
       code: 'Promise.all([]); Promise.resolve(1);',
       errors: [{ message }, { message }],
+    },
+    // a type-only declaration does not satisfy a value reference
+    {
+      code: 'interface Promise {} Promise.resolve(1);',
+      errors: [{ message }],
+    },
+    // a value declaration does not shadow a type reference
+    {
+      code: 'var Promise = 1; let y: Promise;',
+      errors: [{ message }],
     },
   ],
 });
