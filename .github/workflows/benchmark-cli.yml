@@ -33,10 +33,11 @@ jobs:
         with:
           cache: 'false'
 
-      # build:js is now one rslib build covering the library surface AND the
-      # eslint-plugin worker; the worker imports @rslint/native, whose
-      # index.d.ts comes from `napi build`. So build napi first even though the
-      # CLI benchmarks only exercise the Go binary.
+      # build:js is one rslib build covering the library surface AND the
+      # eslint-plugin worker. The worker loads the platform .node at runtime, so
+      # build napi first to drop the host .node into its @rslint/native-{tuple}
+      # package (the CLI benchmarks mainly exercise the Go binary, but may spawn
+      # the worker).
       - name: Build napi parser
         run: pnpm --filter @rslint/native run build
       - name: Build JS package

@@ -122,8 +122,10 @@ func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedComman
 // CollectProgramFiles collects all source file paths from the given programs
 // into a set for fast lookup. Also stores symlink-resolved paths to handle
 // platform differences (e.g. macOS /tmp → /private/tmp).
-func CollectProgramFiles(programs []*compiler.Program, fs vfs.FS) map[string]struct{} {
+func CollectProgramFiles(programs []*compiler.Program, fs vfs.FS, singleThreaded bool) map[string]struct{} {
+	// Pass 1: collect unique file names (serial — cheap map dedup).
 	fileSet := make(map[string]struct{})
+	var names []string
 	for _, prog := range programs {
 		for _, sf := range prog.GetSourceFiles() {
 			name := sf.FileName()
@@ -131,11 +133,32 @@ func CollectProgramFiles(programs []*compiler.Program, fs vfs.FS) map[string]str
 				continue
 			}
 			fileSet[name] = struct{}{}
-			if resolved := fs.Realpath(name); resolved != name {
-				fileSet[resolved] = struct{}{}
+			names = append(names, name)
+		}
+	}
+
+	// Pass 2: resolve each name's realpath so symlinked paths (pnpm stores,
+	// macOS /tmp→/private/tmp) also index into the set. Each Realpath is an
+	// independent syscall, the underlying cachedvfs cache is concurrent-safe,
+	// and workers write disjoint slice indices — so the resolves run on the
+	// shared WorkGroup, which honors --singleThreaded exactly like the
+	// lint/type-check phases (NewWorkGroup(true) runs the tasks serially).
+	resolved := make([]string, len(names))
+	wg := core.NewWorkGroup(singleThreaded)
+	for i := range names {
+		wg.Queue(func() {
+			if r := fs.Realpath(names[i]); r != names[i] {
+				resolved[i] = r
 			}
+		})
+	}
+	wg.RunAndWait()
+
+	// Merge resolved paths (serial — workers wrote disjoint slice indices).
+	for _, r := range resolved {
+		if r != "" {
+			fileSet[r] = struct{}{}
 		}
 	}
 	return fileSet
 }
-

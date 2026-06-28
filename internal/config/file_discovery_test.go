@@ -713,7 +713,7 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 //   3. DiscoverGapFiles
 //   4. Verify GetConfigForFile (linter's per-file decision) is consistent
 //
-// The structural guarantee being tested: if isDirPathBlocked(dir, configIgnores)
+// The structural guarantee being tested: if isDirAbsolutelyBlocked(dir, configIgnores)
 // returns true in collectGitignoreGlobs (causing .gitignore skip), then
 // GetConfigForFile also returns nil for any file in that dir.
 // =============================================================================
@@ -820,10 +820,10 @@ func TestE2E_NestedGitignoreAffectsProgramFiles(t *testing.T) {
 // tests/e2e/ files should be discoverable as gap files.
 func TestE2E_FileLevelIgnoreWithNegation(t *testing.T) {
 	files := map[string]string{
-		"src/index.ts":        "x",
-		"tests/unit/a.ts":     "x",
-		"tests/e2e/smoke.ts":  "x",
-		"tests/.gitignore":    "tmp/\n",
+		"src/index.ts":         "x",
+		"tests/unit/a.ts":      "x",
+		"tests/e2e/smoke.ts":   "x",
+		"tests/.gitignore":     "tmp/\n",
 		"tests/e2e/.gitignore": "screenshots/\n",
 	}
 	config := RslintConfig{
@@ -977,8 +977,8 @@ func TestE2E_MultipleIgnoreEntries(t *testing.T) {
 // the linter correctly skips them (isDirBlockedByIgnores blocks the directory).
 func TestE2E_ConfigIgnoredDirInProgram(t *testing.T) {
 	files := map[string]string{
-		"src/index.ts":             "x",
-		"tests/helpers/setup.ts":   "x",
+		"src/index.ts":           "x",
+		"tests/helpers/setup.ts": "x",
 	}
 	config := RslintConfig{
 		{Ignores: []string{"**/tests/**"}},
@@ -1004,9 +1004,9 @@ func TestE2E_ConfigIgnoredDirInProgram(t *testing.T) {
 // Both mechanisms should work — the file should be excluded regardless of which one catches it.
 func TestE2E_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
 	files := map[string]string{
-		".gitignore":       "dist/\n",
-		"src/index.ts":     "x",
-		"dist/bundle.ts":   "x",
+		".gitignore":     "dist/\n",
+		"src/index.ts":   "x",
+		"dist/bundle.ts": "x",
 	}
 	config := RslintConfig{
 		{Ignores: []string{"**/dist/**"}},
@@ -1027,7 +1027,7 @@ func TestE2E_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
 // Only files in the allowed directory should be discovered, config ignores still apply.
 func TestE2E_AllowDirsWithConfigIgnores(t *testing.T) {
 	files := map[string]string{
-		".gitignore":              "dist/\n",
+		".gitignore":             "dist/\n",
 		"packages/foo/src/a.ts":  "x",
 		"packages/foo/dist/b.ts": "x",
 		"packages/bar/src/c.ts":  "x",
@@ -1198,11 +1198,11 @@ func TestDiscoverGapFiles_AllowFilesFastPathSorted(t *testing.T) {
 // `go test -race`, varied GOMAXPROCS, and CI background noise.
 func TestWalkPool_BoundsConcurrency(t *testing.T) {
 	const (
-		workers   = 4
-		dirCount  = 200
-		hold      = 2 * time.Millisecond // make work observable
-		fanout    = 3
-		maxDepth  = 3 // 3^3 = 27 leaves per root × 200 roots ≈ thousands of jobs
+		workers  = 4
+		dirCount = 200
+		hold     = 2 * time.Millisecond // make work observable
+		fanout   = 3
+		maxDepth = 3 // 3^3 = 27 leaves per root × 200 roots ≈ thousands of jobs
 	)
 
 	pool := newWalkPool(workers)

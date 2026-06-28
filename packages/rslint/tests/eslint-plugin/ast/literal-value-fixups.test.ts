@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@rstest/core';
-import { parse as nativeParse } from '@rslint/native';
+import { parse as nativeParse } from '../../../src/eslint-plugin/native/load-binding.js';
 import {
   normalizeAst,
   buildLineStartOffsets,

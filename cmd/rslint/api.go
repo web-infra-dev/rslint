@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -162,10 +164,22 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				})
 			}
 		}
+		// GetAllRules iterates a map, so sort by name for a deterministic
+		// rule order — same policy as GetEnabledRules, which the
+		// RuleOptions-less path below goes through.
+		slices.SortFunc(rulesWithOptions, func(a, b RuleWithOption) int {
+			return strings.Compare(a.rule.Name, b.rule.Name)
+		})
 	}
 
-	// Create compiler host
-	host := utils.CreateCompilerHost(configDirectory, fs)
+	// Create compiler host with a request-scoped parse cache: the tsconfig
+	// loop below builds one Program per tsconfig on this host, and shared
+	// dependencies (lib/node_modules d.ts, cross-package sources) parse once.
+	// The cache dies with this request — no RetainOnly sweep here, and none
+	// may be added inside the tsConfigs loop (a mid-build eviction boundary
+	// buys nothing per I7 and complicates reasoning).
+	parseCache := utils.NewParseCache()
+	host := utils.WithParseCache(utils.CreateCompilerHost(configDirectory, fs), parseCache)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
@@ -281,15 +295,26 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []api.Diagnostic{}
 	}
-	// sort diagnostics
-	sort.Slice(diagnostics, func(i, j int) bool {
-		if diagnostics[i].FilePath != diagnostics[j].FilePath {
-			return diagnostics[i].FilePath < diagnostics[j].FilePath
+	// Sort diagnostics by (file, start position) only — deliberately NO
+	// end/rule tie-break: ESLint and the upstream rule tests order
+	// same-start diagnostics by emission order (parent reported before
+	// nested child), and a file's diagnostics are all emitted by a single
+	// worker, so under a STABLE sort this key is already fully
+	// deterministic. Keep this comparator in sync with the CLI one in
+	// cmd.go (same policy over rule.RuleDiagnostic).
+	// Known pre-existing exception: a file rooted by two tsconfigs at once
+	// is linted by both programs (duplicate diagnostics with
+	// scheduling-dependent interleaving) — neither introduced nor fixed
+	// here.
+	sort.SliceStable(diagnostics, func(i, j int) bool {
+		a, b := diagnostics[i], diagnostics[j]
+		if a.FilePath != b.FilePath {
+			return a.FilePath < b.FilePath
 		}
-		if diagnostics[i].Range.Start.Line != diagnostics[j].Range.Start.Line {
-			return diagnostics[i].Range.Start.Line < diagnostics[j].Range.Start.Line
+		if a.Range.Start.Line != b.Range.Start.Line {
+			return a.Range.Start.Line < b.Range.Start.Line
 		}
-		return diagnostics[i].Range.Start.Column < diagnostics[j].Range.Start.Column
+		return a.Range.Start.Column < b.Range.Start.Column
 	})
 
 	// Create response

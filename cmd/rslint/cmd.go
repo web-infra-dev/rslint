@@ -2,7 +2,10 @@ package main
 
 import (
 	"bufio"
+	"cmp"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -14,6 +17,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,11 +33,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/term"
 )
 
 // lintArgs is the parsed CLI flag set, decoupled from the global flag
@@ -52,10 +58,15 @@ type lintArgs struct {
 	Format         string
 	NoColor        bool
 	ForceColor     bool
-	Quiet          bool
-	MaxWarnings    int
-	StartTimeMs    int64
-	RuleFlags      []string
+	// StdoutIsTTY is the TTY fact for the real output destination, reported
+	// by the Node host via the IPC init payload (the Go process's own stdout
+	// is an IPC pipe and says nothing about the user's terminal). False when
+	// unknown (old peer, wasm build).
+	StdoutIsTTY bool
+	Quiet       bool
+	MaxWarnings int
+	StartTimeMs int64
+	RuleFlags   []string
 	// Positional args resolved into existing-dir vs file paths.
 	AllowFiles []string
 	AllowDirs  []string
@@ -76,42 +87,41 @@ type ColorScheme struct {
 	BoldText    func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
 	WarnText    func(format string, a ...interface{}) string
+	// Reset is the trailing SGR reset sequence the summary lines emit (empty
+	// when colors are off) — byte-identical to the inline
+	// color.New().SprintFunc()("") emitters it replaces.
+	Reset string
 }
 
-// setupColors initializes the color scheme based on environment and flags
+// newPinnedColor builds a color object pinned to the resolved decision.
+// color.New seeds a per-object noColor switch from the NO_COLOR env at
+// creation time, which would silently override the pipeline-entry decision
+// (e.g. NO_COLOR set but --force-color given) — Enable/DisableColor makes
+// the object follow color.NoColor unconditionally.
+func newPinnedColor(attrs ...color.Attribute) *color.Color {
+	c := color.New(attrs...)
+	if color.NoColor {
+		c.DisableColor()
+	} else {
+		c.EnableColor()
+	}
+	return c
+}
+
+// setupColors builds the SprintfFunc scheme used by the formatters. It is a
+// pure factory: the on/off decision is owned by term.ResolveColorEnabled,
+// applied once at pipeline entry and propagated here via color.NoColor.
 func setupColors() *ColorScheme {
-	// Handle color flags and environment variables
-	if os.Getenv("NO_COLOR") != "" {
-		color.NoColor = true
-	}
-	if os.Getenv("FORCE_COLOR") != "" {
-		color.NoColor = false
-	}
-
-	// GitHub Actions specific handling
-	if os.Getenv("GITHUB_ACTIONS") != "" {
-		color.NoColor = false // Enable colors in GitHub Actions
-	}
-
-	// Create color functions
-	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
-	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
-	errorTextColor := color.New(color.FgRed, color.Bold).SprintfFunc()
-	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
-	dimColor := color.New(color.Faint).SprintfFunc()
-	boldColor := color.New(color.Bold).SprintfFunc()
-	borderColor := color.New(color.Faint).SprintfFunc()
-	WarnColor := color.New(color.FgYellow).SprintfFunc()
-
 	return &ColorScheme{
-		RuleName:    ruleNameColor,
-		FileName:    fileNameColor,
-		ErrorText:   errorTextColor,
-		SuccessText: successColor,
-		DimText:     dimColor,
-		BoldText:    boldColor,
-		BorderText:  borderColor,
-		WarnText:    WarnColor,
+		RuleName:    newPinnedColor(color.FgHiGreen).SprintfFunc(),
+		FileName:    newPinnedColor(color.FgCyan, color.Italic).SprintfFunc(),
+		ErrorText:   newPinnedColor(color.FgRed, color.Bold).SprintfFunc(),
+		SuccessText: newPinnedColor(color.FgGreen, color.Bold).SprintfFunc(),
+		DimText:     newPinnedColor(color.Faint).SprintfFunc(),
+		BoldText:    newPinnedColor(color.Bold).SprintfFunc(),
+		BorderText:  newPinnedColor(color.Faint).SprintfFunc(),
+		WarnText:    newPinnedColor(color.FgYellow).SprintfFunc(),
+		Reset:       newPinnedColor().SprintFunc()(""),
 	}
 }
 
@@ -142,7 +152,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 	return rendered
 }
 
-func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string) {
+func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string, gitlabState *gitlabReportState) {
 	switch format {
 	case "default":
 		printDiagnosticDefault(d, w, comparePathOptions)
@@ -150,9 +160,141 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		printDiagnosticJsonLine(d, w, comparePathOptions)
 	case "github":
 		printDiagnosticGitHub(d, w, comparePathOptions)
+	case "gitlab":
+		printDiagnosticGitLab(d, w, comparePathOptions, gitlabState)
 	default:
 		panic("not supported format " + format)
 	}
+}
+
+// gitlabReportState tracks the streaming state needed to emit the gitlab
+// format as a single JSON array (one open bracket, comma-separated entries,
+// one close bracket) while diagnostics are still printed one at a time, plus
+// a fingerprint occurrence counter so two diagnostics that would otherwise
+// hash identically (rare) don't collapse into one entry in the GitLab MR
+// widget, which merges issues sharing a fingerprint.
+type gitlabReportState struct {
+	wroteFirst   bool
+	fingerprints map[string]int
+}
+
+func newGitlabReportState() *gitlabReportState {
+	return &gitlabReportState{fingerprints: make(map[string]int)}
+}
+
+// finish closes the JSON array. Must be called exactly once after all
+// diagnostics have been printed.
+func (s *gitlabReportState) finish(w *bufio.Writer) {
+	if s.wroteFirst {
+		w.WriteString("]\n")
+	} else {
+		w.WriteString("[]\n")
+	}
+}
+
+// gitlabFingerprint derives a stable identifier for a diagnostic from its
+// location and content. md5 is used only to derive a short opaque key (no
+// cryptographic resistance is needed), and the seen map breaks ties
+// deterministically instead of the random salt some other gitlab formatters
+// use, which keeps report output reproducible across runs.
+func gitlabFingerprint(seen map[string]int, filePath, ruleName, message string, startLine, startColumn, endLine, endColumn int) string {
+	input := fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d", filePath, ruleName, message, startLine, startColumn, endLine, endColumn)
+	digest := func(s string) string {
+		sum := md5.Sum([]byte(s)) //nolint:gosec // opaque identifier, not a security boundary
+		return hex.EncodeToString(sum[:])
+	}
+
+	fingerprint := digest(input)
+	if n, ok := seen[fingerprint]; ok {
+		seen[fingerprint] = n + 1
+		return digest(input + ":" + strconv.Itoa(n))
+	}
+	seen[fingerprint] = 1
+	return fingerprint
+}
+
+// print as [GitLab Code Quality report](https://docs.gitlab.com/ci/testing/code_quality/)
+// format: a single JSON array of issues, suitable for the `codequality`
+// report artifact consumed by GitLab CI merge request widgets.
+func printDiagnosticGitLab(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, state *gitlabReportState) {
+	diagnosticStart := d.Range.Pos()
+	diagnosticEnd := d.Range.End()
+
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
+
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
+
+	var severity string
+	switch d.Severity {
+	case rule.SeverityError:
+		severity = "major"
+	case rule.SeverityWarning:
+		severity = "minor"
+	default:
+		severity = "info"
+	}
+
+	type gitlabPosition struct {
+		Line   int `json:"line"`
+		Column int `json:"column"`
+	}
+	type gitlabPositions struct {
+		Begin gitlabPosition `json:"begin"`
+		End   gitlabPosition `json:"end"`
+	}
+	type gitlabLines struct {
+		Begin int `json:"begin"`
+		End   int `json:"end"`
+	}
+	type gitlabLocation struct {
+		Path      string          `json:"path"`
+		Lines     gitlabLines     `json:"lines"`
+		Positions gitlabPositions `json:"positions"`
+	}
+	type gitlabIssue struct {
+		Description string         `json:"description"`
+		CheckName   string         `json:"check_name"`
+		Fingerprint string         `json:"fingerprint"`
+		Severity    string         `json:"severity"`
+		Location    gitlabLocation `json:"location"`
+	}
+
+	beginLine, beginColumn := startLine+1, int(startColumn)+1
+	endLineNum, endColumnNum := endLine+1, int(endColumn)+1
+
+	issue := gitlabIssue{
+		Description: d.Message.Description,
+		CheckName:   d.RuleName,
+		Fingerprint: gitlabFingerprint(state.fingerprints, filePath, d.RuleName, d.Message.Description, beginLine, beginColumn, endLineNum, endColumnNum),
+		Severity:    severity,
+		Location: gitlabLocation{
+			Path: filePath,
+			Lines: gitlabLines{
+				Begin: beginLine,
+				End:   endLineNum,
+			},
+			Positions: gitlabPositions{
+				Begin: gitlabPosition{Line: beginLine, Column: beginColumn},
+				End:   gitlabPosition{Line: endLineNum, Column: endColumnNum},
+			},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(issue)
+	if err != nil {
+		// gitlabIssue contains only strings and ints, so Marshal cannot fail
+		// in practice; skip rather than risk corrupting the JSON array.
+		return
+	}
+
+	if state.wroteFirst {
+		w.WriteByte(',')
+	} else {
+		w.WriteByte('[')
+		state.wroteFirst = true
+	}
+	w.Write(jsonBytes)
 }
 
 // print as [Workflow commands for GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) format
@@ -476,7 +618,7 @@ Usage:
 Options:
   --init                Initialize a default config in the current directory.
   --config PATH         Which rslint config file to use.
-  --format FORMAT       Output format: default | jsonline | github
+  --format FORMAT       Output format: default | jsonline | github | gitlab
   --fix                 Automatically fix problems
   --type-check          Enable TypeScript type checking
   --type-check-only     Run only TypeScript type checking (skip all lint rules)
@@ -772,8 +914,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	cpuprofOut := args.CpuprofOut
 	singleThreaded := args.SingleThreaded
 	format := args.Format
-	noColor := args.NoColor
-	forceColor := args.ForceColor
 	quiet := args.Quiet
 	maxWarnings := args.MaxWarnings
 	startTimeMs := args.StartTimeMs
@@ -781,13 +921,24 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	allowFiles := args.AllowFiles
 	allowDirs := args.AllowDirs
 
-	// Override color detection based on flags
-	if noColor {
-		color.NoColor = true
-	}
-	if forceColor {
-		color.NoColor = false
-	}
+	// The single color decision for the whole run. It unconditionally
+	// overwrites fatih/color's package-init value, whose isatty component
+	// keyed off the Go process's own stdout — an IPC pipe in every native
+	// lint run, never the user's terminal (its NO_COLOR/TERM components are
+	// re-derived in the tiers below). Nothing after this line mutates
+	// color.NoColor.
+	forceColorEnv, forceColorEnvSet := os.LookupEnv("FORCE_COLOR")
+	_, noColorEnvSet := os.LookupEnv("NO_COLOR")
+	color.NoColor = !term.ResolveColorEnabled(term.ColorInputs{
+		NoColorFlag:      args.NoColor,
+		ForceColorFlag:   args.ForceColor,
+		ForceColorEnv:    forceColorEnv,
+		ForceColorEnvSet: forceColorEnvSet,
+		NoColorEnvSet:    noColorEnvSet,
+		GithubActionsEnv: os.Getenv("GITHUB_ACTIONS"),
+		Term:             os.Getenv("TERM"),
+		StdoutIsTTY:      args.StdoutIsTTY,
+	})
 
 	enableVirtualTerminalProcessing()
 	timeBefore := resolveStartTime(startTimeMs)
@@ -833,6 +984,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+
+	// Run-scoped parse cache shared by every Program built in this pipeline
+	// (initial build, gap fallback, --fix rebuilds). Created here and passed
+	// down explicitly — see utils.WithParseCache (I5: no package singleton).
+	parseCache := utils.NewParseCache()
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
@@ -889,8 +1045,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			//
 			// Config ignores are passed so that directories which are
 			// directory-level blocked (e.g. **/tests/**) are pruned during
-			// the .gitignore scan. This is safe because isDirPathBlocked is
-			// the same function used by the linter — blocked dirs' files
+			// the .gitignore scan. This is safe because isDirAbsolutelyBlocked is
+			// the same predicate used by the linter — blocked dirs' files
 			// are never linted, so their .gitignore patterns are irrelevant.
 			//
 			// Concurrency:
@@ -909,45 +1065,36 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// pre-augmentation entries (createProgramsForConfig only reads
 			// languageOptions.parserOptions.project — Ignores entries are
 			// no-ops for it; verified in LoadTsConfigsFromRslintConfig).
+			// Read each config's gitignore on the shared WorkGroup (honoring
+			// --singleThreaded). In the parallel path these overlap with the
+			// serial createProgramsForConfig loop below; that is safe because
+			// createProgramsForConfig only reads parserOptions.project, never
+			// Ignores, so observing the pre-augmentation configMap is fine.
+			// Results are merged after the loop — DiscoverGapFiles needs them.
 			type giResult struct {
 				configDir string
 				globs     []string
 			}
 			var (
-				giResults chan giResult
-				giWG      sync.WaitGroup
+				giResults []giResult
+				giMu      sync.Mutex
 			)
-			if singleThreaded {
-				// Inline serial gitignore reads.
-				giResults = nil
-				for configDir, entries := range configMap {
-					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-					globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores)
-					if len(globs) > 0 {
-						configMap[configDir] = append(
-							rslintconfig.RslintConfig{{Ignores: globs}},
-							configMap[configDir]...,
-						)
+			giWG := core.NewWorkGroup(singleThreaded)
+			for configDir, entries := range configMap {
+				configIgnores := rslintconfig.ExtractConfigIgnores(entries)
+				giWG.Queue(func() {
+					if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
+						giMu.Lock()
+						giResults = append(giResults, giResult{configDir, globs})
+						giMu.Unlock()
 					}
-				}
-			} else {
-				giResults = make(chan giResult, len(configMap))
-				for configDir, entries := range configMap {
-					configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-					giWG.Add(1)
-					go func(dir string, ignores []string) {
-						defer giWG.Done()
-						globs := rslintconfig.ReadGitignoreAsGlobs(dir, fs, ignores)
-						giResults <- giResult{configDir: dir, globs: globs}
-					}(configDir, configIgnores)
-				}
-				go func() { giWG.Wait(); close(giResults) }()
+				})
 			}
 
 			seenTsConfigs := make(map[string]struct{})
 
 			for configDir, entries := range configMap {
-				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs)
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs, parseCache)
 				if exitCode != 0 {
 					return exitCode
 				}
@@ -957,18 +1104,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				programs = append(programs, progs...)
 			}
 
-			// Drain gitignore results (parallel path only) and merge into
-			// configMap. Must complete before DiscoverGapFiles, which relies
-			// on the augmented configMap.
-			if giResults != nil {
-				for r := range giResults {
-					if len(r.globs) > 0 {
-						configMap[r.configDir] = append(
-							rslintconfig.RslintConfig{{Ignores: r.globs}},
-							configMap[r.configDir]...,
-						)
-					}
-				}
+			// Join the gitignore reads and merge into configMap. Must complete
+			// before DiscoverGapFiles, which relies on the augmented configMap.
+			giWG.RunAndWait()
+			for _, r := range giResults {
+				configMap[r.configDir] = append(
+					rslintconfig.RslintConfig{{Ignores: r.globs}},
+					configMap[r.configDir]...,
+				)
 			}
 		} else {
 			// Legacy single-config format
@@ -984,7 +1127,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				exitCode int
 			)
 			rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, singleThreaded, nil,
+				rslintConfig, currentDirectory, fs, singleThreaded, nil, parseCache,
 			)
 			if exitCode != 0 {
 				return exitCode
@@ -1002,7 +1145,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			exitCode int
 		)
 		rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
-			rslintConfig, currentDirectory, fs, singleThreaded, nil,
+			rslintConfig, currentDirectory, fs, singleThreaded, nil, parseCache,
 		)
 		if exitCode != 0 {
 			return exitCode
@@ -1055,7 +1198,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	fallbackProgramIndex := -1    // index of the gap-file fallback program (if any) within `programs`
 
 	{
-		programFiles := utils.CollectProgramFiles(programs, fs)
+		programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
 
 		var gapFiles []string
 		if configMap != nil {
@@ -1099,11 +1242,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if gapFiles != nil {
 			// Build type-info set from existing (tsconfig) Programs BEFORE
 			// appending the fallback, so fallback files are NOT in this set.
-			typeInfoFiles = utils.CollectProgramFiles(programs, fs)
+			typeInfoFiles = utils.CollectProgramFiles(programs, fs, singleThreaded)
 			capturedGapFiles = gapFiles
 
 			if len(gapFiles) > 0 {
-				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs)
+				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs, parseCache)
 				if fallback != nil {
 					programs = append(programs, fallback)
 					fallbackProgramIndex = len(programs) - 1
@@ -1111,6 +1254,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 		}
 	}
+
+	// Initial build (including the gap fallback) is complete: evict cache
+	// entries for files that ended up in no program — build-time dedup
+	// losers, parsed-then-dropped duplicates. Deletion-only, see
+	// ParseCache.RetainOnly (I7).
+	parseCache.RetainOnly(programs)
 
 	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
 	// Returns the program slice and the index of the fallback gap-file program
@@ -1120,14 +1269,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if configMap != nil {
 			seen := make(map[string]struct{})
 			for configDir, entries := range configMap {
-				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen)
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen, parseCache)
 				if exitCode != 0 {
 					return nil, -1, fmt.Errorf("failed to create programs for %s", configDir)
 				}
 				baseProgs = append(baseProgs, progs...)
 			}
 		} else {
-			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 			if exitCode != 0 {
 				return nil, -1, errors.New("failed to create programs")
 			}
@@ -1137,7 +1286,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// Rebuild fallback Program for gap files (content may have changed after fixes).
 		fallbackIdx := -1
 		if len(capturedGapFiles) > 0 {
-			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs)
+			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs, parseCache)
 			if fallback != nil {
 				baseProgs = append(baseProgs, fallback)
 				fallbackIdx = len(baseProgs) - 1
@@ -1264,7 +1413,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 	// Phase 2: Apply fixes if --fix flag is enabled.
 	// Uses multi-pass fixing: after applying fixes, rebuild programs and re-lint
-	// to catch cascading issues (e.g. ban-types fix triggers no-inferrable-types).
+	// to catch cascading issues (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 	// After fixing, allDiags is replaced with remaining (unfixed) diagnostics.
 	const maxFixPasses = 10
 	if fix && len(allDiags) > 0 {
@@ -1278,6 +1427,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			if err != nil || len(newPrograms) == 0 {
 				break
 			}
+
+			// Evict cache entries no longer referenced by any live program:
+			// previous-round ASTs of rewritten files and this round's dedup
+			// losers. The live set is the union of this round's programs and
+			// the initial ones — the initial slice stays referenced until the
+			// end of this function, so its objects are alive regardless and
+			// keeping their entries costs nothing (deletion-only, I7).
+			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint: collect remaining diagnostics.
 			// Rebuild file filters for the new programs (ownership + ignores).
@@ -1330,6 +1487,26 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		}
 	}
 
+	// Diagnostics arrive in completion order — programs and, within a
+	// program, file shards run in parallel — so impose a deterministic
+	// order before printing. The key is (file, start position) only,
+	// deliberately with NO end/rule tie-break: ESLint orders same-start
+	// diagnostics by emission order (parent reported before nested child),
+	// and a file's diagnostics are all emitted by a single worker, so under
+	// a STABLE sort this key is already fully deterministic. Keep this
+	// comparator in sync with the --api one in api.go (same policy over
+	// api.Diagnostic).
+	// Known pre-existing exception: a file rooted by two tsconfigs at once
+	// is linted by both programs (duplicate diagnostics with
+	// scheduling-dependent interleaving) — neither introduced nor fixed
+	// here.
+	slices.SortStableFunc(allDiags, func(a, b rule.RuleDiagnostic) int {
+		if c := strings.Compare(a.FilePath, b.FilePath); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Range.Pos(), b.Range.Pos())
+	})
+
 	// Phase 3: Print diagnostics and count errors/warnings.
 	// allDiags contains: original diagnostics (no fix), or remaining after fix.
 	errorsCount := 0
@@ -1337,6 +1514,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	typeErrorsCount := 0
 	{
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
+		var gitlabState *gitlabReportState
+		if format == "gitlab" {
+			gitlabState = newGitlabReportState()
+		}
 		for i, d := range allDiags {
 			switch d.Severity {
 			case rule.SeverityError:
@@ -1355,10 +1536,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			if quiet && d.Severity != rule.SeverityError {
 				continue
 			}
-			printDiagnostic(d, w, comparePathOptions, format)
+			printDiagnostic(d, w, comparePathOptions, format, gitlabState)
 			if w.Available() < 4096 {
 				w.Flush()
 			}
+		}
+		if gitlabState != nil {
+			gitlabState.finish(w)
 		}
 		w.Flush()
 	}
@@ -1437,7 +1621,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				pluralize(typeCheckedFileCount, "file", "files"),
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
-				color.New().SprintFunc()(""),
+				colors.Reset,
 			)
 		} else if fix && fixedCount > 0 {
 			fixText := pluralize(fixedCount, "issue", "issues")
@@ -1456,7 +1640,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				colors.BoldText("%d", threadsCount),
 				colors.SuccessText("%d", fixedCount),
 				fixText,
-				color.New().SprintFunc()(""), // Reset
+				colors.Reset,
 			)
 		} else {
 			fmt.Fprintf(
@@ -1472,7 +1656,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				rulesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
-				color.New().SprintFunc()(""), // Reset
+				colors.Reset,
 			)
 		}
 	}

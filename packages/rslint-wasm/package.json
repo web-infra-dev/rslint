@@ -1,6 +1,6 @@
 {
   "name": "@rslint/wasm",
-  "version": "0.5.3",
+  "version": "0.6.3",
   "description": "rslint wasm package",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -23,7 +23,7 @@
     "type": "git",
     "url": "https://github.com/web-infra-dev/rslint"
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "pnpm@10.34.4",
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@microsoft/api-extractor": "7.58.7",

@@ -67,8 +67,14 @@ func CollectSemantic(program *compiler.Program) Semantic {
 	tc, done := program.GetTypeChecker(context.Background())
 	defer done()
 
-	for id, sourceFile := range program.GetSourceFiles() {
-		CollectSemanticInFile(tc, sourceFile, &semantic, id)
+	sourceFiles := program.GetSourceFiles()
+	sourceFileIds := make(map[*ast.SourceFile]SourceFileId, len(sourceFiles))
+	for id, sourceFile := range sourceFiles {
+		sourceFileIds[sourceFile] = id
+	}
+
+	for id, sourceFile := range sourceFiles {
+		CollectSemanticInFile(tc, sourceFile, &semantic, id, sourceFileIds)
 	}
 	return semantic
 }
@@ -96,24 +102,30 @@ type Semantic struct {
 	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
 	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
 	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
+	NodeFlags    map[NodeReference]uint32         `json:"node_flags"`
 	Primtypes    PrimTypes                        `json:"primtypes"`
 	TypeExtra    TypeExtra                        `json:"type_extra"`
 	FuncData     FunctionData                     `json:"func_data"`
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
+	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
+	// The primary symbol remains recorded in Node2sym.
+	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
 }
 
 func NewSemantic() Semantic {
 	return Semantic{
-		Symtab:           make(map[ast.SymbolId]SymbolInfo),
-		Typetab:          make(map[checker.TypeId]TypeInfo),
-		Sym2type:         make(map[ast.SymbolId]checker.TypeId),
-		AliasSymbols:     make(map[ast.SymbolId]ast.SymbolId),
-		Node2sym:         make(map[NodeReference]ast.SymbolId),
-		Node2type:        make(map[NodeReference]checker.TypeId),
-		ShorthandSymbols: make(map[NodeReference]ast.SymbolId),
-		Primtypes:        PrimTypes{},
+		Symtab:                   make(map[ast.SymbolId]SymbolInfo),
+		Typetab:                  make(map[checker.TypeId]TypeInfo),
+		Sym2type:                 make(map[ast.SymbolId]checker.TypeId),
+		AliasSymbols:             make(map[ast.SymbolId]ast.SymbolId),
+		Node2sym:                 make(map[NodeReference]ast.SymbolId),
+		Node2type:                make(map[NodeReference]checker.TypeId),
+		NodeFlags:                make(map[NodeReference]uint32),
+		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
+		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
+		Primtypes:                PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
 			Func: make(map[int]FunctionData),
@@ -137,7 +149,7 @@ func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
 		Never:     tc.GetNeverType().Id(),
 	}
 }
-func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int) {
+func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int, sourceFileIds map[*ast.SourceFile]SourceFileId) {
 	if tc == nil || file == nil {
 		return
 	}
@@ -147,6 +159,27 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 	positionMap := file.GetPositionMap()
 	utf16 := func(pos int) int {
 		return positionMap.UTF8ToUTF16(pos)
+	}
+	nodeReference := func(node *ast.Node) *NodeReference {
+		if node == nil || node.Pos() < 0 || node.End() < 0 {
+			return nil
+		}
+
+		nodeSourceFile := ast.GetSourceFileOfNode(node)
+		if nodeSourceFile == nil {
+			return nil
+		}
+		nodeSourceFileId, ok := sourceFileIds[nodeSourceFile]
+		if !ok {
+			return nil
+		}
+
+		nodePositionMap := nodeSourceFile.GetPositionMap()
+		return &NodeReference{
+			SourceFileId: nodeSourceFileId,
+			Start:        nodePositionMap.UTF8ToUTF16(node.Pos()),
+			End:          nodePositionMap.UTF8ToUTF16(node.End()),
+		}
 	}
 
 	recordType := func(ty *checker.Type) checker.TypeId {
@@ -193,6 +226,9 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				Start:        utf16(node.Pos()),
 				End:          utf16(node.End()),
 			}
+			if node.Flags != 0 {
+				semantic.NodeFlags[key] = uint32(node.Flags)
+			}
 			// typescript will panic if we pass typeDeclaration to GetTypeAtLocation
 			if !ast.IsTypeDeclaration(node) {
 				if tyAtNode := tc.GetTypeAtLocation(node); tyAtNode != nil {
@@ -208,15 +244,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
 
-					// Get declaration position if available
-					var declRef *NodeReference
-					if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Pos() >= 0 && symbol.ValueDeclaration.End() >= 0 {
-						declRef = &NodeReference{
-							SourceFileId: sourceFileId,
-							Start:        utf16(symbol.ValueDeclaration.Pos()),
-							End:          utf16(symbol.ValueDeclaration.End()),
-						}
-					}
+					declRef := nodeReference(symbol.ValueDeclaration)
 
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
@@ -247,22 +275,11 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			if valueSymbol := tc.GetShorthandAssignmentValueSymbol(node); valueSymbol != nil {
 				value_sym_id := ast.GetSymbolId(valueSymbol)
 				semantic.ShorthandSymbols[key] = value_sym_id
-
 				// Also record this symbol if not already recorded
 				if _, exists := semantic.Symtab[value_sym_id]; !exists {
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
-
-						// Get declaration position if available
-						var declRef *NodeReference
-						if valueSymbol.ValueDeclaration != nil && valueSymbol.ValueDeclaration.Pos() >= 0 && valueSymbol.ValueDeclaration.End() >= 0 {
-							declRef = &NodeReference{
-								SourceFileId: sourceFileId,
-								Start:        utf16(valueSymbol.ValueDeclaration.Pos()),
-								End:          utf16(valueSymbol.ValueDeclaration.End()),
-							}
-						}
-
+						declRef := nodeReference(valueSymbol.ValueDeclaration)
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
 							Name:       sanitizeSymbolName(valueSymbol.Name),
@@ -271,6 +288,33 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 							Decl:       declRef,
 						}
 						semantic.Sym2type[value_sym_id] = typeID
+					}
+				}
+			}
+
+			if ast.IsParameterPropertyDeclaration(node, node.Parent) {
+				name := node.Name()
+				if name != nil && ast.IsIdentifier(name) {
+					if nameKey := nodeReference(name); nameKey != nil {
+						parameterSymbol, _ := tc.GetSymbolsOfParameterPropertyDeclaration(node, name.Text())
+						if parameterSymbol != nil {
+							parameterSymbolID := ast.GetSymbolId(parameterSymbol)
+							semantic.ParameterPropertySymbols[*nameKey] = parameterSymbolID
+							if _, exists := semantic.Symtab[parameterSymbolID]; !exists {
+								if ty := tc.GetTypeOfSymbol(parameterSymbol); ty != nil {
+									typeID := recordType(ty)
+									declRef := nodeReference(parameterSymbol.ValueDeclaration)
+									semantic.Symtab[parameterSymbolID] = SymbolInfo{
+										Id:         parameterSymbolID,
+										Name:       sanitizeSymbolName(parameterSymbol.Name),
+										Flags:      int(parameterSymbol.Flags),
+										CheckFlags: int(parameterSymbol.CheckFlags),
+										Decl:       declRef,
+									}
+									semantic.Sym2type[parameterSymbolID] = typeID
+								}
+							}
+						}
 					}
 				}
 			}

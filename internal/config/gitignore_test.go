@@ -133,7 +133,7 @@ func TestReadGitignoreAsGlobs_RootOnly(t *testing.T) {
 		"src/a.ts":   "x",
 	})
 	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
-	assert.Assert(t, len(globs) >= 2)
+	assert.Equal(t, len(globs), 2, "got: %v", globs)
 
 	hasDistGlob := false
 	hasLogGlob := false
@@ -307,6 +307,24 @@ func TestConvertGitignoreToGlobs_NestedStarMatchAll(t *testing.T) {
 	globs := convertGitignoreToGlobs("*\n", "packages/app")
 	assert.Equal(t, len(globs), 1)
 	assert.Equal(t, globs[0], "packages/app/**/*")
+}
+
+// The dirOnly suffix-append has a dedup guard: if the built glob already ends
+// "/**/*", appending again would yield "…/**/*/**/*". A trailing-slash gitignore
+// line whose body already ends "/**/*" (e.g. "src/**/*/") exercises it. Without
+// the guard the result over-matches one level deeper. Pin the deduped output so
+// the guard can't be silently dropped.
+func TestConvertGitignoreToGlobs_DirOnlySuffixDedup(t *testing.T) {
+	// Body "src/**/*" (rooted via the internal '/'), trailing '/' → dirOnly.
+	// glob already ends "/**/*" → must NOT become "src/**/*/**/*".
+	globs := convertGitignoreToGlobs("src/**/*/\n", "")
+	assert.Equal(t, len(globs), 1)
+	assert.Equal(t, globs[0], "src/**/*")
+
+	// Same with a nested baseDir prefix.
+	nested := convertGitignoreToGlobs("src/**/*/\n", "pkg/app")
+	assert.Equal(t, len(nested), 1)
+	assert.Equal(t, nested[0], "pkg/app/src/**/*")
 }
 
 // --- Ancestor inheritance tests ---
@@ -503,7 +521,7 @@ func TestReadGitignoreAsGlobs_ConfigIgnoresPrunesDir(t *testing.T) {
 		"tests/unit/a.test.ts":  "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"**/tests/**"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**"}))
 	gs := globSet(globs)
 
 	// Exactly 1 glob: root .gitignore "dist/" → "**/dist/**/*"
@@ -519,7 +537,7 @@ func TestReadGitignoreAsGlobs_FileLevelConfigIgnoreDoesNotPrune(t *testing.T) {
 		"tests/a.test.ts":  "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"**/tests/**/*"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**/*"}))
 	gs := globSet(globs)
 
 	// 2 globs: root dist + tests snapshots (file-level ignore doesn't prune dirs)
@@ -528,7 +546,7 @@ func TestReadGitignoreAsGlobs_FileLevelConfigIgnoreDoesNotPrune(t *testing.T) {
 	assert.Assert(t, gs["tests/**/snapshots/**/*"], "tests snapshots should be collected")
 }
 
-// A3: dir-level + negation — isDirPathBlocked skips negation → still prunes.
+// A3: dir-level + negation — isDirAbsolutelyBlocked skips negation → still prunes.
 func TestReadGitignoreAsGlobs_NegationInConfigIgnoreStillPrunes(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":           "dist/\n",
@@ -536,7 +554,7 @@ func TestReadGitignoreAsGlobs_NegationInConfigIgnoreStillPrunes(t *testing.T) {
 		"tests/e2e/a.ts":       "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"**/tests/**", "!tests/e2e/**"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**", "!tests/e2e/**"}))
 
 	// Exactly 1 glob: root dist. tests/e2e/.gitignore NOT collected.
 	assert.Equal(t, len(globs), 1, "should have exactly 1 glob, got: %v", globs)
@@ -553,7 +571,7 @@ func TestReadGitignoreAsGlobs_SiblingDirPreservesGitignore(t *testing.T) {
 		"tests/a.test.ts":         "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"**/tests/**"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**"}))
 	gs := globSet(globs)
 
 	// Exactly 2 globs: root dist + packages/foo tmp. tests/ pruned.
@@ -589,7 +607,7 @@ func TestReadGitignoreAsGlobs_DeepNestedConfigIgnore(t *testing.T) {
 		"src/a.ts":                     "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"**/vendor/**"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/vendor/**"}))
 	gs := globSet(globs)
 
 	// Exactly 2 globs: root *.log + src generated. All 3 vendor .gitignore pruned.
@@ -601,16 +619,16 @@ func TestReadGitignoreAsGlobs_DeepNestedConfigIgnore(t *testing.T) {
 // A7: wildcard config ignore (crates/**) — multiple nested .gitignore skipped.
 func TestReadGitignoreAsGlobs_WildcardConfigIgnoreSkipsNested(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                    "dist/\n",
-		"crates/core/.gitignore":        "artifacts/\n",
-		"crates/binding/.gitignore":     "generated/\n",
-		"packages/rspack/.gitignore":    "tmp/\n",
-		"crates/core/src/lib.rs":        "x",
-		"crates/binding/src/lib.rs":     "x",
-		"packages/rspack/src/index.ts":  "x",
+		".gitignore":                   "dist/\n",
+		"crates/core/.gitignore":       "artifacts/\n",
+		"crates/binding/.gitignore":    "generated/\n",
+		"packages/rspack/.gitignore":   "tmp/\n",
+		"crates/core/src/lib.rs":       "x",
+		"crates/binding/src/lib.rs":    "x",
+		"packages/rspack/src/index.ts": "x",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"crates/**"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"crates/**"}))
 	gs := globSet(globs)
 
 	// Exactly 2: root dist + packages/rspack tmp. Both crates/ .gitignore pruned.
@@ -626,7 +644,7 @@ func TestReadGitignoreAsGlobs_EmptyConfigIgnores(t *testing.T) {
 		"tests/.gitignore": "snapshots/\n",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{}))
 	gs := globSet(globs)
 
 	assert.Equal(t, len(globs), 2, "empty slice = no pruning, got: %v", globs)
@@ -642,7 +660,7 @@ func TestReadGitignoreAsGlobs_ExactPathConfigIgnore(t *testing.T) {
 		"build/tools/.gitignore":  "tmp/\n",
 	})
 
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"build/output/**"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"build/output/**"}))
 	gs := globSet(globs)
 
 	// 2 globs: root dist + build/tools tmp. build/output cache pruned.
@@ -656,21 +674,21 @@ func TestReadGitignoreAsGlobs_ExactPathConfigIgnore(t *testing.T) {
 // Note: {Files: []string{}} (empty slice) still counts as len(Files)==0, so IS global.
 func TestExtractConfigIgnores_OnlyGlobalEntries(t *testing.T) {
 	config := RslintConfig{
-		{Ignores: []string{"**/tests/**"}},                                             // global ignore ✓
-		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},                       // has files+rules → NOT global
-		{Ignores: []string{"scripts/**"}},                                              // global ignore ✓
-		{Files: []string{}, Ignores: []string{"also-global"}},                          // empty files + only ignores → IS global (len(Files)==0)
-		{Ignores: []string{"vendor/**"}, Rules: Rules{"r": "error"}},                   // has rules → NOT global
-		{Files: []string{"**/*.js"}, Ignores: []string{"not-global"}},                  // has non-empty files → NOT global
+		{Ignores: []string{"**/tests/**"}},                            // global ignore ✓
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},      // has files+rules → NOT global
+		{Ignores: []string{"scripts/**"}},                             // global ignore ✓
+		{Files: []string{}, Ignores: []string{"also-global"}},         // empty files + only ignores → IS global (len(Files)==0)
+		{Ignores: []string{"vendor/**"}, Rules: Rules{"r": "error"}},  // has rules → NOT global
+		{Files: []string{"**/*.js"}, Ignores: []string{"not-global"}}, // has non-empty files → NOT global
 	}
 
 	ignores := ExtractConfigIgnores(config)
 
 	// Entries 0, 2, 3 are global ignores. Entries 1, 4, 5 are not.
 	assert.Equal(t, len(ignores), 3, "should extract exactly 3 patterns, got: %v", ignores)
-	assert.Equal(t, ignores[0], "**/tests/**")
-	assert.Equal(t, ignores[1], "scripts/**")
-	assert.Equal(t, ignores[2], "also-global")
+	assert.Equal(t, ignores[0].Glob, "**/tests/**")
+	assert.Equal(t, ignores[1].Glob, "scripts/**")
+	assert.Equal(t, ignores[2].Glob, "also-global")
 }
 
 // A11: multiple global ignore entries — all patterns combined.
@@ -682,13 +700,13 @@ func TestExtractConfigIgnores_MultipleEntries(t *testing.T) {
 
 	ignores := ExtractConfigIgnores(config)
 	assert.Equal(t, len(ignores), 3, "should combine all patterns, got: %v", ignores)
-	assert.Equal(t, ignores[0], "**/tests/**")
-	assert.Equal(t, ignores[1], "packages/rspack/compiled/**")
-	assert.Equal(t, ignores[2], "crates/**")
+	assert.Equal(t, ignores[0].Glob, "**/tests/**")
+	assert.Equal(t, ignores[1].Glob, "packages/rspack/compiled/**")
+	assert.Equal(t, ignores[2].Glob, "crates/**")
 }
 
 // A12: bare config ignore without /** suffix (e.g., "tests" or "dist").
-// isDirPathBlocked matches the directory itself and all parents, so this
+// isDirAbsolutelyBlocked matches the directory itself and all parents, so this
 // should still prune. Verify via exact glob count.
 func TestReadGitignoreAsGlobs_BareConfigIgnorePattern(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
@@ -699,9 +717,9 @@ func TestReadGitignoreAsGlobs_BareConfigIgnorePattern(t *testing.T) {
 		"src/a.ts":         "x",
 	})
 
-	// Bare "tests" — no trailing /**. isDirPathBlocked("tests", ["tests"]) should
+	// Bare "tests" — no trailing /**. isDirAbsolutelyBlocked("tests", ["tests"]) should
 	// match via matchGlob("tests", "tests") → true → blocked.
-	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"tests"})
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"tests"}))
 	gs := globSet(globs)
 
 	// 2 globs: root *.log + src/generated. tests/ pruned by bare "tests" pattern.
@@ -711,9 +729,10 @@ func TestReadGitignoreAsGlobs_BareConfigIgnorePattern(t *testing.T) {
 }
 
 // A13: gitignore and config ignore both target the same directory.
-// collectGitignoreGlobs checks gitignore patterns FIRST (isDirIgnoredByGlobs),
-// then config ignores (isDirPathBlocked). If both match, the directory is pruned
-// by whichever check comes first. Verify the result is identical to having only one.
+// collectGitignoreGlobs checks config ignores FIRST (isDirAbsolutelyBlocked),
+// then the collected gitignore patterns (isDirIgnoredByGlobs). If both match,
+// the directory is pruned by whichever check comes first. Verify the result is
+// identical to having only one.
 func TestReadGitignoreAsGlobs_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":       "dist/\nbuild/\n",
@@ -727,12 +746,12 @@ func TestReadGitignoreAsGlobs_OverlappingGitignoreAndConfigIgnore(t *testing.T) 
 
 	// dist/ is in both .gitignore and config ignores.
 	// build/ is only in .gitignore.
-	configIgnores := []string{"**/dist/**"}
+	configIgnores := ParseIgnorePatterns([]string{"**/dist/**"})
 	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
 	gs := globSet(globs)
 
-	// dist/ pruned by GITIGNORE (isDirIgnoredByGlobs runs first → **/dist/**/* matches).
-	// build/ pruned by GITIGNORE.
+	// dist/ pruned by CONFIG IGNORE (isDirAbsolutelyBlocked runs first → **/dist/** matches).
+	// build/ pruned by the collected gitignore glob (isDirIgnoredByGlobs → **/build/**/* matches).
 	// Neither dist/.gitignore nor build/.gitignore collected.
 	// Only root .gitignore (dist/ + build/) and src/.gitignore (generated/) remain.
 	assert.Equal(t, len(globs), 3, "should have 3 globs, got: %v", globs)
@@ -750,12 +769,12 @@ func TestReadGitignoreAsGlobs_OverlappingGitignoreAndConfigIgnore(t *testing.T) 
 // from the config-ignored directory (and nothing else changes).
 func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                "dist/\n",
-		"src/.gitignore":            "generated/\n",
-		"tests/.gitignore":          "snapshots/\n",
-		"tests/unit/.gitignore":     "coverage/\n",
-		"tests/unit/a.test.ts":      "x",
-		"src/a.ts":                  "x",
+		".gitignore":            "dist/\n",
+		"src/.gitignore":        "generated/\n",
+		"tests/.gitignore":      "snapshots/\n",
+		"tests/unit/.gitignore": "coverage/\n",
+		"tests/unit/a.test.ts":  "x",
+		"src/a.ts":              "x",
 	})
 
 	// WITHOUT configIgnores: all 4 .gitignore files collected → 4 patterns.
@@ -768,7 +787,7 @@ func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
 	assert.Assert(t, gsWithout["tests/unit/**/coverage/**/*"])
 
 	// WITH configIgnores: tests/ pruned → only 2 patterns (root + src).
-	globsWith := ReadGitignoreAsGlobs(dir, osvfs.FS(), []string{"**/tests/**"})
+	globsWith := ReadGitignoreAsGlobs(dir, osvfs.FS(), ParseIgnorePatterns([]string{"**/tests/**"}))
 	gsWith := globSet(globsWith)
 	assert.Equal(t, len(globsWith), 2, "with configIgnores should collect 2 patterns (tests/ pruned), got: %v", globsWith)
 	assert.Assert(t, gsWith["**/dist/**/*"])
@@ -784,17 +803,17 @@ func TestReadGitignoreAsGlobs_RegressionWithVsWithout(t *testing.T) {
 // at the walk level (not entered then filtered), which is the performance win.
 func TestReadGitignoreAsGlobs_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                    "dist/\n",
-		"src/a.ts":                      "x",
-		"src/.gitignore":                "generated/\n",
-		"tests/unit/a.test.ts":          "x",
-		"tests/.gitignore":              "snapshots/\n",
-		"tests/unit/.gitignore":         "coverage/\n",
-		"tests/unit/deep/nested/a.ts":   "x",
+		".gitignore":                  "dist/\n",
+		"src/a.ts":                    "x",
+		"src/.gitignore":              "generated/\n",
+		"tests/unit/a.test.ts":        "x",
+		"tests/.gitignore":            "snapshots/\n",
+		"tests/unit/.gitignore":       "coverage/\n",
+		"tests/unit/deep/nested/a.ts": "x",
 	})
 
 	spy := &gitignoreSpyFS{FS: osvfs.FS()}
-	globs := ReadGitignoreAsGlobs(dir, spy, []string{"**/tests/**"})
+	globs := ReadGitignoreAsGlobs(dir, spy, ParseIgnorePatterns([]string{"**/tests/**"}))
 
 	// Output correctness: only root + src patterns.
 	assert.Equal(t, len(globs), 2, "got: %v", globs)
@@ -826,13 +845,13 @@ func TestReadGitignoreAsGlobs_ConfigIgnoreSkipsWalkLevel(t *testing.T) {
 // Proves that configIgnores reduces the number of GetAccessibleEntries calls.
 func TestReadGitignoreAsGlobs_ConfigIgnoreReducesWalkCount(t *testing.T) {
 	dir := setupGitignoreFixture(t, map[string]string{
-		".gitignore":                  "*.log\n",
-		"tests/unit/a.ts":             "x",
-		"tests/unit/sub/b.ts":         "x",
-		"tests/.gitignore":            "tmp/\n",
-		"tests/unit/.gitignore":       "output/\n",
-		"tests/unit/sub/.gitignore":   "cache/\n",
-		"src/a.ts":                    "x",
+		".gitignore":                "*.log\n",
+		"tests/unit/a.ts":           "x",
+		"tests/unit/sub/b.ts":       "x",
+		"tests/.gitignore":          "tmp/\n",
+		"tests/unit/.gitignore":     "output/\n",
+		"tests/unit/sub/.gitignore": "cache/\n",
+		"src/a.ts":                  "x",
 	})
 
 	// Without configIgnores: walks everything including tests/ subtree.
@@ -842,7 +861,7 @@ func TestReadGitignoreAsGlobs_ConfigIgnoreReducesWalkCount(t *testing.T) {
 
 	// With configIgnores: skips tests/ subtree.
 	spyWith := &gitignoreSpyFS{FS: osvfs.FS()}
-	ReadGitignoreAsGlobs(dir, spyWith, []string{"**/tests/**"})
+	ReadGitignoreAsGlobs(dir, spyWith, ParseIgnorePatterns([]string{"**/tests/**"}))
 	countWith := len(spyWith.accessedDirs)
 
 	// With configIgnores should access FEWER directories.

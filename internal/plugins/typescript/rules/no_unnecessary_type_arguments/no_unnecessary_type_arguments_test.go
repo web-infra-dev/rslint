@@ -209,6 +209,14 @@ interface Bar extends Foo {
 function f<T = Foo>() {}
 f<Bar>();
 		`},
+		{
+			// Regression: more type arguments than parameters must not panic by
+			// indexing past the type-parameter list (it is a type error in the
+			// source, so the rule reports nothing, matching upstream).
+			Code: `
+function f<T, U>(): void {}
+f<number, string, boolean>();
+    `},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
@@ -385,8 +393,6 @@ function bar<T = F<string>>() {}
 bar();
       `,
 			},
-			// TODO(port): why do we need to report on `error` types?
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryTypeParameter",

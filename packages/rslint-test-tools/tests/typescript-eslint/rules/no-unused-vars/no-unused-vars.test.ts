@@ -387,11 +387,37 @@ export const ComponentFoo = () => {
         },
       },
     },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/3303
-    // jsx: "react-jsx" mode — factory is auto-imported, React import is unused
+    // jsx: "react-jsx" with a React import but NO JSX in the file — React is
+    // genuinely unused and must still be reported.
     {
       code: `
 import React from 'react';
+
+export const x = 1;
+      `,
+      errors: [
+        {
+          messageId: 'unusedVar',
+        },
+      ],
+      filename: 'react.tsx',
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+          project: './tsconfig.jsx-reactjsx.json',
+        },
+      },
+    },
+    // Documented gap: a custom pragma declared via an `@jsx X` comment is not
+    // recognized (that requires eslint-plugin-react's jsx-uses-react, which is a
+    // no-op in rslint), so `X` is still reported even though it is the active
+    // JSX factory for this file.
+    {
+      code: `
+/** @jsx X.createElement */
+import X from './x';
 
 export const ComponentFoo = () => {
   return <div>Foo Foo</div>;
@@ -402,6 +428,7 @@ export const ComponentFoo = () => {
           messageId: 'unusedVar',
         },
       ],
+      filename: 'react.tsx',
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {
@@ -1173,6 +1200,48 @@ export interface CrossRef<T, U extends T> {}
   ],
 
   valid: [
+    // jsx: "react-jsx" — React is referenced only by JSX. Matching
+    // @typescript-eslint/parser's jsxPragma default ("React"), the factory is
+    // treated as used whenever JSX is present, so React is NOT reported.
+    // (Reporting it would require opting into parserOptions.jsxPragma=null per
+    // typescript-eslint #3303, which rslint does not expose.)
+    {
+      code: `
+import React from 'react';
+
+export const ComponentFoo = () => {
+  return <div>Foo Foo</div>;
+};
+      `,
+      filename: 'react.tsx',
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+          project: './tsconfig.jsx-reactjsx.json',
+        },
+      },
+    },
+    // jsx: "react-jsx" — fragment-only usage also marks the React factory used.
+    {
+      code: `
+import React from 'react';
+
+export const ComponentFoo = () => {
+  return <>Foo</>;
+};
+      `,
+      filename: 'react.tsx',
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+          project: './tsconfig.jsx-reactjsx.json',
+        },
+      },
+    },
     `
 import { ClassDecoratorFactory } from 'decorators';
 @ClassDecoratorFactory()

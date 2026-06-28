@@ -92,7 +92,7 @@ func DiscoverGapFiles(
 
 	// 2. Prepend default directory ignores so they are always active
 	// regardless of user config.
-	globalIgnores = append(utils.DefaultIgnoreDirGlobs(), globalIgnores...)
+	globalIgnores = append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), globalIgnores...)
 
 	// Use non-nil empty slice to distinguish "files field present, no gaps"
 	// from "no files field" (nil).
@@ -138,6 +138,11 @@ func DiscoverGapFiles(
 		seen      sync.Map // map[string]struct{} — file dedupe
 		dirIgnore sync.Map // map[string]bool — pattern check cache, write-once per path
 	)
+
+	// Precompute negation reaches once. canPruneDir uses them to prune gitignore
+	// file-level directories (e.g. target/ → **/target/**/*) without ever
+	// skipping a directory a `!` pattern could re-include.
+	neg := buildNegReach(globalIgnores)
 
 	// Defer the parallelism limit to GOMAXPROCS (Go's standard knob; aligned
 	// with container CGroup CPU limits). Lower bound of 2 keeps the walker
@@ -235,7 +240,11 @@ func DiscoverGapFiles(
 						continue
 					}
 				} else {
-					blocked := isDirPathBlocked(childPath, globalIgnores)
+					// canPruneDir unifies both directory-prune cases: absolute
+					// blocks (dir/**, bare names) and negation-aware file-level
+					// gitignore covers (dir/**/*). Sound — prunes only when every
+					// descendant file would be ignored by isFileIgnored.
+					blocked := canPruneDir(childPath, globalIgnores, neg)
 					dirIgnore.Store(childPath, blocked)
 					if blocked {
 						continue

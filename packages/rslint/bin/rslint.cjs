@@ -3,20 +3,13 @@ const startTime = Date.now();
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const os = require('node:os');
-const fs = require('node:fs');
 
 function getBinPath() {
-  // dev / local `build:bin` output sits next to this script
-  if (fs.existsSync(path.resolve(__dirname, './rslint'))) {
-    return path.resolve(__dirname, './rslint');
-  }
-  if (fs.existsSync(path.resolve(__dirname, './rslint.exe'))) {
-    return path.resolve(__dirname, './rslint.exe');
-  }
-  // published: the Go binary lives in the @rslint/native-{tuple} subpackage,
-  // reached via its `./bin` export. npm installs only the subpackage matching
-  // the host os/cpu/libc, so on linux we just try gnu then musl and use
-  // whichever got installed — no libc sniffing (Go binaries are static, the
+  // The Go binary lives in the @rslint/native-{tuple} platform package, reached
+  // via its `./bin` export. Resolution is identical in dev and prod: `pnpm build`
+  // drops the host binary into npm/rslint/{tuple}/, and npm installs only the
+  // subpackage matching the host os/cpu/libc. On linux we just try gnu then musl
+  // and use whichever resolved — no libc sniffing (Go binaries are static, the
   // gnu/musl distinction doesn't matter to them).
   const arch = os.arch();
   const tuples =
@@ -42,10 +35,14 @@ async function main() {
     pathToFileURL(path.resolve(__dirname, '../dist/cli.js')).href
   );
   const exitCode = await run(binPath, process.argv.slice(2), startTime);
-  process.exit(exitCode);
+  // process.exit() would tear down before async-buffered stdout writes (pipes,
+  // Windows TTYs) flush, truncating the lint tail. Setting exitCode lets the
+  // event loop drain naturally; run()'s cleanup guarantees nothing keeps it
+  // alive.
+  process.exitCode = exitCode;
 }
 
 main().catch((err) => {
   process.stderr.write(`rslint: ${err}\n`);
-  process.exit(1);
+  process.exitCode = 1;
 });

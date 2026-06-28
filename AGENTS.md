@@ -26,7 +26,7 @@ This document summarizes how to work on rslint effectively and consistently.
 - Lint JS: `pnpm run lint`
 - Format JS/TS/MD: `pnpm run format`
 - CLI: `go run ./cmd/rslint --help`
-  - Examples: `go run ./cmd/rslint --config rslint.jsonc`, `--fix`, `--format default|jsonline|github`, `--quiet`, `--max-warnings 0`
+  - Examples: `go run ./cmd/rslint --config rslint.jsonc`, `--fix`, `--format default|jsonline|github|gitlab`, `--quiet`, `--max-warnings 0`
 - LSP: `go run ./cmd/rslint --lsp` | IPC API: `go run ./cmd/rslint --api`
 
 ## Coding Style & Naming Conventions
@@ -55,7 +55,7 @@ This document summarizes how to work on rslint effectively and consistently.
 - If a change affects the high-level architecture, runtime data flow, or major integration paths, update `architecture.md` in the same change.
 - rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
 - The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
-- Use `--format github` in CI to emit GitHub workflow annotations.
+- Use `--format github` in CI to emit GitHub workflow annotations, or `--format gitlab` to emit a Code Quality report (`codequality` artifact) for GitLab CI merge requests.
 
 ## Website UI Guidelines (shadcn/ui)
 

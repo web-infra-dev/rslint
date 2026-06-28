@@ -5,6 +5,7 @@ import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { EslintPluginLintRequest } from '../../src/eslint-plugin/plugin/plugin-lint-protocol.js';
 
 import { LOCAL_CONFIG_DIR, localConfigs } from './worker-pool-e2e-helpers.js';
+import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 
 /**
  * Plugin-lint host — cancellation via AbortSignal. The LSP path bridges Go's
@@ -12,10 +13,10 @@ import { LOCAL_CONFIG_DIR, localConfigs } from './worker-pool-e2e-helpers.js';
  * host.lint must cancel the dispatched worker tasks so the worker stops instead
  * of running to completion.
  *
- * Windows-skipped for the same napi-teardown reason as the other worker e2e
- * suites (they spawn + tear down real workers).
+ * win32 teardown is gated by SKIP_WIN32_NAPI_TEARDOWN (same napi-teardown
+ * reason as the other worker e2e suites); the flag is false so this runs too.
  */
-describe.skipIf(process.platform === 'win32')(
+describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'createPluginLintHost — cancellation via AbortSignal',
   () => {
     const req: EslintPluginLintRequest = {

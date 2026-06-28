@@ -1,0 +1,1675 @@
+// Rstest Snapshot v1
+
+exports[`arrow-body-style > invalid 1`] = `
+{
+  "code": "for (var foo = () => { return a in b ? bar : () => {} } ;;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 2`] = `
+{
+  "code": "a in b; for (var f = () => { return c };;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 3`] = `
+{
+  "code": "for (a = b => { return c in d ? e : f } ;;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 4`] = `
+{
+  "code": "for (var f = () => { return a };;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 5`] = `
+{
+  "code": "for (var f;f = () => { return a };);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 6`] = `
+{
+  "code": "for (var f = () => { return a in c };;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 7`] = `
+{
+  "code": "for (var f;f = () => { return a in c };);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 8`] = `
+{
+  "code": "for (;;){var f = () => { return a in c }}",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 9`] = `
+{
+  "code": "for (a = b => { return c = d in e } ;;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 10`] = `
+{
+  "code": "for (var a;;a = b => { return c = d in e } );",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 11`] = `
+{
+  "code": "for (let a = (b, c, d) => { return vb && c in d; }; ;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 12`] = `
+{
+  "code": "for (let a = (b, c, d) => { return v in b && c in d; }; ;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 13`] = `
+{
+  "code": "function foo(){ for (let a = (b, c, d) => { return v in b && c in d; }; ;); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 14`] = `
+{
+  "code": "for ( a = (b, c, d) => { return v in b && c in d; }; ;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 15`] = `
+{
+  "code": "for ( a = (b) => { return (c in d) }; ;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 16`] = `
+{
+  "code": "for (let a = (b, c, d) => { return vb in dd ; }; ;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 17`] = `
+{
+  "code": "for (let a = (b, c, d) => { return vb in c in dd ; }; ;);",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 18`] = `
+{
+  "code": "do{let a = () => {return f in ff}}while(true){}",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 19`] = `
+{
+  "code": "do{for (let a = (b, c, d) => { return vb in c in dd ; }; ;);}while(true){}",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 20`] = `
+{
+  "code": "scores.map(score => { return x in +(score / maxScore).toFixed(2)});",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 21`] = `
+{
+  "code": "const fn = (a, b) => { return a + x in Number(b) };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 22`] = `
+{
+  "code": "var foo = () => 0",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 23`] = `
+{
+  "code": "var foo = () => 0;",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 24`] = `
+{
+  "code": "var foo = () => ({});",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 25`] = `
+{
+  "code": "var foo = () => (  {});",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 26`] = `
+{
+  "code": "(() => ({}))",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 27`] = `
+{
+  "code": "(() => ( {}))",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 28`] = `
+{
+  "code": "var foo = () => { return 0; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 29`] = `
+{
+  "code": "var foo = () => { return 0 };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 30`] = `
+{
+  "code": "var foo = () => { return bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 31`] = `
+{
+  "code": "var foo = () => {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; put a value of \`undefined\` immediately after the \`=>\`.",
+      "messageId": "unexpectedEmptyBlock",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 32`] = `
+{
+  "code": "var foo = () => {
+return 0;
+};",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 33`] = `
+{
+  "code": "var foo = () => { return { bar: 0 }; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; parenthesize the returned value and move it immediately after the \`=>\`.",
+      "messageId": "unexpectedObjectBlock",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 34`] = `
+{
+  "code": "var foo = () => { return ({ bar: 0 }); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 35`] = `
+{
+  "code": "var foo = () => { return a, b }",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 36`] = `
+{
+  "code": "var foo = () => { return };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 37`] = `
+{
+  "code": "var foo = () => { return; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 38`] = `
+{
+  "code": "var foo = () => { return ( /* a */ {ok: true} /* b */ ) };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 39`] = `
+{
+  "code": "var foo = () => { return '{' };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 40`] = `
+{
+  "code": "var foo = () => { return { bar: 0 }.bar; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; parenthesize the returned value and move it immediately after the \`=>\`.",
+      "messageId": "unexpectedObjectBlock",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 41`] = `
+{
+  "code": "var foo = (retv, name) => {
+retv[name] = true;
+return retv;
+};",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body.",
+      "messageId": "unexpectedOtherBlock",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 42`] = `
+{
+  "code": "var foo = () => { bar };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body.",
+      "messageId": "unexpectedOtherBlock",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 43`] = `
+{
+  "code": "var foo = () => { return 0; };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 44`] = `
+{
+  "code": "var foo = () => { return bar(); };",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 45`] = `
+{
+  "code": "var foo = () => ({});",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 46`] = `
+{
+  "code": "var foo = () => ({ bar: 0 });",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 47`] = `
+{
+  "code": "var foo = () => (((((((5)))))));",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 48`] = `
+{
+  "code": "var foo = () => { return bar }
+[1, 2, 3].map(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 49`] = `
+{
+  "code": "var foo = () => { return bar }
+(1).toString();",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 50`] = `
+{
+  "code": "var foo = () => { return bar };
+[1, 2, 3].map(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 51`] = `
+{
+  "code": "var foo = /* a */ ( /* b */ ) /* c */ => /* d */ { /* e */ return /* f */ 5 /* g */ ; /* h */ } /* i */ ;",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 96,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 52`] = `
+{
+  "code": "var foo = /* a */ ( /* b */ ) /* c */ => /* d */ ( /* e */ 5 /* f */ ) /* g */ ;",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 53`] = `
+{
+  "code": "var foo = () => {
+return bar;
+};",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 54`] = `
+{
+  "code": "var foo = () => {
+return bar;};",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 55`] = `
+{
+  "code": "var foo = () => {return bar;
+};",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 56`] = `
+{
+  "code": "
+              var foo = () => {
+                return foo
+                  .bar;
+              };
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; move the returned value immediately after the \`=>\`.",
+      "messageId": "unexpectedSingleBlock",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 31,
+          "line": 2,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 57`] = `
+{
+  "code": "
+              var foo = () => {
+                return {
+                  bar: 1,
+                  baz: 2
+                };
+              };
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected block statement surrounding arrow body; parenthesize the returned value and move it immediately after the \`=>\`.",
+      "messageId": "unexpectedObjectBlock",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 7,
+        },
+        "start": {
+          "column": 31,
+          "line": 2,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 58`] = `
+{
+  "code": "var foo = () => ({foo: 1}).foo();",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 59`] = `
+{
+  "code": "var foo = () => ({foo: 1}.foo());",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 60`] = `
+{
+  "code": "var foo = () => ( {foo: 1} ).foo();",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 61`] = `
+{
+  "code": "
+              var foo = () => ({
+                  bar: 1,
+                  baz: 2
+                });
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 32,
+          "line": 2,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 62`] = `
+{
+  "code": "
+              parsedYears = _map(years, (year) => (
+                  {
+                      index : year,
+                      title : splitYear(year)
+                  }
+              ));
+            ",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 6,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`arrow-body-style > invalid 63`] = `
+{
+  "code": "const createMarker = (color) => ({ latitude, longitude }, index) => {};",
+  "diagnostics": [
+    {
+      "message": "Expected block statement surrounding arrow body.",
+      "messageId": "expectedBlock",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "arrow-body-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

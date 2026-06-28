@@ -1,11 +1,40 @@
 import { spawn, ChildProcess } from 'child_process';
-import path from 'path';
+import { createRequire } from 'node:module';
 import type {
   RslintServiceInterface,
   RSlintOptions,
   PendingMessage,
   IpcMessage,
 } from './types.js';
+
+const require = createRequire(import.meta.url);
+
+/**
+ * Resolve the rslint Go binary from the matching `@rslint/native-<tuple>`
+ * platform package (its `./bin` export) — the same resolution the CLI launcher
+ * (`bin/rslint.cjs`) uses. Linux tries gnu then musl (Go is statically linked,
+ * so the libc split is irrelevant to it).
+ */
+function resolveRslintBinary(): string {
+  const arch = process.arch;
+  const tuples =
+    process.platform === 'linux'
+      ? [`linux-${arch}-gnu`, `linux-${arch}-musl`]
+      : process.platform === 'win32'
+        ? [`win32-${arch}-msvc`]
+        : [`${process.platform}-${arch}`];
+  for (const tuple of tuples) {
+    try {
+      return require.resolve(`@rslint/native-${tuple}/bin`);
+    } catch {
+      // not installed for this tuple; try the next
+    }
+  }
+  throw new Error(
+    `rslint: no native binary for ${process.platform}-${arch} ` +
+      `(looked for @rslint/native-{${tuples.join(',')}})`,
+  );
+}
 
 /**
  * Node.js implementation of RslintService using child processes
@@ -22,8 +51,7 @@ export class NodeRslintService implements RslintServiceInterface {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath =
-      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
+    this.rslintPath = options.rslintPath || resolveRslintBinary();
 
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],

@@ -562,7 +562,8 @@ func TestEdgeCases_DeepNesting(t *testing.T) {
 		{
 			Code: "declare const a: string;\ndeclare const b: string | null;\nconst x = (a ?? 'x') ?? b;\n",
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "neverNullish", Line: 3, Column: 11},
+				// outer `??` LHS `(a ?? 'x')` anchors at `a` (col 12), not `(`, matching upstream's paren-less ESTree node
+				{MessageId: "neverNullish", Line: 3, Column: 12},
 				{MessageId: "neverNullish", Line: 3, Column: 12},
 			},
 		},

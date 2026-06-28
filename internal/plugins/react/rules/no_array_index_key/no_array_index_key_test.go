@@ -201,6 +201,26 @@ foo.map((baz, i) => cloneElement(someChild, { key: i }))
 		// identifier; a member-access argument is NOT a match.
 		{Code: `foo.map((bar, i) => <Foo key={String(i.foo)} />)`, Tsx: true},
 
+		// ---- Logical-operator key values (ESTree LogicalExpression) ----
+		// ESTree models `||`, `&&`, and `??` as LogicalExpression, NOT a
+		// BinaryExpression. upstream's checkPropValue has no
+		// LogicalExpression branch and getIdentifiersFromBinaryExpression
+		// bails on it, so the `key={fallback || index}` idiom is left
+		// untouched. tsgo collapses both shapes into KindBinaryExpression;
+		// these lock the alignment so logical fallbacks are never flagged.
+		{Code: `foo.map((bar, i) => <Foo key={bar.id || i} />)`, Tsx: true},
+		{Code: `foo.map((bar, i) => <Foo key={bar.id ?? i} />)`, Tsx: true},
+		{Code: `foo.map((bar, i) => <Foo key={i && bar.id} />)`, Tsx: true},
+		{Code: `foo.map((bar, i) => <Foo key={bar.a || bar.b || i} />)`, Tsx: true},
+		{Code: `foo.map((bar, i) => <Foo key={(bar.id || i)} />)`, Tsx: true},
+		// Same logical fallback through the createElement props path.
+		{Code: `foo.map((bar, i) => React.createElement('Foo', { key: bar.id || i }))`, Tsx: true},
+		// Logical nested INSIDE a real BinaryExpression — the `+` enters
+		// the binary branch, but the recursion stops at the `||` subtree,
+		// so the index hidden there is NOT collected. Without the logical
+		// guard on the recursion this would false-positive.
+		{Code: `foo.map((bar, i) => <Foo key={'x' + (bar.id || i)} />)`, Tsx: true},
+
 		// ---- TS expression wrappers on the pragma identifier / key value ----
 		// ESLint's JavaScript parser cannot produce `as` / `!` / `<T>x` /
 		// `satisfies` shapes, so its `no-array-index-key` never sees
@@ -342,6 +362,17 @@ foo.map((baz, i) => cloneElement(someChild, { key: i }))
 		},
 		{
 			Code: `foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)`,
+			Tsx:  true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "noArrayIndex", Line: 1, Column: 31},
+			},
+		},
+
+		// Real BinaryExpression whose right operand is a logical subtree —
+		// the `+` reports the index on the left while the `||` subtree is
+		// skipped: one report, no crash, no double-count.
+		{
+			Code: `foo.map((bar, i) => <Foo key={i + (bar.id || 0)} />)`,
 			Tsx:  true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noArrayIndex", Line: 1, Column: 31},

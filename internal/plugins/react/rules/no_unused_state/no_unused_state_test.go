@@ -1293,6 +1293,30 @@ func TestNoUnusedStateRule(t *testing.T) {
           }
         }
       `, Tsx: true},
+
+		// ---- Regression: class property without initializer must not panic ----
+		// processPropertyDeclaration passed the optional (nil) initializer
+		// straight into SkipOuterExpressions, causing a SIGSEGV.
+		{Code: `
+        class NoInitializerPropertyTest extends React.Component {
+          editor: any;
+          KEY: any;
+          render() {
+            return <div />;
+          }
+        }
+      `, Tsx: true},
+
+		// ---- Regression: uninitialized property coexists with used state ----
+		{Code: `
+        class NoInitializerWithUsedStateTest extends React.Component {
+          editor: any;
+          state = { foo: 1 };
+          render() {
+            return <div>{this.state.foo}</div>;
+          }
+        }
+      `, Tsx: true},
 	}, []rule_tester.InvalidTestCase{
 		// ---- Upstream: unused getInitialState ----
 		{
@@ -2002,6 +2026,23 @@ func TestNoUnusedStateRule(t *testing.T) {
 			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unusedStateField", Message: "Unused state field: 'foo'", Line: 3, Column: 21},
+			},
+		},
+
+		// ---- Regression: uninitialized property must not mask unused state ----
+		{
+			Code: `
+        class NoInitializerWithUnusedStateTest extends React.Component {
+          editor: any;
+          state = { foo: 1 };
+          render() {
+            return <div />;
+          }
+        }
+      `,
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unusedStateField", Message: "Unused state field: 'foo'", Line: 4, Column: 21},
 			},
 		},
 	})

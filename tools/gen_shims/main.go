@@ -54,6 +54,7 @@ func main() {
 		"diagnostics",
 		"evaluator",
 		"jsonrpc",
+		"parser",
 		"scanner",
 		"tsoptions",
 		"tspath",

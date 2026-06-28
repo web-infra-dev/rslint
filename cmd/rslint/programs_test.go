@@ -119,7 +119,7 @@ func TestBuildProgramFileSet_ContainsSourceFiles(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	fileSet := utils.CollectProgramFiles([]*compiler.Program{program}, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	fileSet := utils.CollectProgramFiles([]*compiler.Program{program}, bundled.WrapFS(cachedvfs.From(osvfs.FS())), false)
 
 	// Should contain user source files
 	found := 0
@@ -156,7 +156,7 @@ func TestBuildProgramFileSet_RealpathKeyForSymlinks(t *testing.T) {
 		t.Fatalf("Failed to create program: %v", err)
 	}
 
-	fileSet := utils.CollectProgramFiles([]*compiler.Program{program}, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
+	fileSet := utils.CollectProgramFiles([]*compiler.Program{program}, bundled.WrapFS(cachedvfs.From(osvfs.FS())), false)
 
 	// The file should be findable via BOTH the original and resolved paths
 	resolvedFilePath := tspath.NormalizePath(filepath.Join(realTmpDir, "test.ts"))

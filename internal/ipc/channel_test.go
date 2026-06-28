@@ -380,3 +380,62 @@ func TestChannel_SendAfterClose(t *testing.T) {
 		t.Fatal("expected SendNotification error after close")
 	}
 }
+
+// blockingCloseReader models a Windows synchronous-I/O stdin pipe: Read parks
+// (so readLoop blocks in ReadFrame) and Close blocks until released — mirroring
+// (*os.File).Close on a fd whose in-flight ReadFile cannot be interrupted.
+type blockingCloseReader struct {
+	release     chan struct{} // test closes this to let Read and Close return
+	closeCalled chan struct{} // closed iff Close is ever invoked
+}
+
+func (r *blockingCloseReader) Read([]byte) (int, error) {
+	<-r.release
+	return 0, io.EOF
+}
+
+func (r *blockingCloseReader) Close() error {
+	close(r.closeCalled)
+	<-r.release // uninterruptible, like a Windows FD.Close awaiting a live read
+	return nil
+}
+
+// TestChannel_CloseDoesNotBlockOnReader pins the windows-latest hang fix:
+// closeWith must NOT close (or otherwise block on) the underlying reader. When
+// the channel closes, readLoop is typically parked in a blocked ReadFrame; on a
+// Windows synchronous pipe, closing the reader to interrupt it makes
+// (*os.File).Close block until that read returns — which it can't, since the
+// peer is waiting for this process to exit — deadlocking the CLI's exit path.
+// Reaping the parked readLoop is left to os.Exit (the sole caller is the CLI).
+func TestChannel_CloseDoesNotBlockOnReader(t *testing.T) {
+	r := &blockingCloseReader{
+		release:     make(chan struct{}),
+		closeCalled: make(chan struct{}),
+	}
+	t.Cleanup(func() { close(r.release) }) // unpark Read (and any Close) at the end
+	_, pw := io.Pipe()
+	t.Cleanup(func() { _ = pw.Close() })
+
+	c := NewChannel(r, pw)
+	c.Start() // readLoop parks in r.Read
+
+	done := make(chan struct{})
+	go func() { _ = c.Close(); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("Close blocked while readLoop was parked in Read — closeWith must not close/await the reader")
+	}
+
+	// The channel is closed, and the reader was never touched.
+	select {
+	case <-c.Done():
+	default:
+		t.Fatal("Close did not shut the channel down")
+	}
+	select {
+	case <-r.closeCalled:
+		t.Fatal("closeWith closed the underlying reader; on Windows that deadlocks the exit path")
+	default:
+	}
+}
