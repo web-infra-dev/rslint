@@ -42,23 +42,7 @@ func isPromiseCallback(node *ast.Node) bool {
 		return false
 	}
 	parent := ast.WalkUpParenthesizedExpressions(node.Parent)
-	if parent == nil || !ast.IsCallExpression(parent) {
-		return false
-	}
-	call := parent.AsCallExpression()
-	if call == nil || call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
-		return false
-	}
-	callee := ast.SkipOuterExpressions(call.Expression, skipTransparent)
-	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
-		return false
-	}
-	name := callee.AsPropertyAccessExpression().Name()
-	if name == nil || !ast.IsIdentifier(name) {
-		return false
-	}
-	text := name.AsIdentifier().Text
-	return text == "then" || text == "catch"
+	return promiseutil.IsMemberCall(parent, "then") || promiseutil.IsMemberCall(parent, "catch")
 }
 
 func firstParameterName(node *ast.Node) string {
@@ -85,7 +69,14 @@ func isCallbackContainer(node *ast.Node, opts Options) bool {
 		return false
 	}
 
+	// Object/class methods, accessors, and constructors are callback containers
+	// too: in ESTree their bodies are FunctionExpressions, so upstream flags a
+	// method whose first parameter is err/error. tsgo represents them as
+	// dedicated declaration kinds, so enumerate them here. exemptDeclarations
+	// only affects FunctionDeclaration, matching upstream.
 	isFunction := node.Kind == ast.KindFunctionExpression || node.Kind == ast.KindArrowFunction ||
+		node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindGetAccessor ||
+		node.Kind == ast.KindSetAccessor || node.Kind == ast.KindConstructor ||
 		(!opts.ExemptDeclarations && node.Kind == ast.KindFunctionDeclaration)
 	if !isFunction {
 		return false

@@ -33,6 +33,11 @@ ruleTester.run('no-promise-in-callback', {} as never, {
     // weird case, upstream assumes it's okay if you return
     { code: 'a(function(err) { return doThing().then(a) })' },
 
+    // object/class methods whose first param isn't err/error, and getters
+    // (which take no params) are never err/error callbacks
+    { code: 'const o = { onError(e) { Promise.resolve(e) } }' },
+    { code: 'class X { get value() { return p.then(a) } }' },
+
     {
       code: `
         function fn(err) {
@@ -90,6 +95,16 @@ ruleTester.run('no-promise-in-callback', {} as never, {
     },
     {
       code: 'let x = (err) => doThingWith(err).then(a)',
+      errors: [{ message: errorMessage }],
+    },
+
+    // object/class methods with an err/error first param are callbacks too
+    {
+      code: 'const o = { onError(err) { Promise.resolve(err) } }',
+      errors: [{ message: errorMessage }],
+    },
+    {
+      code: 'class X { onError(error) { audit().catch(log) } }',
       errors: [{ message: errorMessage }],
     },
   ],

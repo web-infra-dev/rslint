@@ -55,6 +55,12 @@ func TestNoPromiseInCallbackExtras(t *testing.T) {
 
 			// ---- Real-user: legacy helper callback with unrelated error-shaped name ----
 			{Code: `legacy(function(errorMessage) { fetchData().then(useData) })`},
+
+			// ---- Method/accessor containers whose first param isn't err/error ----
+			{Code: `const o = { onError(e) { Promise.resolve(e) } }`},
+			{Code: `class X { onError(reason) { audit().catch(log) } }`},
+			// A getter takes no parameters, so it is never an err/error callback.
+			{Code: `class X { get value() { return p.then(a) } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Branch lock-in: err/error as first parameter are callbacks ----
@@ -134,6 +140,25 @@ func TestNoPromiseInCallbackExtras(t *testing.T) {
 			// ---- Real-user: Express-style middleware callback ----
 			{
 				Code:   `middleware(function(error, req, res, next) { audit(req).catch(next) })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
+			},
+
+			// ---- Method-like containers: ESTree models these bodies as FunctionExpressions,
+			// so upstream flags methods/constructors/setters whose first param is err/error.
+			{
+				Code:   `const o = { onError(err) { Promise.resolve(err) } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
+			},
+			{
+				Code:   `class X { onError(error) { audit().catch(log) } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
+			},
+			{
+				Code:   `class X { constructor(err) { Promise.resolve(err) } }`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
+			},
+			{
+				Code:   `class X { set err(error) { audit().catch(log) } }`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
 			},
 		},
