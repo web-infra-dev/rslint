@@ -25,6 +25,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_resolves"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_in_order"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_on_top"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_jest_mocked"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_contain"
@@ -64,6 +65,7 @@ func GetAllRules() []rule.Rule {
 		prefer_expect_resolves.PreferExpectResolvesRule,
 		prefer_hooks_in_order.PreferHooksInOrderRule,
 		prefer_hooks_on_top.PreferHooksOnTopRule,
+		prefer_jest_mocked.PreferJestMockedRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,

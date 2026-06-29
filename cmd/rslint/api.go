@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -45,20 +44,18 @@ var astInfoProgramCache = &programCache{}
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
 
-	// Format is not used for IPC mode as we return structured data
-	_ = req.Format
-
-	// Set working directory if provided
-	if req.WorkingDirectory != "" {
-		if err := os.Chdir(req.WorkingDirectory); err != nil {
-			return nil, fmt.Errorf("failed to change directory: %w", err)
+	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
+	// reused --api process, so mutating the process-global cwd would leak
+	// across requests (and race a future concurrent mode). Everything
+	// downstream (resolveRequestPath / config loader / CreateCompilerHost /
+	// CreateProgram) takes this directory explicitly, so a local var suffices.
+	currentDirectory := req.WorkingDirectory
+	if currentDirectory == "" {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return nil, fmt.Errorf("error getting current directory: %w", err)
 		}
-	}
-
-	// Get current directory
-	currentDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("error getting current directory: %w", err)
+		currentDirectory = cwd
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
@@ -107,90 +104,36 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
 
-	// Load rslint configuration and determine which tsconfig files to use
-	rslintConfig, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
-
-	// Merge languageOptions from request with config file if provided
-	if req.LanguageOptions != nil && len(rslintConfig) > 0 {
-		// Convert API LanguageOptions to config LanguageOptions
-		configLanguageOptions := &rslintconfig.LanguageOptions{}
-		if req.LanguageOptions.ParserOptions != nil {
-			configLanguageOptions.ParserOptions = &rslintconfig.ParserOptions{
-				ProjectService: rslintconfig.BoolPtr(req.LanguageOptions.ParserOptions.ProjectService),
-				Project:        rslintconfig.ProjectPaths(req.LanguageOptions.ParserOptions.Project),
-			}
+	// Config is the JS-resolved final config object (serialized RslintConfig).
+	// --api never reads config from disk or auto-discovers — the JS side does
+	// all of overrideConfig / config-file / discovery / normalize. Empty/absent
+	// means "no config" (zero rules).
+	var rslintConfig rslintconfig.RslintConfig
+	if len(req.Config) > 0 {
+		if err := json.Unmarshal(req.Config, &rslintConfig); err != nil {
+			return nil, fmt.Errorf("invalid config: %w", err)
 		}
-
-		// Override languageOptions for the first config entry
-		rslintConfig[0].LanguageOptions = configLanguageOptions
-
-		// Re-extract tsconfig files with updated languageOptions
-		overrideTsconfigs := []string{}
-		for _, entry := range rslintConfig {
-			if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
-				for _, config := range entry.LanguageOptions.ParserOptions.Project {
-					tsconfigPath := tspath.ResolvePath(configDirectory, config)
-					if fs.FileExists(tsconfigPath) {
-						overrideTsconfigs = append(overrideTsconfigs, tsconfigPath)
-					}
-				}
-			}
-		}
-		if len(overrideTsconfigs) > 0 {
-			tsConfigs = overrideTsconfigs
-		}
+	}
+	configDirectory := req.ConfigDirectory
+	if configDirectory == "" {
+		configDirectory = currentDirectory
+	}
+	configDirectory = tspath.NormalizePath(configDirectory)
+	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(rslintConfig, configDirectory, fs)
+	if err != nil {
+		return nil, fmt.Errorf("error resolving tsconfig: %w", err)
 	}
 
 	// Validate rule options against their schemas before linting. Without
-	// this, a misconfigured rule is silently dropped per-file by
-	// GetEnabledRules with only a stderr line to show for it — the IPC
-	// caller would get a "successful" lint response that's just missing a
-	// rule's diagnostics.
+	// this, a misconfigured rule is silently dropped per-file with only a
+	// stderr line — the IPC caller would get a "successful" lint response
+	// that's missing a rule's diagnostics.
 	if errs := rslintconfig.GlobalRuleRegistry.ValidateConfig(rslintConfig); len(errs) > 0 {
 		msgs := make([]string, len(errs))
-		for i, err := range errs {
-			msgs[i] = err.Error()
+		for i, e := range errs {
+			msgs[i] = e.Error()
 		}
 		return nil, fmt.Errorf("invalid rule configuration: %s", strings.Join(msgs, "; "))
-	}
-
-	type RuleWithOption struct {
-		rule   rule.Rule
-		option interface{}
-	}
-	rulesWithOptions := []RuleWithOption{}
-	// filter rule based on request.RuleOptions
-	if len(req.RuleOptions) > 0 {
-		for _, r := range rslintconfig.GlobalRuleRegistry.GetAllRules() {
-			if option, ok := req.RuleOptions[r.Name]; ok {
-				if r.IsEslintPluginRule {
-					// The api/wasm path runs native rules only — it never
-					// registers plugin placeholders or dispatches to a Node
-					// worker, so a plugin rule here would be silently no-op'd (a
-					// false green). It cannot occur today (api calls only
-					// RegisterAllRules), but surface it loudly if it ever does.
-					fmt.Fprintf(os.Stderr, "rslint: api does not support eslint-plugin rule %q; ignoring\n", r.Name)
-					continue
-				}
-				if r.RunWithOptions != nil {
-					validated, err := rule.ValidateAndHydrateOptions(r.Schema, r.Name, option)
-					if err != nil {
-						return nil, fmt.Errorf("invalid options for rule %q: %w", r.Name, err)
-					}
-					option = validated
-				}
-				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
-					rule:   r,
-					option: option,
-				})
-			}
-		}
-		// GetAllRules iterates a map, so sort by name for a deterministic
-		// rule order — same policy as GetEnabledRules, which the
-		// RuleOptions-less path below goes through.
-		slices.SortFunc(rulesWithOptions, func(a, b RuleWithOption) int {
-			return strings.Compare(a.rule.Name, b.rule.Name)
-		})
 	}
 
 	// Create compiler host with a request-scoped parse cache: the tsconfig
@@ -216,10 +159,32 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs = append(programs, program)
 	}
 
+	// Discover "gap" files — requested/matched files absent from every tsconfig
+	// Program (the typical lintText/lintFiles in-memory file) — and append an
+	// AST-only fallback Program for them, plus the type-info set that gates
+	// type-aware rules off no-type-info files. Identical to the CLI via the
+	// shared helper. configMap is nil: the --api path is always single-config
+	// (the JS side resolves any multi-config merge into one entry list).
+	// fallbackProgramIndex is unused here — the --api path never runs the
+	// type-check phase (RunLinterOptions.TypeCheck stays false), so there is no
+	// per-program type-check skip mask to build.
+	programs, typeInfoFiles, _, _ := buildProgramsWithGapFallback(
+		programs, nil, rslintConfig, configDirectory, fs, allowedFiles, nil, parseCache, false,
+	)
+
 	// Collect diagnostics and source files
 	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
 	errorsCount := 0
+	warningsCount := 0
+	fixableErrorsCount := 0
+	fixableWarningsCount := 0
+	// When Fix is requested, the original RuleDiagnostics (byte-offset fixes +
+	// their SourceFile) are retained per file for the in-band fix pass below.
+	var diagnosticsByFile map[string][]rule.RuleDiagnostic
+	if req.Fix {
+		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
+	}
 
 	// Track source files for encoding
 	sourceFiles := make(map[string]*ast.SourceFile)
@@ -251,35 +216,96 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 					Column: int(endColumn) + 1,
 				},
 			},
+			Severity: d.Severity.String(),
 		}
 
-		// Add fixes if available
+		// Fix and suggestion ranges are flat UTF-16 offsets (ESLint's unit),
+		// converted from the rule's byte offsets via byteOffsetToUTF16. This is
+		// a DIFFERENT conversion than the line/column above (which counts UTF-16
+		// units from the line start, not a flat file offset).
+		fixText := d.SourceFile.Text()
+
+		// Add fixes if available.
 		if d.FixesPtr != nil && len(*d.FixesPtr) > 0 {
 			var fixes []api.Fix
 			for _, fix := range *d.FixesPtr {
-				// Convert TextRange to character positions
-				startPos := fix.Range.Pos()
-				endPos := fix.Range.End()
-
 				fixes = append(fixes, api.Fix{
 					Text:     fix.Text,
-					StartPos: startPos,
-					EndPos:   endPos,
+					StartPos: byteOffsetToUTF16(fixText, fix.Range.Pos()),
+					EndPos:   byteOffsetToUTF16(fixText, fix.Range.End()),
 				})
 			}
 			diagnostic.Fixes = fixes
 		}
 
-		diagnostics = append(diagnostics, diagnostic)
-		errorsCount++
+		// Add suggestions if available — optional, user-selected fixes the
+		// editor surfaces (distinct from auto-applied Fixes).
+		if d.Suggestions != nil && len(*d.Suggestions) > 0 {
+			suggestions := make([]api.Suggestion, 0, len(*d.Suggestions))
+			for _, sug := range *d.Suggestions {
+				var fixes []api.Fix
+				for _, fix := range sug.FixesArr {
+					fixes = append(fixes, api.Fix{
+						Text:     fix.Text,
+						StartPos: byteOffsetToUTF16(fixText, fix.Range.Pos()),
+						EndPos:   byteOffsetToUTF16(fixText, fix.Range.End()),
+					})
+				}
+				suggestions = append(suggestions, api.Suggestion{
+					MessageId: sug.Message.Id,
+					Message:   sug.Message.Description,
+					Data:      sug.Message.Data,
+					Fixes:     fixes,
+				})
+			}
+			diagnostic.Suggestions = suggestions
+		}
 
+		diagnostics = append(diagnostics, diagnostic)
+
+		// Split counts by severity (ESLint semantics): errorCount counts errors
+		// only, not the total. fixable*Count counts the fixable subset.
+		hasFix := d.FixesPtr != nil && len(*d.FixesPtr) > 0
+		switch d.Severity {
+		case rule.SeverityError:
+			errorsCount++
+			if hasFix {
+				fixableErrorsCount++
+			}
+		case rule.SeverityWarning:
+			warningsCount++
+			if hasFix {
+				fixableWarningsCount++
+			}
+		}
+
+		// Retain the original diagnostic (byte-offset fixes + SourceFile) for the
+		// in-band fix pass, grouped by absolute file path.
+		if req.Fix && hasFix {
+			diagnosticsByFile[d.FilePath] = append(diagnosticsByFile[d.FilePath], d)
+		}
 	}
+
+	// Exclude config-ignored files from the lint scope (and therefore from
+	// FileCount and the LintedFiles list built below), matching the CLI
+	// (cmd.go). Without this an ignored file the caller passed would still be
+	// linted — its rules are gated off so it produces no diagnostics, but it
+	// would inflate the count and seed a phantom empty result on the JS side.
+	// --api takes one resolved config (single-config mode), so configMap /
+	// programConfigDirs are nil.
+	fileFilters := buildFileFilters(programs, nil, nil, rslintConfig, configDirectory)
 
 	// Run linter
 	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:       programs,
-		SingleThreaded: false, // Don't use single-threaded mode for IPC
-		Scope:          linter.FileScope{Files: allowedFiles},
+		Programs:         programs,
+		SingleThreaded:   false, // Don't use single-threaded mode for IPC
+		Scope:            linter.FileScope{Files: allowedFiles},
+		PerProgramFilter: toFileFilters(fileFilters),
+		// Defense-in-depth alongside the GetRulesForFile gate: RunLinter passes
+		// a nil TypeChecker to rules running on files outside this set (gap /
+		// fallback files), so a non-type-aware rule with optional TypeChecker
+		// usage degrades gracefully. nil ⇒ no fallback ⇒ no gap distinction.
+		TypeInfoFiles: typeInfoFiles,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
@@ -287,36 +313,22 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
 
-			if len(req.RuleOptions) == 0 {
-				rules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), configDirectory, false)
-				return rules
-			}
-
-			var settings map[string]interface{}
-			if merged := rslintConfig.GetConfigForFile(sourceFile.FileName(), configDirectory); merged != nil && len(merged.Settings) > 0 {
-				settings = rslintconfig.CloneSettings(merged.Settings)
-			}
-			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
-				runFunc := func(ctx rule.RuleContext) rule.RuleListeners {
-					runOpts := r.option
-					if optsSlice, ok := runOpts.([]any); ok && len(optsSlice) == 1 {
-						runOpts = optsSlice[0]
-					}
-					return r.rule.Run(ctx, runOpts)
-				}
-				if r.rule.RunWithOptions != nil {
-					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
-						opts, _ := r.option.([]any)
-						return r.rule.RunWithOptions(ctx, opts)
-					}
-				}
-				return linter.ConfiguredRule{
-					Name:             r.rule.Name,
-					Settings:         settings,
-					RequiresTypeInfo: r.rule.RequiresTypeInfo,
-					Run:              runFunc,
-				}
-			})
+			// GetActiveRulesForFile applies the type-aware gate: when
+			// typeInfoFiles is non-nil and this file is not in it (a gap /
+			// fallback file with no type information), type-aware rules are
+			// filtered out — the only guard against a type-aware rule
+			// dereferencing a nil TypeChecker and crashing the process.
+			// typeInfoFiles==nil ⇒ no fallback ⇒ every linted file has type
+			// info ⇒ nothing to filter. Rules come solely from the resolved
+			// config object (config.rules); --api has no separate rule-options
+			// surface.
+			//
+			// enforcePlugins=true: the --api config is a resolved JS-style flat
+			// config (plugins + rules), exactly like the CLI's JS/TS config path,
+			// so a rule carrying a plugin prefix runs only when its plugin is
+			// declared in the config's `plugins` — matching CLI and ESLint
+			// semantics (a rule whose plugin is not declared is skipped).
+			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, sourceFile.FileName(), configDirectory, true, typeInfoFiles)
 		},
 		OnDiagnostic: diagnosticCollector,
 	})
@@ -349,12 +361,52 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		return a.Range.Start.Column < b.Range.Start.Column
 	})
 
+	// Apply fixes in-band when requested. ApplyRuleFixes is the same pure fixer
+	// the CLI uses (cmd.go applyFixPass), but here the result stays in-memory in
+	// Output — the JS side persists it via Rslint.outputFixes. Single pass over
+	// each file's fixes (non-overlapping applied, overlapping left for a later
+	// lint); no cross-pass re-lint cascade (P1, see design §8).
+	var output map[string]string
+	if req.Fix && len(diagnosticsByFile) > 0 {
+		output = make(map[string]string)
+		for filePath, fileDiags := range diagnosticsByFile {
+			originalContent := fileDiags[0].SourceFile.Text()
+			fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiags)
+			if didFix {
+				output[tspath.ConvertToRelativePath(filePath, comparePathOptions)] = fixedContent
+			}
+		}
+		if len(output) == 0 {
+			output = nil
+		}
+	}
+
+	// The files actually linted (config ignores already excluded by the
+	// PerProgramFilter above). sourceFiles was populated by GetRulesForFile for
+	// every linted file under its program-canonical relative path — the same
+	// path space as Diagnostic.FilePath — so the JS side can seed one result per
+	// entry. Sorted for a deterministic response.
+	lintedFiles := make([]string, 0, len(sourceFiles))
+	for filePath := range sourceFiles {
+		lintedFiles = append(lintedFiles, filePath)
+	}
+	sort.Strings(lintedFiles)
+
 	// Create response
 	response := &api.LintResponse{
-		Diagnostics: diagnostics,
-		ErrorCount:  errorsCount,
-		FileCount:   int(lintResult.LintedFileCount),
+		Diagnostics:         diagnostics,
+		ErrorCount:          errorsCount,
+		WarningCount:        warningsCount,
+		FixableErrorCount:   fixableErrorsCount,
+		FixableWarningCount: fixableWarningsCount,
+		// FileCount mirrors len(LintedFiles) (unique linted files), not
+		// RunLinter's per-program visit count which double-counts a file rooted
+		// by two tsconfig programs — keeping it consistent with LintedFiles and
+		// the ESLint per-file result shape.
+		FileCount:   len(lintedFiles),
 		RuleCount:   len(lintResult.ExecutedRules),
+		LintedFiles: lintedFiles,
+		Output:      output,
 	}
 	// Only include encoded source files if requested
 	if req.IncludeEncodedSourceFiles {
@@ -372,78 +424,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		response.EncodedSourceFiles = encodedSourceFiles
 	}
 	return response, nil
-}
-
-// HandleApplyFixes handles apply fixes requests in IPC mode
-func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixesResponse, error) {
-	// Convert API diagnostics to rule diagnostics for use with linter.ApplyRuleFixes
-	var ruleDiagnostics []rule.RuleDiagnostic
-
-	for _, clientDiag := range req.Diagnostics {
-		if len(clientDiag.Fixes) == 0 {
-			continue
-		}
-
-		// Convert API fixes to rule fixes
-		var ruleFixes []rule.RuleFix
-		for _, clientFix := range clientDiag.Fixes {
-			// Create TextRange from start and end positions
-			textRange := core.NewTextRange(clientFix.StartPos, clientFix.EndPos)
-
-			ruleFix := rule.RuleFix{
-				Text:  clientFix.Text,
-				Range: textRange,
-			}
-			ruleFixes = append(ruleFixes, ruleFix)
-		}
-
-		// Create rule diagnostic
-		ruleDiag := rule.RuleDiagnostic{
-			Range:    core.NewTextRange(0, 0), // Not used by ApplyRuleFixes
-			RuleName: clientDiag.RuleName,
-			Message: rule.RuleMessage{
-				Id:          clientDiag.MessageId,
-				Description: clientDiag.Message,
-			},
-			FixesPtr: &ruleFixes,
-		}
-
-		ruleDiagnostics = append(ruleDiagnostics, ruleDiag)
-	}
-
-	// Use linter.ApplyRuleFixes to apply the fixes
-	code := req.FileContent
-	outputs := []string{}
-	wasFixed := false
-
-	// Apply fixes iteratively to handle overlapping fixes
-	for {
-		fixedContent, unapplied, fixed := linter.ApplyRuleFixes(code, ruleDiagnostics)
-		if !fixed {
-			break
-		}
-
-		outputs = append(outputs, fixedContent)
-		code = fixedContent
-		wasFixed = true
-
-		// Update diagnostics to only include unapplied ones for next iteration
-		ruleDiagnostics = unapplied
-		if len(ruleDiagnostics) == 0 {
-			break
-		}
-	}
-
-	// Count applied and unapplied fixes
-	appliedCount := len(req.Diagnostics) - len(ruleDiagnostics)
-	unappliedCount := len(ruleDiagnostics)
-
-	return &api.ApplyFixesResponse{
-		FixedContent:   outputs,
-		WasFixed:       wasFixed,
-		AppliedCount:   appliedCount,
-		UnappliedCount: unappliedCount,
-	}, nil
 }
 
 // HandleGetAstInfo handles get AST info requests in IPC mode
@@ -629,6 +609,21 @@ func buildTsConfigContent(fileName string, compilerOptions map[string]any) strin
 	}
 
 	return fmt.Sprintf(`{"compilerOptions":%s,"files":["%s"]}`, string(optsJSON), fileName)
+}
+
+// byteOffsetToUTF16 converts a byte offset within text to a flat UTF-16 code
+// unit offset — the unit ESLint uses for fix / suggestion ranges. This is a
+// DIFFERENT conversion than line/column (scanner.GetECMALineAndUTF16CharacterOfPosition,
+// which counts UTF-16 units from a line start); fix ranges are flat offsets
+// from the start of the file.
+func byteOffsetToUTF16(text string, byteOffset int) int {
+	if byteOffset <= 0 {
+		return 0
+	}
+	if byteOffset >= len(text) {
+		return int(core.UTF16Len(text))
+	}
+	return int(core.UTF16Len(text[:byteOffset]))
 }
 
 // runAPI runs the linter in IPC mode

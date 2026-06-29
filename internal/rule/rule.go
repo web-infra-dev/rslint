@@ -61,6 +61,29 @@ func ParseSeverity(level string) DiagnosticSeverity {
 	}
 }
 
+// NormalizeOptions returns a rule's options in ESLint context.options form
+// ([]any). Rules receive the value of the resolved config's `rules` entry minus
+// the severity level; config.rules unwraps a single configured option to a bare
+// value (see config.parseArrayRuleConfig), so a rule that expects the
+// eslint-format array (e.g. reads optArray[0]) would silently miss a
+// single-option config. Re-wrapping a bare value lets every rule read
+// options[0] uniformly, whether the option arrived wrapped (multi-option or an
+// explicit array) or unwrapped (a single option).
+//
+// It returns an empty (non-nil) slice when no options were configured, so both
+// native rules (which key on `len == 0 → defaults`) and the eslint-plugin host
+// (which serializes context.options to JSON and needs `[]`, not `null`) share a
+// single normalization path.
+func NormalizeOptions(raw any) []any {
+	if raw == nil {
+		return []any{}
+	}
+	if arr, ok := raw.([]interface{}); ok {
+		return arr
+	}
+	return []any{raw}
+}
+
 const (
 	lastTokenKind                        ast.Kind = 1000
 	lastOnExitTokenKind                  ast.Kind = 2000

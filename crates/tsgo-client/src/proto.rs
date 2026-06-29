@@ -53,6 +53,9 @@ pub struct Semantic {
     // Shorthand property assignment value symbols (node -> value_symbol_id)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub shorthand_symbols: Vec<(NodeReference, u32)>,
+    // Parameter property declarations create another symbol at the same name node; node2sym keeps the primary symbol.
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub parameter_property_symbols: Vec<(NodeReference, u32)>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -228,6 +231,22 @@ impl Semantic {
     pub fn get_shorthand_assignment_value_symbol(&self, location: &NodeReference) -> Option<u32> {
         // Look up in the shorthand_symbols mapping
         self.shorthand_symbols
+            .iter()
+            .find(|(node_ref, _)| {
+                node_ref.sourcefile_id == location.sourcefile_id
+                    && node_ref.start == location.start
+                    && node_ref.end == location.end
+            })
+            .map(|(_, sym_id)| *sym_id)
+    }
+
+    /// Returns the extra symbol declared by a parameter property name.
+    ///
+    /// TypeScript parameter properties such as `constructor(private x: string)` declare two
+    /// symbols at the same source location. The primary symbol remains in `node2sym`; this
+    /// method returns the other one.
+    pub fn get_parameter_property_symbol(&self, location: &NodeReference) -> Option<u32> {
+        self.parameter_property_symbols
             .iter()
             .find(|(node_ref, _)| {
                 node_ref.sourcefile_id == location.sourcefile_id

@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -20,6 +20,7 @@
     "bench:go": "go test -bench=. -benchtime=5s ./tests/bench-go/",
     "check-spell": "pnpx cspell lint --no-progress --show-context",
     "version": "zx scripts/version.mjs",
+    "version:crates": "zx scripts/version-crates.mjs",
     "release": "pnpm publish -r --no-git-checks",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",

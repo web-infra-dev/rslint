@@ -490,6 +490,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-expect-resolves.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-hooks-in-order.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-hooks-on-top.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-jest-mocked.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',
@@ -505,11 +506,14 @@ export default defineConfig({
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
     './tests/eslint-plugin-promise/rules/avoid-new.test.ts',
     './tests/eslint-plugin-promise/rules/catch-or-return.test.ts',
+    './tests/eslint-plugin-promise/rules/no-callback-in-promise.test.ts',
     './tests/eslint-plugin-promise/rules/no-multiple-resolved.test.ts',
     './tests/eslint-plugin-promise/rules/no-nesting.test.ts',
     './tests/eslint-plugin-promise/rules/no-new-statics.test.ts',
+    './tests/eslint-plugin-promise/rules/no-return-in-finally.test.ts',
     './tests/eslint-plugin-promise/rules/no-return-wrap.test.ts',
     './tests/eslint-plugin-promise/rules/param-names.test.ts',
+    './tests/eslint-plugin-promise/rules/prefer-catch.test.ts',
     './tests/eslint-plugin-promise/rules/valid-params.test.ts',
 
     // eslint-plugin-unicorn

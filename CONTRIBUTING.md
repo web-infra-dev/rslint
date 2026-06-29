@@ -42,11 +42,11 @@ After building, you can test the rslint CLI:
 
 ```bash
 # Test the binary
-./packages/rslint/bin/rslint --help
+./packages/rslint/bin/rslint.cjs --help
 
 
 # Lint the project itself
-./packages/rslint/bin/rslint --config rslint.json
+./packages/rslint/bin/rslint.cjs
 ```
 
 ## Debugging VSCode Extension

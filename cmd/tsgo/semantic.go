@@ -109,19 +109,23 @@ type Semantic struct {
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
+	// ParameterPropertySymbols maps a parameter property name node to the other symbol declared at that location.
+	// The primary symbol remains recorded in Node2sym.
+	ParameterPropertySymbols map[NodeReference]ast.SymbolId `json:"parameter_property_symbols"`
 }
 
 func NewSemantic() Semantic {
 	return Semantic{
-		Symtab:           make(map[ast.SymbolId]SymbolInfo),
-		Typetab:          make(map[checker.TypeId]TypeInfo),
-		Sym2type:         make(map[ast.SymbolId]checker.TypeId),
-		AliasSymbols:     make(map[ast.SymbolId]ast.SymbolId),
-		Node2sym:         make(map[NodeReference]ast.SymbolId),
-		Node2type:        make(map[NodeReference]checker.TypeId),
-		NodeFlags:        make(map[NodeReference]uint32),
-		ShorthandSymbols: make(map[NodeReference]ast.SymbolId),
-		Primtypes:        PrimTypes{},
+		Symtab:                   make(map[ast.SymbolId]SymbolInfo),
+		Typetab:                  make(map[checker.TypeId]TypeInfo),
+		Sym2type:                 make(map[ast.SymbolId]checker.TypeId),
+		AliasSymbols:             make(map[ast.SymbolId]ast.SymbolId),
+		Node2sym:                 make(map[NodeReference]ast.SymbolId),
+		Node2type:                make(map[NodeReference]checker.TypeId),
+		NodeFlags:                make(map[NodeReference]uint32),
+		ShorthandSymbols:         make(map[NodeReference]ast.SymbolId),
+		ParameterPropertySymbols: make(map[NodeReference]ast.SymbolId),
+		Primtypes:                PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
 			Func: make(map[int]FunctionData),
@@ -271,14 +275,11 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 			if valueSymbol := tc.GetShorthandAssignmentValueSymbol(node); valueSymbol != nil {
 				value_sym_id := ast.GetSymbolId(valueSymbol)
 				semantic.ShorthandSymbols[key] = value_sym_id
-
 				// Also record this symbol if not already recorded
 				if _, exists := semantic.Symtab[value_sym_id]; !exists {
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
-
 						declRef := nodeReference(valueSymbol.ValueDeclaration)
-
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
 							Name:       sanitizeSymbolName(valueSymbol.Name),
@@ -287,6 +288,33 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 							Decl:       declRef,
 						}
 						semantic.Sym2type[value_sym_id] = typeID
+					}
+				}
+			}
+
+			if ast.IsParameterPropertyDeclaration(node, node.Parent) {
+				name := node.Name()
+				if name != nil && ast.IsIdentifier(name) {
+					if nameKey := nodeReference(name); nameKey != nil {
+						parameterSymbol, _ := tc.GetSymbolsOfParameterPropertyDeclaration(node, name.Text())
+						if parameterSymbol != nil {
+							parameterSymbolID := ast.GetSymbolId(parameterSymbol)
+							semantic.ParameterPropertySymbols[*nameKey] = parameterSymbolID
+							if _, exists := semantic.Symtab[parameterSymbolID]; !exists {
+								if ty := tc.GetTypeOfSymbol(parameterSymbol); ty != nil {
+									typeID := recordType(ty)
+									declRef := nodeReference(parameterSymbol.ValueDeclaration)
+									semantic.Symtab[parameterSymbolID] = SymbolInfo{
+										Id:         parameterSymbolID,
+										Name:       sanitizeSymbolName(parameterSymbol.Name),
+										Flags:      int(parameterSymbol.Flags),
+										CheckFlags: int(parameterSymbol.CheckFlags),
+										Decl:       declRef,
+									}
+									semantic.Sym2type[parameterSymbolID] = typeID
+								}
+							}
+						}
 					}
 				}
 			}

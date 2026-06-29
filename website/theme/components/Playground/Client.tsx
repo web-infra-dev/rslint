@@ -51,32 +51,23 @@ const Playground: React.FC = () => {
         '/index.ts': code,
       };
 
-      // Add rslint.json if we have a valid config
-      if (rslintConfig) {
-        fileContents['/rslint.json'] = JSON.stringify(rslintConfig);
-      }
-
       // Add tsconfig.json if we have a valid config
       if (tsConfig) {
         fileContents['/tsconfig.json'] = JSON.stringify(tsConfig);
       }
 
-      // Extract rules from rslint config for ruleOptions
-      let ruleOptions: Record<string, string> | undefined;
-      if (rslintConfig && Array.isArray(rslintConfig)) {
-        ruleOptions = {};
-        for (const configItem of rslintConfig) {
-          if (configItem && typeof configItem.rules === 'object') {
-            Object.assign(ruleOptions, configItem.rules);
-          }
-        }
-      }
-
+      // The Node.js API takes the config object directly (Go no longer reads
+      // /rslint.json from the VFS). configDirectory is the memfs root where
+      // tsconfig.json lives, so the config's relative `project` resolves.
+      // rules (with their options) travel inside the config entries; there is
+      // no separate ruleOptions surface.
       const result = await service.lint({
         includeEncodedSourceFiles: true,
         fileContents,
-        config: 'rslint.json',
-        ruleOptions,
+        config: Array.isArray(rslintConfig)
+          ? (rslintConfig as Record<string, unknown>[])
+          : undefined,
+        configDirectory: '/',
       });
       setInitialized(true);
 
