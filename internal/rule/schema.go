@@ -13,26 +13,53 @@ import (
 type Schema interface {
 	Validate(raw any) (any, error)
 	TSType() string
+	HasDefault() bool
+}
+
+// DefaultSchema wraps an inner schema and returns a default value if the input is nil.
+type DefaultSchema struct {
+	inner Schema
+	def   any
+}
+
+// Default wraps a schema with a default value.
+func Default(inner Schema, def any) *DefaultSchema {
+	return &DefaultSchema{
+		inner: inner,
+		def:   def,
+	}
+}
+
+func (s *DefaultSchema) Validate(raw any) (any, error) {
+	if raw == nil {
+		if s.def == nil {
+			return nil, nil
+		}
+		return s.inner.Validate(s.def)
+	}
+	return s.inner.Validate(raw)
+}
+
+func (s *DefaultSchema) TSType() string {
+	return s.inner.TSType()
+}
+
+func (s *DefaultSchema) HasDefault() bool {
+	return true
 }
 
 // AnySchema matches any value
-type AnySchema struct {
-	def any
-}
+type AnySchema struct{}
 
 func Any() *AnySchema {
 	return &AnySchema{}
 }
 
-func (s *AnySchema) Default(def any) *AnySchema {
-	s.def = def
-	return s
+func (s *AnySchema) Default(def any) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *AnySchema) Validate(raw any) (any, error) {
-	if raw == nil {
-		return s.def, nil
-	}
 	return raw, nil
 }
 
@@ -40,26 +67,24 @@ func (s *AnySchema) TSType() string {
 	return "any"
 }
 
-// BoolSchema validates boolean values
-type BoolSchema struct {
-	def *bool
+func (s *AnySchema) HasDefault() bool {
+	return true
 }
+
+// BoolSchema validates boolean values
+type BoolSchema struct{}
 
 func Bool() *BoolSchema {
 	return &BoolSchema{}
 }
 
-func (s *BoolSchema) Default(def bool) *BoolSchema {
-	s.def = &def
-	return s
+func (s *BoolSchema) Default(def bool) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *BoolSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		if s.def != nil {
-			return *s.def, nil
-		}
-		return false, nil
+		return nil, fmt.Errorf("expected bool, got nil")
 	}
 	b, ok := raw.(bool)
 	if !ok {
@@ -72,9 +97,12 @@ func (s *BoolSchema) TSType() string {
 	return "boolean"
 }
 
+func (s *BoolSchema) HasDefault() bool {
+	return false
+}
+
 // IntSchema validates integer values
 type IntSchema struct {
-	def *int
 	min *int
 	max *int
 }
@@ -83,9 +111,8 @@ func Int() *IntSchema {
 	return &IntSchema{}
 }
 
-func (s *IntSchema) Default(def int) *IntSchema {
-	s.def = &def
-	return s
+func (s *IntSchema) Default(def int) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *IntSchema) Min(minVal int) *IntSchema {
@@ -100,10 +127,7 @@ func (s *IntSchema) Max(maxVal int) *IntSchema {
 
 func (s *IntSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		if s.def != nil {
-			return *s.def, nil
-		}
-		return 0, nil
+		return nil, fmt.Errorf("expected int, got nil")
 	}
 
 	var val int
@@ -129,26 +153,24 @@ func (s *IntSchema) TSType() string {
 	return "number"
 }
 
-// StringSchema validates string values
-type StringSchema struct {
-	def *string
+func (s *IntSchema) HasDefault() bool {
+	return false
 }
+
+// StringSchema validates string values
+type StringSchema struct{}
 
 func String() *StringSchema {
 	return &StringSchema{}
 }
 
-func (s *StringSchema) Default(def string) *StringSchema {
-	s.def = &def
-	return s
+func (s *StringSchema) Default(def string) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *StringSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		if s.def != nil {
-			return *s.def, nil
-		}
-		return "", nil
+		return nil, fmt.Errorf("expected string, got nil")
 	}
 	str, ok := raw.(string)
 	if !ok {
@@ -161,27 +183,26 @@ func (s *StringSchema) TSType() string {
 	return "string"
 }
 
+func (s *StringSchema) HasDefault() bool {
+	return false
+}
+
 // EnumSchema validates string values matching a set of options
 type EnumSchema struct {
 	allowed []string
-	def     *string
 }
 
 func Enum(allowed ...string) *EnumSchema {
 	return &EnumSchema{allowed: allowed}
 }
 
-func (s *EnumSchema) Default(def string) *EnumSchema {
-	s.def = &def
-	return s
+func (s *EnumSchema) Default(def string) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *EnumSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		if s.def != nil {
-			return *s.def, nil
-		}
-		return "", nil
+		return nil, fmt.Errorf("expected string, got nil")
 	}
 	str, ok := raw.(string)
 	if !ok {
@@ -203,21 +224,23 @@ func (s *EnumSchema) TSType() string {
 	return "(" + strings.Join(parts, " | ") + ")"
 }
 
+func (s *EnumSchema) HasDefault() bool {
+	return false
+}
+
 // ArraySchema validates slices of values
 type ArraySchema struct {
 	item   Schema
 	minLen *int
 	maxLen *int
-	def    []any
 }
 
 func Array(item Schema) *ArraySchema {
-	return &ArraySchema{item: item, def: []any{}}
+	return &ArraySchema{item: item}
 }
 
-func (s *ArraySchema) Default(def []any) *ArraySchema {
-	s.def = def
-	return s
+func (s *ArraySchema) Default(def []any) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *ArraySchema) MinLen(n int) *ArraySchema {
@@ -231,23 +254,27 @@ func (s *ArraySchema) MaxLen(n int) *ArraySchema {
 }
 
 func (s *ArraySchema) Len(n int) *ArraySchema {
-	return s.MinLen(n).MaxLen(n)
+	s.minLen = &n
+	s.maxLen = &n
+	return s
 }
 
 func (s *ArraySchema) Validate(raw any) (any, error) {
-	var arr []any
 	if raw == nil {
-		arr = s.def
-	} else {
-		val := reflect.ValueOf(raw)
-		if val.Kind() == reflect.Slice {
-			arr = make([]any, val.Len())
-			for i := range val.Len() {
-				arr[i] = val.Index(i).Interface()
-			}
-		} else {
-			return nil, fmt.Errorf("expected slice, got %T", raw)
+		if s.HasDefault() {
+			return []any{}, nil
 		}
+		return nil, fmt.Errorf("expected slice, got nil")
+	}
+	var arr []any
+	val := reflect.ValueOf(raw)
+	if val.Kind() == reflect.Slice {
+		arr = make([]any, val.Len())
+		for i := range val.Len() {
+			arr[i] = val.Index(i).Interface()
+		}
+	} else {
+		return nil, fmt.Errorf("expected slice, got %T", raw)
 	}
 
 	if s.minLen != nil && len(arr) < *s.minLen {
@@ -270,6 +297,10 @@ func (s *ArraySchema) Validate(raw any) (any, error) {
 
 func (s *ArraySchema) TSType() string {
 	return fmt.Sprintf("Array<%s>", s.item.TSType())
+}
+
+func (s *ArraySchema) HasDefault() bool {
+	return s.minLen == nil || *s.minLen <= 0
 }
 
 // ObjectSchema validates map of key-value pairs
@@ -314,13 +345,26 @@ func (s *ObjectSchema) Validate(raw any) (any, error) {
 func (s *ObjectSchema) TSType() string {
 	var parts []string
 	for k, v := range s.properties {
-		parts = append(parts, fmt.Sprintf("%s?: %s", k, v.TSType()))
+		suffix := ""
+		if v.HasDefault() {
+			suffix = "?"
+		}
+		parts = append(parts, fmt.Sprintf("%s%s: %s", k, suffix, v.TSType()))
 	}
 	sort.Strings(parts)
 	if len(parts) == 0 {
 		return "Record<string, any>"
 	}
 	return fmt.Sprintf("{ %s }", strings.Join(parts, "; "))
+}
+
+func (s *ObjectSchema) HasDefault() bool {
+	for _, propSchema := range s.properties {
+		if !propSchema.HasDefault() {
+			return false
+		}
+	}
+	return true
 }
 
 // TupleSchema validates ordered element shapes in a slice
@@ -344,8 +388,7 @@ func (s *TupleSchema) Validate(raw any) (any, error) {
 			arr[i] = val.Index(i).Interface()
 		}
 	} else {
-		// Single element wrapped in array
-		arr = []any{raw}
+		return nil, fmt.Errorf("expected slice, got %T", raw)
 	}
 
 	res := make([]any, len(s.items))
@@ -366,29 +409,43 @@ func (s *TupleSchema) Validate(raw any) (any, error) {
 func (s *TupleSchema) TSType() string {
 	var parts []string
 	for _, item := range s.items {
-		parts = append(parts, item.TSType() + "?")
+		suffix := ""
+		if item.HasDefault() {
+			suffix = "?"
+		}
+		parts = append(parts, item.TSType()+suffix)
 	}
 	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
+}
+
+func (s *TupleSchema) HasDefault() bool {
+	if len(s.items) == 0 {
+		return true
+	}
+	for _, item := range s.items {
+		if !item.HasDefault() {
+			return false
+		}
+	}
+	return true
 }
 
 // UnionSchema validates raw input against multiple alternatives
 type UnionSchema struct {
 	schemas []Schema
-	def     any
 }
 
 func Union(schemas ...Schema) *UnionSchema {
 	return &UnionSchema{schemas: schemas}
 }
 
-func (s *UnionSchema) Default(def any) *UnionSchema {
-	s.def = def
-	return s
+func (s *UnionSchema) Default(def any) *DefaultSchema {
+	return Default(s, def)
 }
 
 func (s *UnionSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		return s.def, nil
+		return nil, fmt.Errorf("expected non-nil value, got nil")
 	}
 	var errors []error
 	for _, schema := range s.schemas {
@@ -407,4 +464,8 @@ func (s *UnionSchema) TSType() string {
 		parts = append(parts, schema.TSType())
 	}
 	return "(" + strings.Join(parts, " | ") + ")"
+}
+
+func (s *UnionSchema) HasDefault() bool {
+	return false
 }

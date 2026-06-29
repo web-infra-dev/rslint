@@ -48,16 +48,13 @@ func TestAnySchema(t *testing.T) {
 func TestBoolSchema(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
 		s := Bool()
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if val != false {
-			t.Errorf("expected false by default, got %v", val)
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil when not wrapped")
 		}
 
 		sDef := Bool().Default(true)
-		val, err = sDef.Validate(nil)
+		val, err := sDef.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -93,16 +90,13 @@ func TestBoolSchema(t *testing.T) {
 func TestIntSchema(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
 		s := Int()
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if val != 0 {
-			t.Errorf("expected 0, got %v", val)
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil when not wrapped")
 		}
 
 		sDef := Int().Default(42)
-		val, err = sDef.Validate(nil)
+		val, err := sDef.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -219,16 +213,13 @@ func TestIntSchema(t *testing.T) {
 func TestStringSchema(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
 		s := String()
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if val != "" {
-			t.Errorf("expected empty string, got %q", val)
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil when not wrapped")
 		}
 
 		sDef := String().Default("foo")
-		val, err = sDef.Validate(nil)
+		val, err := sDef.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -264,16 +255,13 @@ func TestStringSchema(t *testing.T) {
 func TestEnumSchema(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
 		s := Enum("a", "b")
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if val != "" {
-			t.Errorf("expected empty string, got %q", val)
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil when not wrapped")
 		}
 
 		sDef := Enum("a", "b").Default("b")
-		val, err = sDef.Validate(nil)
+		val, err := sDef.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -386,10 +374,10 @@ func TestArraySchema(t *testing.T) {
 	t.Run("MinLen", func(t *testing.T) {
 		s := Array(Int()).MinLen(2)
 
-		// nil treated as empty array — should fail min
+		// nil fails on slice check when not wrapped
 		_, err := s.Validate(nil)
-		if err == nil || !strings.Contains(err.Error(), "less than minimum") {
-			t.Errorf("expected less than minimum error for nil, got %v", err)
+		if err == nil || !strings.Contains(err.Error(), "expected slice") {
+			t.Errorf("expected expected slice error, got %v", err)
 		}
 
 		// too short
@@ -420,7 +408,7 @@ func TestArraySchema(t *testing.T) {
 	t.Run("MaxLen", func(t *testing.T) {
 		s := Array(Int()).MaxLen(2)
 
-		// nil treated as empty array — should pass
+		// nil should succeed and return empty array since minLen is nil (0 is allowed)
 		val, err := s.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error for nil: %v", err)
@@ -473,10 +461,10 @@ func TestArraySchema(t *testing.T) {
 	t.Run("Len(0)", func(t *testing.T) {
 		s := Array(Int()).Len(0)
 
-		// nil is empty — should pass
+		// nil should succeed and return empty array since minLen is 0 (0 is allowed)
 		val, err := s.Validate(nil)
 		if err != nil {
-			t.Fatalf("unexpected error for nil with Len(0): %v", err)
+			t.Fatalf("unexpected error for nil: %v", err)
 		}
 		if !reflect.DeepEqual(val, []any{}) {
 			t.Errorf("expected [], got %v", val)
@@ -512,6 +500,7 @@ func TestObjectSchema(t *testing.T) {
 		s := Object(map[string]Schema{
 			"foo": String().Default("bar"),
 		})
+		// Since all fields are optional, ObjectSchema.Validate(nil) should succeed!
 		val, err := s.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -519,6 +508,15 @@ func TestObjectSchema(t *testing.T) {
 		expected := map[string]any{"foo": "bar"}
 		if !reflect.DeepEqual(val, expected) {
 			t.Errorf("expected %v, got %v", expected, val)
+		}
+
+		// If a field is required, it should fail on nil
+		sRequired := Object(map[string]Schema{
+			"foo": String(),
+		})
+		_, err = sRequired.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil when a field is required")
 		}
 	})
 
@@ -582,10 +580,19 @@ func TestObjectSchema(t *testing.T) {
 			"foo": String(),
 			"bar": Int(),
 		})
-		// should be sorted alphabetically
-		expected := "{ bar?: number; foo?: string }"
+		// should be sorted alphabetically, no question marks since not optional
+		expected := "{ bar: number; foo: string }"
 		if s.TSType() != expected {
 			t.Errorf("expected %q, got %q", expected, s.TSType())
+		}
+
+		sMixed := Object(map[string]Schema{
+			"foo": String(),
+			"bar": Int().Default(42),
+		})
+		expectedMixed := "{ bar?: number; foo: string }"
+		if sMixed.TSType() != expectedMixed {
+			t.Errorf("expected %q, got %q", expectedMixed, sMixed.TSType())
 		}
 
 		empty := Object(nil)
@@ -598,6 +605,7 @@ func TestObjectSchema(t *testing.T) {
 func TestTupleSchema(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
 		s := Tuple(String().Default("a"), Int().Default(2))
+		// Since all elements are optional, TupleSchema.Validate(nil) should succeed!
 		val, err := s.Validate(nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -606,10 +614,17 @@ func TestTupleSchema(t *testing.T) {
 		if !reflect.DeepEqual(val, expected) {
 			t.Errorf("expected %v, got %v", expected, val)
 		}
+
+		// If an element is required, it should fail on nil
+		sRequired := Tuple(String(), Int().Default(2))
+		_, err = sRequired.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil when an element is required")
+		}
 	})
 
 	t.Run("Validate", func(t *testing.T) {
-		s := Tuple(String(), Int())
+		s := Tuple(String(), Int().Default(0))
 
 		input := []any{"hello", 10.0}
 		val, err := s.Validate(input)
@@ -621,14 +636,10 @@ func TestTupleSchema(t *testing.T) {
 			t.Errorf("expected %v, got %v", expected, val)
 		}
 
-		// single element input wrapped
-		val, err = s.Validate("world")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		expectedWrapped := []any{"world", 0}
-		if !reflect.DeepEqual(val, expectedWrapped) {
-			t.Errorf("expected %v, got %v", expectedWrapped, val)
+		// single element input is not a slice, should fail
+		_, err = s.Validate("world")
+		if err == nil {
+			t.Error("expected error for non-slice input")
 		}
 
 		// element error
@@ -641,9 +652,15 @@ func TestTupleSchema(t *testing.T) {
 
 	t.Run("TSType", func(t *testing.T) {
 		s := Tuple(String(), Int(), Bool())
-		expected := "[string?, number?, boolean?]"
+		expected := "[string, number, boolean]"
 		if s.TSType() != expected {
 			t.Errorf("expected %q, got %q", expected, s.TSType())
+		}
+
+		sMixed := Tuple(String(), Int().Default(42), Bool().Default(true))
+		expectedMixed := "[string, number?, boolean?]"
+		if sMixed.TSType() != expectedMixed {
+			t.Errorf("expected %q, got %q", expectedMixed, sMixed.TSType())
 		}
 	})
 }
@@ -692,4 +709,52 @@ func TestUnionSchema(t *testing.T) {
 			t.Errorf("expected %q, got %q", expected, s.TSType())
 		}
 	})
+}
+
+func TestHasDefault(t *testing.T) {
+	// 1. Basic schemas do not have defaults (except AnySchema)
+	if Bool().HasDefault() {
+		t.Error("BoolSchema should not have a default")
+	}
+	if Int().HasDefault() {
+		t.Error("IntSchema should not have a default")
+	}
+	if String().HasDefault() {
+		t.Error("StringSchema should not have a default")
+	}
+	if !Any().HasDefault() {
+		t.Error("AnySchema should have a default")
+	}
+
+	// 2. DefaultSchema has a default
+	if !Bool().Default(true).HasDefault() {
+		t.Error("DefaultSchema should have a default")
+	}
+
+	// 3. UnionSchema never has a default directly
+	if Union(Bool(), String()).HasDefault() {
+		t.Error("UnionSchema should not have a default")
+	}
+	if Union(Bool().Default(true), String().Default("")).HasDefault() {
+		t.Error("UnionSchema should not have a default even if members do")
+	}
+
+	// 4. TupleSchema has a default if all options have defaults
+	if Tuple(Bool(), String().Default("")).HasDefault() {
+		t.Error("TupleSchema with non-default members should not have a default")
+	}
+	if !Tuple(Bool().Default(true), String().Default("")).HasDefault() {
+		t.Error("TupleSchema with all default members should have a default")
+	}
+
+	// 5. ArraySchema has a default if length of 0 is allowed
+	if !Array(Int()).HasDefault() {
+		t.Error("Array(Int()) should have a default since length 0 is allowed")
+	}
+	if !Array(Int()).MinLen(0).HasDefault() {
+		t.Error("Array(Int()).MinLen(0) should have a default since length 0 is allowed")
+	}
+	if Array(Int()).MinLen(1).HasDefault() {
+		t.Error("Array(Int()).MinLen(1) should not have a default since length 0 is not allowed")
+	}
 }
