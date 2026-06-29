@@ -491,6 +491,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/prefer-hooks-in-order.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-hooks-on-top.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-jest-mocked.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-spy-on.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-strict-equal.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-be.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-to-contain.test.ts',
