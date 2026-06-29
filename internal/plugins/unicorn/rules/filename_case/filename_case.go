@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // caseStyle is one of the four supported filename case styles.
@@ -71,24 +70,18 @@ type Options struct {
 	MultipleFileExtensions bool
 }
 
-func parseOptions(rawOpts any) Options {
+func buildOptions(optsMap map[string]any) Options {
 	opts := Options{
 		Cases:                  []caseStyle{caseByKey["kebabCase"]},
-		MultipleFileExtensions: true,
-	}
-	optsMap := utils.GetOptionsMap(rawOpts)
-	if optsMap == nil {
-		return opts
+		MultipleFileExtensions: optsMap["multipleFileExtensions"].(bool),
 	}
 
-	if v, ok := optsMap["case"].(string); ok {
-		if c, found := caseByKey[v]; found {
-			opts.Cases = []caseStyle{c}
-		}
-	} else if casesMap, ok := optsMap["cases"].(map[string]interface{}); ok {
+	if c, found := caseByKey[optsMap["case"].(string)]; found {
+		opts.Cases = []caseStyle{c}
+	} else if casesMap, ok := optsMap["cases"].(map[string]any); ok {
 		var chosen []caseStyle
 		for _, c := range allCases {
-			if b, ok := casesMap[c.key].(bool); ok && b {
+			if b, _ := casesMap[c.key].(bool); b {
 				chosen = append(chosen, c)
 			}
 		}
@@ -97,22 +90,13 @@ func parseOptions(rawOpts any) Options {
 		}
 	}
 
-	if v, ok := optsMap["ignore"].([]interface{}); ok {
-		for _, item := range v {
-			s, ok := item.(string)
-			if !ok {
-				continue
-			}
-			if re, err := regexp2.Compile(s, reOpts); err == nil {
-				opts.Ignores = append(opts.Ignores, re)
-			} else {
-				opts.InvalidIgnores = append(opts.InvalidIgnores, invalidIgnore{pattern: s, err: err})
-			}
+	for _, item := range optsMap["ignore"].([]any) {
+		s := item.(string)
+		if re, err := regexp2.Compile(s, reOpts); err == nil {
+			opts.Ignores = append(opts.Ignores, re)
+		} else {
+			opts.InvalidIgnores = append(opts.InvalidIgnores, invalidIgnore{pattern: s, err: err})
 		}
-	}
-
-	if v, ok := optsMap["multipleFileExtensions"].(bool); ok {
-		opts.MultipleFileExtensions = v
 	}
 
 	return opts
@@ -443,12 +427,23 @@ func isLowerCase(s string) bool { return s == strings.ToLower(s) }
 
 var FilenameCaseRule = rule.Rule{
 	Name: "unicorn/filename-case",
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"case": rule.String().Default(""),
+		"cases": rule.Object(map[string]rule.Schema{
+			"camelCase":  rule.Bool().Default(false),
+			"snakeCase":  rule.Bool().Default(false),
+			"kebabCase":  rule.Bool().Default(false),
+			"pascalCase": rule.Bool().Default(false),
+		}),
+		"ignore":                 rule.Array(rule.String()),
+		"multipleFileExtensions": rule.Bool().Default(true),
+	})),
 	// The rule is purely filename-driven — it does not inspect any AST node.
-	// `Run` is invoked once per source file, so we do the work here and
-	// return an empty listener map. (The linter's visitor walks SourceFile
+	// RunWithOptions is invoked once per source file, so we do the work here
+	// and return an empty listener map. (The linter's visitor walks SourceFile
 	// children but never the SourceFile node itself, so a
 	// `ast.KindSourceFile` listener would silently never fire.)
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}
@@ -464,7 +459,8 @@ var FilenameCaseRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		opts := parseOptions(options)
+		optsMap, _ := options[0].(map[string]any)
+		opts := buildOptions(optsMap)
 
 		// Configuration error: any malformed `ignore` pattern aborts
 		// case-checking on this file. Mirrors ESLint's behaviour, where

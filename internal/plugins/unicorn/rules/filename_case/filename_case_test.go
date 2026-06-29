@@ -372,19 +372,6 @@ func TestFilenameCase(t *testing.T) {
 			// behaviour. Here we lock the equivalent already-camel form.
 			{Code: `// lock-in: digit-prefixed second word`, FileName: "src/foo/iss_47Spec.js", Options: caseOpt("camelCase")},
 
-			// Locks in: non-string `ignore` entries don't poison the array —
-			// the valid string pattern still ignores its target. Companion
-			// to the invalid-list case above; together they prove non-string
-			// items are dropped silently and the rest of the array still
-			// applies normally.
-			{
-				Code: `// lock-in: non-string ignore entries silently dropped, valid sibling still ignores`,
-				FileName: "src/foo/FOOBAR.js",
-				Options: map[string]interface{}{
-					"case":   "kebabCase",
-					"ignore": []interface{}{nil, 42, map[string]interface{}{}, `FOOBAR\.js`},
-				},
-			},
 			// Locks in: an empty `ignore` array works the same as omitting
 			// `ignore` — no diagnostics, no spurious empty-pattern matches.
 			{
@@ -1013,44 +1000,6 @@ func TestFilenameCase(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
 					Message:   "Invalid regular expression in `ignore` option: `*invalid`: error parsing regexp: missing argument to repetition operator in `*invalid`",
-				}},
-			},
-			// Locks in: non-string entries (`null`, numbers, objects) in the
-			// `ignore` array are silently skipped — they are NOT treated as
-			// malformed patterns. Without this, a JSON-stringified RegExp
-			// object (which lands as `{}` on the Go side) or any other
-			// stray non-string would fire spurious `invalidIgnorePattern`
-			// diagnostics. Here the only valid string pattern doesn't match
-			// `foo_bar.js`, so we get a normal case-violation report — the
-			// crucial assertion is that we do NOT see any
-			// `invalidIgnorePattern` diagnostic alongside it.
-			{
-				Code: `// lock-in: non-string ignore entries do not fire invalidIgnorePattern`,
-				FileName: "src/foo/foo_bar.js",
-				Options: map[string]interface{}{
-					"case":   "kebabCase",
-					"ignore": []interface{}{nil, 42, map[string]interface{}{}, `FOOBAR\.js`},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
-				}},
-			},
-			// Locks in: when non-string + valid string + invalid string ignore
-			// entries co-exist, the invalid string still wins (fatal short-
-			// circuit), the valid string never gets to apply, and the
-			// non-string is silently dropped. End-to-end coverage of all
-			// three ignore-entry classes interacting.
-			{
-				Code: `// lock-in: non-string + valid + invalid ignore entries together`,
-				FileName: "src/foo/FOOBAR.js",
-				Options: map[string]interface{}{
-					"case":   "kebabCase",
-					"ignore": []interface{}{nil, `FOOBAR\.js`, `[unclosed`},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
 				}},
 			},
 			// Locks in `englishishJoin` 4-item oxford comma + `or` end-to-end:
