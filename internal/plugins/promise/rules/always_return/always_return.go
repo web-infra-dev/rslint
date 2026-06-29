@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -50,7 +51,7 @@ func isInlineThenFunctionExpression(node *ast.Node) bool {
 	for parent != nil && ast.IsOuterExpression(parent, skipTransparent) {
 		parent = parent.Parent
 	}
-	if parent == nil || !ast.IsCallExpression(parent) || !isMemberCall(parent, "then") {
+	if parent == nil || !ast.IsCallExpression(parent) || !promiseutil.IsMemberCall(parent, "then") {
 		return false
 	}
 	args := parent.Arguments()
@@ -73,17 +74,7 @@ func isFunctionWithBlockStatement(node *ast.Node) bool {
 	}
 }
 
-func isMemberCall(node *ast.Node, memberName string) bool {
-	if node == nil || !ast.IsCallExpression(node) {
-		return false
-	}
-	callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
-	if callee == nil || !ast.IsPropertyAccessExpression(callee) {
-		return false
-	}
-	name := callee.AsPropertyAccessExpression().Name()
-	return name != nil && ast.IsIdentifier(name) && name.AsIdentifier().Text == memberName
-}
+
 
 func isLastCallback(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
@@ -126,7 +117,7 @@ func isLastCallback(node *ast.Node) bool {
 				return false
 			}
 			call := parent.Parent
-			if call != nil && ast.IsCallExpression(call) && (isMemberCall(call, "catch") || isMemberCall(call, "finally")) {
+			if call != nil && ast.IsCallExpression(call) && (promiseutil.IsMemberCall(call, "catch") || promiseutil.IsMemberCall(call, "finally")) {
 				target = call
 				parent = target.Parent
 				continue

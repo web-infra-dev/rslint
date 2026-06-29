@@ -3,12 +3,12 @@ import { describe, test, expect } from '@rstest/core';
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
 
-import {
-  LOCAL_CONFIG_DIR,
-  localConfigs,
-  task,
-} from './worker-pool-e2e-helpers.js';
+import { LOCAL_CONFIG_DIR, localConfigs } from './worker-pool-e2e-helpers.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
+import {
+  runPoolScenario,
+  formatScenarioFailure,
+} from './pool-isolation/harness.js';
 
 /**
  * WorkerPool end-to-end — queue model: tasks wait in `pendingQueue`
@@ -87,62 +87,14 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       expect((pool as any).pendingQueue.length).toBe(0);
     }, 15_000);
 
+    // Driving every slot past its respawn cap (crashCount=cap + terminate)
+    // drains the in-flight batch as parseError:pool_degraded. The terminate of
+    // an oxc-napi worker can native-abort on Windows — run it isolated (see
+    // ./pool-isolation). The in-child asserts pin the pool_degraded drain.
     test('all workers degraded → pendingQueue drains as parseError:pool_degraded (no hang)', async () => {
-      // Regression for review P0 #2. When every worker exhausts its
-      // respawn cap (default 3), the 'exit' handler used to JUST log;
-      // `kickQueue` skips not-ready slots, so anything in
-      // `pendingQueue` waited forever — `await pool.lintBatch(tasks)`
-      // never returned and the host had no path to recover.
-      //
-      // Fix: in the cap-reached branch, drain `pendingQueue` with
-      // `parseError: 'pool_degraded'` once every slot is `ready=false`.
-      const pool = new WorkerPool({
-        configs: localConfigs,
-        workerCount: 1,
-        retryCap: 1,
-      });
-      await pool.init();
-
-      // Wedge: enqueue a couple of tasks but hold the worker non-ready
-      // so kickQueue can't dispatch.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const internals = pool as any;
-      internals.workers[0].ready = false;
-
-      const batchP = pool.lintBatch(
-        [1, 2].map((i) => ({
-          filePath: `q${i}.ts`,
-          text: 'const x = null;\n',
-          rules: { 'local/no-null': { options: [] } },
-          collectFixes: false,
-          suggestionsMode: 'off',
-          configKey: LOCAL_CONFIG_DIR,
-        })),
-      );
-      await new Promise((r) => setTimeout(r, 30));
-
-      // Simulate the terminal "all workers exhausted retryCap" state by
-      // bumping crashCount and re-running the exit handler. The exit
-      // handler is wired during `attachOngoingHandlers`; the simplest
-      // path is to terminate the worker (triggers a real 'exit') after
-      // setting crashCount to the cap.
-      internals.workers[0].crashCount = internals.opts.retryCap;
-      await internals.workers[0].worker.terminate();
-
-      const result = await batchP;
-      expect(result).toHaveLength(2);
-      for (const r of result) {
-        expect(r.parseError).toBe('pool_degraded');
-        expect(r.cancelled).toBe(false);
-        expect(r.diagnostics).toEqual([]);
-      }
-      // Pending queue fully drained.
-      expect(internals.pendingQueue.length).toBe(0);
-
-      // Tear down cleanly — the pool is in a degraded state but
-      // shutdown() should still work.
-      await pool.shutdown();
-    }, 15_000);
+      const r = await runPoolScenario('all-degraded');
+      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
+    }, 20_000);
 
     // Queue-model regression suite — five tests pinning the design
     // properties that the Finding 3 refactor introduced.
@@ -267,81 +219,14 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       }
     }, 30_000);
 
+    // A SECOND batch issued AFTER the pool settled into the terminal degraded
+    // state must also resolve pool_degraded (not hang) — Fix A. Reaching that
+    // state needs a forced terminate of an oxc-napi worker, which can
+    // native-abort on Windows, so run it isolated (see ./pool-isolation). The
+    // in-child asserts pin the terminal-state sanity checks and both drains.
     test('lintBatch issued AFTER the pool settled into the terminal degraded state resolves as pool_degraded (does not hang)', async () => {
-      // Regression for Fix A. The existing "all workers degraded →
-      // pendingQueue drains as parseError:pool_degraded" test only covers
-      // tasks ALREADY in-flight when the terminal exit fires. A
-      // `lintBatch` issued AFTER the pool has settled into the degraded
-      // state was never drained: it passed the `closed` guard (pool is
-      // degraded, not closed) and the `workers.length === 0` guard, then
-      // `kickQueue` skipped the not-ready slot and NO future event would
-      // ever call the drain again → `Promise.all` never settled →
-      // permanent hang. Fix: `lintBatch` calls
-      // `drainQueueIfAllSlotsDegraded()` after the enqueue/kick so a
-      // batch handed to an already-terminal pool resolves immediately.
-      const pool = new WorkerPool({
-        configs: localConfigs,
-        workerCount: 1,
-        retryCap: 1,
-      });
-      await pool.init();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const internals = pool as any;
-
-      // Drive the pool to the terminal degraded state EXACTLY the way the
-      // existing in-flight-drain test does: hold the slot non-ready,
-      // enqueue a first batch, push crashCount to the cap, and terminate
-      // the worker so its real 'exit' handler takes the cap-reached
-      // branch and drains that first batch as pool_degraded.
-      internals.workers[0].ready = false;
-      const firstBatch = pool.lintBatch([
-        task('first.ts', 'const x = null;\n'),
-      ]);
-      await new Promise((r) => setTimeout(r, 30));
-      internals.workers[0].crashCount = internals.opts.retryCap;
-      await internals.workers[0].worker.terminate();
-
-      const firstResult = await firstBatch;
-      expect(firstResult).toHaveLength(1);
-      expect(firstResult[0].parseError).toBe('pool_degraded');
-
-      // Pool is now terminal: slot is ready=false, respawning=false,
-      // EXITED (the worker thread really died — this is the discriminator
-      // that separates this from a benign not-ready-but-alive worker),
-      // crashCount>=cap, and NOT closed. Sanity-check that state so the
-      // test is exercising the intended scenario.
-      expect(internals.closed).toBe(false);
-      expect(internals.workers).toHaveLength(1);
-      expect(internals.workers[0].ready).toBe(false);
-      expect(internals.workers[0].respawning).toBe(false);
-      expect(internals.workers[0].exited).toBe(true);
-
-      // Issue a SECOND batch against the already-degraded pool. With the
-      // fix it must RESOLVE (every result pool_degraded). Without the fix
-      // it hangs forever — race it against a rejecting timer so the
-      // negative-check produces a clean, fast failure instead of wedging
-      // the whole suite on the per-test timeout.
-      const secondBatch = pool.lintBatch([
-        task('second-a.ts', 'const y = null;\n'),
-        task('second-b.ts', 'const z = null;\n'),
-      ]);
-      const guard = new Promise<never>((_, rej) =>
-        setTimeout(
-          () => rej(new Error('second lintBatch hung — Fix A regression')),
-          4_000,
-        ),
-      );
-      const secondResult = await Promise.race([secondBatch, guard]);
-      expect(secondResult).toHaveLength(2);
-      for (const r of secondResult) {
-        expect(r.parseError).toBe('pool_degraded');
-        expect(r.cancelled).toBe(false);
-        expect(r.diagnostics).toEqual([]);
-      }
-      expect(internals.pendingQueue.length).toBe(0);
-
-      await pool.shutdown();
-    }, 15_000);
+      const r = await runPoolScenario('lint-batch-after-degraded');
+      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
+    }, 20_000);
   },
 );

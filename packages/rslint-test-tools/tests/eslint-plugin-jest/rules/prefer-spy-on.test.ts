@@ -13,6 +13,7 @@ ruleTester.run('prefer-spy-on', {} as never, {
     { code: 'const mockObj = { mock: jest.fn() }' },
     { code: 'mockObj = { mock: jest.fn() }' },
     { code: 'window[`${name}`] = jest[`fn${expression}`]()' },
+    { code: 'class A { #f; m() { this.#f = jest.fn(); } }' },
   ],
   invalid: [
     {
@@ -187,6 +188,19 @@ ruleTester.run('prefer-spy-on', {} as never, {
           column: 1,
           endLine: 1,
           endColumn: 59,
+        },
+      ],
+    },
+    {
+      code: 'obj.a = (jest.fn().mockReturnValue(1))',
+      output: "jest.spyOn(obj, 'a').mockImplementation().mockReturnValue(1)",
+      errors: [
+        {
+          messageId: 'useJestSpyOn',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 39,
         },
       ],
     },

@@ -342,7 +342,7 @@ Important behavior differences by integration:
 - **CLI**: can rerun lint and fix for multiple passes
 - **LSP quick fix**: returns direct text edits for one diagnostic
 - **LSP fix-all**: runs repeated lint-fix cycles, then returns one whole-document replacement edit
-- **API**: returns fix metadata to the caller and also exposes `applyFixes`
+- **API**: `lint({ fix: true })` applies fixes in a single pass and returns the fixed source per file in `output` (the JS side persists it via `Rslint.outputFixes`). There is no separate `applyFixes`, and—unlike the CLI—it does not re-lint across passes.
 
 ## 8. Configuration & Directives
 
@@ -421,7 +421,7 @@ The loading flow differs by config type:
 
 **JS/TS config**:
 
-1. `packages/rslint/src/cli.ts` discovers one or more config files
+1. `packages/rslint/src/cli/cli.ts` discovers one or more config files
 2. each config is loaded and normalized on the Node side
 3. the Node wrapper sends a stdin payload to the Go binary via `--config-stdin`
 4. Go parses either a multi-config payload or a legacy single-config payload
@@ -473,7 +473,7 @@ rslint [options] [files...]
 
 ### CLI Processing Flow
 
-The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli.ts`) and the Go binary (`cmd/rslint/`).
+The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli/cli.ts`) and the Go binary (`cmd/rslint/`).
 
 1. **Node.js Wrapper**: parses args, discovers JS/TS configs, and decides whether to use `--config-stdin`
 2. **Config Path Selection**:

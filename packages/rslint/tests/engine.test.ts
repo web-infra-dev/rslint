@@ -2,7 +2,7 @@ import { describe, test, expect } from '@rstest/core';
 import { PassThrough } from 'node:stream';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runEngine } from '../src/engine.js';
+import { runEngine } from '../src/cli/engine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FAKE_BIN = path.resolve(__dirname, './fixtures/fake-ipc-binary.cjs');

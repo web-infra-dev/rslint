@@ -107,6 +107,24 @@ func jestFnCallFixEnd(jestFnCall *ast.Node) int {
 	return node.End()
 }
 
+func wrappedJestFnChainClosingParenFixes(jestFnCall *ast.Node) []rule.RuleFix {
+	node := jestFnCall
+	for node.Parent != nil &&
+		(node.Parent.Kind == ast.KindPropertyAccessExpression || node.Parent.Kind == ast.KindCallExpression) {
+		node = node.Parent
+	}
+	if node == jestFnCall {
+		return nil
+	}
+
+	var fixes []rule.RuleFix
+	for node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
+		node = node.Parent
+		fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(node.End()-1, node.End())))
+	}
+	return fixes
+}
+
 func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node) []rule.RuleFix {
 	obj := rslintUtils.AccessExpressionObject(left)
 	prop := accessExpressionPropertyNode(left)
@@ -114,7 +132,7 @@ func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node)
 	mockImplementation := getAutoFixMockImplementation(jestFnCall, ctx)
 	jestFnEnd := jestFnCallFixEnd(jestFnCall)
 
-	return []rule.RuleFix{
+	fixes := []rule.RuleFix{
 		rule.RuleFixInsertBefore(ctx.SourceFile, left, "jest.spyOn("),
 		rule.RuleFixReplaceRange(
 			core.NewTextRange(obj.End(), prop.Pos()),
@@ -125,6 +143,8 @@ func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node)
 			quote+")"+mockImplementation,
 		),
 	}
+
+	return append(fixes, wrappedJestFnChainClosingParenFixes(jestFnCall)...)
 }
 
 var PreferSpyOnRule = rule.Rule{
@@ -143,6 +163,11 @@ var PreferSpyOnRule = rule.Rule{
 
 				left := ast.SkipParentheses(bin.Left)
 				if !jestUtils.IsMemberAccessNode(left) {
+					return
+				}
+
+				prop := accessExpressionPropertyNode(left)
+				if prop != nil && prop.Kind == ast.KindPrivateIdentifier {
 					return
 				}
 

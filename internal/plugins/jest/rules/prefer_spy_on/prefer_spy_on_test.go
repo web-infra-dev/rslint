@@ -24,6 +24,7 @@ func TestPreferSpyOnRule(t *testing.T) {
 			{Code: `const mockObj = { mock: jest.fn() }`},
 			{Code: `mockObj = { mock: jest.fn() }`},
 			{Code: "window[`${name}`] = jest[`fn${expression}`]()"},
+			{Code: `class Foo { #bar; test() { this.#bar = jest.fn() } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -115,6 +116,20 @@ func TestPreferSpyOnRule(t *testing.T) {
 				Output: []string{`jest.spyOn(foo, 'bar').mockImplementation(baz => baz)`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 59},
+				},
+			},
+			{
+				Code:   `foo.bar = (jest.fn().mockImplementation(baz => baz))`,
+				Output: []string{`jest.spyOn(foo, 'bar').mockImplementation(baz => baz)`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 53},
+				},
+			},
+			{
+				Code:   `obj.a = (jest.fn().mockReturnValue(1))`,
+				Output: []string{`jest.spyOn(obj, 'a').mockImplementation().mockReturnValue(1)`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useJestSpyOn", Line: 1, Column: 1, EndLine: 1, EndColumn: 39},
 				},
 			},
 			{

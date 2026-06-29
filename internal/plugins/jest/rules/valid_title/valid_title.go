@@ -48,8 +48,8 @@ func firstOptionMap(options any) map[string]interface{} {
 	if options == nil {
 		return nil
 	}
-	arr, ok := options.([]interface{})
-	if !ok || len(arr) == 0 {
+	arr := rule.NormalizeOptions(options)
+	if len(arr) == 0 {
 		return nil
 	}
 	m, ok := arr[0].(map[string]interface{})

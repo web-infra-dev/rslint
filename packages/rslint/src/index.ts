@@ -1,16 +1,8 @@
-import { NodeRslintService } from './node.js';
-import {
-  LintOptions,
-  LintResponse,
-  RSLintService,
-  ApplyFixesRequest,
-  ApplyFixesResponse,
-  GetAstInfoRequest,
-  GetAstInfoResponse,
-} from './service.js';
-
-export { defineConfig, globalIgnores } from './define-config.js';
-export type { RslintConfigEntry, ESLintPlugin } from './define-config.js';
+export { defineConfig, globalIgnores } from './config/define-config.js';
+export type {
+  RslintConfigEntry,
+  ESLintPlugin,
+} from './config/define-config.js';
 export {
   ts,
   js,
@@ -21,67 +13,20 @@ export {
   jestPlugin,
   unicornPlugin,
   jsxA11yPlugin,
-} from './configs/index.js';
+} from './config/presets/index.js';
 
-// Export the main RSLintService class for direct usage
-export { RSLintService } from './service.js';
-
-// Export specific implementations for advanced usage
-export { NodeRslintService } from './node.js';
-
-// For backward compatibility and convenience
-export async function lint(options: LintOptions): Promise<LintResponse> {
-  const service = new RSLintService(
-    new NodeRslintService({
-      workingDirectory: options.workingDirectory,
-    }),
-  );
-  const result = await service.lint(options);
-  await service.close();
-  return result;
-}
-
-// Convenience function for applying fixes
-export async function applyFixes(
-  options: ApplyFixesRequest,
-): Promise<ApplyFixesResponse> {
-  const service = new RSLintService(new NodeRslintService());
-  const result = await service.applyFixes(options);
-  await service.close();
-  return result;
-}
-
-// Convenience function for getting AST info
-export async function getAstInfo(
-  options: GetAstInfoRequest,
-): Promise<GetAstInfoResponse> {
-  const service = new RSLintService(new NodeRslintService());
-  const result = await service.getAstInfo(options);
-  await service.close();
-  return result;
-}
-
-// Export all types
-export {
-  type Diagnostic,
-  type LintOptions,
-  type LintResponse,
-  type ApplyFixesRequest,
-  type ApplyFixesResponse,
-  type LanguageOptions,
-  type ParserOptions,
-  type RSlintOptions,
-  type RslintServiceInterface,
-  // AST Info types
-  type GetAstInfoRequest,
-  type GetAstInfoResponse,
-  type NodeInfo,
-  type TypeInfo,
-  type SymbolInfo,
-  type SignatureInfo,
-  type FlowInfo,
-  type ParameterInfo,
-  type TypeParamInfo,
-  type IndexInfo,
-  type TypePredicateInfo,
-} from './types.js';
+// The ESLint v10-aligned programmatic Node.js API (issue #1106). This `Rslint`
+// class is the only linting surface exported from the package root; alongside
+// it the root exports just the config-authoring helpers (`defineConfig` /
+// `globalIgnores`) and the plugin presets. The low-level engine (the `lint`
+// convenience, `RSLintService`, and the Node backend) lives on internal
+// subpaths — `@rslint/core/internal` and `@rslint/core/service` — not on the
+// public root. (The browser/web-worker backend lives in `@rslint/wasm`.)
+export { Rslint } from './api/rslint.js';
+export type {
+  RslintOptions,
+  LintResult,
+  LintMessage,
+  LintSuggestion,
+  LintMessageFix,
+} from './api/rslint.js';

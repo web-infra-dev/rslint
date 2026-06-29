@@ -11,6 +11,22 @@ export interface Range {
   end: Position;
 }
 
+export interface Fix {
+  text: string;
+  startPos: number;
+  endPos: number;
+}
+
+// An optional, user-selected fix (ESLint's suggestions): surfaced for the
+// editor/user to pick, NOT applied by `fix: true`. `data` carries the
+// messageId's placeholder values (ESLint v10 suggestion.data).
+export interface Suggestion {
+  messageId: string;
+  message: string;
+  data?: Record<string, string>;
+  fixes?: Fix[];
+}
+
 export interface Diagnostic {
   ruleName: string;
   message: string;
@@ -18,47 +34,50 @@ export interface Diagnostic {
   filePath: string;
   range: Range;
   severity?: string;
-  suggestions: any[];
+  fixes?: Fix[];
+  suggestions?: Suggestion[];
 }
 
 export interface LintResponse {
   diagnostics: Diagnostic[];
+  // errorCount / warningCount are split by severity (ESLint semantics):
+  // errorCount counts only error-severity diagnostics, not the total.
   errorCount: number;
+  warningCount: number;
+  // fixableErrorCount / fixableWarningCount count the auto-fixable subset.
+  fixableErrorCount: number;
+  fixableWarningCount: number;
   fileCount: number;
   ruleCount: number;
-  duration: string;
+  // Files actually linted (config `ignores` excluded), each a program-canonical
+  // path relative to configDirectory — same path space as Diagnostic.filePath.
+  // Present for lintFiles so the Rslint class seeds one result per linted file.
+  lintedFiles?: string[];
+  output?: Record<string, string>; // Per-file fixed source, present when fix:true applied a fix
   encodedSourceFiles?: Record<string, string>; // Binary encoded source files as base64-encoded strings
 }
 
 export interface LintOptions {
   files?: string[];
-  config?: string; // Path to rslint.json config file
+  // Final resolved config — normalized config entries (normalizeConfig output:
+  // plain objects, plugins as string[], no live functions). The JS side
+  // resolves overrideConfig / config-file / discovery / normalize into this;
+  // Go (`--api`) never reads config from disk. Empty/absent = no config.
+  //
+  // Listing a plugin does NOT auto-enable its rules: every rule must be named
+  // explicitly under an entry's `rules` (or pulled in via a preset that does
+  // so), matching ESLint flat-config semantics.
+  config?: Record<string, unknown>[];
+  // Anchor dir for resolving the config's relative files/ignores/project.
+  configDirectory?: string;
   workingDirectory?: string;
-  ruleOptions?: Record<string, string>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
-  languageOptions?: LanguageOptions; // Override languageOptions from config file
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
-}
-
-export interface LanguageOptions {
-  parserOptions?: ParserOptions;
-}
-
-export interface ParserOptions {
-  projectService?: boolean;
-  project?: string[] | string;
-}
-
-export interface ApplyFixesRequest {
-  fileContent: string; // Current content of the file
-  diagnostics: Diagnostic[]; // Diagnostics with fixes to apply
-}
-
-export interface ApplyFixesResponse {
-  fixedContent: string[]; // The content after applying fixes (array of intermediate versions)
-  wasFixed: boolean; // Whether any fixes were actually applied
-  appliedCount: number; // Number of fixes that were applied
-  unappliedCount: number; // Number of fixes that couldn't be applied
+  // Apply rule auto-fixes in-band (ESLint's `fix: true`); the fixed source per
+  // file is returned in LintResponse.output and is NOT written to disk. Rules
+  // and languageOptions live in the config entries — there is no separate
+  // ruleOptions / languageOptions override surface.
+  fix?: boolean;
 }
 
 export interface RSlintOptions {

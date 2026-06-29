@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@rstest/core';
-import { globalIgnores } from '../src/define-config.js';
+import { globalIgnores } from '../src/config/define-config.js';
 
 describe('globalIgnores', () => {
   test('returns a config entry containing only the ignores', () => {
