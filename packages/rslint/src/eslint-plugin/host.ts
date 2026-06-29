@@ -1,7 +1,7 @@
 /**
  * Plugin-lint host: owns a {@link WorkerPool} and answers the reverse
  * `pluginLint` requests Go sends. Shared by BOTH hosts that own a
- * pool — the CLI engine (`packages/rslint/src/engine.ts`, over the IPC
+ * pool — the CLI engine (`packages/rslint/src/cli/engine.ts`, over the IPC
  * channel) and the VS Code extension's PluginLintPool (over the LSP
  * `rslint/pluginLint` request) — so the request→tasks→result
  * boundary lives in exactly one place.

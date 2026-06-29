@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"cmp"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -150,7 +152,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 	return rendered
 }
 
-func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string) {
+func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string, gitlabState *gitlabReportState) {
 	switch format {
 	case "default":
 		printDiagnosticDefault(d, w, comparePathOptions)
@@ -158,9 +160,141 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		printDiagnosticJsonLine(d, w, comparePathOptions)
 	case "github":
 		printDiagnosticGitHub(d, w, comparePathOptions)
+	case "gitlab":
+		printDiagnosticGitLab(d, w, comparePathOptions, gitlabState)
 	default:
 		panic("not supported format " + format)
 	}
+}
+
+// gitlabReportState tracks the streaming state needed to emit the gitlab
+// format as a single JSON array (one open bracket, comma-separated entries,
+// one close bracket) while diagnostics are still printed one at a time, plus
+// a fingerprint occurrence counter so two diagnostics that would otherwise
+// hash identically (rare) don't collapse into one entry in the GitLab MR
+// widget, which merges issues sharing a fingerprint.
+type gitlabReportState struct {
+	wroteFirst   bool
+	fingerprints map[string]int
+}
+
+func newGitlabReportState() *gitlabReportState {
+	return &gitlabReportState{fingerprints: make(map[string]int)}
+}
+
+// finish closes the JSON array. Must be called exactly once after all
+// diagnostics have been printed.
+func (s *gitlabReportState) finish(w *bufio.Writer) {
+	if s.wroteFirst {
+		w.WriteString("]\n")
+	} else {
+		w.WriteString("[]\n")
+	}
+}
+
+// gitlabFingerprint derives a stable identifier for a diagnostic from its
+// location and content. md5 is used only to derive a short opaque key (no
+// cryptographic resistance is needed), and the seen map breaks ties
+// deterministically instead of the random salt some other gitlab formatters
+// use, which keeps report output reproducible across runs.
+func gitlabFingerprint(seen map[string]int, filePath, ruleName, message string, startLine, startColumn, endLine, endColumn int) string {
+	input := fmt.Sprintf("%s:%s:%s:%d:%d:%d:%d", filePath, ruleName, message, startLine, startColumn, endLine, endColumn)
+	digest := func(s string) string {
+		sum := md5.Sum([]byte(s)) //nolint:gosec // opaque identifier, not a security boundary
+		return hex.EncodeToString(sum[:])
+	}
+
+	fingerprint := digest(input)
+	if n, ok := seen[fingerprint]; ok {
+		seen[fingerprint] = n + 1
+		return digest(input + ":" + strconv.Itoa(n))
+	}
+	seen[fingerprint] = 1
+	return fingerprint
+}
+
+// print as [GitLab Code Quality report](https://docs.gitlab.com/ci/testing/code_quality/)
+// format: a single JSON array of issues, suitable for the `codequality`
+// report artifact consumed by GitLab CI merge request widgets.
+func printDiagnosticGitLab(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, state *gitlabReportState) {
+	diagnosticStart := d.Range.Pos()
+	diagnosticEnd := d.Range.End()
+
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
+
+	filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
+
+	var severity string
+	switch d.Severity {
+	case rule.SeverityError:
+		severity = "major"
+	case rule.SeverityWarning:
+		severity = "minor"
+	default:
+		severity = "info"
+	}
+
+	type gitlabPosition struct {
+		Line   int `json:"line"`
+		Column int `json:"column"`
+	}
+	type gitlabPositions struct {
+		Begin gitlabPosition `json:"begin"`
+		End   gitlabPosition `json:"end"`
+	}
+	type gitlabLines struct {
+		Begin int `json:"begin"`
+		End   int `json:"end"`
+	}
+	type gitlabLocation struct {
+		Path      string          `json:"path"`
+		Lines     gitlabLines     `json:"lines"`
+		Positions gitlabPositions `json:"positions"`
+	}
+	type gitlabIssue struct {
+		Description string         `json:"description"`
+		CheckName   string         `json:"check_name"`
+		Fingerprint string         `json:"fingerprint"`
+		Severity    string         `json:"severity"`
+		Location    gitlabLocation `json:"location"`
+	}
+
+	beginLine, beginColumn := startLine+1, int(startColumn)+1
+	endLineNum, endColumnNum := endLine+1, int(endColumn)+1
+
+	issue := gitlabIssue{
+		Description: d.Message.Description,
+		CheckName:   d.RuleName,
+		Fingerprint: gitlabFingerprint(state.fingerprints, filePath, d.RuleName, d.Message.Description, beginLine, beginColumn, endLineNum, endColumnNum),
+		Severity:    severity,
+		Location: gitlabLocation{
+			Path: filePath,
+			Lines: gitlabLines{
+				Begin: beginLine,
+				End:   endLineNum,
+			},
+			Positions: gitlabPositions{
+				Begin: gitlabPosition{Line: beginLine, Column: beginColumn},
+				End:   gitlabPosition{Line: endLineNum, Column: endColumnNum},
+			},
+		},
+	}
+
+	jsonBytes, err := json.Marshal(issue)
+	if err != nil {
+		// gitlabIssue contains only strings and ints, so Marshal cannot fail
+		// in practice; skip rather than risk corrupting the JSON array.
+		return
+	}
+
+	if state.wroteFirst {
+		w.WriteByte(',')
+	} else {
+		w.WriteByte('[')
+		state.wroteFirst = true
+	}
+	w.Write(jsonBytes)
 }
 
 // print as [Workflow commands for GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) format
@@ -484,7 +618,7 @@ Usage:
 Options:
   --init                Initialize a default config in the current directory.
   --config PATH         Which rslint config file to use.
-  --format FORMAT       Output format: default | jsonline | github
+  --format FORMAT       Output format: default | jsonline | github | gitlab
   --fix                 Automatically fix problems
   --type-check          Enable TypeScript type checking
   --type-check-only     Run only TypeScript type checking (skip all lint rules)
@@ -1058,68 +1192,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// --- Gap file discovery and fallback Program ---
 	// Discover files that match config `files` patterns but are not in any
 	// tsconfig Program. These "gap" files get a fallback Program (AST-only,
-	// no type info) and only run non-type-aware rules.
-	var typeInfoFiles map[string]struct{}
-	var capturedGapFiles []string // retained for --fix rebuild
-	fallbackProgramIndex := -1    // index of the gap-file fallback program (if any) within `programs`
-
-	{
-		programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
-
-		var gapFiles []string
-		if configMap != nil {
-			gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded)
-		} else {
-			gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded)
-		}
-
-		// CLI file args bypass config `files` patterns (ESLint behavior):
-		// if a user explicitly passes a file, lint it even if no config entry
-		// has a matching `files` pattern.
-		if gapFiles != nil && len(allowFiles) > 0 {
-			gapSet := make(map[string]struct{}, len(gapFiles))
-			for _, f := range gapFiles {
-				gapSet[f] = struct{}{}
-			}
-			for _, f := range allowFiles {
-				nf := tspath.NormalizePath(f)
-				if _, inProgram := programFiles[nf]; inProgram {
-					continue
-				}
-				if _, alreadyGap := gapSet[nf]; alreadyGap {
-					continue
-				}
-				// Check if config would assign any rules to this file.
-				var merged *rslintconfig.MergedConfig
-				if configMap != nil {
-					cfgDir, cfg := rslintconfig.FindNearestConfig(nf, configMap)
-					if cfg != nil {
-						merged = cfg.GetConfigForFile(nf, cfgDir)
-					}
-				} else {
-					merged = rslintConfig.GetConfigForFile(nf, currentDirectory)
-				}
-				if merged != nil {
-					gapFiles = append(gapFiles, nf)
-				}
-			}
-		}
-
-		if gapFiles != nil {
-			// Build type-info set from existing (tsconfig) Programs BEFORE
-			// appending the fallback, so fallback files are NOT in this set.
-			typeInfoFiles = utils.CollectProgramFiles(programs, fs, singleThreaded)
-			capturedGapFiles = gapFiles
-
-			if len(gapFiles) > 0 {
-				fallback, _ := createFallbackProgram(gapFiles, singleThreaded, cwd, fs, parseCache)
-				if fallback != nil {
-					programs = append(programs, fallback)
-					fallbackProgramIndex = len(programs) - 1
-				}
-			}
-		}
-	}
+	// no type info) and only run non-type-aware rules. Shared verbatim with
+	// the --api path (HandleLint) via buildProgramsWithGapFallback, so both
+	// resolve gap files, the fallback Program, and the type-info set (the
+	// type-aware gate's only input) identically. cwd == currentDirectory here
+	// (see above), so passing currentDirectory preserves prior behavior.
+	programs, typeInfoFiles, fallbackProgramIndex, capturedGapFiles := buildProgramsWithGapFallback(
+		programs, configMap, rslintConfig, currentDirectory, fs, allowFiles, allowDirs, parseCache, singleThreaded,
+	)
 
 	// Initial build (including the gap fallback) is complete: evict cache
 	// entries for files that ended up in no program — build-time dedup
@@ -1380,6 +1460,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	typeErrorsCount := 0
 	{
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
+		var gitlabState *gitlabReportState
+		if format == "gitlab" {
+			gitlabState = newGitlabReportState()
+		}
 		for i, d := range allDiags {
 			switch d.Severity {
 			case rule.SeverityError:
@@ -1398,10 +1482,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			if quiet && d.Severity != rule.SeverityError {
 				continue
 			}
-			printDiagnostic(d, w, comparePathOptions, format)
+			printDiagnostic(d, w, comparePathOptions, format, gitlabState)
 			if w.Available() < 4096 {
 				w.Flush()
 			}
+		}
+		if gitlabState != nil {
+			gitlabState.finish(w)
 		}
 		w.Flush()
 	}

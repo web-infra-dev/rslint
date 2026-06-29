@@ -4,13 +4,13 @@ import {
   loadConfigFile,
   normalizeConfig,
   collectPluginMeta,
-} from './config-loader.js';
-import { parseArgs, classifyArgs, isJSConfigFile } from './utils/args.js';
+} from '../config/config-loader.js';
+import { parseArgs, classifyArgs, isJSConfigFile } from '../utils/args.js';
 import {
   discoverConfigs,
   filterConfigsByParentIgnores,
   type ConfigEntry,
-} from './utils/config-discovery.js';
+} from '../utils/config-discovery.js';
 
 /**
  * Load multiple JS/TS configs and run them through the Go binary over IPC.
