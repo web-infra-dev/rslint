@@ -205,26 +205,56 @@ func (s *EnumSchema) TSType() string {
 
 // ArraySchema validates slices of values
 type ArraySchema struct {
-	item Schema
+	item   Schema
+	minLen *int
+	maxLen *int
+	def    []any
 }
 
 func Array(item Schema) *ArraySchema {
-	return &ArraySchema{item: item}
+	return &ArraySchema{item: item, def: []any{}}
+}
+
+func (s *ArraySchema) Default(def []any) *ArraySchema {
+	s.def = def
+	return s
+}
+
+func (s *ArraySchema) MinLen(n int) *ArraySchema {
+	s.minLen = &n
+	return s
+}
+
+func (s *ArraySchema) MaxLen(n int) *ArraySchema {
+	s.maxLen = &n
+	return s
+}
+
+func (s *ArraySchema) Len(n int) *ArraySchema {
+	return s.MinLen(n).MaxLen(n)
 }
 
 func (s *ArraySchema) Validate(raw any) (any, error) {
-	if raw == nil {
-		return []any{}, nil
-	}
 	var arr []any
-	val := reflect.ValueOf(raw)
-	if val.Kind() == reflect.Slice {
-		arr = make([]any, val.Len())
-		for i := range val.Len() {
-			arr[i] = val.Index(i).Interface()
-		}
+	if raw == nil {
+		arr = s.def
 	} else {
-		return nil, fmt.Errorf("expected slice, got %T", raw)
+		val := reflect.ValueOf(raw)
+		if val.Kind() == reflect.Slice {
+			arr = make([]any, val.Len())
+			for i := range val.Len() {
+				arr[i] = val.Index(i).Interface()
+			}
+		} else {
+			return nil, fmt.Errorf("expected slice, got %T", raw)
+		}
+	}
+
+	if s.minLen != nil && len(arr) < *s.minLen {
+		return nil, fmt.Errorf("array length %d is less than minimum %d", len(arr), *s.minLen)
+	}
+	if s.maxLen != nil && len(arr) > *s.maxLen {
+		return nil, fmt.Errorf("array length %d is greater than maximum %d", len(arr), *s.maxLen)
 	}
 
 	res := make([]any, len(arr))

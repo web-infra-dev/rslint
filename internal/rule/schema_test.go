@@ -166,6 +166,48 @@ func TestIntSchema(t *testing.T) {
 		}
 	})
 
+	t.Run("MinOnly", func(t *testing.T) {
+		s := Int().Min(0)
+
+		_, err := s.Validate(-1)
+		if err == nil || !strings.Contains(err.Error(), "less than min") {
+			t.Errorf("expected less than min error, got %v", err)
+		}
+
+		val, err := s.Validate(0)
+		if err != nil {
+			t.Fatalf("unexpected error at boundary: %v", err)
+		}
+		if val != 0 {
+			t.Errorf("expected 0, got %v", val)
+		}
+
+		val, err = s.Validate(9999)
+		if err != nil {
+			t.Fatalf("unexpected error above min: %v", err)
+		}
+		if val != 9999 {
+			t.Errorf("expected 9999, got %v", val)
+		}
+	})
+
+	t.Run("MaxOnly", func(t *testing.T) {
+		s := Int().Max(100)
+
+		val, err := s.Validate(100)
+		if err != nil {
+			t.Fatalf("unexpected error at boundary: %v", err)
+		}
+		if val != 100 {
+			t.Errorf("expected 100, got %v", val)
+		}
+
+		_, err = s.Validate(101)
+		if err == nil || !strings.Contains(err.Error(), "greater than max") {
+			t.Errorf("expected greater than max error, got %v", err)
+		}
+	})
+
 	t.Run("TSType", func(t *testing.T) {
 		s := Int()
 		if s.TSType() != "number" {
@@ -271,7 +313,7 @@ func TestEnumSchema(t *testing.T) {
 }
 
 func TestArraySchema(t *testing.T) {
-	t.Run("Default", func(t *testing.T) {
+	t.Run("NilReturnsEmpty", func(t *testing.T) {
 		s := Array(String())
 		val, err := s.Validate(nil)
 		if err != nil {
@@ -280,6 +322,27 @@ func TestArraySchema(t *testing.T) {
 		expected := []any{}
 		if !reflect.DeepEqual(val, expected) {
 			t.Errorf("expected %v, got %v", expected, val)
+		}
+	})
+
+	t.Run("Default", func(t *testing.T) {
+		// Custom default returned on nil input
+		s := Array(String()).Default([]any{"a", "b"})
+		val, err := s.Validate(nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{"a", "b"}) {
+			t.Errorf("expected [a b], got %v", val)
+		}
+
+		// Explicit value overrides default
+		val, err = s.Validate([]any{"c"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{"c"}) {
+			t.Errorf("expected [c], got %v", val)
 		}
 	})
 
@@ -317,6 +380,121 @@ func TestArraySchema(t *testing.T) {
 		_, err = s.Validate("not-a-slice")
 		if err == nil || !strings.Contains(err.Error(), "expected slice") {
 			t.Errorf("expected slice error, got %v", err)
+		}
+	})
+
+	t.Run("MinLen", func(t *testing.T) {
+		s := Array(Int()).MinLen(2)
+
+		// nil treated as empty array — should fail min
+		_, err := s.Validate(nil)
+		if err == nil || !strings.Contains(err.Error(), "less than minimum") {
+			t.Errorf("expected less than minimum error for nil, got %v", err)
+		}
+
+		// too short
+		_, err = s.Validate([]any{1})
+		if err == nil || !strings.Contains(err.Error(), "less than minimum") {
+			t.Errorf("expected less than minimum error, got %v", err)
+		}
+
+		// exactly at min
+		val, err := s.Validate([]any{1, 2})
+		if err != nil {
+			t.Fatalf("unexpected error at min boundary: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{1, 2}) {
+			t.Errorf("expected [1, 2], got %v", val)
+		}
+
+		// above min
+		val, err = s.Validate([]any{1, 2, 3})
+		if err != nil {
+			t.Fatalf("unexpected error above min: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{1, 2, 3}) {
+			t.Errorf("expected [1, 2, 3], got %v", val)
+		}
+	})
+
+	t.Run("MaxLen", func(t *testing.T) {
+		s := Array(Int()).MaxLen(2)
+
+		// nil treated as empty array — should pass
+		val, err := s.Validate(nil)
+		if err != nil {
+			t.Fatalf("unexpected error for nil: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{}) {
+			t.Errorf("expected [], got %v", val)
+		}
+
+		// exactly at max
+		val, err = s.Validate([]any{1, 2})
+		if err != nil {
+			t.Fatalf("unexpected error at max boundary: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{1, 2}) {
+			t.Errorf("expected [1, 2], got %v", val)
+		}
+
+		// exceeds max
+		_, err = s.Validate([]any{1, 2, 3})
+		if err == nil || !strings.Contains(err.Error(), "greater than maximum") {
+			t.Errorf("expected greater than maximum error, got %v", err)
+		}
+	})
+
+	t.Run("Len", func(t *testing.T) {
+		s := Array(Int()).Len(2)
+
+		// too short
+		_, err := s.Validate([]any{1})
+		if err == nil || !strings.Contains(err.Error(), "less than minimum") {
+			t.Errorf("expected less than minimum error, got %v", err)
+		}
+
+		// exact length
+		val, err := s.Validate([]any{1, 2})
+		if err != nil {
+			t.Fatalf("unexpected error at exact length: %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{1, 2}) {
+			t.Errorf("expected [1, 2], got %v", val)
+		}
+
+		// too long
+		_, err = s.Validate([]any{1, 2, 3})
+		if err == nil || !strings.Contains(err.Error(), "greater than maximum") {
+			t.Errorf("expected greater than maximum error, got %v", err)
+		}
+	})
+
+	t.Run("Len(0)", func(t *testing.T) {
+		s := Array(Int()).Len(0)
+
+		// nil is empty — should pass
+		val, err := s.Validate(nil)
+		if err != nil {
+			t.Fatalf("unexpected error for nil with Len(0): %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{}) {
+			t.Errorf("expected [], got %v", val)
+		}
+
+		// empty slice — should pass
+		val, err = s.Validate([]any{})
+		if err != nil {
+			t.Fatalf("unexpected error for empty slice with Len(0): %v", err)
+		}
+		if !reflect.DeepEqual(val, []any{}) {
+			t.Errorf("expected [], got %v", val)
+		}
+
+		// non-empty — should fail
+		_, err = s.Validate([]any{1})
+		if err == nil || !strings.Contains(err.Error(), "greater than maximum") {
+			t.Errorf("expected greater than maximum error for Len(0), got %v", err)
 		}
 	})
 
