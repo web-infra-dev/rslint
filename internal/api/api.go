@@ -1,6 +1,6 @@
 // Package api is the single-direction programmatic IPC service used by
 // `--api` mode (consumed by packages/rslint-wasm and packages/rslint-api).
-// The peer (a Node parent or a wasm host) sends lint/applyFixes/getAstInfo
+// The peer (a Node parent or a wasm host) sends lint/getAstInfo
 // requests; this service answers them. It does NOT dispatch tasks back to
 // the peer — that bidirectional path is internal/ipc.Channel.
 //
@@ -52,8 +52,6 @@ func NewAstInfoBuilder(c *checker.Checker, sf *ast.SourceFile) *AstInfoBuilder {
 const (
 	// KindLint is sent from JS to Go to request linting.
 	KindLint ipc.MessageKind = "lint"
-	// KindApplyFixes is sent from JS to Go to request applying fixes.
-	KindApplyFixes ipc.MessageKind = "applyFixes"
 	// KindGetAstInfo is sent from JS to Go to request AST info at a position.
 	KindGetAstInfo ipc.MessageKind = "getAstInfo"
 )
@@ -74,71 +72,59 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string `json:"files,omitempty"`
-	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string   `json:"format,omitempty"`
-	WorkingDirectory string   `json:"workingDirectory,omitempty"`
-	// Supports both string level and array [level, options] format
-	RuleOptions               map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents              map[string]string      `json:"fileContents,omitempty"`              // Map of file paths to their contents for VFS
-	LanguageOptions           *LanguageOptions       `json:"languageOptions,omitempty"`           // Override languageOptions from config file
-	IncludeEncodedSourceFiles bool                   `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
-}
-
-// LanguageOptions contains language-specific configuration options
-type LanguageOptions struct {
-	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
-}
-
-// ProjectPaths represents project paths that can be either a single string or an array of strings
-type ProjectPaths []string
-
-// UnmarshalJSON implements custom JSON unmarshaling to support both string and string[] formats
-func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
-	// Try to unmarshal as string first
-	var singlePath string
-	if err := json.Unmarshal(data, &singlePath); err == nil {
-		*p = []string{singlePath}
-		return nil
-	}
-
-	// If that fails, try to unmarshal as array of strings
-	var paths []string
-	if err := json.Unmarshal(data, &paths); err != nil {
-		return err
-	}
-	*p = paths
-	return nil
-}
-
-// ParserOptions contains parser-specific configuration
-type ParserOptions struct {
-	ProjectService bool         `json:"projectService"`
-	Project        ProjectPaths `json:"project,omitempty"`
+	Files []string `json:"files,omitempty"`
+	// Final resolved config — a serialized RslintConfig (RslintConfigEntry[]).
+	// The JS side does ALL of overrideConfig / config-file / auto-discovery /
+	// normalize and hands Go only this object; --api never reads config from
+	// disk. Empty/absent means "no config" (zero rules). Rules AND
+	// languageOptions live in the config entries — there is no separate
+	// ruleOptions / languageOptions override surface.
+	Config json.RawMessage `json:"config,omitempty"`
+	// Anchor directory for resolving the config's relative
+	// files / ignores / parserOptions.project. Defaults to the working dir.
+	ConfigDirectory  string            `json:"configDirectory,omitempty"`
+	WorkingDirectory string            `json:"workingDirectory,omitempty"`
+	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	// Fix, when true, applies rule auto-fixes in-band and returns the fixed
+	// source per file in LintResponse.Output (ESLint's `fix: true`). The fix is
+	// computed but NOT written to disk — the JS side (Rslint.outputFixes) writes
+	// it. Remaining (unfixed) diagnostics are still reported.
+	Fix                       bool `json:"fix,omitempty"`
+	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
 type ByteArray []byte
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics        []Diagnostic         `json:"diagnostics"`
-	ErrorCount         int                  `json:"errorCount"`
-	FileCount          int                  `json:"fileCount"`
-	RuleCount          int                  `json:"ruleCount"`
+	Diagnostics []Diagnostic `json:"diagnostics"`
+	// ErrorCount / WarningCount are split by severity (ESLint semantics):
+	// ErrorCount counts only error-severity diagnostics, NOT the total.
+	ErrorCount   int `json:"errorCount"`
+	WarningCount int `json:"warningCount"`
+	// FixableErrorCount / FixableWarningCount count diagnostics that carry an
+	// auto-fix, split by severity (ESLint LintResult.fixable*Count).
+	FixableErrorCount   int `json:"fixableErrorCount"`
+	FixableWarningCount int `json:"fixableWarningCount"`
+	FileCount           int `json:"fileCount"`
+	RuleCount           int `json:"ruleCount"`
+	// LintedFiles lists the files actually linted (config `ignores` excluded),
+	// each the program's canonical path relative to the config directory — the
+	// same path space as Diagnostic.FilePath. The JS side seeds one LintResult
+	// per entry, so a glob match the config ignores yields no phantom result,
+	// and a symlinked glob path can't duplicate a result. Present for lintFiles;
+	// lintText seeds from its own explicit path instead.
+	//
+	// MUST NOT be omitempty: an all-ignored lint produces an empty (non-nil)
+	// slice that has to serialize as `[]`, distinct from an old binary that
+	// omits the field entirely. The JS glob-fallback keys on the field's
+	// ABSENCE, so collapsing empty→absent would re-seed phantom empty results.
+	LintedFiles []string `json:"lintedFiles"`
+	// Output holds the fixed source per file, present only when Fix was
+	// requested and at least one fix applied (ESLint LintResult.output, but
+	// keyed by file path since one lint covers many files). The JS side writes
+	// these back via Rslint.outputFixes.
+	Output             map[string]string    `json:"output,omitempty"`
 	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
-}
-
-// ApplyFixesRequest represents a request to apply fixes from JS to Go
-type ApplyFixesRequest struct {
-	FileContent string       `json:"fileContent"` // Current content of the file
-	Diagnostics []Diagnostic `json:"diagnostics"` // Diagnostics with fixes to apply
-}
-
-// ApplyFixesResponse represents a response after applying fixes
-type ApplyFixesResponse struct {
-	FixedContent   []string `json:"fixedContent"`   // The content after applying fixes (array of intermediate versions)
-	WasFixed       bool     `json:"wasFixed"`       // Whether any fixes were actually applied
-	AppliedCount   int      `json:"appliedCount"`   // Number of fixes that were applied
-	UnappliedCount int      `json:"unappliedCount"` // Number of fixes that couldn't be applied
 }
 
 // Position represents a position in a file
@@ -155,13 +141,14 @@ type Range struct {
 
 // Diagnostic represents a single lint diagnostic
 type Diagnostic struct {
-	RuleName  string `json:"ruleName"`
-	Message   string `json:"message"`
-	FilePath  string `json:"filePath"`
-	Range     Range  `json:"range"`
-	Severity  string `json:"severity,omitempty"`
-	MessageId string `json:"messageId"`
-	Fixes     []Fix  `json:"fixes,omitempty"`
+	RuleName    string       `json:"ruleName"`
+	Message     string       `json:"message"`
+	FilePath    string       `json:"filePath"`
+	Range       Range        `json:"range"`
+	Severity    string       `json:"severity,omitempty"`
+	MessageId   string       `json:"messageId"`
+	Fixes       []Fix        `json:"fixes,omitempty"`
+	Suggestions []Suggestion `json:"suggestions,omitempty"`
 }
 
 // Fix represents a single fix that can be applied
@@ -171,10 +158,20 @@ type Fix struct {
 	EndPos   int    `json:"endPos"`   // Character position in the file content
 }
 
+// Suggestion is an optional, user-selected fix (ESLint's "suggestions"):
+// unlike Fixes, which `fix: true` applies automatically, a suggestion is
+// surfaced for the editor/user to choose. Data exposes the messageId's
+// placeholder values (ESLint v10 suggestion.data).
+type Suggestion struct {
+	MessageId string            `json:"messageId"`
+	Message   string            `json:"message"`
+	Data      map[string]string `json:"data,omitempty"`
+	Fixes     []Fix             `json:"fixes,omitempty"`
+}
+
 // Handler defines the interface for handling IPC messages
 type Handler interface {
 	HandleLint(req LintRequest) (*LintResponse, error)
-	HandleApplyFixes(req ApplyFixesRequest) (*ApplyFixesResponse, error)
 	HandleGetAstInfo(req GetAstInfoRequest) (*GetAstInfoResponse, error)
 }
 
@@ -212,8 +209,6 @@ func (s *Service) Start() error {
 			s.handleHandshake(msg)
 		case KindLint:
 			s.handleLint(msg)
-		case KindApplyFixes:
-			s.handleApplyFixes(msg)
 		case KindGetAstInfo:
 			s.handleGetAstInfo(msg)
 		case ipc.KindExit:
@@ -252,23 +247,6 @@ func (s *Service) handleLint(msg *ipc.Message) {
 		return
 	}
 	resp, err := s.handler.HandleLint(req)
-	if err != nil {
-		s.sendError(msg.ID, err.Error())
-		return
-	}
-
-	s.sendResponse(msg.ID, resp)
-}
-
-// handleApplyFixes handles apply fixes messages
-func (s *Service) handleApplyFixes(msg *ipc.Message) {
-	var req ApplyFixesRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse apply fixes request: %v", err))
-		return
-	}
-
-	resp, err := s.handler.HandleApplyFixes(req)
 	if err != nil {
 		s.sendError(msg.ID, err.Error())
 		return

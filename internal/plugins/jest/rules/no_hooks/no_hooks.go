@@ -50,8 +50,8 @@ func parseOptions(options any) Options {
 		return opts
 	}
 
-	optArray, isArray := options.([]interface{})
-	if !isArray || len(optArray) == 0 {
+	optArray := rule.NormalizeOptions(options)
+	if len(optArray) == 0 {
 		return opts
 	}
 	optsMap, ok := optArray[0].(map[string]interface{})

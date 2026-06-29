@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import picomatch from 'picomatch';
 import { glob } from 'tinyglobby';
-import { type RslintConfigEntry } from '../define-config.ts';
+import { type RslintConfigEntry } from '../config/define-config.ts';
 
 export const JS_CONFIG_FILES = [
   'rslint.config.js',

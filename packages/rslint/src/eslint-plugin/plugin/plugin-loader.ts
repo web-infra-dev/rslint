@@ -31,11 +31,14 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
-import { selectPluginSource, unwrapPluginModule } from '../../plugin-source.js';
+import {
+  selectPluginSource,
+  unwrapPluginModule,
+} from '../../config/plugin-source.js';
 
 /**
  * Extension-aware config loader for worker init. Mirrors the strategy
- * `packages/rslint/src/config-loader.ts::loadConfigFile` uses on the
+ * `packages/rslint/src/config/config-loader.ts::loadConfigFile` uses on the
  * main thread so a `.ts`/`.mts` config file loads identically in both
  * places.
  *
@@ -207,7 +210,7 @@ export async function loadPluginsFromConfigFile(
   // Per entry, the live community plugins come from the object-form
   // `plugins` map (`plugins: { uc: unicornPlugin }`), selected via the
   // shared `selectPluginSource`. This mirrors `normalizeConfig` in
-  // packages/rslint/src/config-loader.ts — both paths must extract plugins
+  // packages/rslint/src/config/config-loader.ts — both paths must extract plugins
   // from the same source, or the worker holds a plugin set that doesn't
   // match what the main thread believed was active. Array-form `plugins`
   // (the native-name whitelist) carries no live objects and yields no

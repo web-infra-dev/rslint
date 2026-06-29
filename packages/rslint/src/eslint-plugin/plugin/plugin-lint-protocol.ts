@@ -4,7 +4,7 @@
  * sends down (`pluginLint` IPC request OR `rslint/pluginLint`
  * LSP request) and the shape it reads back.
  *
- * Both the CLI host (`packages/rslint/src/engine.ts`) and the LSP host
+ * Both the CLI host (`packages/rslint/src/cli/engine.ts`) and the LSP host
  * (`packages/vscode-extension/src/PluginLintPool.ts`) receive an
  * EslintPluginLintRequest from Go, build per-file LintTasks against the
  * WorkerPool, and project the results back. The boundary logic is

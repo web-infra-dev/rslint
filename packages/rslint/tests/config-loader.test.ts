@@ -3,7 +3,7 @@ import {
   loadConfigFile,
   normalizeConfig,
   collectPluginMeta,
-} from '../src/config-loader.js';
+} from '../src/config/config-loader.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
