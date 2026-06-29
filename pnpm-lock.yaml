@@ -196,8 +196,8 @@ importers:
         specifier: ^6.4.1
         version: 6.4.1(@typescript-eslint/parser@8.59.0(eslint@10.5.0(jiti@2.6.1))(typescript@5.9.3))(eslint@10.5.0(jiti@2.6.1))
       eslint-plugin-es-x:
-        specifier: ^9.6.0
-        version: 9.6.0(eslint@10.5.0(jiti@2.6.1))
+        specifier: ^9.7.0
+        version: 9.7.0(eslint@10.5.0(jiti@2.6.1))
       eslint-plugin-playwright:
         specifier: ^2.10.4
         version: 2.10.4(eslint@10.5.0(jiti@2.6.1))
@@ -3879,8 +3879,8 @@ packages:
       '@typescript-eslint/parser':
         optional: true
 
-  eslint-plugin-es-x@9.6.0:
-    resolution: {integrity: sha512-F74Ceu0n+EuANGyZyt9jFsawVC88rhyXXqVkKr/+9S54n5omZvUqe5yTCuAUhBk37yRCOKS45Os9IuxJpiVYGw==}
+  eslint-plugin-es-x@9.7.0:
+    resolution: {integrity: sha512-BT0pUw0toxtrHulYycGiUTL++qC11opyPYMuGUR7AgmuQ/N1YN1xLupF8rGxlaGqEqkqeedJuacCxxAcYgGkvg==}
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       eslint: '>=9.29.0'
@@ -9677,7 +9677,7 @@ snapshots:
     optionalDependencies:
       '@typescript-eslint/parser': 8.59.0(eslint@10.5.0(jiti@2.6.1))(typescript@5.9.3)
 
-  eslint-plugin-es-x@9.6.0(eslint@10.5.0(jiti@2.6.1)):
+  eslint-plugin-es-x@9.7.0(eslint@10.5.0(jiti@2.6.1)):
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.5.0(jiti@2.6.1))
       '@eslint-community/regexpp': 4.12.2
