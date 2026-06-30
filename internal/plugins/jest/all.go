@@ -19,6 +19,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_unneeded_async_expect_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_called_with"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_equality_matcher"
@@ -60,6 +61,7 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		no_test_prefixes.NoTestPrefixesRule,
+		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
 		prefer_called_with.PreferCalledWithRule,
 		prefer_each.PreferEachRule,
 		prefer_equality_matcher.PreferEqualityMatcherRule,
