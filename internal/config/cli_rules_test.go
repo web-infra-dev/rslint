@@ -405,8 +405,7 @@ func TestIntegration_CLIArrayOverridesConfigString(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	assert.Assert(t, merged != nil)
 	assert.Equal(t, merged.Rules["no-console"].Level, "warn")
-	optsSlice, ok := merged.Rules["no-console"].Options.([]interface{})
-	assert.Assert(t, ok)
+	optsSlice := merged.Rules["no-console"].Options
 	assert.Equal(t, len(optsSlice), 1)
 	opts, ok := optsSlice[0].(map[string]interface{})
 	assert.Assert(t, ok)

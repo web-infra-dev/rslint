@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -71,19 +70,13 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 				finalOptions := ruleConfigCopy.Options
 
 				if ruleImpl.RunWithOptions != nil {
-					validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, ruleConfigCopy.Options)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "[rslint] Error validating options for rule %q: %v\n", ruleName, err)
-						continue
-					}
-					finalOptions = validated
 					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleImpl.RunWithOptions(ctx, validated)
+						return ruleImpl.RunWithOptions(ctx, ruleConfigCopy.Options)
 					}
 				} else {
-					runOpts := ruleConfigCopy.Options
-					if optsSlice, ok := runOpts.([]any); ok && len(optsSlice) == 1 {
-						runOpts = optsSlice[0]
+					runOpts := any(ruleConfigCopy.Options)
+					if len(ruleConfigCopy.Options) == 1 {
+						runOpts = ruleConfigCopy.Options[0]
 					}
 					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
 						return ruleImpl.Run(ctx, runOpts)
@@ -136,30 +129,47 @@ func (r *RuleRegistry) GetActiveRulesForFile(
 
 // ValidateConfig checks all rule options in the configuration against their schemas.
 // It collects and returns all validation errors found.
+// As a side effect, it mutates the configuration in-place to convert all rule
+// entries to *RuleConfig and stores the pre-hydrated options in Options.
 func (r *RuleRegistry) ValidateConfig(config RslintConfig) []error {
 	var errs []error
-	for _, entry := range config {
+	for i := range config {
+		entry := &config[i]
 		for ruleName, ruleValue := range entry.Rules {
-			var rawOptions any
-			var isEnabled bool
-
+			var rc *RuleConfig
 			switch v := ruleValue.(type) {
 			case string:
-				isEnabled = v != "off" && v != ""
-			case []interface{}:
-				rc := parseArrayRuleConfig(v)
-				if rc != nil {
-					isEnabled = rc.IsEnabled()
-					rawOptions = rc.Options
+				var options []any
+				if v != "off" && v != "" {
+					options = []any{}
 				}
+				rc = &RuleConfig{Level: v, Options: options}
+				entry.Rules[ruleName] = rc
+			case []interface{}:
+				rc = parseArrayRuleConfig(v)
+				if rc != nil {
+					entry.Rules[ruleName] = rc
+				}
+			case *RuleConfig:
+				rc = v
 			}
 
-			if isEnabled {
+			if rc == nil {
+				continue
+			}
+
+			if rc.IsEnabled() {
 				if ruleImpl, exists := r.rules[ruleName]; exists {
-					if ruleImpl.RunWithOptions != nil {
-						_, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, rawOptions)
+					if ruleImpl.RunWithOptions != nil && ruleImpl.Schema == nil {
+						errs = append(errs, fmt.Errorf("rule %q has RunWithOptions but no Schema", ruleName))
+						continue
+					}
+					if ruleImpl.Schema != nil {
+						validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, rc.Options)
 						if err != nil {
 							errs = append(errs, err)
+						} else {
+							rc.Options = validated
 						}
 					}
 				}

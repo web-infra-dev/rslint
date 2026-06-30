@@ -104,8 +104,8 @@ type Rules map[string]interface{}
 
 // RuleConfig represents individual rule configuration
 type RuleConfig struct {
-	Level   string      `json:"level,omitempty"`   // "error", "warn", "off"
-	Options interface{} `json:"options,omitempty"` // Rule-specific options (string, map, array, etc.)
+	Level   string
+	Options []any
 }
 
 // IsEnabled returns true if the rule is enabled (not "off")
@@ -125,15 +125,15 @@ func (rc *RuleConfig) GetLevel() string {
 }
 
 // GetOptions returns the rule options, ensuring we return a usable value
-func (rc *RuleConfig) GetOptions() interface{} {
-	if rc == nil || rc.Options == nil {
+func (rc *RuleConfig) GetOptions() []any {
+	if rc == nil {
 		return nil
 	}
 	return rc.Options
 }
 
 // SetOptions sets the rule options
-func (rc *RuleConfig) SetOptions(options interface{}) {
+func (rc *RuleConfig) SetOptions(options []any) {
 	if rc != nil {
 		rc.Options = options
 	}
@@ -238,7 +238,11 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 		return nil
 	}
 
-	ruleConfig := &RuleConfig{Level: level}
+	var options []any
+	if level != "off" && level != "" {
+		options = []any{}
+	}
+	ruleConfig := &RuleConfig{Level: level, Options: options}
 
 	// Remaining elements are rule options — pass them through to the rule's
 	// option parser as an array by default.
@@ -441,11 +445,17 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 		for ruleName, ruleValue := range entry.Rules {
 			switch v := ruleValue.(type) {
 			case string:
-				merged.Rules[ruleName] = &RuleConfig{Level: v}
+				var options []any
+				if v != "off" && v != "" {
+					options = []any{}
+				}
+				merged.Rules[ruleName] = &RuleConfig{Level: v, Options: options}
 			case []interface{}:
 				if rc := parseArrayRuleConfig(v); rc != nil {
 					merged.Rules[ruleName] = rc
 				}
+			case *RuleConfig:
+				merged.Rules[ruleName] = v
 			}
 		}
 

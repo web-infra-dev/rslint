@@ -694,3 +694,94 @@ func TestValidateConfig_ReturnsErrors(t *testing.T) {
 		t.Errorf("Expected no validation errors, got %d: %v", len(errs), errs)
 	}
 }
+
+func TestValidateConfig_HydratesAndBypasses(t *testing.T) {
+	RegisterAllRules()
+
+	config := RslintConfig{
+		{
+			Rules: Rules{
+				"no-console": []interface{}{
+					"error",
+					map[string]interface{}{
+						"allow": []interface{}{"warn"},
+					},
+				},
+			},
+		},
+	}
+
+	// Before validation: the rule value is []interface{}
+	ruleValBefore := config[0].Rules["no-console"]
+	if _, ok := ruleValBefore.([]interface{}); !ok {
+		t.Fatalf("Expected raw config to be []interface{}, got %T", ruleValBefore)
+	}
+
+	errs := GlobalRuleRegistry.ValidateConfig(config)
+	if len(errs) > 0 {
+		t.Fatalf("Expected no validation errors, got: %v", errs)
+	}
+
+	// After validation: the rule value should be mutated to *RuleConfig, and hydrated
+	ruleValAfter := config[0].Rules["no-console"]
+	rc, ok := ruleValAfter.(*RuleConfig)
+	if !ok {
+		t.Fatalf("Expected config value to be mutated to *RuleConfig, got %T", ruleValAfter)
+	}
+
+	if len(rc.Options) == 0 {
+		t.Fatal("Expected Options to be hydrated and populated, got empty")
+	}
+
+	// Mutate the cached options to a dummy value to prove that GetEnabledRules bypasses validation
+	// and retrieves/uses the cached options directly.
+	dummyOptions := []any{"dummy-option"}
+	rc.Options = dummyOptions
+
+	enabledRules, _ := GlobalRuleRegistry.GetEnabledRules(config, "test.js", "", false)
+	var noConsoleRule *linter.ConfiguredRule
+	for i := range enabledRules {
+		if enabledRules[i].Name == "no-console" {
+			noConsoleRule = &enabledRules[i]
+			break
+		}
+	}
+
+	if noConsoleRule == nil {
+		t.Fatal("Expected no-console rule to be enabled")
+	}
+
+	// Assert that it used our dummy cached options
+	opts, ok := noConsoleRule.Options.([]any)
+	if !ok || len(opts) != 1 || opts[0] != "dummy-option" {
+		t.Errorf("Expected GetEnabledRules to use cached options %v, got %v", dummyOptions, noConsoleRule.Options)
+	}
+}
+
+func TestValidateConfig_ErrorOnRunWithOptionsWithoutSchema(t *testing.T) {
+	registry := NewRuleRegistry()
+	registry.Register("bad-rule", rule.Rule{
+		Name: "bad-rule",
+		RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+			return rule.RuleListeners{}
+		},
+	})
+
+	config := RslintConfig{
+		{
+			Rules: Rules{
+				"bad-rule": "error",
+			},
+		},
+	}
+
+	errs := registry.ValidateConfig(config)
+	if len(errs) != 1 {
+		t.Fatalf("Expected exactly 1 error, got %d", len(errs))
+	}
+	expectedMsg := `rule "bad-rule" has RunWithOptions but no Schema`
+	if !strings.Contains(errs[0].Error(), expectedMsg) {
+		t.Errorf("Expected error message to contain %q, got %q", expectedMsg, errs[0].Error())
+	}
+}
+

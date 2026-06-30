@@ -350,8 +350,8 @@ func TestGetConfigForFile_ArrayRuleConfig(t *testing.T) {
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn', got %q", rc.Level)
 	}
-	optsSlice, ok := rc.Options.([]interface{})
-	if !ok || len(optsSlice) == 0 {
+	optsSlice := rc.Options
+	if len(optsSlice) == 0 {
 		t.Error("Expected options slice")
 		return
 	}
@@ -657,8 +657,8 @@ func TestGetConfigForFile_MultipleEntries_ArrayRuleOverridesString(t *testing.T)
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn' from array override, got %q", rc.Level)
 	}
-	optsSlice2, ok2 := rc.Options.([]interface{})
-	if !ok2 || len(optsSlice2) == 0 {
+	optsSlice2 := rc.Options
+	if len(optsSlice2) == 0 {
 		t.Fatal("Expected options slice from array config")
 		return
 	}
