@@ -301,15 +301,11 @@ func TestEnumSchema(t *testing.T) {
 }
 
 func TestArraySchema(t *testing.T) {
-	t.Run("NilReturnsEmpty", func(t *testing.T) {
+	t.Run("NilReturnsError", func(t *testing.T) {
 		s := Array(String())
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		expected := []any{}
-		if !reflect.DeepEqual(val, expected) {
-			t.Errorf("expected %v, got %v", expected, val)
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil input on non-optional array")
 		}
 	})
 
@@ -408,17 +404,14 @@ func TestArraySchema(t *testing.T) {
 	t.Run("MaxLen", func(t *testing.T) {
 		s := Array(Int()).MaxLen(2)
 
-		// nil should succeed and return empty array since minLen is nil (0 is allowed)
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error for nil: %v", err)
-		}
-		if !reflect.DeepEqual(val, []any{}) {
-			t.Errorf("expected [], got %v", val)
+		// nil should fail since ArraySchema is not optional
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil input")
 		}
 
 		// exactly at max
-		val, err = s.Validate([]any{1, 2})
+		val, err := s.Validate([]any{1, 2})
 		if err != nil {
 			t.Fatalf("unexpected error at max boundary: %v", err)
 		}
@@ -461,17 +454,14 @@ func TestArraySchema(t *testing.T) {
 	t.Run("Len(0)", func(t *testing.T) {
 		s := Array(Int()).Len(0)
 
-		// nil should succeed and return empty array since minLen is 0 (0 is allowed)
-		val, err := s.Validate(nil)
-		if err != nil {
-			t.Fatalf("unexpected error for nil: %v", err)
-		}
-		if !reflect.DeepEqual(val, []any{}) {
-			t.Errorf("expected [], got %v", val)
+		// nil should fail since ArraySchema is not optional
+		_, err := s.Validate(nil)
+		if err == nil {
+			t.Error("expected error for nil input")
 		}
 
 		// empty slice — should pass
-		val, err = s.Validate([]any{})
+		val, err := s.Validate([]any{})
 		if err != nil {
 			t.Fatalf("unexpected error for empty slice with Len(0): %v", err)
 		}
@@ -711,50 +701,50 @@ func TestUnionSchema(t *testing.T) {
 	})
 }
 
-func TestHasDefault(t *testing.T) {
-	// 1. Basic schemas do not have defaults (except AnySchema)
-	if Bool().HasDefault() {
-		t.Error("BoolSchema should not have a default")
+func TestIsOptional(t *testing.T) {
+	// 1. Basic schemas are not optional (except AnySchema)
+	if Bool().IsOptional() {
+		t.Error("BoolSchema should not be optional")
 	}
-	if Int().HasDefault() {
-		t.Error("IntSchema should not have a default")
+	if Int().IsOptional() {
+		t.Error("IntSchema should not be optional")
 	}
-	if String().HasDefault() {
-		t.Error("StringSchema should not have a default")
+	if String().IsOptional() {
+		t.Error("StringSchema should not be optional")
 	}
-	if !Any().HasDefault() {
-		t.Error("AnySchema should have a default")
-	}
-
-	// 2. DefaultSchema has a default
-	if !Bool().Default(true).HasDefault() {
-		t.Error("DefaultSchema should have a default")
+	if !Any().IsOptional() {
+		t.Error("AnySchema should be optional")
 	}
 
-	// 3. UnionSchema never has a default directly
-	if Union(Bool(), String()).HasDefault() {
-		t.Error("UnionSchema should not have a default")
-	}
-	if Union(Bool().Default(true), String().Default("")).HasDefault() {
-		t.Error("UnionSchema should not have a default even if members do")
+	// 2. DefaultSchema is optional
+	if !Bool().Default(true).IsOptional() {
+		t.Error("DefaultSchema should be optional")
 	}
 
-	// 4. TupleSchema has a default if all options have defaults
-	if Tuple(Bool(), String().Default("")).HasDefault() {
-		t.Error("TupleSchema with non-default members should not have a default")
+	// 3. UnionSchema is never optional directly
+	if Union(Bool(), String()).IsOptional() {
+		t.Error("UnionSchema should not be optional")
 	}
-	if !Tuple(Bool().Default(true), String().Default("")).HasDefault() {
-		t.Error("TupleSchema with all default members should have a default")
+	if Union(Bool().Default(true), String().Default("")).IsOptional() {
+		t.Error("UnionSchema should not be optional even if members are")
 	}
 
-	// 5. ArraySchema has a default if length of 0 is allowed
-	if !Array(Int()).HasDefault() {
-		t.Error("Array(Int()) should have a default since length 0 is allowed")
+	// 4. TupleSchema is optional if all options are optional
+	if Tuple(Bool(), String().Default("")).IsOptional() {
+		t.Error("TupleSchema with non-optional members should not be optional")
 	}
-	if !Array(Int()).MinLen(0).HasDefault() {
-		t.Error("Array(Int()).MinLen(0) should have a default since length 0 is allowed")
+	if !Tuple(Bool().Default(true), String().Default("")).IsOptional() {
+		t.Error("TupleSchema with all optional members should be optional")
 	}
-	if Array(Int()).MinLen(1).HasDefault() {
-		t.Error("Array(Int()).MinLen(1) should not have a default since length 0 is not allowed")
+
+	// 5. ArraySchema is never optional directly
+	if Array(Int()).IsOptional() {
+		t.Error("Array(Int()) should not be optional")
+	}
+	if Array(Int()).MinLen(0).IsOptional() {
+		t.Error("Array(Int()).MinLen(0) should not be optional")
+	}
+	if Array(Int()).MinLen(1).IsOptional() {
+		t.Error("Array(Int()).MinLen(1) should not be optional")
 	}
 }

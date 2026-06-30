@@ -9,7 +9,7 @@ import (
 var NoConsoleRule = rule.Rule{
 	Name: "no-console",
 	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
-		"allow": rule.Array(rule.String()),
+		"allow": rule.Array(rule.String()).Default([]any{}),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		opts := parseOptions(options[0])

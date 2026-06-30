@@ -13,7 +13,7 @@ import (
 type Schema interface {
 	Validate(raw any) (any, error)
 	TSType() string
-	HasDefault() bool
+	IsOptional() bool
 }
 
 // DefaultSchema wraps an inner schema and returns a default value if the input is nil.
@@ -44,7 +44,7 @@ func (s *DefaultSchema) TSType() string {
 	return s.inner.TSType()
 }
 
-func (s *DefaultSchema) HasDefault() bool {
+func (s *DefaultSchema) IsOptional() bool {
 	return true
 }
 
@@ -67,7 +67,7 @@ func (s *AnySchema) TSType() string {
 	return "any"
 }
 
-func (s *AnySchema) HasDefault() bool {
+func (s *AnySchema) IsOptional() bool {
 	return true
 }
 
@@ -97,7 +97,7 @@ func (s *BoolSchema) TSType() string {
 	return "boolean"
 }
 
-func (s *BoolSchema) HasDefault() bool {
+func (s *BoolSchema) IsOptional() bool {
 	return false
 }
 
@@ -153,7 +153,7 @@ func (s *IntSchema) TSType() string {
 	return "number"
 }
 
-func (s *IntSchema) HasDefault() bool {
+func (s *IntSchema) IsOptional() bool {
 	return false
 }
 
@@ -183,7 +183,7 @@ func (s *StringSchema) TSType() string {
 	return "string"
 }
 
-func (s *StringSchema) HasDefault() bool {
+func (s *StringSchema) IsOptional() bool {
 	return false
 }
 
@@ -224,7 +224,7 @@ func (s *EnumSchema) TSType() string {
 	return "(" + strings.Join(parts, " | ") + ")"
 }
 
-func (s *EnumSchema) HasDefault() bool {
+func (s *EnumSchema) IsOptional() bool {
 	return false
 }
 
@@ -261,7 +261,7 @@ func (s *ArraySchema) Len(n int) *ArraySchema {
 
 func (s *ArraySchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		if s.HasDefault() {
+		if s.IsOptional() {
 			return []any{}, nil
 		}
 		return nil, fmt.Errorf("expected slice, got nil")
@@ -299,8 +299,8 @@ func (s *ArraySchema) TSType() string {
 	return fmt.Sprintf("Array<%s>", s.item.TSType())
 }
 
-func (s *ArraySchema) HasDefault() bool {
-	return s.minLen == nil || *s.minLen <= 0
+func (s *ArraySchema) IsOptional() bool {
+	return false
 }
 
 // ObjectSchema validates map of key-value pairs
@@ -346,7 +346,7 @@ func (s *ObjectSchema) TSType() string {
 	var parts []string
 	for k, v := range s.properties {
 		suffix := ""
-		if v.HasDefault() {
+		if v.IsOptional() {
 			suffix = "?"
 		}
 		parts = append(parts, fmt.Sprintf("%s%s: %s", k, suffix, v.TSType()))
@@ -358,9 +358,9 @@ func (s *ObjectSchema) TSType() string {
 	return fmt.Sprintf("{ %s }", strings.Join(parts, "; "))
 }
 
-func (s *ObjectSchema) HasDefault() bool {
+func (s *ObjectSchema) IsOptional() bool {
 	for _, propSchema := range s.properties {
-		if !propSchema.HasDefault() {
+		if !propSchema.IsOptional() {
 			return false
 		}
 	}
@@ -410,7 +410,7 @@ func (s *TupleSchema) TSType() string {
 	var parts []string
 	for _, item := range s.items {
 		suffix := ""
-		if item.HasDefault() {
+		if item.IsOptional() {
 			suffix = "?"
 		}
 		parts = append(parts, item.TSType()+suffix)
@@ -418,12 +418,12 @@ func (s *TupleSchema) TSType() string {
 	return fmt.Sprintf("[%s]", strings.Join(parts, ", "))
 }
 
-func (s *TupleSchema) HasDefault() bool {
+func (s *TupleSchema) IsOptional() bool {
 	if len(s.items) == 0 {
 		return true
 	}
 	for _, item := range s.items {
-		if !item.HasDefault() {
+		if !item.IsOptional() {
 			return false
 		}
 	}
@@ -466,6 +466,6 @@ func (s *UnionSchema) TSType() string {
 	return "(" + strings.Join(parts, " | ") + ")"
 }
 
-func (s *UnionSchema) HasDefault() bool {
+func (s *UnionSchema) IsOptional() bool {
 	return false
 }

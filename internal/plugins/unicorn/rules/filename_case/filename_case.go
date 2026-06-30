@@ -435,7 +435,7 @@ var FilenameCaseRule = rule.Rule{
 			"kebabCase":  rule.Bool().Default(false),
 			"pascalCase": rule.Bool().Default(false),
 		}),
-		"ignore":                 rule.Array(rule.String()),
+		"ignore":                 rule.Array(rule.String()).Default([]any{}),
 		"multipleFileExtensions": rule.Bool().Default(true),
 	})),
 	// The rule is purely filename-driven — it does not inspect any AST node.

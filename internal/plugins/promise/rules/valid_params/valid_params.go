@@ -66,7 +66,7 @@ func calledMemberName(node *ast.Node) string {
 var ValidParamsRule = rule.Rule{
 	Name: "promise/valid-params",
 	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
-		"exclude": rule.Array(rule.String()),
+		"exclude": rule.Array(rule.String()).Default([]any{}),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		optsMap, _ := options[0].(map[string]any)

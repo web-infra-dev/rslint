@@ -381,7 +381,7 @@ var ValidTitleRule = rule.Rule{
 		"ignoreSpaces":             rule.Bool().Default(false),
 		"ignoreTypeOfDescribeName": rule.Bool().Default(false),
 		"ignoreTypeOfTestName":     rule.Bool().Default(false),
-		"disallowedWords":          rule.Array(rule.String()),
+		"disallowedWords":          rule.Array(rule.String()).Default([]any{}),
 		"mustMatch":                matcherPatternSchema,
 		"mustNotMatch":             matcherPatternSchema,
 	})),
