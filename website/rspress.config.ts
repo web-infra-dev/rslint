@@ -31,6 +31,11 @@ export default defineConfig({
   },
   globalStyles: path.join(__dirname, 'styles/index.css'),
   llms: true,
+  markdown: {
+    link: {
+      checkAnchors: true,
+    },
+  },
   themeConfig: {
     socialLinks: [
       {
