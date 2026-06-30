@@ -1,0 +1,476 @@
+// Rstest Snapshot v1
+
+exports[`curly > invalid 1`] = `
+{
+  "code": "if (foo) bar()",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'if' condition.",
+      "messageId": "missingCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 2`] = `
+{
+  "code": "while (foo) bar()",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'while' condition.",
+      "messageId": "missingCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 3`] = `
+{
+  "code": "for (;foo;) bar()",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'for' condition.",
+      "messageId": "missingCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 4`] = `
+{
+  "code": "do bar(); while (foo)",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'do'.",
+      "messageId": "missingCurlyAfter",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 5`] = `
+{
+  "code": "for (var foo in bar) console.log(foo)",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'for-in'.",
+      "messageId": "missingCurlyAfter",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 6`] = `
+{
+  "code": "for (var foo of bar) console.log(foo)",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'for-of'.",
+      "messageId": "missingCurlyAfter",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 7`] = `
+{
+  "code": "if (foo) { bar() } else baz()",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'else'.",
+      "messageId": "missingCurlyAfter",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 8`] = `
+{
+  "code": "if (foo) { bar() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'if' condition.",
+      "messageId": "unexpectedCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 9`] = `
+{
+  "code": "while (foo) { bar() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'while' condition.",
+      "messageId": "unexpectedCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 10`] = `
+{
+  "code": "for (;foo;) { bar() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'for' condition.",
+      "messageId": "unexpectedCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 11`] = `
+{
+  "code": "do{foo();} while(bar);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'do'.",
+      "messageId": "unexpectedCurlyAfter",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 12`] = `
+{
+  "code": "for (var foo in bar) {console.log(foo)}",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'for-in'.",
+      "messageId": "unexpectedCurlyAfter",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 13`] = `
+{
+  "code": "if (foo) baz(); else { bar() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'else'.",
+      "messageId": "unexpectedCurlyAfter",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 14`] = `
+{
+  "code": "if (foo) 
+ baz()",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'if' condition.",
+      "messageId": "missingCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 15`] = `
+{
+  "code": "if (foo) { 
+ quz = true; 
+ }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'if' condition.",
+      "messageId": "unexpectedCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 16`] = `
+{
+  "code": "if (foo) 
+ quz = { 
+ bar: baz, 
+ qux: foo 
+ };",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'if' condition.",
+      "messageId": "missingCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 17`] = `
+{
+  "code": "if (foo) { let bar; } else baz();",
+  "diagnostics": [
+    {
+      "message": "Expected { after 'else'.",
+      "messageId": "missingCurlyAfter",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`curly > invalid 18`] = `
+{
+  "code": "if (foo) {bar()} baz()",
+  "diagnostics": [
+    {
+      "message": "Unnecessary { after 'if' condition.",
+      "messageId": "unexpectedCurlyAfterCondition",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "curly",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -73,8 +73,9 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 		if !ok {
 			// try convert options to JSON and back to struct
 			opts = NoConfusingVoidExpressionOptions{}
-			// get first element of options
-			options_array, _ := options.([]interface{})
+			// get first element of options (re-wrapping config.rules' unwrapped
+			// single option into eslint-format []any)
+			options_array := rule.NormalizeOptions(options)
 			// if options_array has at least one element, try to unmarshal it
 			if len(options_array) > 0 {
 				optsJSON, err := json.Marshal(options_array[0])

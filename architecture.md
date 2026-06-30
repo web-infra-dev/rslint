@@ -342,7 +342,7 @@ Important behavior differences by integration:
 - **CLI**: can rerun lint and fix for multiple passes
 - **LSP quick fix**: returns direct text edits for one diagnostic
 - **LSP fix-all**: runs repeated lint-fix cycles, then returns one whole-document replacement edit
-- **API**: returns fix metadata to the caller and also exposes `applyFixes`
+- **API**: `lint({ fix: true })` applies fixes in a single pass and returns the fixed source per file in `output` (the JS side persists it via `Rslint.outputFixes`). There is no separate `applyFixes`, and—unlike the CLI—it does not re-lint across passes.
 
 ## 8. Configuration & Directives
 
@@ -421,7 +421,7 @@ The loading flow differs by config type:
 
 **JS/TS config**:
 
-1. `packages/rslint/src/cli.ts` discovers one or more config files
+1. `packages/rslint/src/cli/cli.ts` discovers one or more config files
 2. each config is loaded and normalized on the Node side
 3. the Node wrapper sends a stdin payload to the Go binary via `--config-stdin`
 4. Go parses either a multi-config payload or a legacy single-config payload
@@ -473,7 +473,7 @@ rslint [options] [files...]
 
 ### CLI Processing Flow
 
-The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli.ts`) and the Go binary (`cmd/rslint/`).
+The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli/cli.ts`) and the Go binary (`cmd/rslint/`).
 
 1. **Node.js Wrapper**: parses args, discovers JS/TS configs, and decides whether to use `--config-stdin`
 2. **Config Path Selection**:
@@ -659,15 +659,15 @@ Rules are tested in more than one style depending on where they live:
 
 ## 13. Adding a New Rule (Checklist)
 
-The maintained rule-porting workflow now lives under [`agents/port-rule`](./agents/port-rule/).
+The maintained rule-porting workflow now lives under [`.agents/skills/port-rule`](./.agents/skills/port-rule/).
 
 Use these entry points instead of duplicating a separate checklist here:
 
-- [`agents/port-rule/SKILL.md`](./agents/port-rule/SKILL.md): primary skill entry and workflow
-- [`agents/port-rule/references/PORT_RULE.md`](./agents/port-rule/references/PORT_RULE.md): detailed end-to-end porting guide
-- [`agents/QUICK_REFERENCE.md`](./agents/QUICK_REFERENCE.md): commands, naming conventions, and condensed checklist
+- [`.agents/skills/port-rule/SKILL.md`](./.agents/skills/port-rule/SKILL.md): primary skill entry and workflow
+- [`.agents/skills/port-rule/references/PORT_RULE.md`](./.agents/skills/port-rule/references/PORT_RULE.md): detailed end-to-end porting guide
+- [`.agents/skills/port-rule/references/QUICK_REFERENCE.md`](./.agents/skills/port-rule/references/QUICK_REFERENCE.md): commands, naming conventions, and condensed checklist
 
-If the rule-porting workflow changes, update the material under `agents/port-rule` rather than reintroducing a second checklist in this document.
+If the rule-porting workflow changes, update the material under `.agents/skills/port-rule` rather than reintroducing a second checklist in this document.
 
 ## 14. Dependency Layering & Boundaries
 

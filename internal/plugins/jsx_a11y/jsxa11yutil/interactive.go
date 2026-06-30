@@ -12,8 +12,7 @@ package jsxa11yutil
 //     entries from aria-query's `elementRoles` / axobject-query's
 //     `elementAXObjects`.
 //
-// The data tables snapshot the upstream output of the same filter pipeline
-// — see the script in `agents/port-rule/notes` for the regenerator.
+// The data tables snapshot the upstream output of the same filter pipeline.
 //
 // Behavior parity caveat — schema-level `constraints` (e.g. "scoped to the
 // body element", "ancestor table element has grid role") are NOT modeled.

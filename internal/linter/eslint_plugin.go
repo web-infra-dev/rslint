@@ -328,7 +328,7 @@ func eslintPluginBatchKey(f EslintPluginFileInput) string {
 func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestionsMode string) EslintPluginLintRequest {
 	rules := map[string]EslintPluginRuleConfig{}
 	for _, r := range batch[0].Rules {
-		rules[r.Name] = EslintPluginRuleConfig{Options: optionsToArray(r.Options)}
+		rules[r.Name] = EslintPluginRuleConfig{Options: rule.NormalizeOptions(r.Options)}
 	}
 	wireFiles := make([]EslintPluginLintFile, 0, len(batch))
 	for _, f := range batch {
@@ -345,19 +345,6 @@ func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestio
 		Rules:           rules,
 		Fix:             fix,
 		SuggestionsMode: suggestionsMode,
-	}
-}
-
-// optionsToArray normalizes rslint's RuleConfig.Options (nil / single value
-// / array) into ESLint's options array (context.options).
-func optionsToArray(opts any) []any {
-	switch v := opts.(type) {
-	case nil:
-		return []any{}
-	case []any:
-		return v
-	default:
-		return []any{opts}
 	}
 }
 

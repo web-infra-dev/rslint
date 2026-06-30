@@ -1,5 +1,4 @@
 import { describe, test, expect } from '@rstest/core';
-import path from 'node:path';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
 import type { LintTask } from '../../src/eslint-plugin/worker-pool.js';
@@ -10,6 +9,10 @@ import {
   task,
 } from './worker-pool-e2e-helpers.js';
 import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
+import {
+  runPoolScenario,
+  formatScenarioFailure,
+} from './pool-isolation/harness.js';
 
 /**
  * WorkerPool end-to-end — lifecycle: init + lintBatch + shutdown happy
@@ -156,90 +159,17 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       await pool.shutdown();
     });
 
-    // pool.shutdown() posts {kind:'shutdown'} to every worker and waits
-    // up to 5 s for each to exit cooperatively before falling back to
-    // `worker.terminate()`. This invariant matters when the host (CLI
-    // parent on Ctrl-C, VS Code on extension dispose, …) tears the pool
-    // down while a plugin listener is wedged in a sync infinite loop —
-    // the worker can't even process the inbound shutdown message, so
-    // graceful exit is impossible and the pool must escalate to a forced
-    // terminate. Test fires a never-completing task, calls shutdown
-    // without a per-task timeout, and asserts the pool fully drains
-    // within grace + slack.
+    // A plugin listener wedged in a sync infinite loop can't process the
+    // inbound shutdown message, so shutdown must escalate to a forced
+    // terminate() after the 5s grace. Terminating an oxc-napi worker can
+    // native-abort below the JS layer on Windows — run it isolated (see
+    // ./pool-isolation/runner.mjs). PASS = clean terminate; TOLERATED-PASS =
+    // pool reached terminate then the subprocess aborted; FAIL = hang, failed
+    // in-child assertion, or a crash before the terminate point.
     test('shutdown drains a sync-wedged worker via terminate fallback within grace', async () => {
-      const hangConfigPath = path.resolve(
-        __dirname,
-        'fixtures',
-        'hang.config.mjs',
-      );
-      const hangConfigDir = path.dirname(hangConfigPath);
-
-      const pool = new WorkerPool({
-        configs: [
-          {
-            configPath: hangConfigPath,
-            configDirectory: hangConfigDir,
-          },
-        ],
-        workerCount: 1,
-        // 60 s — longer than the test ceiling, so a task_timeout-driven
-        // respawn can't preempt the shutdown path we're trying to test.
-        taskTimeoutMs: 60_000,
-      });
-      await pool.init();
-
-      // Fire-and-forget: the hang listener spins forever on Program, so
-      // the task never resolves naturally. shutdown is the only force
-      // that can free the pool.
-      const wedgeP = pool.lintBatch([
-        {
-          filePath: 'wedge.ts',
-          text: 'const x = 1;\n',
-          rules: { 'hang/hang': { options: [] } },
-          collectFixes: false,
-          suggestionsMode: 'off',
-          configKey: hangConfigDir,
-        },
-      ]);
-
-      // Brief grace so the worker is actually inside the sync hang
-      // when shutdown lands. Without this the worker might still be
-      // sitting in its inbound queue and could process the shutdown
-      // message before entering the loop — a different (faster) path
-      // that doesn't exercise the terminate fallback we're testing.
-      await new Promise((r) => setTimeout(r, 200));
-
-      const shutdownStart = Date.now();
-      await pool.shutdown();
-      const elapsed = Date.now() - shutdownStart;
-
-      // worker-pool.ts grace = 5 s; total elapsed = grace + small
-      // overhead for terminate() to actually kill the worker thread.
-      // Lower bound 4.5 s catches a regression where shutdown returns
-      // immediately (without waiting for the worker). Upper bound 8 s
-      // catches a regression where the terminate fallback never fires.
-      expect(elapsed).toBeGreaterThanOrEqual(4_500);
-      expect(elapsed).toBeLessThan(8_000);
-
-      // In-flight tasks resolve with a sentinel parseError instead of
-      // hanging the caller forever. worker-pool.ts:539-548 maps the
-      // shutdown-kind rejection back to a result-shaped failure so
-      // callers (internal/linter) see one file as plugin-lint-failed rather
-      // than the whole batch throwing.
-      const wedgeResults = await wedgeP;
-      expect(wedgeResults).toHaveLength(1);
-      expect(wedgeResults[0].parseError).toBe('shutdown');
-
-      // Pool is fully drained — no leaked worker slot.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const finalWorkers = (pool as any).workers as Array<unknown>;
-      expect(finalWorkers.length).toBe(0);
-
-      // Idempotent: a second shutdown returns instantly without throwing.
-      const secondStart = Date.now();
-      await pool.shutdown();
-      expect(Date.now() - secondStart).toBeLessThan(50);
-    }, 15_000);
+      const r = await runPoolScenario('hang-shutdown');
+      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
+    }, 20_000);
 
     // U12: a single WorkerPool instance must support N lintBatch calls
     // in sequence (the CLI's fix-loop and the LSP's continuous edit
@@ -291,79 +221,22 @@ describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
       await pool.shutdown();
     }, 30_000);
 
-    // U11: a plugin that installs a `setInterval` (or any unref-able
-    // timer) during its module top-level must NOT prevent the worker
-    // from exiting on shutdown. The worker process keeps running until
-    // the event loop drains; an unref'd timer is fine, but a refed
-    // setInterval would keep the worker alive past `pool.shutdown()`,
-    // hanging the parent's Wait.
+    // U11: a plugin with a refed top-level `setInterval` keeps the worker event
+    // loop alive, so `pool.shutdown()` can't drain it cooperatively and must
+    // escalate to a forced `terminate()`. Terminating a worker that holds the
+    // oxc-napi addon can native-abort below the JS layer on Windows — which
+    // would crash THIS test process if the pool ran in-process. So the scenario
+    // runs in an isolated subprocess (see ./pool-isolation/runner.mjs): a native
+    // abort is confined there, and the pool's outcome comes back via milestones.
     //
-    // The test uses a fixture plugin that creates a setInterval in its
-    // top-level, then verifies pool.shutdown completes in bounded time.
-    // If the timer kept the worker alive, shutdown would either time
-    // out (caught by Jest's per-test timeout) or rely on terminate()
-    // fallback (visible via a longer-than-expected elapsed time).
+    //   PASS           = clean terminate (mac/linux): shutdown bounded + drained
+    //   TOLERATED-PASS = pool reached terminate, then the subprocess aborted
+    //                    (Windows napi teardown) — the pool still did its job
+    //   FAIL           = hang, failed in-child assertion, or a crash BEFORE the
+    //                    terminate point — a real regression
     test('U11: plugin with a top-level setInterval — shutdown still terminates the worker', async () => {
-      const cfgDir = path.resolve(__dirname, 'fixtures');
-      const cfgPath = path.join(cfgDir, '_u11.config.mjs');
-      const pluginPath = path.join(cfgDir, '_u11-plugin.mjs');
-      await import('node:fs/promises').then((fs) =>
-        Promise.all([
-          fs.writeFile(
-            pluginPath,
-            `// Intentionally schedules a REFED interval that would
-// otherwise keep the worker alive forever. The test pins that
-// pool.shutdown() still tears the worker down within a bounded
-// elapsed window (5 s graceful + terminate fallback).
-const _interval = setInterval(() => { /* never fires within test */ }, 60_000);
-// eslint-disable-next-line no-unused-vars
-export default {
-  meta: { name: 'u11-interval-plugin' },
-  rules: { noop: { meta: {}, create() { return {}; } } },
-};
-`,
-            'utf8',
-          ),
-          fs.writeFile(
-            cfgPath,
-            `import plugin from './_u11-plugin.mjs';
-export default [{ plugins: { u11: plugin } }];
-`,
-            'utf8',
-          ),
-        ]),
-      );
-
-      try {
-        const pool = new WorkerPool({
-          configs: [{ configPath: cfgPath, configDirectory: cfgDir }],
-          workerCount: 1,
-        });
-        await pool.init();
-
-        const start = Date.now();
-        await pool.shutdown();
-        const elapsed = Date.now() - start;
-
-        // Worker pool's shutdown gives each worker up to 5s graceful
-        // before terminate(). A worker keeping its event loop alive
-        // via setInterval would hit terminate fallback — bounded by
-        // grace + small overhead. Test fails if shutdown is unbounded
-        // (i.e. hangs past 10s) or if terminate fallback itself fails
-        // (worker_threads.terminate is OS-level and very reliable).
-        expect(elapsed).toBeLessThan(8_000);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const workers = (pool as any).workers as Array<unknown>;
-        expect(workers).toHaveLength(0);
-      } finally {
-        await import('node:fs/promises').then((fs) =>
-          Promise.all([
-            fs.rm(cfgPath, { force: true }),
-            fs.rm(pluginPath, { force: true }),
-          ]),
-        );
-      }
-    }, 15_000);
+      const r = await runPoolScenario('u11');
+      expect(r.verdict, formatScenarioFailure(r)).not.toBe('FAIL');
+    }, 20_000);
   },
 );

@@ -522,7 +522,7 @@ const maxFixPasses = 10
 // handleFixAllCodeAction computes all auto-fixes for the given URI using
 // multi-pass fixing: each pass lints → applies fixes → updates the session
 // overlay, repeating until no more fixes are found or maxFixPasses is reached.
-// This handles cascading fixes (e.g. ban-types fix triggers no-inferrable-types).
+// This handles cascading fixes (e.g. no-wrapper-object-types fix triggers no-inferrable-types).
 // It does NOT push diagnostics or update s.diagnostics — that is left to the
 // subsequent didSave handler in the normal save flow.
 func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.DocumentUri) (lsproto.CodeActionResponse, error) {

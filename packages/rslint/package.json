@@ -1,21 +1,21 @@
 {
   "name": "@rslint/core",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "exports": {
     ".": {
       "@typescript/source": "./src/index.ts",
       "default": "./dist/index.js"
     },
-    "./browser": {
-      "@typescript/source": "./src/browser.ts",
-      "default": "./dist/browser.js"
-    },
     "./service": {
-      "@typescript/source": "./src/service.ts",
+      "@typescript/source": "./src/service/service.ts",
       "default": "./dist/service.js"
     },
+    "./internal": {
+      "@typescript/source": "./src/internal/node.ts",
+      "default": "./dist/internal.js"
+    },
     "./config-loader": {
-      "@typescript/source": "./src/config-loader.ts",
+      "@typescript/source": "./src/config/config-loader.ts",
       "default": "./dist/config-loader.js"
     },
     "./eslint-plugin": {
@@ -56,13 +56,11 @@
     "rslint",
     "linter",
     "typescript",
-    "go",
-    "browser",
-    "webworker"
+    "go"
   ],
   "devDependencies": {
-    "@eslint/plugin-kit": "0.3.5",
-    "@rslib/core": "0.22.0",
+    "@eslint/plugin-kit": "0.7.2",
+    "@rslib/core": "0.23.0",
     "@rslint/api": "workspace:*",
     "@types/node": "24.0.14",
     "@types/picomatch": "4.0.2",

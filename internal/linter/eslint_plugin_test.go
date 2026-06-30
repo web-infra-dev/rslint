@@ -548,27 +548,6 @@ func TestDispatchEslintPlugin_FrameReuseOverlayAndNoFrame(t *testing.T) {
 	}
 }
 
-func TestOptionsToArray(t *testing.T) {
-	if got := optionsToArray(nil); len(got) != 0 {
-		t.Errorf("nil → empty array, got %v", got)
-	}
-	got := optionsToArray([]any{"a", "b"})
-	if len(got) != 2 || got[0] != "a" || got[1] != "b" {
-		t.Errorf("array → passthrough preserving elements, got %v", got)
-	}
-	single := optionsToArray(map[string]any{"k": 1})
-	if len(single) != 1 || !reflect.DeepEqual(single[0], map[string]any{"k": 1}) {
-		t.Errorf("single object → wrapped 1-element array holding the object, got %v", single)
-	}
-	// A lone array-valued option (["error", ["a","b"]] → Options [["a","b"]])
-	// must surface as context.options == [["a","b"]]: one element that is the
-	// array itself, not the two strings flattened into the options list.
-	nested := optionsToArray([]any{[]any{"a", "b"}})
-	if len(nested) != 1 || !reflect.DeepEqual(nested[0], []any{"a", "b"}) {
-		t.Errorf("single array option → context.options [[a,b]], got %v", nested)
-	}
-}
-
 // TestEslintPluginWire_RoundTrip pins the wire JSON keys against the Node
 // worker's plugin-lint-protocol.ts. A silent key drift (e.g. startPos →
 // start) would drop data on the wire without a compile error, so assert every

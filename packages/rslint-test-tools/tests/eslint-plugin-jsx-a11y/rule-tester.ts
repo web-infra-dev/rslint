@@ -1,7 +1,7 @@
 import path from 'node:path';
 import util from 'node:util';
 
-import { lint } from '@rslint/core';
+import { lint } from '@rslint/core/internal';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
 
@@ -84,25 +84,26 @@ export class RuleTester {
               : (validCase.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
 
-          const { configPath, cleanup } = await buildConfigForSettings(
-            config,
-            settings,
-          );
-          let diags;
-          try {
-            diags = await lint({
-              config: configPath,
-              workingDirectory: cwd,
-              fileContents: {
-                [absoluteFilename]: code,
+          const { config: resolvedConfig, configDirectory } =
+            await buildConfigForSettings(config, settings);
+          const diags = await lint({
+            config: [
+              ...resolvedConfig,
+              {
+                rules: {
+                  [ruleName]:
+                    Array.isArray(options) && options.length > 0
+                      ? ['error', ...options]
+                      : 'error',
+                },
               },
-              ruleOptions: {
-                [ruleName]: options,
-              },
-            });
-          } finally {
-            cleanup();
-          }
+            ],
+            configDirectory,
+            workingDirectory: cwd,
+            fileContents: {
+              [absoluteFilename]: code,
+            },
+          });
 
           assert(
             diags.diagnostics?.length === 0,
@@ -130,25 +131,26 @@ export class RuleTester {
               ? defaultFilename
               : (item.filename ?? defaultFilename);
           const absoluteFilename = path.resolve(import.meta.dirname, filename);
-          const { configPath, cleanup } = await buildConfigForSettings(
-            config,
-            settings,
-          );
-          let diags;
-          try {
-            diags = await lint({
-              config: configPath,
-              workingDirectory: cwd,
-              fileContents: {
-                [absoluteFilename]: code,
+          const { config: resolvedConfig, configDirectory } =
+            await buildConfigForSettings(config, settings);
+          const diags = await lint({
+            config: [
+              ...resolvedConfig,
+              {
+                rules: {
+                  [ruleName]:
+                    Array.isArray(options) && options.length > 0
+                      ? ['error', ...options]
+                      : 'error',
+                },
               },
-              ruleOptions: {
-                [ruleName]: options,
-              },
-            });
-          } finally {
-            cleanup();
-          }
+            ],
+            configDirectory,
+            workingDirectory: cwd,
+            fileContents: {
+              [absoluteFilename]: code,
+            },
+          });
 
           if (typeof item.errors === 'number') {
             if (item.errors === 0) {
