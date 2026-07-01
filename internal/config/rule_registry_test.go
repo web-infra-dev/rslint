@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -338,7 +340,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 			Rules: Rules{
 				"@typescript-eslint/no-explicit-any": "error",
 				"react/jsx-uses-react":               "error",
-				"import/no-self-import":               "error", // import plugin NOT in plugins array
+				"import/no-self-import":              "error", // import plugin NOT in plugins array
 			},
 		},
 	}
@@ -446,7 +448,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 			Files:   []string{"**/*.tsx"},
 			Plugins: []string{"react"},
 			Rules: Rules{
-				"react/jsx-uses-react":             "error",
+				"react/jsx-uses-react":              "error",
 				"@typescript-eslint/ban-ts-comment": "error", // TS rule in react entry
 			},
 		},
@@ -641,4 +643,140 @@ func ruleNameSet(rules []linter.ConfiguredRule) map[string]bool {
 		set[r.Name] = true
 	}
 	return set
+}
+
+func TestValidateConfig_ReturnsErrors(t *testing.T) {
+	RegisterAllRules()
+
+	// Invalid config: "allow" option of no-console should be an array of strings, not a number
+	invalidConfig := RslintConfig{
+		{
+			Rules: Rules{
+				"no-console": []interface{}{
+					"error",
+					map[string]interface{}{
+						"allow": 123,
+					},
+				},
+			},
+		},
+	}
+
+	errs := GlobalRuleRegistry.ValidateConfig(invalidConfig)
+	if len(errs) == 0 {
+		t.Fatal("Expected validation errors, got none")
+	}
+
+	foundNoConsoleErr := false
+	for _, err := range errs {
+		if strings.Contains(err.Error(), `configuration validation failed for rule "no-console"`) {
+			foundNoConsoleErr = true
+		}
+	}
+	if !foundNoConsoleErr {
+		t.Errorf("Expected a validation error for 'no-console', got: %v", errs)
+	}
+
+	// Valid config should return no errors
+	validConfig := RslintConfig{
+		{
+			Rules: Rules{
+				"no-console": []interface{}{
+					"error",
+					map[string]interface{}{
+						"allow": []interface{}{"log", "warn"},
+					},
+				},
+			},
+		},
+	}
+	errs = GlobalRuleRegistry.ValidateConfig(validConfig)
+	if len(errs) > 0 {
+		t.Errorf("Expected no validation errors, got %d: %v", len(errs), errs)
+	}
+}
+
+func TestValidateConfig_HydratesAndBypasses(t *testing.T) {
+	RegisterAllRules()
+
+	config := RslintConfig{
+		{
+			Rules: Rules{
+				"no-console": []interface{}{
+					"error",
+					map[string]interface{}{
+						"allow": []interface{}{"warn"},
+					},
+				},
+			},
+		},
+	}
+
+	// Before validation: the rule value is []interface{}
+	ruleValBefore := config[0].Rules["no-console"]
+	if _, ok := ruleValBefore.([]interface{}); !ok {
+		t.Fatalf("Expected raw config to be []interface{}, got %T", ruleValBefore)
+	}
+
+	errs := GlobalRuleRegistry.ValidateConfig(config)
+	if len(errs) > 0 {
+		t.Fatalf("Expected no validation errors, got: %v", errs)
+	}
+
+	// After validation: the rule value should be mutated to *RuleConfig, and hydrated
+	ruleValAfter := config[0].Rules["no-console"]
+	rc, ok := ruleValAfter.(*RuleConfig)
+	if !ok {
+		t.Fatalf("Expected config value to be mutated to *RuleConfig, got %T", ruleValAfter)
+	}
+
+	if len(rc.Options) == 0 {
+		t.Fatal("Expected Options to be hydrated and populated, got empty")
+	}
+
+	// Mutate the cached options to a dummy value to prove that GetEnabledRules bypasses validation
+	// and retrieves/uses the cached options directly.
+	dummyOptions := []any{"dummy-option"}
+	rc.Options = dummyOptions
+
+	enabledRules, _ := GlobalRuleRegistry.GetEnabledRules(config, "test.js", "", false)
+	var noConsoleRule *linter.ConfiguredRule
+	for i := range enabledRules {
+		if enabledRules[i].Name == "no-console" {
+			noConsoleRule = &enabledRules[i]
+			break
+		}
+	}
+
+	if noConsoleRule == nil {
+		t.Fatal("Expected no-console rule to be enabled")
+	}
+
+	// Assert that it used our dummy cached options
+	opts, ok := noConsoleRule.Options.([]any)
+	if !ok || len(opts) != 1 || opts[0] != "dummy-option" {
+		t.Errorf("Expected GetEnabledRules to use cached options %v, got %v", dummyOptions, noConsoleRule.Options)
+	}
+}
+
+func TestRegister_PanicOnRunWithOptionsWithoutSchema(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected Register to panic for rule with RunWithOptions but no Schema")
+		} else {
+			expectedMsg := `rule "bad-rule" has RunWithOptions but no Schema`
+			actualMsg := fmt.Sprint(r)
+			if !strings.Contains(actualMsg, expectedMsg) {
+				t.Errorf("Expected panic message to contain %q, got %q", expectedMsg, actualMsg)
+			}
+		}
+	}()
+
+	registry := NewRuleRegistry()
+	registry.Register("bad-rule", rule.Rule{
+		Name: "bad-rule",
+		RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+			return rule.RuleListeners{}
+		},
+	})
 }

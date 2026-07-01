@@ -104,59 +104,20 @@ func reportEqeqeq(ctx rule.RuleContext, operatorToken *ast.Node, left, right *as
 	rule.ReportNodeWithFixesOrSuggestions(ctx, operatorToken, canAutofix, msg, suggestionMsg, fix)
 }
 
-// eqeqeqOptions holds parsed options for the rule.
-type eqeqeqOptions struct {
-	mode       string // "always", "smart", "allow-null"
-	nullOption string // "always", "never", "ignore" (only used in "always" mode)
-}
-
-// parseOptions extracts the mode and null sub-option from the rule options.
-func parseOptions(opts any) eqeqeqOptions {
-	result := eqeqeqOptions{
-		mode:       "always",
-		nullOption: "always",
-	}
-
-	if opts == nil {
-		return result
-	}
-
-	// Options can be:
-	// 1. A string: "always", "smart", "allow-null"
-	// 2. An array: ["always", {"null": "ignore"}]
-	switch v := opts.(type) {
-	case string:
-		result.mode = v
-	case []interface{}:
-		if len(v) > 0 {
-			if modeStr, ok := v[0].(string); ok {
-				result.mode = modeStr
-			}
-		}
-		if len(v) > 1 {
-			if optsMap, ok := v[1].(map[string]interface{}); ok {
-				if nullVal, ok := optsMap["null"].(string); ok {
-					result.nullOption = nullVal
-				}
-			}
-		}
-	}
-
-	// "allow-null" is shorthand for ["always", {"null": "ignore"}]
-	if result.mode == "allow-null" {
-		result.mode = "always"
-		result.nullOption = "ignore"
-	}
-
-	return result
-}
-
 // EqeqeqRule requires use of === and !==.
 // https://eslint.org/docs/latest/rules/eqeqeq
 var EqeqeqRule = rule.Rule{
 	Name: "eqeqeq",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema: rule.Tuple(
+		rule.Enum("always", "smart").Default("always"),
+		rule.Object(map[string]rule.Schema{
+			"null": rule.Enum("always", "never", "ignore").Default("always"),
+		}),
+	),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		mode := rule.Must[string](options[0])
+		optsMap := rule.Must[map[string]any](options[1])
+		nullOption := rule.Must[string](optsMap["null"])
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
@@ -173,9 +134,9 @@ var EqeqeqRule = rule.Rule{
 					return
 				}
 
-				switch opts.mode {
+				switch mode {
 				case "always":
-					handleAlwaysMode(ctx, binary, opKind, left, right, opts.nullOption)
+					handleAlwaysMode(ctx, binary, opKind, left, right, nullOption)
 				case "smart":
 					handleSmartMode(ctx, binary, opKind, left, right)
 				}

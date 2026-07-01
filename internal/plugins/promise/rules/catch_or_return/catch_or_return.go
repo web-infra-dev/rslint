@@ -6,7 +6,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const skipTransparent = ast.OEKParentheses
@@ -16,37 +15,6 @@ type Options struct {
 	AllowThenStrict   bool
 	AllowFinally      bool
 	TerminationMethod []string
-}
-
-func parseOptions(options any) Options {
-	opts := Options{TerminationMethod: []string{"catch"}}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
-		return opts
-	}
-	if v, ok := optsMap["allowThen"].(bool); ok {
-		opts.AllowThen = v
-	}
-	if v, ok := optsMap["allowThenStrict"].(bool); ok {
-		opts.AllowThenStrict = v
-	}
-	if v, ok := optsMap["allowFinally"].(bool); ok {
-		opts.AllowFinally = v
-	}
-	if v, ok := optsMap["terminationMethod"].(string); ok {
-		opts.TerminationMethod = []string{v}
-	} else if arr, ok := optsMap["terminationMethod"].([]interface{}); ok {
-		methods := make([]string, 0, len(arr))
-		for _, m := range arr {
-			if s, ok := m.(string); ok {
-				methods = append(methods, s)
-			}
-		}
-		if len(methods) > 0 {
-			opts.TerminationMethod = methods
-		}
-	}
-	return opts
 }
 
 func buildTerminationMessage(methods []string) rule.RuleMessage {
@@ -107,8 +75,38 @@ func isAllowedPromiseTermination(expression *ast.Node, opts Options) bool {
 
 var CatchOrReturnRule = rule.Rule{
 	Name: "promise/catch-or-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"allowThen":         rule.Bool().Default(false),
+		"allowThenStrict":   rule.Bool().Default(false),
+		"allowFinally":      rule.Bool().Default(false),
+		"terminationMethod": rule.Union(rule.String(), rule.Array(rule.String())).Default("catch"),
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap := rule.Must[map[string]any](options[0])
+
+		var terminationMethod []string
+		if t, ok := optsMap["terminationMethod"].(string); ok {
+			terminationMethod = []string{t}
+		} else if arr, ok := optsMap["terminationMethod"].([]any); ok && len(arr) > 0 {
+			terminationMethod = make([]string, len(arr))
+			for i, v := range arr {
+				terminationMethod[i] = rule.Must[string](v)
+			}
+		} else {
+			// empty array: fall back to default
+			terminationMethod = []string{"catch"}
+		}
+
+		allowThen := rule.Must[bool](optsMap["allowThen"])
+		allowThenStrict := rule.Must[bool](optsMap["allowThenStrict"])
+		allowFinally := rule.Must[bool](optsMap["allowFinally"])
+		opts := Options{
+			AllowThen:         allowThen,
+			AllowThenStrict:   allowThenStrict,
+			AllowFinally:      allowFinally,
+			TerminationMethod: terminationMethod,
+		}
+
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
 				expr := ast.SkipOuterExpressions(node.AsExpressionStatement().Expression, skipTransparent)

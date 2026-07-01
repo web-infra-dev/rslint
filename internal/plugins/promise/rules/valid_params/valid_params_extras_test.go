@@ -64,13 +64,13 @@ func TestValidParamsExtras(t *testing.T) {
 			// This rule does not provide fixes.
 
 			// ---- Branch lock-in: exclude parses []string in Go tests as well as JSON []interface{} ----
-			{Code: `somePromise().catch(TypeError, handler)`, Options: map[string]interface{}{"exclude": []string{"catch"}}},
+			{Code: `somePromise().catch(TypeError, handler)`, Options: []interface{}{map[string]interface{}{"exclude": []string{"catch"}}}},
 
 			// ---- Branch lock-in: unknown methods are ignored even when nested after a promise call ----
 			{Code: `Promise.resolve(1).unknown(1, 2, 3)`},
 
 			// ---- Real-user: Bluebird filtered catch can be excluded ----
-			{Code: `fetchData().catch(TypeError, recover).catch(logError)`, Options: map[string]interface{}{"exclude": []interface{}{"catch"}}},
+			{Code: `fetchData().catch(TypeError, recover).catch(logError)`, Options: []interface{}{map[string]interface{}{"exclude": []interface{}{"catch"}}}},
 
 			// ---- Real-user: type checker would reject this, upstream valid-params does not ----
 			{Code: `Promise.all(123)`},
@@ -119,7 +119,7 @@ func TestValidParamsExtras(t *testing.T) {
 			// ---- Branch lock-in: exclude only suppresses listed method ----
 			{
 				Code:    `somePromise().then().catch(TypeError, handler)`,
-				Options: map[string]interface{}{"exclude": []interface{}{"catch"}},
+				Options: []interface{}{map[string]interface{}{"exclude": []interface{}{"catch"}}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "requireTwoOptionalArguments", Message: "Promise.then() requires 1 or 2 arguments, but received 0", Line: 1, Column: 1}},
 			},
 

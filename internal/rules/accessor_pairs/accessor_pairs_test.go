@@ -8,14 +8,14 @@ import (
 )
 
 func TestAccessorPairsRule(t *testing.T) {
-	bothOpts := map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true}
-	setOnlyOpts := map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false}
-	getOnlyOpts := map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true}
-	noneOpts := map[string]interface{}{"setWithoutGet": false, "getWithoutSet": false}
-	classBoth := map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true, "enforceForClassMembers": true}
-	classOff := map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true, "enforceForClassMembers": false}
-	tsOnly := map[string]interface{}{"enforceForTSTypes": true}
-	tsGetAlso := map[string]interface{}{"enforceForTSTypes": true, "getWithoutSet": true}
+	bothOpts := []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true}}
+	setOnlyOpts := []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false}}
+	getOnlyOpts := []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true}}
+	noneOpts := []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": false}}
+	classBoth := []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true, "enforceForClassMembers": true}}
+	classOff := []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true, "enforceForClassMembers": false}}
+	tsOnly := []interface{}{map[string]interface{}{"enforceForTSTypes": true}}
+	tsGetAlso := []interface{}{map[string]interface{}{"enforceForTSTypes": true, "getWithoutSet": true}}
 
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -29,7 +29,7 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			// Default: getWithoutSet=false, so lone getter is valid
 			{Code: `var o = { get a() {} }`},
-			{Code: `var o = { get a() {} }`, Options: map[string]interface{}{}},
+			{Code: `var o = { get a() {} }`, Options: []interface{}{map[string]interface{}{}}},
 
 			// No accessors
 			{Code: `var o = {};`, Options: bothOpts},
@@ -96,24 +96,24 @@ func TestAccessorPairsRule(t *testing.T) {
 			{Code: `var o = {set: function() {}}`},
 			{Code: `Object.defineProperties(obj, {set: {value: function() {}}});`},
 			{Code: `Object.create(null, {set: {value: function() {}}});`},
-			{Code: `var o = {get: function() {}}`, Options: map[string]interface{}{"getWithoutSet": true}},
+			{Code: `var o = {get: function() {}}`, Options: []interface{}{map[string]interface{}{"getWithoutSet": true}}},
 			{Code: `var o = {[set]: function() {}}`},
 			{Code: `var set = 'value'; Object.defineProperty(obj, 'foo', {[set]: function(value) {}});`},
 
 			// Classes — default (no errors without enforceForClassMembers or with options off)
-			{Code: `class A { get a() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class A { get #a() {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}},
-			{Code: `class A { set a(foo) {} }`, Options: map[string]interface{}{"enforceForClassMembers": false}},
+			{Code: `class A { get a() {} }`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class A { get #a() {} }`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}},
+			{Code: `class A { set a(foo) {} }`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": false}}},
 			{Code: `class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }`, Options: classOff},
 			{Code: `(class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} });`, Options: classOff},
 
 			// Class — individual options disabled
-			{Code: `class A { get a() {} }`, Options: map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true}},
-			{Code: `class A { set a(foo) {} }`, Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
-			{Code: `class A { static get a() {} }`, Options: map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true}},
-			{Code: `class A { static set a(foo) {} }`, Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
-			{Code: `A = class { set a(foo) {} };`, Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
-			{Code: `class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }`, Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": false, "enforceForClassMembers": true}},
+			{Code: `class A { get a() {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true}}},
+			{Code: `class A { set a(foo) {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}}},
+			{Code: `class A { static get a() {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true}}},
+			{Code: `class A { static set a(foo) {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}}},
+			{Code: `A = class { set a(foo) {} };`, Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}}},
+			{Code: `class A { get a() {} set b(foo) {} static get c() {} static set d(bar) {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": false, "enforceForClassMembers": true}}},
 
 			// Class — no accessors
 			{Code: `class A {}`, Options: classBoth},
@@ -166,17 +166,17 @@ func TestAccessorPairsRule(t *testing.T) {
 			// TS — default off, lone setter/getter in types is valid
 			{Code: `interface I { get prop(): any }`},
 			{Code: `type T = { set prop(value: any): void }`},
-			{Code: `interface I { get prop(): any, set prop(value: any): void }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `type T = { get prop(): any, set prop(value: any): void }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { get prop(): any, between: true, set prop(value: any): void }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { set prop(value: any): void, get prop(): any }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { set prop(value: any): void, get 'prop'(): any }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I {}`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { (...args): void }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { new(...args): unknown }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { prop: () => any }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `interface I { method(): any }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
-			{Code: `type T = { get prop(): any }`, Options: map[string]interface{}{"enforceForTSTypes": true}},
+			{Code: `interface I { get prop(): any, set prop(value: any): void }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `type T = { get prop(): any, set prop(value: any): void }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { get prop(): any, between: true, set prop(value: any): void }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { set prop(value: any): void, get prop(): any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { set prop(value: any): void, get 'prop'(): any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I {}`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { (...args): void }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { new(...args): unknown }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { prop: () => any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `interface I { method(): any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
+			{Code: `type T = { get prop(): any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}}},
 
 			// ---- Structural matching of computed keys ----
 
@@ -272,7 +272,6 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			// `[/a/]` and string `'/a/'` both normalize to static name "/a/".
 			{Code: `var o = { get '/a/'() {}, set [/a/](v) {} };`, Options: bothOpts},
-
 		},
 		[]rule_tester.InvalidTestCase{
 			// Default — setter without getter
@@ -312,7 +311,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			{
 				Code:    `var o = { get a() {} };`,
-				Options: map[string]interface{}{"getWithoutSet": true},
+				Options: []interface{}{map[string]interface{}{"getWithoutSet": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingSetterInObjectLiteral", Line: 1, Column: 11},
 				},
@@ -582,7 +581,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			{
 				Code:    `class A { get a() {} set b(foo) {} }`,
-				Options: map[string]interface{}{},
+				Options: []interface{}{map[string]interface{}{}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInClass"},
 				},
@@ -899,7 +898,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			// Spread in descriptor: treated syntactically, only named properties are
 			// considered — so {...d, set: ...} still counts as "set without get".
 			{
-				Code:    `Object.defineProperty(o, 'k', {...d, set: function(v) {}});`,
+				Code: `Object.defineProperty(o, 'k', {...d, set: function(v) {}});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInPropertyDescriptor"},
 				},
@@ -915,7 +914,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			// Parenthesized Object.defineProperties callee with optional chain.
 			{
-				Code:    `(Object?.defineProperties)(obj, {foo: {set: function(v){}}});`,
+				Code: `(Object?.defineProperties)(obj, {foo: {set: function(v){}}});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInPropertyDescriptor"},
 				},
@@ -931,7 +930,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			{
 				Code:    `Object.defineProperty(o, 'k', {get() { return 1; }});`,
-				Options: map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingSetterInPropertyDescriptor"},
 				},
@@ -1122,13 +1121,13 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			// ---- Classes: default / enforceForClassMembers:true echo ----
 
-			{Code: `class A { set a(foo) {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
+			{Code: `class A { set a(foo) {} }`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
 			{Code: `class A { set a(foo) {} }`, Options: classBoth, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
 			{Code: `A = class { get a() {} };`, Options: classBoth, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}}},
-			{Code: `class A { set a(value) {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
-			{Code: `class A { static set a(value) {} }`, Options: map[string]interface{}{"enforceForClassMembers": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
-			{Code: `A = class { set a(value) {} };`, Options: map[string]interface{}{"enforceForClassMembers": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
-			{Code: `(class A { static set a(value) {} });`, Options: map[string]interface{}{"enforceForClassMembers": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
+			{Code: `class A { set a(value) {} }`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
+			{Code: `class A { static set a(value) {} }`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
+			{Code: `A = class { set a(value) {} };`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
+			{Code: `(class A { static set a(value) {} });`, Options: []interface{}{map[string]interface{}{"enforceForClassMembers": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}}},
 
 			// ---- Class private-identifier forms ----
 
@@ -1139,7 +1138,7 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			{
 				Code:    `class A { set a(value) {} }`,
-				Options: map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass"}},
 			},
 			{
@@ -1149,7 +1148,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			{
 				Code:    `let foo = class A { get a() {} };`,
-				Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}},
 			},
 			{
@@ -1159,27 +1158,27 @@ func TestAccessorPairsRule(t *testing.T) {
 			},
 			{
 				Code:    `(class { get a() {} });`,
-				Options: map[string]interface{}{"getWithoutSet": true, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}},
 			},
 			{
 				Code:    `class A { get '#a'() {} };`,
-				Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}},
 			},
 			{
 				Code:    `class A { get #a() {} };`,
-				Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}},
 			},
 			{
 				Code:    `class A { static get '#a'() {} };`,
-				Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}},
 			},
 			{
 				Code:    `class A { static get #a() {} };`,
-				Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true},
+				Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass"}},
 			},
 
@@ -1207,11 +1206,11 @@ func TestAccessorPairsRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `class A { get a() {} set b(foo) {} }`, Options: map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true},
+				Code: `class A { get a() {} set b(foo) {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": false, "getWithoutSet": true, "enforceForClassMembers": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingSetterInClass", Line: 1, Column: 11}},
 			},
 			{
-				Code: `class A { get a() {} set b(foo) {} }`, Options: map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true},
+				Code: `class A { get a() {} set b(foo) {} }`, Options: []interface{}{map[string]interface{}{"setWithoutGet": true, "getWithoutSet": false, "enforceForClassMembers": true}},
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingGetterInClass", Line: 1, Column: 22}},
 			},
 			{
@@ -1627,13 +1626,13 @@ func TestAccessorPairsRule(t *testing.T) {
 
 			// TS: interface / type literal.
 			{
-				Code: `interface I { set prop(value: any): any }`, Options: map[string]interface{}{"enforceForTSTypes": true},
+				Code: `interface I { set prop(value: any): any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInType", Message: "Getter is not present for type setter 'prop'."},
 				},
 			},
 			{
-				Code: `type T = { get prop(): any }`, Options: map[string]interface{}{"enforceForTSTypes": true, "getWithoutSet": true},
+				Code: `type T = { get prop(): any }`, Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true, "getWithoutSet": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingSetterInType", Message: "Setter is not present for type getter 'prop'."},
 				},
@@ -1645,7 +1644,7 @@ func TestAccessorPairsRule(t *testing.T) {
 			// Locked in here so future refactors can't silently change it.
 			{
 				Code:    `interface I { set [prop](value: any): any }`,
-				Options: map[string]interface{}{"enforceForTSTypes": true},
+				Options: []interface{}{map[string]interface{}{"enforceForTSTypes": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "missingGetterInType", Message: "Getter is not present for type setter."},
 				},

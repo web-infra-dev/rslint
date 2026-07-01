@@ -78,7 +78,7 @@ func TestValidParamsUpstream(t *testing.T) {
         }).catch(function(e) {
         });
       `,
-				Options: map[string]interface{}{"exclude": []interface{}{"catch"}},
+				Options: []interface{}{map[string]interface{}{"exclude": []interface{}{"catch"}}},
 			},
 
 			// ---- integration test ----

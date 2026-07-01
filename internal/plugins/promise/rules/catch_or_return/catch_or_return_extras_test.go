@@ -53,14 +53,19 @@ func TestCatchOrReturnExtras(t *testing.T) {
 
 			// ---- Dimension 4: allowThen + allowThenStrict both set — only null is valid ----
 			// When both flags are set, allowThen && !allowThenStrict is false, so only null passes.
-			{Code: `frank().then(go).then(null, doIt)`, Options: map[string]interface{}{"allowThen": true, "allowThenStrict": true}},
+			{Code: `frank().then(go).then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThen": true, "allowThenStrict": true}}},
 
 			// ---- Dimension 4: allowFinally with terminationMethod array ----
 			// .finally() terminates via terminationMethod list (not via allowFinally recursion).
-			{Code: `frank().then(go).finally()`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "finally"}}},
+			{Code: `frank().then(go).finally()`, Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{"catch", "finally"}}}},
+
+			// ---- Branch lock-in: terminationMethod explicit empty array falls back to default ----
+			// An explicitly empty array must not disable the allowlist entirely; it falls
+			// back to the documented default ["catch"], same as omitting the option.
+			{Code: `frank().then(go).catch(doIt)`, Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{}}}},
 
 			// ---- Dimension 4: terminationMethod array with custom name ----
-			{Code: `frank().then(go).asCallback(fn)`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "asCallback"}}},
+			{Code: `frank().then(go).asCallback(fn)`, Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{"catch", "asCallback"}}}},
 
 			// ---- Real-user: cy chains with multiple method calls ----
 			// https://github.com/eslint-community/eslint-plugin-promise/issues — Cypress exemption
@@ -109,14 +114,14 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			// ---- Dimension 4: allowThen + allowThenStrict — non-null first arg is invalid ----
 			{
 				Code:    `frank().then(a, b)`,
-				Options: map[string]interface{}{"allowThen": true, "allowThenStrict": true},
+				Options: []interface{}{map[string]interface{}{"allowThen": true, "allowThenStrict": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}},
 			},
 
 			// ---- Dimension 4: allowFinally — .then() after .finally() is not valid termination ----
 			{
 				Code:    `frank().then(go).catch(doIt).finally(fn).then(bar)`,
-				Options: map[string]interface{}{"allowFinally": true},
+				Options: []interface{}{map[string]interface{}{"allowFinally": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}},
 			},
 
@@ -125,7 +130,7 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			// prevents entering the allowThen / allowThenStrict block → falls through → reported.
 			{
 				Code:    `frank().then(go)`,
-				Options: map[string]interface{}{"allowThen": true},
+				Options: []interface{}{map[string]interface{}{"allowThen": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}},
 			},
 
@@ -135,7 +140,7 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			// → "finally" not in default list → reports.
 			{
 				Code:    `frank().finally(fn)`,
-				Options: map[string]interface{}{"allowFinally": true},
+				Options: []interface{}{map[string]interface{}{"allowFinally": true}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}},
 			},
 
@@ -143,7 +148,7 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			// Locks in that a single string terminationMethod is normalized to a slice.
 			{
 				Code:    `frank().then(go)`,
-				Options: map[string]interface{}{"terminationMethod": "done"},
+				Options: []interface{}{map[string]interface{}{"terminationMethod": "done"}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: doneMessage, Line: 1}},
 			},
 
@@ -151,7 +156,7 @@ func TestCatchOrReturnExtras(t *testing.T) {
 			// Locks in the []interface{} parsing branch.
 			{
 				Code:    `frank().then(go)`,
-				Options: map[string]interface{}{"terminationMethod": []interface{}{"done", "catch"}},
+				Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{"done", "catch"}}},
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: "Expected done,catch() or return", Line: 1}},
 			},
 

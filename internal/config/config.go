@@ -104,8 +104,8 @@ type Rules map[string]interface{}
 
 // RuleConfig represents individual rule configuration
 type RuleConfig struct {
-	Level   string      `json:"level,omitempty"`   // "error", "warn", "off"
-	Options interface{} `json:"options,omitempty"` // Rule-specific options (string, map, array, etc.)
+	Level   string
+	Options []any
 }
 
 // IsEnabled returns true if the rule is enabled (not "off")
@@ -125,15 +125,15 @@ func (rc *RuleConfig) GetLevel() string {
 }
 
 // GetOptions returns the rule options, ensuring we return a usable value
-func (rc *RuleConfig) GetOptions() interface{} {
-	if rc == nil || rc.Options == nil {
+func (rc *RuleConfig) GetOptions() []any {
+	if rc == nil {
 		return nil
 	}
 	return rc.Options
 }
 
 // SetOptions sets the rule options
-func (rc *RuleConfig) SetOptions(options interface{}) {
+func (rc *RuleConfig) SetOptions(options []any) {
 	if rc != nil {
 		rc.Options = options
 	}
@@ -238,29 +238,16 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 		return nil
 	}
 
-	ruleConfig := &RuleConfig{Level: level}
+	var options []any
+	if level != "off" && level != "" {
+		options = []any{}
+	}
+	ruleConfig := &RuleConfig{Level: level, Options: options}
 
 	// Remaining elements are rule options — pass them through to the rule's
-	// option parser which knows how to interpret its own format.
+	// option parser as an array by default.
 	if len(ruleArray) > 1 {
-		remaining := ruleArray[1:]
-		if len(remaining) == 1 {
-			if _, isArray := remaining[0].([]interface{}); isArray {
-				// A lone option that is itself an array (e.g. ["error",
-				// ["a","b"]]): keep the outer wrapper so it stays distinguishable
-				// from a multi-element option list and maps to context.options ==
-				// [["a","b"]]. Unwrapping would collapse it to ["a","b"],
-				// indistinguishable from ["error","a","b"] — and the eslint-plugin
-				// dispatch would then drop a nesting level.
-				ruleConfig.Options = remaining
-			} else {
-				// Single non-array option: pass the value directly (string, map).
-				ruleConfig.Options = remaining[0]
-			}
-		} else {
-			// Multiple option elements: pass as array (e.g. ["both", {blockScopedFunctions: "disallow"}])
-			ruleConfig.Options = remaining
-		}
+		ruleConfig.Options = ruleArray[1:]
 	}
 
 	return ruleConfig
@@ -458,20 +445,17 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 		for ruleName, ruleValue := range entry.Rules {
 			switch v := ruleValue.(type) {
 			case string:
-				merged.Rules[ruleName] = &RuleConfig{Level: v}
+				var options []any
+				if v != "off" && v != "" {
+					options = []any{}
+				}
+				merged.Rules[ruleName] = &RuleConfig{Level: v, Options: options}
 			case []interface{}:
 				if rc := parseArrayRuleConfig(v); rc != nil {
 					merged.Rules[ruleName] = rc
 				}
-			case map[string]interface{}:
-				ruleConfig := &RuleConfig{}
-				if level, ok := v["level"].(string); ok {
-					ruleConfig.Level = level
-				}
-				if options, ok := v["options"].(map[string]interface{}); ok {
-					ruleConfig.Options = options
-				}
-				merged.Rules[ruleName] = ruleConfig
+			case *RuleConfig:
+				merged.Rules[ruleName] = v
 			}
 		}
 

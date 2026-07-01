@@ -16,31 +16,6 @@ type Options struct {
 	EnforceForTSTypes      bool
 }
 
-func parseOptions(options any) Options {
-	opts := Options{
-		GetWithoutSet:          false,
-		SetWithoutGet:          true,
-		EnforceForClassMembers: true,
-		EnforceForTSTypes:      false,
-	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["getWithoutSet"].(bool); ok {
-			opts.GetWithoutSet = v
-		}
-		if v, ok := optsMap["setWithoutGet"].(bool); ok {
-			opts.SetWithoutGet = v
-		}
-		if v, ok := optsMap["enforceForClassMembers"].(bool); ok {
-			opts.EnforceForClassMembers = v
-		}
-		if v, ok := optsMap["enforceForTSTypes"].(bool); ok {
-			opts.EnforceForTSTypes = v
-		}
-	}
-	return opts
-}
-
 type containerKind int
 
 const (
@@ -388,8 +363,25 @@ func checkTypeMembers(ctx rule.RuleContext, members []*ast.Node, opts Options) {
 // https://eslint.org/docs/latest/rules/accessor-pairs
 var AccessorPairsRule = rule.Rule{
 	Name: "accessor-pairs",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"getWithoutSet":          rule.Bool().Default(false),
+		"setWithoutGet":          rule.Bool().Default(true),
+		"enforceForClassMembers": rule.Bool().Default(true),
+		"enforceForTSTypes":      rule.Bool().Default(false),
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap := rule.Must[map[string]any](options[0])
+		getWithoutSet := rule.Must[bool](optsMap["getWithoutSet"])
+		setWithoutGet := rule.Must[bool](optsMap["setWithoutGet"])
+		enforceForClassMembers := rule.Must[bool](optsMap["enforceForClassMembers"])
+		enforceForTSTypes := rule.Must[bool](optsMap["enforceForTSTypes"])
+		opts := Options{
+			GetWithoutSet:          getWithoutSet,
+			SetWithoutGet:          setWithoutGet,
+			EnforceForClassMembers: enforceForClassMembers,
+			EnforceForTSTypes:      enforceForTSTypes,
+		}
+
 		if !opts.SetWithoutGet && !opts.GetWithoutSet {
 			return rule.RuleListeners{}
 		}

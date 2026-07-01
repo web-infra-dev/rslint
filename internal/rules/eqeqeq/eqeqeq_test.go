@@ -20,27 +20,20 @@ func TestEqeqeqRule(t *testing.T) {
 			{Code: `a !== b`},
 			{Code: `a === null`},
 			{Code: `null !== a`},
-			{Code: `a === b`, Options: "always"},
+			{Code: `a === b`, Options: []interface{}{"always"}},
 
 			// "smart" mode
-			{Code: `typeof a == 'number'`, Options: "smart"},
-			{Code: `'string' != typeof a`, Options: "smart"},
-			{Code: `typeof a == typeof b`, Options: "smart"},
-			{Code: `null == a`, Options: "smart"},
-			{Code: `a != null`, Options: "smart"},
-			{Code: `'hello' != 'world'`, Options: "smart"},
-			{Code: `2 == 3`, Options: "smart"},
-			{Code: `0 == 0`, Options: "smart"},
-			{Code: `true == true`, Options: "smart"},
-			{Code: `null == null`, Options: "smart"},
-			{Code: `a === b`, Options: "smart"},
-
-			// "allow-null" (same as ["always", {"null": "ignore"}])
-			{Code: `a == null`, Options: "allow-null"},
-			{Code: `null == a`, Options: "allow-null"},
-			{Code: `a != null`, Options: "allow-null"},
-			{Code: `null != a`, Options: "allow-null"},
-			{Code: `a === b`, Options: "allow-null"},
+			{Code: `typeof a == 'number'`, Options: []interface{}{"smart"}},
+			{Code: `'string' != typeof a`, Options: []interface{}{"smart"}},
+			{Code: `typeof a == typeof b`, Options: []interface{}{"smart"}},
+			{Code: `null == a`, Options: []interface{}{"smart"}},
+			{Code: `a != null`, Options: []interface{}{"smart"}},
+			{Code: `'hello' != 'world'`, Options: []interface{}{"smart"}},
+			{Code: `2 == 3`, Options: []interface{}{"smart"}},
+			{Code: `0 == 0`, Options: []interface{}{"smart"}},
+			{Code: `true == true`, Options: []interface{}{"smart"}},
+			{Code: `null == null`, Options: []interface{}{"smart"}},
+			{Code: `a === b`, Options: []interface{}{"smart"}},
 
 			// "always" with null:"ignore"
 			{Code: `a == null`, Options: []interface{}{"always", map[string]interface{}{"null": "ignore"}}},
@@ -71,12 +64,12 @@ func TestEqeqeqRule(t *testing.T) {
 			{Code: `(null) != a`, Options: []interface{}{"always", map[string]interface{}{"null": "ignore"}}},
 
 			// "smart" mode — parenthesized null, typeof, same-type literals
-			{Code: `(null) == a`, Options: "smart"},
-			{Code: `a != (null)`, Options: "smart"},
-			{Code: `(typeof a) == 'number'`, Options: "smart"},
-			{Code: `('hello') == ('world')`, Options: "smart"},
-			{Code: `(1) == (2)`, Options: "smart"},
-			{Code: `(true) == (false)`, Options: "smart"},
+			{Code: `(null) == a`, Options: []interface{}{"smart"}},
+			{Code: `a != (null)`, Options: []interface{}{"smart"}},
+			{Code: `(typeof a) == 'number'`, Options: []interface{}{"smart"}},
+			{Code: `('hello') == ('world')`, Options: []interface{}{"smart"}},
+			{Code: `(1) == (2)`, Options: []interface{}{"smart"}},
+			{Code: `(true) == (false)`, Options: []interface{}{"smart"}},
 
 			// Nesting contexts — strict equality in various positions
 			{Code: `if (a === b) {}`},
@@ -166,7 +159,7 @@ func TestEqeqeqRule(t *testing.T) {
 			// "smart" mode - non-exempted loose equality (suggestions)
 			{
 				Code:    `a == b`,
-				Options: "smart",
+				Options: []interface{}{"smart"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceOperator", Output: `a === b`},
@@ -175,7 +168,7 @@ func TestEqeqeqRule(t *testing.T) {
 			},
 			{
 				Code:    `a != b`,
-				Options: "smart",
+				Options: []interface{}{"smart"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceOperator", Output: `a !== b`},
@@ -185,7 +178,7 @@ func TestEqeqeqRule(t *testing.T) {
 			// smart mode - cross-type literals (suggestions)
 			{
 				Code:    `true == 1`,
-				Options: "smart",
+				Options: []interface{}{"smart"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 6, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceOperator", Output: `true === 1`},
@@ -194,54 +187,11 @@ func TestEqeqeqRule(t *testing.T) {
 			},
 			{
 				Code:    `0 != '1'`,
-				Options: "smart",
+				Options: []interface{}{"smart"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceOperator", Output: `0 !== '1'`},
 					}},
-				},
-			},
-
-			// "allow-null" - non-null loose equality (typeof gets autofix, others get suggestions)
-			{
-				Code:    `a == b`,
-				Options: "allow-null",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 3, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-						{MessageId: "replaceOperator", Output: `a === b`},
-					}},
-				},
-			},
-			{
-				Code:    `typeof a == 'number'`,
-				Options: "allow-null",
-				Output:  []string{`typeof a === 'number'`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 10},
-				},
-			},
-			{
-				Code:    `'hello' != 'world'`,
-				Options: "allow-null",
-				Output:  []string{`'hello' !== 'world'`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 9},
-				},
-			},
-			{
-				Code:    `2 == 3`,
-				Options: "allow-null",
-				Output:  []string{`2 === 3`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 3},
-				},
-			},
-			{
-				Code:    `true == true`,
-				Options: "allow-null",
-				Output:  []string{`true === true`},
-				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 6},
 				},
 			},
 
@@ -578,7 +528,7 @@ func TestEqeqeqRule(t *testing.T) {
 			// ═══ Smart mode — parenthesized typeof/literals still exempt ═══
 			{
 				Code:    `(a) == b`,
-				Options: "smart",
+				Options: []interface{}{"smart"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 5, Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{MessageId: "replaceOperator", Output: `(a) === b`},

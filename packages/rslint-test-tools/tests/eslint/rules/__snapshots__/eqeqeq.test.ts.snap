@@ -340,110 +340,6 @@ exports[`eqeqeq > invalid 13`] = `
 
 exports[`eqeqeq > invalid 14`] = `
 {
-  "code": "typeof a == "number"",
-  "diagnostics": [
-    {
-      "message": "Expected '===' and instead saw '=='.",
-      "messageId": "unexpected",
-      "range": {
-        "end": {
-          "column": 12,
-          "line": 1,
-        },
-        "start": {
-          "column": 10,
-          "line": 1,
-        },
-      },
-      "ruleName": "eqeqeq",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`eqeqeq > invalid 15`] = `
-{
-  "code": ""hello" != "world"",
-  "diagnostics": [
-    {
-      "message": "Expected '!==' and instead saw '!='.",
-      "messageId": "unexpected",
-      "range": {
-        "end": {
-          "column": 11,
-          "line": 1,
-        },
-        "start": {
-          "column": 9,
-          "line": 1,
-        },
-      },
-      "ruleName": "eqeqeq",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`eqeqeq > invalid 16`] = `
-{
-  "code": "2 == 3",
-  "diagnostics": [
-    {
-      "message": "Expected '===' and instead saw '=='.",
-      "messageId": "unexpected",
-      "range": {
-        "end": {
-          "column": 5,
-          "line": 1,
-        },
-        "start": {
-          "column": 3,
-          "line": 1,
-        },
-      },
-      "ruleName": "eqeqeq",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`eqeqeq > invalid 17`] = `
-{
-  "code": "true == true",
-  "diagnostics": [
-    {
-      "message": "Expected '===' and instead saw '=='.",
-      "messageId": "unexpected",
-      "range": {
-        "end": {
-          "column": 8,
-          "line": 1,
-        },
-        "start": {
-          "column": 6,
-          "line": 1,
-        },
-      },
-      "ruleName": "eqeqeq",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`eqeqeq > invalid 18`] = `
-{
   "code": "true == null",
   "diagnostics": [
     {
@@ -468,7 +364,7 @@ exports[`eqeqeq > invalid 18`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 19`] = `
+exports[`eqeqeq > invalid 15`] = `
 {
   "code": "true != null",
   "diagnostics": [
@@ -494,7 +390,7 @@ exports[`eqeqeq > invalid 19`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 20`] = `
+exports[`eqeqeq > invalid 16`] = `
 {
   "code": "null == null",
   "diagnostics": [
@@ -520,7 +416,7 @@ exports[`eqeqeq > invalid 20`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 21`] = `
+exports[`eqeqeq > invalid 17`] = `
 {
   "code": "null != null",
   "diagnostics": [
@@ -546,7 +442,7 @@ exports[`eqeqeq > invalid 21`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 22`] = `
+exports[`eqeqeq > invalid 18`] = `
 {
   "code": "a === null",
   "diagnostics": [
@@ -572,7 +468,7 @@ exports[`eqeqeq > invalid 22`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 23`] = `
+exports[`eqeqeq > invalid 19`] = `
 {
   "code": "null !== a",
   "diagnostics": [
@@ -598,7 +494,7 @@ exports[`eqeqeq > invalid 23`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 24`] = `
+exports[`eqeqeq > invalid 20`] = `
 {
   "code": "null === null",
   "diagnostics": [
@@ -624,7 +520,7 @@ exports[`eqeqeq > invalid 24`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 25`] = `
+exports[`eqeqeq > invalid 21`] = `
 {
   "code": "null !== null",
   "diagnostics": [
@@ -650,7 +546,7 @@ exports[`eqeqeq > invalid 25`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 26`] = `
+exports[`eqeqeq > invalid 22`] = `
 {
   "code": "a == b",
   "diagnostics": [
@@ -676,7 +572,7 @@ exports[`eqeqeq > invalid 26`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 27`] = `
+exports[`eqeqeq > invalid 23`] = `
 {
   "code": "a == b",
   "diagnostics": [
@@ -702,7 +598,7 @@ exports[`eqeqeq > invalid 27`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 28`] = `
+exports[`eqeqeq > invalid 24`] = `
 {
   "code": "(a) == b",
   "diagnostics": [
@@ -728,7 +624,7 @@ exports[`eqeqeq > invalid 28`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 29`] = `
+exports[`eqeqeq > invalid 25`] = `
 {
   "code": "a == (b)",
   "diagnostics": [
@@ -754,7 +650,7 @@ exports[`eqeqeq > invalid 29`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 30`] = `
+exports[`eqeqeq > invalid 26`] = `
 {
   "code": "(a) == (b)",
   "diagnostics": [
@@ -780,7 +676,7 @@ exports[`eqeqeq > invalid 30`] = `
 }
 `;
 
-exports[`eqeqeq > invalid 31`] = `
+exports[`eqeqeq > invalid 27`] = `
 {
   "code": "(a == b) == (c)",
   "diagnostics": [

@@ -1,6 +1,8 @@
 package rule
 
 import (
+	"fmt"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -113,14 +115,41 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	Run                func(ctx RuleContext, options any) RuleListeners
+	// Schema declares the options validator for this rule. Use Tuple(...) for rules
+	// with multiple positional arguments; use Object/Enum/etc. for a single option.
+	Schema Schema
+	// Run is the legacy, non-validated rule execution callback. Receives the raw configuration object.
+	Run func(ctx RuleContext, options any) RuleListeners
+	// RunWithOptions is the schema-driven rule execution callback. Receives parsed, validated,
+	// and default-hydrated options as a []any slice matching the declared Tuple schema.
+	RunWithOptions func(ctx RuleContext, options []any) RuleListeners
+}
+
+// ValidateAndHydrateOptions decodes raw config options against the rule's Schema,
+// applying defaults and returning the validated options as a []any slice.
+// The top-level Schema must be a Tuple or Array — both produce []any from Validate.
+func ValidateAndHydrateOptions(schema Schema, ruleName string, raw any) ([]any, error) {
+	if schema == nil {
+		return nil, nil //nolint:nilnil // no Schema means no options to validate, not an error
+	}
+	val, err := schema.Validate(raw)
+	if err != nil {
+		return nil, fmt.Errorf("configuration validation failed for rule %q: %w", ruleName, err)
+	}
+	result, ok := val.([]any)
+	if !ok {
+		return nil, fmt.Errorf("rule %q: top-level Schema must be Tuple or Array (got %T); wrap the schema in rule.Tuple(...)", ruleName, val)
+	}
+	return result, nil
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
+		Schema:           r.Schema,
 		Run:              r.Run,
+		RunWithOptions:   r.RunWithOptions,
 	}
 }
 

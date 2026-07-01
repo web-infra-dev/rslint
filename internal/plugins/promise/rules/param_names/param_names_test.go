@@ -31,7 +31,7 @@ func TestParamNames(t *testing.T) {
 			{Code: `new NonPromise()`},
 			{
 				Code:    `new Promise((yes, no) => {})`,
-				Options: map[string]interface{}{"resolvePattern": "^yes$", "rejectPattern": "^no$"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "^yes$", "rejectPattern": "^no$"}},
 			},
 
 			// ---- Patterns/defaults/rest skip (mirrors ESLint `.name===undefined`) ----
@@ -71,29 +71,29 @@ func TestParamNames(t *testing.T) {
 			// ---- Partial options: other field falls back to default ----
 			{
 				Code:    `new Promise((yes, reject) => {})`,
-				Options: map[string]interface{}{"resolvePattern": "^yes$"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "^yes$"}},
 			},
 			{
 				Code:    `new Promise((resolve, no) => {})`,
-				Options: map[string]interface{}{"rejectPattern": "^no$"},
+				Options: []interface{}{map[string]interface{}{"rejectPattern": "^no$"}},
 			},
 
 			// ---- regexp2 / ECMAScript features (RE2 can't handle these) ----
 			// Lookbehind
 			{
 				Code:    `new Promise((resolve) => {})`,
-				Options: map[string]interface{}{"resolvePattern": "(?<!_)resolve"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "(?<!_)resolve"}},
 			},
 			// Unicode property escape
 			{
 				Code:    `new Promise((resolve) => {})`,
-				Options: map[string]interface{}{"resolvePattern": `^\p{Ll}+$`},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": `^\p{Ll}+$`}},
 			},
 
 			// ---- Invalid pattern: rule silently no-ops (can't match) ----
 			{
 				Code:    `new Promise((reject, resolve) => {})`,
-				Options: map[string]interface{}{"resolvePattern": "[unclosed"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "[unclosed"}},
 			},
 
 			// ---- TS generic type argument on Promise ----
@@ -189,7 +189,7 @@ func TestParamNames(t *testing.T) {
 			},
 			{
 				Code:    `new Promise(function(resolve, reject) {})`,
-				Options: map[string]interface{}{"resolvePattern": "^yes$", "rejectPattern": "^no$"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "^yes$", "rejectPattern": "^no$"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "resolveParamNames",
@@ -295,7 +295,7 @@ func TestParamNames(t *testing.T) {
 			// ---- Partial options: only resolvePattern changed ----
 			{
 				Code:    `new Promise((no, rejectX) => {})`,
-				Options: map[string]interface{}{"resolvePattern": "^yes$"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "^yes$"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "resolveParamNames",
@@ -319,7 +319,7 @@ func TestParamNames(t *testing.T) {
 			// ---- Partial options: only rejectPattern changed ----
 			{
 				Code:    `new Promise((resolveX, yes) => {})`,
-				Options: map[string]interface{}{"rejectPattern": "^no$"},
+				Options: []interface{}{map[string]interface{}{"rejectPattern": "^no$"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "resolveParamNames",
@@ -344,7 +344,7 @@ func TestParamNames(t *testing.T) {
 			//      (ESLint uses `regex.source`; our formatter must NOT re-escape `\`).
 			{
 				Code:    `new Promise((bad) => {})`,
-				Options: map[string]interface{}{"resolvePattern": `^\w+resolve$`},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": `^\w+resolve$`}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "resolveParamNames",
@@ -360,7 +360,7 @@ func TestParamNames(t *testing.T) {
 			// ---- ECMAScript-only lookbehind pattern compiles under regexp2 ----
 			{
 				Code:    `new Promise((_resolve) => {})`,
-				Options: map[string]interface{}{"resolvePattern": "(?<!_)resolve"},
+				Options: []interface{}{map[string]interface{}{"resolvePattern": "(?<!_)resolve"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
 						MessageId: "resolveParamNames",

@@ -9,41 +9,43 @@ import (
 )
 
 // caseOpt builds a `[{case: ...}]`-style option payload (single-case form).
-func caseOpt(c string) map[string]interface{} {
-	return map[string]interface{}{"case": c}
+func caseOpt(c string) []interface{} {
+	return []interface{}{map[string]interface{}{"case": c}}
 }
 
 // casesOpt builds a `[{cases: {...}}]`-style option payload (multi-case form).
-func casesOpt(m map[string]bool) map[string]interface{} {
+func casesOpt(m map[string]bool) []interface{} {
 	cases := make(map[string]interface{}, len(m))
 	for k, v := range m {
 		cases[k] = v
 	}
-	return map[string]interface{}{"cases": cases}
+	return []interface{}{map[string]interface{}{"cases": cases}}
 }
 
 // withMfe returns a clone of `base` with `multipleFileExtensions` set.
-func withMfe(base map[string]interface{}, v bool) map[string]interface{} {
-	out := make(map[string]interface{}, len(base)+1)
-	for k, v := range base {
-		out[k] = v
+func withMfe(base []interface{}, v bool) []interface{} {
+	baseMap := base[0].(map[string]interface{})
+	out := make(map[string]interface{}, len(baseMap)+1)
+	for k, val := range baseMap {
+		out[k] = val
 	}
 	out["multipleFileExtensions"] = v
-	return out
+	return []interface{}{out}
 }
 
 // withIgnore returns a clone of `base` plus an `ignore` array.
-func withIgnore(base map[string]interface{}, patterns ...string) map[string]interface{} {
-	out := make(map[string]interface{}, len(base)+1)
-	for k, v := range base {
-		out[k] = v
+func withIgnore(base []interface{}, patterns ...string) []interface{} {
+	baseMap := base[0].(map[string]interface{})
+	out := make(map[string]interface{}, len(baseMap)+1)
+	for k, val := range baseMap {
+		out[k] = val
 	}
 	pats := make([]interface{}, len(patterns))
 	for i, p := range patterns {
 		pats[i] = p
 	}
 	out["ignore"] = pats
-	return out
+	return []interface{}{out}
 }
 
 // All upstream `valid` / `invalid` cases are migrated below in the same
@@ -164,39 +166,39 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`)},
 			{Code: `// idx-via-ignore`, FileName: "src/foo/index.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("camelCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("camelCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("snakeCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("pascalCase"), `FOOBAR\.js`)},
 			{Code: `// ignored-by-regex`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("pascalCase"), `FOOBAR\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// multi-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`, `BARBAZ\.js`)},
 			{Code: `// multi-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `FOOBAR\.js`, `BARBAZ\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// escaped-brackets`, FileName: "src/foo/[FOOBAR].js",
 				Options: withIgnore(caseOpt("camelCase"), `\[FOOBAR\]\.js`)},
 			{Code: `// escaped-brackets`, FileName: "src/foo/[FOOBAR].js",
 				Options: withIgnore(caseOpt("camelCase"), `\[FOOBAR]\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// escaped-braces`, FileName: "src/foo/{FOOBAR}.js",
 				Options: withIgnore(caseOpt("snakeCase"), `\{FOOBAR\}\.js`)},
 			{Code: `// escaped-braces`, FileName: "src/foo/{FOOBAR}.js",
 				Options: withIgnore(caseOpt("snakeCase"), `\{FOOBAR\}\.js`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// alternation`, FileName: "src/foo/foo.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`)},
 			{Code: `// alternation`, FileName: "src/foo/foo-bar.js",
@@ -207,10 +209,10 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`)},
 			{Code: `// alternation`, FileName: "src/foo/foo_bar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`),
-				Skip: true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
+				Skip:    true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
 			{Code: `// alternation`, FileName: "src/foo/FOO_bar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`),
-				Skip: true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
+				Skip:    true /* SKIP: ignore JS RegExp variant (case-insensitive flag) */},
 			{Code: `// suffix-ignore`, FileName: "src/foo/foo-bar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `\.(web|android|ios)\.js$`)},
 			{Code: `// suffix-ignore`, FileName: "src/foo/FooBar.web.js",
@@ -221,55 +223,55 @@ func TestFilenameCase(t *testing.T) {
 				Options: withIgnore(caseOpt("kebabCase"), `\.(web|android|ios)\.js$`)},
 			{Code: `// suffix-ignore`, FileName: "src/foo/FooBar.something.js",
 				Options: withIgnore(caseOpt("kebabCase"), `\.(?:web|android|ios|something)\.js$`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// prefix-ignore`, FileName: "src/foo/FooBar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^(F|f)oo`)},
 			{Code: `// prefix-ignore`, FileName: "src/foo/FooBar.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^[Ff]oo`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`)},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/FOOBAR.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`)},
 			{Code: `// 2-pattern-ignore`, FileName: "src/foo/BARBAZ.js",
 				Options: withIgnore(caseOpt("kebabCase"), `^FOO`, `BAZ\.js$`),
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+				Skip:    true /* SKIP: ignore JS RegExp variant */},
 			{Code: `// many-ignore`, FileName: "src/foo/FOOBAR.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
+					"cases": map[string]interface{}{
+						"kebabCase": true, "camelCase": true,
+						"snakeCase": true, "pascalCase": true,
+					},
+					"ignore": []interface{}{`FOOBAR\.js`},
+				}}},
+			{Code: `// many-ignore`, FileName: "src/foo/FOOBAR.js",
+				Options: []interface{}{map[string]interface{}{
 					"cases": map[string]interface{}{
 						"kebabCase": true, "camelCase": true,
 						"snakeCase": true, "pascalCase": true,
 					},
 					"ignore": []interface{}{`FOOBAR\.js`},
 				}},
-			{Code: `// many-ignore`, FileName: "src/foo/FOOBAR.js",
-				Options: map[string]interface{}{
+				Skip: true /* SKIP: ignore JS RegExp variant */},
+			{Code: `// many-ignore`, FileName: "src/foo/BaRbAz.js",
+				Options: []interface{}{map[string]interface{}{
 					"cases": map[string]interface{}{
 						"kebabCase": true, "camelCase": true,
 						"snakeCase": true, "pascalCase": true,
 					},
-					"ignore": []interface{}{`FOOBAR\.js`},
-				},
-				Skip: true /* SKIP: ignore JS RegExp variant */},
+					"ignore": []interface{}{`FOOBAR\.js`, `BaRbAz\.js`},
+				}}},
 			{Code: `// many-ignore`, FileName: "src/foo/BaRbAz.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"cases": map[string]interface{}{
 						"kebabCase": true, "camelCase": true,
 						"snakeCase": true, "pascalCase": true,
 					},
 					"ignore": []interface{}{`FOOBAR\.js`, `BaRbAz\.js`},
 				}},
-			{Code: `// many-ignore`, FileName: "src/foo/BaRbAz.js",
-				Options: map[string]interface{}{
-					"cases": map[string]interface{}{
-						"kebabCase": true, "camelCase": true,
-						"snakeCase": true, "pascalCase": true,
-					},
-					"ignore": []interface{}{`FOOBAR\.js`, `BaRbAz\.js`},
-				},
 				Skip: true /* SKIP: ignore JS RegExp variant */},
 
 			// ---- Default-ignored index files (any case enabled) ----
@@ -372,25 +374,12 @@ func TestFilenameCase(t *testing.T) {
 			// behaviour. Here we lock the equivalent already-camel form.
 			{Code: `// lock-in: digit-prefixed second word`, FileName: "src/foo/iss_47Spec.js", Options: caseOpt("camelCase")},
 
-			// Locks in: non-string `ignore` entries don't poison the array —
-			// the valid string pattern still ignores its target. Companion
-			// to the invalid-list case above; together they prove non-string
-			// items are dropped silently and the rest of the array still
-			// applies normally.
-			{
-				Code: `// lock-in: non-string ignore entries silently dropped, valid sibling still ignores`,
-				FileName: "src/foo/FOOBAR.js",
-				Options: map[string]interface{}{
-					"case":   "kebabCase",
-					"ignore": []interface{}{nil, 42, map[string]interface{}{}, `FOOBAR\.js`},
-				},
-			},
 			// Locks in: an empty `ignore` array works the same as omitting
 			// `ignore` — no diagnostics, no spurious empty-pattern matches.
 			{
-				Code: `// lock-in: empty ignore array`,
+				Code:     `// lock-in: empty ignore array`,
 				FileName: "src/foo/foo-bar.js",
-				Options: map[string]interface{}{"case": "kebabCase", "ignore": []interface{}{}},
+				Options:  []interface{}{map[string]interface{}{"case": "kebabCase", "ignore": []interface{}{}}},
 			},
 
 			// Locks in `splitWords` Pass 2 multi-fire end-to-end: an
@@ -423,12 +412,12 @@ func TestFilenameCase(t *testing.T) {
 			// schema's `oneOf` would reject this config, but a JSON config
 			// can carry both — pinning the precedence keeps it deterministic.
 			{
-				Code: `// lock-in: case takes precedence over cases when both are set`,
+				Code:     `// lock-in: case takes precedence over cases when both are set`,
 				FileName: "src/foo/fooBar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"case":  "camelCase",
 					"cases": map[string]interface{}{"snakeCase": true},
-				},
+				}},
 			},
 
 			// Locks in: an unknown `case` value (e.g. `"camelcase"` lowercase
@@ -437,7 +426,6 @@ func TestFilenameCase(t *testing.T) {
 			// "fall through to kebab default", and the invalid case below
 			// proves the default fires when the basename violates kebab.
 			{Code: `// lock-in: unknown case value falls back to kebab default (valid)`, FileName: "src/foo/foo-bar.js", Options: caseOpt("camelcase" /* typo */)},
-
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Disable-comment INSIDE the file body — does NOT match a
@@ -717,10 +705,10 @@ func TestFilenameCase(t *testing.T) {
 			// Two cases — canonical order in our output: camelCase, snakeCase.
 			{
 				Code: `// many-cs+ignore-miss`, FileName: "src/foo/FooBar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"cases":  map[string]interface{}{"camelCase": true, "snakeCase": true},
 					"ignore": []interface{}{`FOOBAR\.js`},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "filenameCase",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
@@ -728,10 +716,10 @@ func TestFilenameCase(t *testing.T) {
 			},
 			{
 				Code: `// many-cs+ignore-miss-pat2`, FileName: "src/foo/FooBar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"cases":  map[string]interface{}{"camelCase": true, "snakeCase": true},
 					"ignore": []interface{}{`BaRbAz\.js`},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "filenameCase",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
@@ -739,10 +727,10 @@ func TestFilenameCase(t *testing.T) {
 			},
 			{
 				Code: `// many-cs+ignore-prefix`, FileName: "src/foo/FooBar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"cases":  map[string]interface{}{"camelCase": true, "snakeCase": true},
 					"ignore": []interface{}{`^foo`},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "filenameCase",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
@@ -750,10 +738,10 @@ func TestFilenameCase(t *testing.T) {
 			},
 			{
 				Code: `// many-cs+ignore-2patterns`, FileName: "src/foo/FooBar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"cases":  map[string]interface{}{"camelCase": true, "snakeCase": true},
 					"ignore": []interface{}{`^foo`, `^bar`},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "filenameCase",
 					Message:   "Filename is not in camel case or snake case. Rename it to `fooBar.js` or `foo_bar.js`.",
@@ -986,10 +974,10 @@ func TestFilenameCase(t *testing.T) {
 			// parsing forgets the invalid-ignore gate.
 			{
 				Code: `// lock-in: invalid ignore under cases option`, FileName: "src/foo/FooBar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"cases":  map[string]interface{}{"camelCase": true, "snakeCase": true},
 					"ignore": []interface{}{`(unclosed`},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "invalidIgnorePattern",
 					Message:   "Invalid regular expression in `ignore` option: `(unclosed`: error parsing regexp: missing closing ) in `(unclosed`",
@@ -1015,44 +1003,6 @@ func TestFilenameCase(t *testing.T) {
 					Message:   "Invalid regular expression in `ignore` option: `*invalid`: error parsing regexp: missing argument to repetition operator in `*invalid`",
 				}},
 			},
-			// Locks in: non-string entries (`null`, numbers, objects) in the
-			// `ignore` array are silently skipped — they are NOT treated as
-			// malformed patterns. Without this, a JSON-stringified RegExp
-			// object (which lands as `{}` on the Go side) or any other
-			// stray non-string would fire spurious `invalidIgnorePattern`
-			// diagnostics. Here the only valid string pattern doesn't match
-			// `foo_bar.js`, so we get a normal case-violation report — the
-			// crucial assertion is that we do NOT see any
-			// `invalidIgnorePattern` diagnostic alongside it.
-			{
-				Code: `// lock-in: non-string ignore entries do not fire invalidIgnorePattern`,
-				FileName: "src/foo/foo_bar.js",
-				Options: map[string]interface{}{
-					"case":   "kebabCase",
-					"ignore": []interface{}{nil, 42, map[string]interface{}{}, `FOOBAR\.js`},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "filenameCase",
-					Message:   "Filename is not in kebab case. Rename it to `foo-bar.js`.",
-				}},
-			},
-			// Locks in: when non-string + valid string + invalid string ignore
-			// entries co-exist, the invalid string still wins (fatal short-
-			// circuit), the valid string never gets to apply, and the
-			// non-string is silently dropped. End-to-end coverage of all
-			// three ignore-entry classes interacting.
-			{
-				Code: `// lock-in: non-string + valid + invalid ignore entries together`,
-				FileName: "src/foo/FOOBAR.js",
-				Options: map[string]interface{}{
-					"case":   "kebabCase",
-					"ignore": []interface{}{nil, `FOOBAR\.js`, `[unclosed`},
-				},
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "invalidIgnorePattern",
-					Message:   "Invalid regular expression in `ignore` option: `[unclosed`: error parsing regexp: unterminated [] set in `[unclosed`",
-				}},
-			},
 			// Locks in `englishishJoin` 4-item oxford comma + `or` end-to-end:
 			// all four `cases` enabled + a basename violating all four of
 			// them yields `camel case, snake case, kebab case, or pascal
@@ -1060,7 +1010,7 @@ func TestFilenameCase(t *testing.T) {
 			// test in splitwords_test.go locks the formatter directly; this
 			// proves the rule produces it via the real diagnostic path.)
 			{
-				Code: `// lock-in: oxford-comma 4-item, all four cases enabled`,
+				Code:     `// lock-in: oxford-comma 4-item, all four cases enabled`,
 				FileName: "src/foo/FOO_BAR.js",
 				Options: casesOpt(map[string]bool{
 					"camelCase": true, "snakeCase": true,
@@ -1076,7 +1026,7 @@ func TestFilenameCase(t *testing.T) {
 			// `_`, because the digit-prefixed word is index 0). Companion
 			// invalid for the unit test in splitwords_test.go.
 			{
-				Code: `// lock-in: first word starting with digit (camel)`,
+				Code:     `// lock-in: first word starting with digit (camel)`,
 				FileName: "src/foo/123-foo.js",
 				Options:  caseOpt("camelCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1088,7 +1038,7 @@ func TestFilenameCase(t *testing.T) {
 			// pascalCase too — the first-word digit also stays unprefixed
 			// in pascal output (`upper(char0)` is identity for digits).
 			{
-				Code: `// lock-in: first word starting with digit (pascal)`,
+				Code:     `// lock-in: first word starting with digit (pascal)`,
 				FileName: "src/foo/123-foo.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1103,7 +1053,7 @@ func TestFilenameCase(t *testing.T) {
 			// here the basename violates kebab and we prove the default
 			// case actually fires.
 			{
-				Code: `// lock-in: unknown case value falls back to kebab default (invalid)`,
+				Code:     `// lock-in: unknown case value falls back to kebab default (invalid)`,
 				FileName: "src/foo/fooBar.js",
 				Options:  caseOpt("camelcase" /* typo */),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1118,26 +1068,26 @@ func TestFilenameCase(t *testing.T) {
 			// alone would have flagged it. Here we confirm the rule
 			// honours `case` and reports nothing.
 			{
-				Code: `// lock-in: case+cases — case wins (filename violates cases-only set)`,
+				Code:     `// lock-in: case+cases — case wins (filename violates cases-only set)`,
 				FileName: "src/foo/foo_bar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"case":  "snakeCase",
 					"cases": map[string]interface{}{"camelCase": true},
-				},
+				}},
 				// Filename is valid snake → no diagnostic. We cover this
 				// in the valid block above; here the invalid mirror is:
 				// case=camel (basename `foo_bar.js`) wins, file violates
 				// camel → reports.
-				Skip: true, /* SKIP: redundant with the valid-block companion */
+				Skip:   true, /* SKIP: redundant with the valid-block companion */
 				Errors: []rule_tester.InvalidTestCaseError{{}},
 			},
 			{
-				Code: `// lock-in: case+cases — case wins, basename violates the chosen case`,
+				Code:     `// lock-in: case+cases — case wins, basename violates the chosen case`,
 				FileName: "src/foo/foo_bar.js",
-				Options: map[string]interface{}{
+				Options: []interface{}{map[string]interface{}{
 					"case":  "camelCase",
 					"cases": map[string]interface{}{"snakeCase": true},
-				},
+				}},
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "filenameCase",
 					Message:   "Filename is not in camel case. Rename it to `fooBar.js`.",
@@ -1149,7 +1099,7 @@ func TestFilenameCase(t *testing.T) {
 			// the ALL-CAPS+Title boundary cut AND the non-first-letter
 			// lowering pipeline.
 			{
-				Code: `// lock-in: Pass 2 multi-fire (pascal lowers non-first letters)`,
+				Code:     `// lock-in: Pass 2 multi-fire (pascal lowers non-first letters)`,
 				FileName: "src/foo/XMLHttpRequest.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1158,7 +1108,7 @@ func TestFilenameCase(t *testing.T) {
 				}},
 			},
 			{
-				Code: `// lock-in: Pass 2 single-fire (pascal lowers non-first letters)`,
+				Code:     `// lock-in: Pass 2 single-fire (pascal lowers non-first letters)`,
 				FileName: "src/foo/HTTPSConnection.js",
 				Options:  caseOpt("pascalCase"),
 				Errors: []rule_tester.InvalidTestCaseError{{
@@ -1174,7 +1124,7 @@ func TestFilenameCase(t *testing.T) {
 			// that proves we still match Node when the all-dots prefix is
 			// shorter than the basename.
 			{
-				Code: `// lock-in: node-extname parity (basename has trailing real ext)`,
+				Code:     `// lock-in: node-extname parity (basename has trailing real ext)`,
 				FileName: "src/foo/...js",
 				Skip:     true, /* SKIP: TS program rejects this odd basename; logic exercised by the unit table inline above */
 			},

@@ -194,6 +194,44 @@ func TestHandleLint_FileCountDeduplicatesAcrossPrograms(t *testing.T) {
 	}
 }
 
+// TestHandleLint_SchemaDrivenRuleViaConfig guards against a regression where
+// schema-driven rules (Schema + RunWithOptions) panicked with a nil-pointer
+// dereference: GetEnabledRules was calling the now-nil legacy Run callback
+// directly instead of dispatching to RunWithOptions with validated,
+// default-hydrated options.
+func TestHandleLint_SchemaDrivenRuleViaConfig(t *testing.T) {
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	if err != nil {
+		t.Fatalf("resolve fixtures dir: %v", err)
+	}
+	targetFile := filepath.Join(fixturesDir, "src", "index.ts")
+
+	// no-console is a schema-driven (RunWithOptions) rule. Pass options via the
+	// config object (the only rule-options surface in --api mode).
+	config := json.RawMessage(`[{"rules": {"no-console": ["error", {"allow": ["log"]}]}}]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  fixturesDir,
+		WorkingDirectory: fixturesDir,
+		Files:            []string{targetFile},
+		FileContents: map[string]string{
+			targetFile: "console.log('a'); console.error('b');\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+
+	if len(response.Diagnostics) != 1 {
+		t.Fatalf("expected exactly one diagnostic (console.error, with console.log allowed), got %d: %+v", len(response.Diagnostics), response.Diagnostics)
+	}
+	if response.Diagnostics[0].RuleName != "no-console" {
+		t.Fatalf("expected diagnostic from no-console, got %q", response.Diagnostics[0].RuleName)
+	}
+}
+
 func TestHandleLint_ExplicitFilesRestrictsScope(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {

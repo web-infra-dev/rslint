@@ -957,7 +957,7 @@ func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
 	}
 
 	cfg, _, _ = s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-console"]) != "warn" {
 		t.Fatalf("expected JS config, got %v", cfg)
 	}
 	if s.rslintConfigPath != "" {
@@ -992,7 +992,7 @@ func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 
 	// File in foo should use foo's config, cwd = foo's directory
 	fooCfg, fooCwd, _ := s.getConfigForURI("file:///project/packages/foo/src/index.ts")
-	if len(fooCfg) != 1 || fooCfg[0].Rules["no-console"] != "warn" {
+	if len(fooCfg) != 1 || getRuleLevel(fooCfg[0].Rules["no-console"]) != "warn" {
 		t.Errorf("foo file should use foo config, got %v", fooCfg)
 	}
 	if fooCwd != "/project/packages/foo" {
@@ -1001,7 +1001,7 @@ func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 
 	// File in bar should use root config, cwd = root directory
 	barCfg, barCwd, _ := s.getConfigForURI("file:///project/packages/bar/src/index.ts")
-	if len(barCfg) != 1 || barCfg[0].Rules["no-console"] != "error" {
+	if len(barCfg) != 1 || getRuleLevel(barCfg[0].Rules["no-console"]) != "error" {
 		t.Errorf("bar file should use root config, got %v", barCfg)
 	}
 	if barCwd != "/project" {
@@ -1017,7 +1017,7 @@ func TestGetConfigForURI_FallbackToJSON(t *testing.T) {
 
 	// No JS configs — should fall back to JSON config; cwd = s.cwd
 	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-debugger"]) != "error" {
 		t.Errorf("should fall back to JSON config, got %v", cfg)
 	}
 	if cwd != s.cwd {
@@ -1036,7 +1036,7 @@ func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
 
 	// JS config should take priority over JSON; cwd = JS config's dir
 	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-console"]) != "warn" {
 		t.Errorf("JS config should override JSON, got %v", cfg)
 	}
 	if cwd != "/project" {
@@ -1061,7 +1061,7 @@ func TestGetConfigForURI_DeeplyNestedFile(t *testing.T) {
 
 	// Deeply nested file should still find root config
 	cfg, _, _ := s.getConfigForURI("file:///project/a/b/c/d/e/f/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-console"]) != "error" {
 		t.Errorf("deeply nested file should find root config, got %v", cfg)
 	}
 }
@@ -1074,7 +1074,7 @@ func TestGetConfigForURI_FileAtConfigDir(t *testing.T) {
 
 	// File in the same directory as config
 	cfg, _, _ := s.getConfigForURI("file:///project/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-console"]) != "error" {
 		t.Errorf("file at config dir should use that config, got %v", cfg)
 	}
 }
@@ -1120,7 +1120,7 @@ func TestGetConfigForURI_MonorepoMultiplePackages(t *testing.T) {
 			if len(cfg) != tt.wantLen {
 				t.Fatalf("expected %d entries, got %d", tt.wantLen, len(cfg))
 			}
-			if cfg[0].Rules["no-console"] != tt.wantRule {
+			if getRuleLevel(cfg[0].Rules["no-console"]) != tt.wantRule {
 				t.Errorf("no-console = %v, want %v", cfg[0].Rules["no-console"], tt.wantRule)
 			}
 		})
@@ -1178,7 +1178,7 @@ func TestGetConfigForURI_WindowsURI(t *testing.T) {
 	}
 
 	cfg, cwd, _ := s.getConfigForURI("file:///C:/Users/project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-console"]) != "error" {
 		t.Errorf("Windows URI should match, got %v", cfg)
 	}
 	if cwd != "C:/Users/project" {
@@ -1196,7 +1196,7 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 
 	// File in a subdirectory — walk up should match the encoded config key
 	cfg, cwd, _ := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/index.ts")
-	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+	if len(cfg) != 1 || getRuleLevel(cfg[0].Rules["no-console"]) != "error" {
 		t.Errorf("Percent-encoded URI should match config, got %v", cfg)
 	}
 	// cwd should be decoded for filesystem use
@@ -1206,7 +1206,7 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 
 	// Deeply nested file — walk must traverse multiple encoded segments
 	cfg2, cwd2, _ := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/components/deep/file.ts")
-	if len(cfg2) != 1 || cfg2[0].Rules["no-console"] != "error" {
+	if len(cfg2) != 1 || getRuleLevel(cfg2[0].Rules["no-console"]) != "error" {
 		t.Errorf("Deeply nested file in encoded path should match config, got %v", cfg2)
 	}
 	if cwd2 != "/Users/John Doe/my project" {
@@ -1592,4 +1592,25 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 		}()
 		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
 	})
+}
+
+func getRuleLevel(ruleVal any) string {
+	if ruleVal == nil {
+		return ""
+	}
+	switch v := ruleVal.(type) {
+	case string:
+		return v
+	case *config.RuleConfig:
+		return v.Level
+	case config.RuleConfig:
+		return v.Level
+	case []any:
+		if len(v) > 0 {
+			if s, ok := v[0].(string); ok {
+				return s
+			}
+		}
+	}
+	return ""
 }

@@ -81,6 +81,10 @@ allMatch := utils.Every(items, func(item T) bool { return condition })
 
 ### Rule Options Parsing
 
+**New rules**: do not parse options by hand. Declare a `Schema` on the `rule.Rule` literal (using one of `rule.Tuple(...)`, `rule.Array(...)`, or `rule.EmptyArray()`), then implement `RunWithOptions` instead of `Run` — see [PORT_RULE.md § Handling Options](./PORT_RULE.md#handling-options) for the full pattern. The framework validates and default-hydrates the raw config before calling `RunWithOptions`, for the CLI, IPC API, LSP, and `rule_tester` alike.
+
+`GetOptionsMap` below is the **legacy** extractor — only relevant for rules that still use the old `Run` callback and haven't been migrated yet (see `.agents/skills/port-rule-to-schema/SKILL.md` to migrate one):
+
 ```go
 // Extract options map from rule options (handles both array and object format)
 optsMap := utils.GetOptionsMap(options)

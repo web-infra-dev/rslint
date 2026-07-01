@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -121,6 +122,18 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(rslintConfig, configDirectory, fs)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving tsconfig: %w", err)
+	}
+
+	// Validate rule options against their schemas before linting. Without
+	// this, a misconfigured rule is silently dropped per-file with only a
+	// stderr line — the IPC caller would get a "successful" lint response
+	// that's missing a rule's diagnostics.
+	if errs := rslintconfig.GlobalRuleRegistry.ValidateConfig(rslintConfig); len(errs) > 0 {
+		msgs := make([]string, len(errs))
+		for i, e := range errs {
+			msgs[i] = e.Error()
+		}
+		return nil, fmt.Errorf("invalid rule configuration: %s", strings.Join(msgs, "; "))
 	}
 
 	// Create compiler host with a request-scoped parse cache: the tsconfig

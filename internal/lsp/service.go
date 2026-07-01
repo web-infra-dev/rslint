@@ -150,8 +150,29 @@ func (s *Server) reloadConfig() error {
 		return fmt.Errorf("could not load rslint config: %w", err)
 	}
 	s.jsonConfig = rslintConfig
+	if errs := config.GlobalRuleRegistry.ValidateConfig(rslintConfig); len(errs) > 0 {
+		s.reportConfigValidationErrors(errs)
+	}
 	s.rebuildTsConfigPaths()
 	return nil
+}
+
+// reportConfigValidationErrors notifies the client that the loaded rule
+// configuration failed schema validation. A rule with invalid options is
+// dropped silently from GetEnabledRules, so this window/showMessage
+// notification is the only signal the editor user gets that a rule stopped
+// linting because of a config mistake.
+func (s *Server) reportConfigValidationErrors(errs []error) {
+	messages := make([]string, len(errs))
+	for i, err := range errs {
+		messages[i] = err.Error()
+	}
+	msg := "[rslint] Invalid rule configuration:\n" + strings.Join(messages, "\n")
+	log.Print(msg)
+	s.outgoingQueue <- lsproto.WindowShowMessageInfo.NewNotificationMessage(&lsproto.ShowMessageParams{
+		Type:    lsproto.MessageTypeError,
+		Message: msg,
+	}).Message()
 }
 
 func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
@@ -190,8 +211,13 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	// Keys are URI strings (e.g. "file:///project") sent from VS Code,
 	// matching the URI format used throughout the LSP protocol.
 	s.jsConfigs = make(map[string]config.RslintConfig, len(payload.Configs))
+	var validationErrors []error
 	for _, cfg := range payload.Configs {
 		s.jsConfigs[cfg.ConfigDirectory] = cfg.Entries
+		validationErrors = append(validationErrors, config.GlobalRuleRegistry.ValidateConfig(cfg.Entries)...)
+	}
+	if len(validationErrors) > 0 {
+		s.reportConfigValidationErrors(validationErrors)
 	}
 	// Clear the JSON config path so that a subsequent JSON file-watcher event
 	// does not silently overwrite the JS/TS configs.

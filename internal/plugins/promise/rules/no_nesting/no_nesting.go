@@ -123,8 +123,9 @@ func buildAvoidNestingMessage() rule.RuleMessage {
 }
 
 var NoNestingRule = rule.Rule{
-	Name: "promise/no-nesting",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Name:   "promise/no-nesting",
+	Schema: rule.EmptyArray(),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Stack of promise-callback function nodes, closest last.
 		callbackStack := []*ast.Node{}
 

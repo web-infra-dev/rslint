@@ -3,14 +3,16 @@ package no_console
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // https://eslint.org/docs/latest/rules/no-console
 var NoConsoleRule = rule.Rule{
 	Name: "no-console",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"allow": rule.Array(rule.String()).Default([]any{}),
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		opts := parseOptions(options[0])
 
 		reportIfConsole := func(node *ast.Node, consoleIdent *ast.Node, propertyName string) {
 			// Check if this property is allowed
@@ -103,20 +105,10 @@ func (o *consoleOptions) isAllowed(method string) bool {
 }
 
 func parseOptions(opts any) consoleOptions {
-	result := consoleOptions{
-		allow: make(map[string]bool),
+	optsMap := rule.Must[map[string]any](opts)
+	result := consoleOptions{allow: make(map[string]bool)}
+	for _, item := range rule.Must[[]any](optsMap["allow"]) {
+		result.allow[rule.Must[string](item)] = true
 	}
-
-	optsMap := utils.GetOptionsMap(opts)
-	if optsMap != nil {
-		if allowArr, ok := optsMap["allow"].([]interface{}); ok {
-			for _, item := range allowArr {
-				if str, ok := item.(string); ok {
-					result.allow[str] = true
-				}
-			}
-		}
-	}
-
 	return result
 }

@@ -152,12 +152,24 @@ func collectNonTypeAwareRules(t *testing.T) []linter.ConfiguredRule {
 			continue
 		}
 		ruleImpl := impl
+		var runFunc func(ctx rule.RuleContext) rule.RuleListeners
+		if ruleImpl.RunWithOptions != nil {
+			validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, nil)
+			if err != nil {
+				t.Fatalf("validate default options for rule %q: %v", name, err)
+			}
+			runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+				return ruleImpl.RunWithOptions(ctx, validated)
+			}
+		} else {
+			runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+				return ruleImpl.Run(ctx, nil)
+			}
+		}
 		out = append(out, linter.ConfiguredRule{
 			Name:     name,
 			Severity: rule.SeverityWarning,
-			Run: func(ctx rule.RuleContext) rule.RuleListeners {
-				return ruleImpl.Run(ctx, nil)
-			},
+			Run:      runFunc,
 		})
 	}
 	return out

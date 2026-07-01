@@ -16,15 +16,15 @@ func TestNoConsoleRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			{
 				Code:    `console.warn("test");`,
-				Options: map[string]interface{}{"allow": []interface{}{"warn"}},
+				Options: []interface{}{map[string]interface{}{"allow": []interface{}{"warn"}}},
 			},
 			{
 				Code:    `console.error("test");`,
-				Options: map[string]interface{}{"allow": []interface{}{"error"}},
+				Options: []interface{}{map[string]interface{}{"allow": []interface{}{"error"}}},
 			},
 			{
 				Code:    `console.warn("test"); console.error("test");`,
-				Options: map[string]interface{}{"allow": []interface{}{"warn", "error"}},
+				Options: []interface{}{map[string]interface{}{"allow": []interface{}{"warn", "error"}}},
 			},
 			{Code: `var x = { console: 1 };`},
 			// Shadowed console should not be reported
@@ -57,7 +57,7 @@ func TestNoConsoleRule(t *testing.T) {
 			},
 			{
 				Code:    `console.log("test");`,
-				Options: map[string]interface{}{"allow": []interface{}{"warn"}},
+				Options: []interface{}{map[string]interface{}{"allow": []interface{}{"warn"}}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 1},
 				},

@@ -6,7 +6,6 @@ import (
 	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // skipTransparent only unwraps parens — ESLint's ESTree parser drops
@@ -19,31 +18,9 @@ import (
 // isn't the standard Promise constructor, don't lint me".
 const skipTransparent = ast.OEKParentheses
 
-const (
-	defaultResolvePattern = "^_?resolve$"
-	defaultRejectPattern  = "^_?reject$"
-)
-
 type Options struct {
 	ResolvePattern string
 	RejectPattern  string
-}
-
-func parseOptions(options any) Options {
-	opts := Options{
-		ResolvePattern: defaultResolvePattern,
-		RejectPattern:  defaultRejectPattern,
-	}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap != nil {
-		if v, ok := optsMap["resolvePattern"].(string); ok && v != "" {
-			opts.ResolvePattern = v
-		}
-		if v, ok := optsMap["rejectPattern"].(string); ok && v != "" {
-			opts.RejectPattern = v
-		}
-	}
-	return opts
 }
 
 func buildResolveParamNamesMessage(pattern string) rule.RuleMessage {
@@ -90,8 +67,18 @@ func regexMatch(re *regexp2.Regexp, s string) bool {
 
 var ParamNamesRule = rule.Rule{
 	Name: "promise/param-names",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"resolvePattern": rule.String().Default("^_?resolve$"),
+		"rejectPattern":  rule.String().Default("^_?reject$"),
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap := rule.Must[map[string]any](options[0])
+		resolvePattern := rule.Must[string](optsMap["resolvePattern"])
+		rejectPattern := rule.Must[string](optsMap["rejectPattern"])
+		opts := Options{
+			ResolvePattern: resolvePattern,
+			RejectPattern:  rejectPattern,
+		}
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work
 		// identically to the original rule (Go's standard `regexp` / RE2 does not).

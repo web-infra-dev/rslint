@@ -4,25 +4,12 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/promise/promiseutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 const skipTransparent = ast.OEKParentheses
 
 type Options struct {
 	AllowReject bool
-}
-
-func parseOptions(options any) Options {
-	opts := Options{}
-	optsMap := utils.GetOptionsMap(options)
-	if optsMap == nil {
-		return opts
-	}
-	if v, ok := optsMap["allowReject"].(bool); ok {
-		opts.AllowReject = v
-	}
-	return opts
 }
 
 func buildResolveMessage() rule.RuleMessage {
@@ -144,8 +131,16 @@ func isExpressionBodyArrowCall(node *ast.Node) bool {
 
 var NoReturnWrapRule = rule.Rule{
 	Name: "promise/no-return-wrap",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"allowReject": rule.Bool().Default(false),
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+		optsMap := rule.Must[map[string]any](options[0])
+		allowReject := rule.Must[bool](optsMap["allowReject"])
+		opts := Options{
+			AllowReject: allowReject,
+		}
+
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				arg := node.AsReturnStatement().Expression

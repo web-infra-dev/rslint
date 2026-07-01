@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -22,6 +23,9 @@ func NewRuleRegistry() *RuleRegistry {
 
 // Register adds a rule to the registry
 func (r *RuleRegistry) Register(ruleName string, ruleImpl rule.Rule) {
+	if ruleImpl.RunWithOptions != nil && ruleImpl.Schema == nil {
+		panic(fmt.Sprintf("rule %q has RunWithOptions but no Schema. Rules without options must set Schema: rule.EmptyArray()", ruleName))
+	}
 	r.rules[ruleName] = ruleImpl
 }
 
@@ -64,16 +68,32 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				ruleConfigCopy := ruleConfig
+				
+				var runFunc func(ctx rule.RuleContext) rule.RuleListeners
+				finalOptions := ruleConfigCopy.Options
+
+				if ruleImpl.RunWithOptions != nil {
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return ruleImpl.RunWithOptions(ctx, ruleConfigCopy.Options)
+					}
+				} else {
+					runOpts := any(ruleConfigCopy.Options)
+					if len(ruleConfigCopy.Options) == 1 {
+						runOpts = ruleConfigCopy.Options[0]
+					}
+					runFunc = func(ctx rule.RuleContext) rule.RuleListeners {
+						return ruleImpl.Run(ctx, runOpts)
+					}
+				}
+
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
 					Name:               ruleName,
 					Settings:           CloneSettings(mergedConfig.Settings),
 					Severity:           ruleConfig.GetSeverity(),
 					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
-					Options:            ruleConfigCopy.Options,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
-					},
+					Options:            finalOptions,
+					Run:                runFunc,
 				})
 			}
 		}
@@ -108,6 +128,58 @@ func (r *RuleRegistry) GetActiveRulesForFile(
 		}
 	}
 	return activeRules
+}
+
+// ValidateConfig checks all rule options in the configuration against their schemas.
+// It collects and returns all validation errors found.
+// As a side effect, it mutates the configuration in-place to convert all rule
+// entries to *RuleConfig and stores the pre-hydrated options in Options.
+func (r *RuleRegistry) ValidateConfig(config RslintConfig) []error {
+	var errs []error
+	for i := range config {
+		entry := &config[i]
+		for ruleName, ruleValue := range entry.Rules {
+			var rc *RuleConfig
+			switch v := ruleValue.(type) {
+			case string:
+				var options []any
+				if v != "off" && v != "" {
+					options = []any{}
+				}
+				rc = &RuleConfig{Level: v, Options: options}
+				entry.Rules[ruleName] = rc
+			case []interface{}:
+				rc = parseArrayRuleConfig(v)
+				if rc != nil {
+					entry.Rules[ruleName] = rc
+				}
+			case *RuleConfig:
+				rc = v
+			}
+
+			if rc == nil {
+				continue
+			}
+
+			if rc.IsEnabled() {
+				if ruleImpl, exists := r.rules[ruleName]; exists {
+					if ruleImpl.RunWithOptions != nil && ruleImpl.Schema == nil {
+						errs = append(errs, fmt.Errorf("rule %q has RunWithOptions but no Schema", ruleName))
+						continue
+					}
+					if ruleImpl.Schema != nil {
+						validated, err := rule.ValidateAndHydrateOptions(ruleImpl.Schema, ruleImpl.Name, rc.Options)
+						if err != nil {
+							errs = append(errs, err)
+						} else {
+							rc.Options = validated
+						}
+					}
+				}
+			}
+		}
+	}
+	return errs
 }
 
 func CloneSettings(settings map[string]interface{}) map[string]interface{} {

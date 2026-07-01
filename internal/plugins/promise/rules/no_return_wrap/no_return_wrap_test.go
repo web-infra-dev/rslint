@@ -41,9 +41,9 @@ func TestNoReturnWrap(t *testing.T) {
 			{Code: `function then() { return Promise.reject() }`},
 			{Code: `doThing(function(x) { return Promise.reject(x) })`},
 			{Code: `doThing().then(function() { return })`},
-			{Code: `doThing().then(function() { return Promise.reject(4) })`, Options: map[string]interface{}{"allowReject": true}},
+			{Code: `doThing().then(function() { return Promise.reject(4) })`, Options: []interface{}{map[string]interface{}{"allowReject": true}}},
 			{Code: `doThing().then((function() { return Promise.resolve(4) }).toString())`},
-			{Code: `doThing().then(() => Promise.reject(4))`, Options: map[string]interface{}{"allowReject": true}},
+			{Code: `doThing().then(() => Promise.reject(4))`, Options: []interface{}{map[string]interface{}{"allowReject": true}}},
 			{Code: `doThing().then(function() { return a() })`},
 			{Code: `doThing().then(function() { return Promise.a() })`},
 			{Code: `doThing().then(() => { return a() })`},
@@ -75,7 +75,7 @@ func TestNoReturnWrap(t *testing.T) {
 
 			// ---- Edge cases: allowReject + parens ----
 			// Parenthesized function with allowReject:true -> valid.
-			{Code: `doThing().then((function() { return Promise.reject(4) }))`, Options: map[string]interface{}{"allowReject": true}},
+			{Code: `doThing().then((function() { return Promise.reject(4) }))`, Options: []interface{}{map[string]interface{}{"allowReject": true}}},
 
 			// ---- Upstream alignment: nested methods/accessors/constructors ----
 			// ESTree exposes these bodies through inner FunctionExpression nodes, so

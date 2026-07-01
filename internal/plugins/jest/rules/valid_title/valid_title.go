@@ -14,6 +14,16 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+var matcherPatternSchema = rule.Union(
+	rule.String(),
+	rule.Array(rule.String()),
+	rule.Object(map[string]rule.Schema{
+		"describe": rule.Union(rule.String(), rule.Array(rule.String())).Default(""),
+		"test":     rule.Union(rule.String(), rule.Array(rule.String())).Default(""),
+		"it":       rule.Union(rule.String(), rule.Array(rule.String())).Default(""),
+	}),
+).Default("")
+
 const jsRegexOpts = regexp2.ECMAScript | regexp2.Unicode
 
 type matcherEntry struct {
@@ -42,32 +52,6 @@ type invalidPattern struct {
 	optionPath string
 	pattern    string
 	err        error
-}
-
-func firstOptionMap(options any) map[string]interface{} {
-	if options == nil {
-		return nil
-	}
-	arr := rule.NormalizeOptions(options)
-	if len(arr) == 0 {
-		return nil
-	}
-	m, ok := arr[0].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	return m
-}
-
-func boolFromMap(m map[string]interface{}, key string, def bool) bool {
-	v, ok := m[key]
-	if !ok || v == nil {
-		return def
-	}
-	if b, ok := v.(bool); ok {
-		return b
-	}
-	return def
 }
 
 func compileRE2(pat string) (*regexp2.Regexp, error) {
@@ -198,28 +182,31 @@ func fillMatcherField(ms *matchersByFn, key string, raw interface{}, optionPath 
 	return invalids
 }
 
-func parseCompiledOptions(options any) compiledOptions {
-	m := firstOptionMap(options)
-	if m == nil {
+func parseCompiledOptions(options []any) compiledOptions {
+	if len(options) == 0 {
+		return compiledOptions{}
+	}
+	m, ok := options[0].(map[string]any)
+	if !ok || m == nil {
 		return compiledOptions{}
 	}
 
 	co := compiledOptions{
-		ignoreSpaces:             boolFromMap(m, "ignoreSpaces", false),
-		ignoreTypeOfDescribeName: boolFromMap(m, "ignoreTypeOfDescribeName", false),
-		ignoreTypeOfTestName:     boolFromMap(m, "ignoreTypeOfTestName", false),
+		ignoreSpaces:             rule.Must[bool](m["ignoreSpaces"]),
+		ignoreTypeOfDescribeName: rule.Must[bool](m["ignoreTypeOfDescribeName"]),
+		ignoreTypeOfTestName:     rule.Must[bool](m["ignoreTypeOfTestName"]),
 	}
 
-	if dw, ok := m["disallowedWords"]; ok && dw != nil {
+	if dw := rule.Must[[]any](m["disallowedWords"]); len(dw) > 0 {
 		co.disallowedConcat, co.invalidPatterns = compileDisallowedWords(dw, co.invalidPatterns)
 	}
 
-	if mn, ok := m["mustNotMatch"]; ok {
+	if mn := m["mustNotMatch"]; mn != nil {
 		var invalids []invalidPattern
 		co.mustNotMatch, invalids = compileMatcherPatterns(mn, "mustNotMatch")
 		co.invalidPatterns = append(co.invalidPatterns, invalids...)
 	}
-	if mm, ok := m["mustMatch"]; ok {
+	if mm := m["mustMatch"]; mm != nil {
 		var invalids []invalidPattern
 		co.mustMatch, invalids = compileMatcherPatterns(mm, "mustMatch")
 		co.invalidPatterns = append(co.invalidPatterns, invalids...)
@@ -390,7 +377,15 @@ func jestEmptyFunctionName(kind jestUtils.JestFnType) string {
 // ValidTitleRule enforces ESLint jest/valid-title.
 var ValidTitleRule = rule.Rule{
 	Name: "jest/valid-title",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+		"ignoreSpaces":             rule.Bool().Default(false),
+		"ignoreTypeOfDescribeName": rule.Bool().Default(false),
+		"ignoreTypeOfTestName":     rule.Bool().Default(false),
+		"disallowedWords":          rule.Array(rule.String()).Default([]any{}),
+		"mustMatch":                matcherPatternSchema,
+		"mustNotMatch":             matcherPatternSchema,
+	})),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		co := parseCompiledOptions(options)
 		if len(co.invalidPatterns) > 0 {
 			for _, bad := range co.invalidPatterns {

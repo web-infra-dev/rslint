@@ -315,7 +315,7 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries
-- `GetOptionsMap` — options parsing (handles both array and map inputs)
+- ~~`GetOptionsMap`~~ — legacy options parsing for the old `Run` callback; **new rules use the `Schema` + `RunWithOptions` framework instead** (see [Handling Options](#handling-options))
 - **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
@@ -331,12 +331,14 @@ See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you fi
 
 **Rule Interface**:
 
+New rules MUST use the schema-driven `RunWithOptions` callback, not the legacy `Run` callback. `Run` only still exists for rules nobody has migrated yet — see [Handling Options](#handling-options) below.
+
 ```go
 // For typescript-eslint rules that use TypeChecker (auto-prefixes with @typescript-eslint/):
 var MyRuleRule = rule.CreateRule(rule.Rule{
     Name:             "my-rule",
     RequiresTypeInfo: true,
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindSomeNode: func(node *ast.Node) {
                 // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
@@ -348,7 +350,7 @@ var MyRuleRule = rule.CreateRule(rule.Rule{
 // For typescript-eslint rules that do NOT use TypeChecker:
 var MyOtherRule = rule.CreateRule(rule.Rule{
     Name: "my-other-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 })
@@ -356,17 +358,19 @@ var MyOtherRule = rule.CreateRule(rule.Rule{
 // For ESLint Core rules:
 var MyCoreRule = rule.Rule{
     Name: "my-core-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 }
 ```
 
+If the rule takes no options at all, specify `schema: rule.EmptyArray()` — `options` is then always an empty slice.
+
 **Key Points**:
 
 - `RuleListeners` is a map from `ast.Kind` to a callback function
 - Each callback receives a `*ast.Node` and reports diagnostics via `ctx.ReportNode()`
-- Options parsing happens inside the `Run` function before returning listeners
+- Options are validated and default-hydrated by the framework before `RunWithOptions` is called — cast the elements of the already-validated `options` slice to the Go shape your `Schema` expects (see [Handling Options](#handling-options))
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
 - **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
@@ -392,32 +396,37 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
+New rules declare options as a **schema**, not as hand-rolled JSON parsing. Define a single `Schema` on the `rule.Rule` literal using the combinators in `internal/rule/schema.go`.
+
+**The top-level schema must be one of: `rule.Tuple(...)`, `rule.Array(...)`, or `rule.EmptyArray()`.**
+
+- Use `rule.EmptyArray()` if the rule accepts no configuration options.
+- Use `rule.Tuple(...)` if the rule expects a fixed positional array of option shapes.
+- Use `rule.Array(...)` if the rule expects a list of homogeneous items.
+
+The framework (`rule.ValidateAndHydrateOptions`, wired into the CLI, the IPC API, the LSP server, and `rule_tester`) validates the raw config against the schema and calls `RunWithOptions` with the already-validated, default-hydrated slice (`[]any`). **Do not write a `parseOptions`/`utils.GetOptionsMap` helper for a new rule** — that pattern is legacy, kept only for rules not yet migrated (see `.agents/skills/port-rule-to-schema/SKILL.md` if you ever need to migrate one).
+
+Cast the validated elements inside `RunWithOptions`'s `options []any` slice to the shape your schema guarantees:
 
 ```go
-func parseOptions(options any) Options {
-    opts := Options{/* defaults */}
-    optsMap := utils.GetOptionsMap(options)
-    if optsMap != nil {
-        // Parse options from optsMap...
-    }
-    return opts
+var MyRuleRule = rule.Rule{
+    Name: "my-rule",
+    Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
+        "allowFoo": rule.Bool().Default(false),
+        "exclude":  rule.Array(rule.String()),
+    })),
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+        optsMap := rule.Must[map[string]any](options[0])
+        allowFoo := rule.Must[bool](optsMap["allowFoo"])
+        excludeArr := rule.Must[[]any](optsMap["exclude"])
+        // ... build a typed Options struct from the asserted fields
+    },
 }
 ```
 
-**Why this matters — the shape the CLI sends is different from Go tests.** `parseArrayRuleConfig` in `internal/config/config.go` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+Refer to [SCHEMA_MANUAL.md](../../port-rule-to-schema/references/SCHEMA_MANUAL.md) for the complete list of schema combinators, default value hydration, and Go type mappings.
 
-**Anti-pattern — do not write this:**
-
-```go
-// ❌ WRONG — only matches when len(remaining) > 1 in config.go;
-//    misses every single-option config and every CLI invocation.
-if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-    if optsJSON, err := json.Marshal(arr[0]); err == nil {
-        _ = json.Unmarshal(optsJSON, &opts)
-    }
-}
-```
+**Edge case — empty arrays are a valid, non-nil value, not "absent".** `rule.Array(...)` validates an explicit `[]` to `[]any{}`, not to the schema's default — `.Default(...)` only applies when the option is omitted entirely. If a rule's documented default for an array option must survive an explicit `[]`, that fallback has to be coded explicitly in `RunWithOptions` (check `len(arr) > 0` before treating it as a real value), not assumed from `.Default()`.
 
 ### Alignment Audit
 
@@ -532,9 +541,15 @@ These docstrings are how a reader (or `grep`) confirms a file is doing its assig
 - Use `map[string]interface{}` to pass options in Go tests.
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
 
-**Options coverage — MUST exercise the JSON path.** Passing a typed struct directly (e.g. `Options: MyRuleOptions{CheckX: utils.Ref(true)}`) short-circuits the `options.(MyRuleOptions)` type assertion and never exercises `utils.GetOptionsMap` or JSON round-trip. CLI and JS configs always take the JSON path, so a struct-only suite leaves the CLI-facing wiring untested.
+**Options coverage — MUST exercise the schema validation path.** `rule_tester.RunRuleTester` runs every test case's `Options` through `rule.ValidateAndHydrateOptions` exactly like the CLI/IPC/LSP do — there is no shortcut that bypasses it, so this is mostly automatic. What you still own: making sure every option your `Schema` declares is actually exercised, and that the _defaulting_ behavior is asserted, not just the happy path.
 
-For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is `map[string]interface{}{...}` (bare object — matches the single-option CLI shape) or `[]interface{}{map[string]interface{}{...}}` (array-wrapped — matches the multi-element / rule_tester shape). This catches bugs like missing `GetOptionsMap` integration, wrong JSON tag casing, and option-name typos that typed structs silently hide. See `no_floating_promises_test.go → TestNoFloatingPromisesOptionParsing` for a reference suite covering both shapes, nil options, empty arrays, malformed values, and nested specifier arrays.
+For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is wrapped in a slice `[]interface{}{...}` (e.g. `[]interface{}{map[string]interface{}{...}}`). Raw options maps must always be wrapped in a slice because schema-driven rules expect a slice payload matching a Tuple or Array schema. Also cover:
+
+- **Omitted option** → must hydrate to the schema's `.Default(...)` value.
+- **Explicit empty array** (for any `rule.Array(...)` option) → confirm whether it should fall back to the same default as omission, or genuinely mean "empty" for this rule, and assert whichever is correct (see the [Handling Options](#handling-options) edge case above — `.Default()` does not cover this case automatically).
+- **Wrong type for an option** (e.g. a string where the schema expects a bool) → confirms the schema actually rejects it, rather than the rule silently misbehaving.
+
+This catches bugs like wrong JSON tag casing, option-name typos, and missing default-fallback handling — the kind of thing a typed-struct-only suite silently hides. See `no_floating_promises_test.go → TestNoFloatingPromisesOptionParsing` for a reference suite covering both option shapes, nil options, empty arrays, malformed values, and nested specifier arrays (predates the schema framework but the shape-coverage pattern still applies).
 
 **Debug Flags**:
 

@@ -57,31 +57,27 @@ export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Rule-specific options object. Each rule defines its own shape; until per-rule
- * types are generated, options are accepted as an open record.
- */
-export type RuleOptions = Record<string, any>;
-
-/**
  * Configuration value accepted for a single rule.
  *
- * - `RuleSeverity` — just toggle the rule.
- * - `[RuleSeverity, ...args]` — ESLint-style array form. Most rules take a
- *   single options object (`[severity, { ... }]`); some accept positional
- *   string/object args (`[severity, "always", { ... }]`).
- * - `{ level, options }` — object form supported by the loader.
+ * `Options` is always a tuple of positional option types, matching the rule's
+ * schema declaration (e.g. `[{ allow?: string[] }]` for a single-options rule,
+ * or `["always" | "smart", { null?: string }]` for a multi-positional rule).
+ *
+ * - `RuleSeverity` — just toggle the rule on/off.
+ * - `[RuleSeverity, ...options]` — ESLint-style array form with optional positional args.
  */
-export type RuleEntry =
+export type RuleEntry<Options extends any[] = []> =
   | RuleSeverity
-  | readonly [RuleSeverity, ...any[]]
-  | { level: RuleSeverity; options?: RuleOptions };
+  | readonly [RuleSeverity, ...Options];
 
 /**
- * Map of rule name → rule configuration. Rule names are `string` (no
- * enumeration of known rules yet); the value shape is what gives editors
+ * Map of rule name → rule configuration. The value shape is what gives editors
  * hints when typing the array or object form.
  */
-export type RulesRecord = Record<string, RuleEntry>;
+export interface RulesRecord {
+  /** @__RULE_OPTIONS__ */
+  [key: string]: RuleEntry<any[]> | undefined;
+}
 
 /**
  * TypeScript parser options. `project` may be a single tsconfig path or a list.

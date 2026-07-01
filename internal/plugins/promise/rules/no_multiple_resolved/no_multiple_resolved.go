@@ -711,8 +711,9 @@ func isPromiseExecutorFunction(node *ast.Node) *ast.Node {
 }
 
 var NoMultipleResolvedRule = rule.Rule{
-	Name: "promise/no-multiple-resolved",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Name:   "promise/no-multiple-resolved",
+	Schema: rule.EmptyArray(),
+	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		reported := make(map[*ast.Node]bool)
 
 		return rule.RuleListeners{

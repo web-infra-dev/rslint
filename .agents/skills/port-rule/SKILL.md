@@ -256,6 +256,7 @@ go test -count=1 ./internal/rules/<rule_name>
 # Run JS tests (first run: append -u to generate snapshots)
 cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
 
+
 # Pre-commit gate (BLOCKING — all must pass before commit)
 pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && pnpm lint:go
 
@@ -263,9 +264,12 @@ pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && p
 pnpm format && pnpm format:go
 ```
 
+**Options framework**: new rules with options MUST use `Schema` + `RunWithOptions` (declarative schema combinators in `internal/rule/schema.go`), not the legacy `Run` + hand-rolled `parseOptions`/`utils.GetOptionsMap` pattern. See [PORT_RULE.md § Handling Options](references/PORT_RULE.md#handling-options) and [SCHEMA_MANUAL.md](../port-rule-to-schema/references/SCHEMA_MANUAL.md).
+
 ## References
 
 - [PORT_RULE.md](references/PORT_RULE.md) - Complete porting guide with code templates
+- [SCHEMA_MANUAL.md](../port-rule-to-schema/references/SCHEMA_MANUAL.md) - Manual for declarative schema combinators (types, defaults, and Go mapping)
 - [AST_PATTERNS.md](references/AST_PATTERNS.md) - AST traversal patterns
 - [UTILS_REFERENCE.md](references/UTILS_REFERENCE.md) - Utility functions
 - [QUICK_REFERENCE.md](references/QUICK_REFERENCE.md) - Commands cheatsheet
