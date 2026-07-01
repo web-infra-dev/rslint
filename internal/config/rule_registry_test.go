@@ -758,7 +758,19 @@ func TestValidateConfig_HydratesAndBypasses(t *testing.T) {
 	}
 }
 
-func TestValidateConfig_ErrorOnRunWithOptionsWithoutSchema(t *testing.T) {
+func TestRegister_PanicOnRunWithOptionsWithoutSchema(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected Register to panic for rule with RunWithOptions but no Schema")
+		} else {
+			expectedMsg := `rule "bad-rule" has RunWithOptions but no Schema`
+			actualMsg := fmt.Sprint(r)
+			if !strings.Contains(actualMsg, expectedMsg) {
+				t.Errorf("Expected panic message to contain %q, got %q", expectedMsg, actualMsg)
+			}
+		}
+	}()
+
 	registry := NewRuleRegistry()
 	registry.Register("bad-rule", rule.Rule{
 		Name: "bad-rule",
@@ -766,22 +778,6 @@ func TestValidateConfig_ErrorOnRunWithOptionsWithoutSchema(t *testing.T) {
 			return rule.RuleListeners{}
 		},
 	})
-
-	config := RslintConfig{
-		{
-			Rules: Rules{
-				"bad-rule": "error",
-			},
-		},
-	}
-
-	errs := registry.ValidateConfig(config)
-	if len(errs) != 1 {
-		t.Fatalf("Expected exactly 1 error, got %d", len(errs))
-	}
-	expectedMsg := `rule "bad-rule" has RunWithOptions but no Schema`
-	if !strings.Contains(errs[0].Error(), expectedMsg) {
-		t.Errorf("Expected error message to contain %q, got %q", expectedMsg, errs[0].Error())
-	}
 }
+
 

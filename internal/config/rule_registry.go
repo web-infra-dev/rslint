@@ -23,6 +23,9 @@ func NewRuleRegistry() *RuleRegistry {
 
 // Register adds a rule to the registry
 func (r *RuleRegistry) Register(ruleName string, ruleImpl rule.Rule) {
+	if ruleImpl.RunWithOptions != nil && ruleImpl.Schema == nil {
+		panic(fmt.Sprintf("rule %q has RunWithOptions but no Schema. Rules without options must set Schema: rule.EmptyArray()", ruleName))
+	}
 	r.rules[ruleName] = ruleImpl
 }
 

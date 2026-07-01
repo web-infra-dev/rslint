@@ -469,3 +469,33 @@ func (s *UnionSchema) TSType() string {
 func (s *UnionSchema) IsOptional() bool {
 	return false
 }
+
+// EmptyArraySchema validates that no options are provided (an empty array or nil)
+type EmptyArraySchema struct{}
+
+func EmptyArray() *EmptyArraySchema {
+	return &EmptyArraySchema{}
+}
+
+func (s *EmptyArraySchema) Validate(raw any) (any, error) {
+	if raw == nil {
+		return []any{}, nil
+	}
+	val := reflect.ValueOf(raw)
+	if val.Kind() == reflect.Slice {
+		if val.Len() > 0 {
+			return nil, fmt.Errorf("expected no options, got %d options", val.Len())
+		}
+		return []any{}, nil
+	}
+	return nil, fmt.Errorf("expected empty options array, got %T", raw)
+}
+
+func (s *EmptyArraySchema) TSType() string {
+	return "[]"
+}
+
+func (s *EmptyArraySchema) IsOptional() bool {
+	return true
+}
+

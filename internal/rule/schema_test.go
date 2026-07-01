@@ -748,3 +748,44 @@ func TestIsOptional(t *testing.T) {
 		t.Error("Array(Int()).MinLen(1) should not be optional")
 	}
 }
+
+func TestEmptyArraySchema(t *testing.T) {
+	s := EmptyArray()
+	if !s.IsOptional() {
+		t.Error("EmptyArray should be optional")
+	}
+	if s.TSType() != "[]" {
+		t.Errorf("expected TSType '[]', got %q", s.TSType())
+	}
+
+	// nil is allowed and results in an empty slice
+	val, err := s.Validate(nil)
+	if err != nil {
+		t.Fatalf("unexpected error validating nil: %v", err)
+	}
+	if slice, ok := val.([]any); !ok || len(slice) != 0 {
+		t.Errorf("expected empty []any, got %v (%T)", val, val)
+	}
+
+	// empty slice is allowed
+	val, err = s.Validate([]any{})
+	if err != nil {
+		t.Fatalf("unexpected error validating empty slice: %v", err)
+	}
+	if slice, ok := val.([]any); !ok || len(slice) != 0 {
+		t.Errorf("expected empty []any, got %v (%T)", val, val)
+	}
+
+	// non-empty slice should error
+	_, err = s.Validate([]any{"foo"})
+	if err == nil {
+		t.Error("expected error validating non-empty slice, got nil")
+	}
+
+	// invalid type should error
+	_, err = s.Validate("not a slice")
+	if err == nil {
+		t.Error("expected error validating string, got nil")
+	}
+}
+
