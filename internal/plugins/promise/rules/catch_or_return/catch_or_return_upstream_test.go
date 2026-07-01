@@ -44,43 +44,43 @@ func TestCatchOrReturnUpstream(t *testing.T) {
 			{Code: `function a() { return frank.then(go).then(to) }`},
 
 			// ---- allowThen - .then(null, fn) ----
-			{Code: `frank().then(go).then(null, doIt)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(go).then().then().then().then(null, doIt)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(go).then().then(null, function() { /* why bother */ })`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank.then(go).then(to).then(null, jail)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(a).then(b).then(null, c)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(a).then(b).then().then().then(null, doIt)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(a).then(b).then(null, function() { /* why bother */ })`, Options: map[string]interface{}{"allowThen": true}},
+			{Code: `frank().then(go).then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(go).then().then().then().then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(go).then().then(null, function() { /* why bother */ })`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank.then(go).then(to).then(null, jail)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(a).then(b).then(null, c)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(a).then(b).then().then().then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(a).then(b).then(null, function() { /* why bother */ })`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
 
 			// ---- allowThen - .then(fn, fn) ----
-			{Code: `frank().then(a, b)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(go).then(zam, doIt)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(a).then(b).then(c, d)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(go).then().then().then().then(wham, doIt)`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank().then(go).then().then(function() {}, function() { /* why bother */ })`, Options: map[string]interface{}{"allowThen": true}},
-			{Code: `frank.then(go).then(to).then(pewPew, jail)`, Options: map[string]interface{}{"allowThen": true}},
+			{Code: `frank().then(a, b)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(go).then(zam, doIt)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(a).then(b).then(c, d)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(go).then().then().then().then(wham, doIt)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank().then(go).then().then(function() {}, function() { /* why bother */ })`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
+			{Code: `frank.then(go).then(to).then(pewPew, jail)`, Options: []interface{}{map[string]interface{}{"allowThen": true}}},
 
 			// ---- allowThenStrict - .then(null, fn) ----
-			{Code: `frank().then(go).then(null, doIt)`, Options: map[string]interface{}{"allowThenStrict": true}},
-			{Code: `frank().then(go).then().then().then().then(null, doIt)`, Options: map[string]interface{}{"allowThenStrict": true}},
-			{Code: `frank().then(go).then().then(null, function() { /* why bother */ })`, Options: map[string]interface{}{"allowThenStrict": true}},
-			{Code: `frank.then(go).then(to).then(null, jail)`, Options: map[string]interface{}{"allowThenStrict": true}},
-			{Code: `frank().then(a).then(b).then(null, c)`, Options: map[string]interface{}{"allowThenStrict": true}},
-			{Code: `frank().then(a).then(b).then().then().then(null, doIt)`, Options: map[string]interface{}{"allowThenStrict": true}},
-			{Code: `frank().then(a).then(b).then(null, function() { /* why bother */ })`, Options: map[string]interface{}{"allowThenStrict": true}},
+			{Code: `frank().then(go).then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
+			{Code: `frank().then(go).then().then().then().then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
+			{Code: `frank().then(go).then().then(null, function() { /* why bother */ })`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
+			{Code: `frank.then(go).then(to).then(null, jail)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
+			{Code: `frank().then(a).then(b).then(null, c)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
+			{Code: `frank().then(a).then(b).then().then().then(null, doIt)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
+			{Code: `frank().then(a).then(b).then(null, function() { /* why bother */ })`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}},
 
 			// ---- allowFinally ----
-			{Code: `frank().then(go).catch(doIt).finally(fn)`, Options: map[string]interface{}{"allowFinally": true}},
-			{Code: `frank().then(go).then().then().then().catch(doIt).finally(fn)`, Options: map[string]interface{}{"allowFinally": true}},
-			{Code: `frank().then(go).then().catch(function() { /* why bother */ }).finally(fn)`, Options: map[string]interface{}{"allowFinally": true}},
+			{Code: `frank().then(go).catch(doIt).finally(fn)`, Options: []interface{}{map[string]interface{}{"allowFinally": true}}},
+			{Code: `frank().then(go).then().then().then().catch(doIt).finally(fn)`, Options: []interface{}{map[string]interface{}{"allowFinally": true}}},
+			{Code: `frank().then(go).then().catch(function() { /* why bother */ }).finally(fn)`, Options: []interface{}{map[string]interface{}{"allowFinally": true}}},
 
 			// ---- terminationMethod=done ----
-			{Code: `frank().then(go).done()`, Options: map[string]interface{}{"terminationMethod": "done"}},
+			{Code: `frank().then(go).done()`, Options: []interface{}{map[string]interface{}{"terminationMethod": "done"}}},
 
 			// ---- terminationMethod=[catch, done] ----
-			{Code: `frank().then(go).catch()`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "done"}}},
-			{Code: `frank().then(go).done()`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "done"}}},
-			{Code: `frank().then(go).finally()`, Options: map[string]interface{}{"terminationMethod": []interface{}{"catch", "finally"}}},
+			{Code: `frank().then(go).catch()`, Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{"catch", "done"}}}},
+			{Code: `frank().then(go).done()`, Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{"catch", "done"}}}},
+			{Code: `frank().then(go).finally()`, Options: []interface{}{map[string]interface{}{"terminationMethod": []interface{}{"catch", "finally"}}}},
 
 			// ---- for coverage: non-promise expression statement ----
 			{Code: `nonPromiseExpressionStatement();`},
@@ -109,12 +109,12 @@ func TestCatchOrReturnUpstream(t *testing.T) {
 			{Code: `function a() { frank.then(go).then(to) }`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
 
 			// ---- allowFinally=true failures ----
-			{Code: `frank().then(go).catch(doIt).finally(fn).then(foo)`, Options: map[string]interface{}{"allowFinally": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
-			{Code: `frank().then(go).catch(doIt).finally(fn).foobar(foo)`, Options: map[string]interface{}{"allowFinally": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(go).catch(doIt).finally(fn).then(foo)`, Options: []interface{}{map[string]interface{}{"allowFinally": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(go).catch(doIt).finally(fn).foobar(foo)`, Options: []interface{}{map[string]interface{}{"allowFinally": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
 
 			// ---- terminationMethod=done failures ----
-			{Code: `frank().then(go)`, Options: map[string]interface{}{"terminationMethod": "done"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: doneMessage, Line: 1}}},
-			{Code: `frank().catch(go)`, Options: map[string]interface{}{"terminationMethod": "done"}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: doneMessage, Line: 1}}},
+			{Code: `frank().then(go)`, Options: []interface{}{map[string]interface{}{"terminationMethod": "done"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: doneMessage, Line: 1}}},
+			{Code: `frank().catch(go)`, Options: []interface{}{map[string]interface{}{"terminationMethod": "done"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: doneMessage, Line: 1}}},
 
 			// ---- assume somePromise.ANYTHING() is a new promise ----
 			{Code: `frank().catch(go).someOtherMethod()`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
@@ -133,12 +133,12 @@ func TestCatchOrReturnUpstream(t *testing.T) {
 			{Code: `frank.then(go).then(to).then(pewPew, jail)`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
 
 			// ---- .then(fn, fn) with allowThenStrict (non-null first arg still invalid) ----
-			{Code: `frank().then(a, b)`, Options: map[string]interface{}{"allowThenStrict": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
-			{Code: `frank().then(go).then(zam, doIt)`, Options: map[string]interface{}{"allowThenStrict": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
-			{Code: `frank().then(a).then(b).then(c, d)`, Options: map[string]interface{}{"allowThenStrict": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
-			{Code: `frank().then(go).then().then().then().then(wham, doIt)`, Options: map[string]interface{}{"allowThenStrict": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
-			{Code: `frank().then(go).then().then(function() {}, function() { /* why bother */ })`, Options: map[string]interface{}{"allowThenStrict": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
-			{Code: `frank.then(go).then(to).then(pewPew, jail)`, Options: map[string]interface{}{"allowThenStrict": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(a, b)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(go).then(zam, doIt)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(a).then(b).then(c, d)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(go).then().then().then().then(wham, doIt)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank().then(go).then().then(function() {}, function() { /* why bother */ })`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
+			{Code: `frank.then(go).then(to).then(pewPew, jail)`, Options: []interface{}{map[string]interface{}{"allowThenStrict": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "terminationMethod", Message: catchMessage, Line: 1}}},
 		},
 	)
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -339,7 +340,7 @@ func TestGetEnabledRules_EnforcePlugins_MultiplePluginsInSameEntry(t *testing.T)
 			Rules: Rules{
 				"@typescript-eslint/no-explicit-any": "error",
 				"react/jsx-uses-react":               "error",
-				"import/no-self-import":               "error", // import plugin NOT in plugins array
+				"import/no-self-import":              "error", // import plugin NOT in plugins array
 			},
 		},
 	}
@@ -447,7 +448,7 @@ func TestGetEnabledRules_EnforcePlugins_PresetPlusAdditionalPlugin(t *testing.T)
 			Files:   []string{"**/*.tsx"},
 			Plugins: []string{"react"},
 			Rules: Rules{
-				"react/jsx-uses-react":             "error",
+				"react/jsx-uses-react":              "error",
 				"@typescript-eslint/ban-ts-comment": "error", // TS rule in react entry
 			},
 		},
@@ -779,5 +780,3 @@ func TestRegister_PanicOnRunWithOptionsWithoutSchema(t *testing.T) {
 		},
 	})
 }
-
-

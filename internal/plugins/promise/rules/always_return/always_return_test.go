@@ -58,32 +58,32 @@ func TestAlwaysReturn(t *testing.T) {
         }
         return x
       })`},
-			{Code: `hey.then(x => { console.log(x) })`, Options: map[string]interface{}{"ignoreLastCallback": true}},
-			{Code: `if(foo) { hey.then(x => { console.log(x) }) }`, Options: map[string]interface{}{"ignoreLastCallback": true}},
-			{Code: `void hey.then(x => { console.log(x) })`, Options: map[string]interface{}{"ignoreLastCallback": true}},
+			{Code: `hey.then(x => { console.log(x) })`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
+			{Code: `if(foo) { hey.then(x => { console.log(x) }) }`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
+			{Code: `void hey.then(x => { console.log(x) })`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
 			{Code: `async function foo() {
         await hey.then(x => { console.log(x) })
-      }`, Options: map[string]interface{}{"ignoreLastCallback": true}},
-			{Code: `hey?.then(x => { console.log(x) })`, Options: map[string]interface{}{"ignoreLastCallback": true}},
-			{Code: `foo = (hey.then(x => { console.log(x) }), 42)`, Options: map[string]interface{}{"ignoreLastCallback": true}},
-			{Code: `(42, hey.then(x => { console.log(x) }))`, Options: map[string]interface{}{"ignoreLastCallback": true}},
+      }`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
+			{Code: `hey?.then(x => { console.log(x) })`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
+			{Code: `foo = (hey.then(x => { console.log(x) }), 42)`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
+			{Code: `(42, hey.then(x => { console.log(x) }))`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
 			{Code: `hey
         .then(x => { console.log(x) })
-        .catch(e => console.error(e))`, Options: map[string]interface{}{"ignoreLastCallback": true}},
+        .catch(e => console.error(e))`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
 			{Code: `hey
         .then(x => { console.log(x) })
         .catch(e => console.error(e))
-        .finally(() => console.error('end'))`, Options: map[string]interface{}{"ignoreLastCallback": true}},
+        .finally(() => console.error('end'))`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
 			{Code: `hey
         .then(x => { console.log(x) })
-        .finally(() => console.error('end'))`, Options: map[string]interface{}{"ignoreLastCallback": true}},
+        .finally(() => console.error('end'))`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}},
 			{Code: `hey.then(x => { globalThis = x })`},
 			{Code: `hey.then(x => { globalThis[a] = x })`},
 			{Code: `hey.then(x => { globalThis.a = x })`},
 			{Code: `hey.then(x => { globalThis.a.n = x })`},
 			{Code: `hey.then(x => { globalThis[12] = x })`},
 			{Code: `hey.then(x => { globalThis['12']["test"] = x })`},
-			{Code: `hey.then(x => { window['x'] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"globalThis", "window"}}},
+			{Code: `hey.then(x => { window['x'] = x })`, Options: []interface{}{map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"globalThis", "window"}}}},
 
 			// ---- Upstream semantic branches and tsgo shape locks ----
 			// Locks in upstream isMemberCall(): computed `.then` is ignored.
@@ -128,7 +128,7 @@ func TestAlwaysReturn(t *testing.T) {
 			{Code: `hey.then(x => { globalThis.a ||= x })`},
 			{Code: `hey.then(x => { globalThis.a ??= x })`},
 			{Code: `hey.then(x => { globalThis[x] -= 1 })`},
-			{Code: `hey.then(x => { window.a += x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}},
+			{Code: `hey.then(x => { window.a += x })`, Options: []interface{}{map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}}},
 
 			// ---- try/catch: catch unreachable because the try block cannot throw ----
 			{Code: `hey.then(function() { try { return 1 } catch (e) { log(e) } })`},
@@ -188,23 +188,23 @@ func TestAlwaysReturn(t *testing.T) {
       })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey
         .then(function(x) { console.log(x) /* missing return here */ })
-        .then(function(y) { console.log(y) /* no error here */ })`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message, Line: 2}}},
-			{Code: `const foo = hey.then(function(x) {});`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+        .then(function(y) { console.log(y) /* no error here */ })`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message, Line: 2}}},
+			{Code: `const foo = hey.then(function(x) {});`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `function foo() {
         return hey.then(function(x) {});
-      }`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+      }`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `async function foo() {
         return await hey.then(x => { console.log(x) })
-      }`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
-			{Code: `const foo = hey?.then(x => { console.log(x) })`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
-			{Code: `const foo = (42, hey.then(x => { console.log(x) }))`, Options: map[string]interface{}{"ignoreLastCallback": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+      }`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `const foo = hey?.then(x => { console.log(x) })`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `const foo = (42, hey.then(x => { console.log(x) }))`, Options: []interface{}{map[string]interface{}{"ignoreLastCallback": true}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { invalid = x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { invalid['x'] = x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 			{Code: `hey.then(x => { const value = x })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
-			{Code: `hey.then(x => { notWindow[x] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
-			{Code: `hey.then(x => { notWindow['x'] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
-			{Code: `hey.then(x => { windows['x'] = x })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
-			{Code: `hey.then(x => { x() })`, Options: map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(x => { notWindow[x] = x })`, Options: []interface{}{map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(x => { notWindow['x'] = x })`, Options: []interface{}{map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(x => { windows['x'] = x })`, Options: []interface{}{map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
+			{Code: `hey.then(x => { x() })`, Options: []interface{}{map[string]interface{}{"ignoreAssignmentVariable": []interface{}{"window"}}}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
 
 			// Locks in upstream process matcher: only process.exit/abort is terminal.
 			{Code: `hey.then(x => { process.exitCode = 1 })`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "thenShouldReturnOrThrow", Message: message}}},
