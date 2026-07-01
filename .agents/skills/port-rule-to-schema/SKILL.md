@@ -167,3 +167,9 @@ var EqeqeqRule = rule.Rule{
 	},
 }
 ```
+
+---
+
+## References
+
+- [SCHEMA_MANUAL.md](references/SCHEMA_MANUAL.md) - Manual for declarative schema combinators (types, defaults, and Go mapping)
