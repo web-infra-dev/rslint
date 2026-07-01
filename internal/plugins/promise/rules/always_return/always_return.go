@@ -54,8 +54,6 @@ func isFunctionWithBlockStatement(node *ast.Node) bool {
 	}
 }
 
-
-
 func isLastCallback(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
@@ -170,7 +168,7 @@ var AlwaysReturnRule = rule.Rule{
 	Name: "promise/always-return",
 	Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
 		"ignoreLastCallback":       rule.Bool().Default(false),
-		"ignoreAssignmentVariable": rule.Union(rule.Array(rule.String())).Default([]any{"globalThis"}),
+		"ignoreAssignmentVariable": rule.Array(rule.String()).Default([]any{"globalThis"}),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		optsMap := rule.Must[map[string]any](options[0])

@@ -18,11 +18,11 @@ var matcherPatternSchema = rule.Union(
 	rule.String(),
 	rule.Array(rule.String()),
 	rule.Object(map[string]rule.Schema{
-		"describe": rule.Union(rule.String(), rule.Array(rule.String())).Default(nil),
-		"test":     rule.Union(rule.String(), rule.Array(rule.String())).Default(nil),
-		"it":       rule.Union(rule.String(), rule.Array(rule.String())).Default(nil),
+		"describe": rule.Union(rule.String(), rule.Array(rule.String())).Default(""),
+		"test":     rule.Union(rule.String(), rule.Array(rule.String())).Default(""),
+		"it":       rule.Union(rule.String(), rule.Array(rule.String())).Default(""),
 	}),
-).Default(nil)
+).Default("")
 
 const jsRegexOpts = regexp2.ECMAScript | regexp2.Unicode
 
