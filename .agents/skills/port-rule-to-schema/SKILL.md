@@ -36,20 +36,13 @@ Inspect how `ctx.Rule().Options` is parsed, checked, and converted. Cross-refere
 
 ### 3. Define the Declarative Schema
 
-Add a `Schema` field to the `rule.Rule` declaration. **The top-level schema must be either `rule.Tuple(...)` or `rule.Array(...)`** — both produce `[]any` from `Validate`, which is what `RunWithOptions` always receives. Use the schema combinators defined in [internal/rule/schema.go](file:///home/swwind/rslint/internal/rule/schema.go):
+Add a `Schema` field to the `rule.Rule` declaration. **The top-level schema must be one of `rule.Tuple(...)`, `rule.Array(...)`, or `rule.EmptyArray()`**:
 
+- If the rule does not accept any configuration options, **you MUST provide `schema: rule.EmptyArray()`** to enforce that no options are passed.
 - Use **`rule.Tuple(...)`** when the rule has a fixed number of positional arguments with potentially different types (e.g., a severity string followed by an options object).
 - Use **`rule.Array(...)`** when the rule takes a variable-length list of homogeneous values (e.g., a list of allowed patterns or keywords).
 
-Available element schemas:
-
-- `rule.Bool()`
-- `rule.Int()`
-- `rule.String()`
-- `rule.Enum("option1", "option2")`
-- `rule.Object(map[string]rule.Schema{ ... })`
-- `rule.Array(itemSchema)`
-- `rule.Union(schemas...)`
+All schema combinators are defined in [internal/rule/schema.go](file:///home/swwind/rslint/internal/rule/schema.go).
 
 _Always specify `.Default(value)` on your schemas to let the framework handle missing values._
 
@@ -85,6 +78,7 @@ Type-assert each element to the Go type that corresponds to its schema:
 ### 5. Update Tests and Custom Call Sites
 
 - In `<rule_name>_test.go`, make sure the tests pass. The rule tester runner automatically leverages the schemas to validate test case options before running rules.
+- **Wrap Options in Slices**: In all test cases (both valid and invalid) inside the rule's tests, if `Options` are defined, **you MUST wrap them in a slice `[]interface{}{...}`** (or `[]interface{}{}` if empty). Because the schema-driven framework expects a slice at the top-level (Tuple or Array), passing a raw map/string directly will fail options validation with `expected slice, got map[string]interface {}`.
 - **Verify Execution API**: Double-check that the ported rule is running with the new `.RunWithOptions` API rather than the legacy `.Run` API.
 - **Drop Legacy `.Run` Calls**: If there is rule-specific code (such as custom test cases/fixtures in `<rule_name>_test.go` or rule-specific helper files) that only runs for this specific rule, you should drop support for the old `.Run` API entirely there. Migrate those custom calls to use `.RunWithOptions` (validating and hydrating options via `rule.ValidateAndHydrateOptions` first).
 
