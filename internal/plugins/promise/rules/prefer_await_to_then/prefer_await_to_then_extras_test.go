@@ -17,10 +17,11 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// ---- Dimension 1: AST node types ----
 
-			// Element access is not dot notation — rule only targets PropertyAccessExpression.
-			// N/A: element-access form (`obj['then']()`) is intentionally not matched.
+			// Element access with a string/template literal key is not an identifier
+			// property, so it stays unmatched (mirrors upstream's node.property.name check).
 			{Code: `function f() { obj['then']() }`},
 			{Code: "function f() { obj[`then`]() }"},
+			// Element access with an identifier key whose name isn't then/catch/finally.
 			{Code: `function f() { obj[sym]() }`},
 
 			// Member access without call (typeof check) — not a CallExpression
@@ -86,7 +87,7 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 			{Code: `function f() { p.thenSomething() }`},
 			{Code: `function f() { p.catchError() }`},
 
-			// ---- For-loop scoping: var / no-decl heads create no scope (Comment 4 fix) ----
+			// ---- For-loop scoping: var / no-decl heads create no scope ----
 			// eslint-scope does not open a scope unless the head is let/const/using.
 			// Without a block body there is no KindBlock ancestor either, so these stay top-level.
 			{Code: `for(;;) thing.then(cb)`},
@@ -296,6 +297,22 @@ func TestPreferAwaitToThenExtras(t *testing.T) {
 				Code: `function f() { Promise.all(items.map(x => x.then(cb))) }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 45, EndLine: 1, EndColumn: 49},
+				},
+			},
+
+			// ---- Element access with an identifier key ----
+			// Upstream matches any MemberExpression.callee, including computed
+			// identifier access like obj[then](), not just dot notation.
+			{
+				Code: `function f() { obj[then]() }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 20, EndLine: 1, EndColumn: 24},
+				},
+			},
+			{
+				Code: `function f() { obj[(then)]() }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "preferAwaitToCallback", Message: msg, Line: 1, Column: 21, EndLine: 1, EndColumn: 25},
 				},
 			},
 		},

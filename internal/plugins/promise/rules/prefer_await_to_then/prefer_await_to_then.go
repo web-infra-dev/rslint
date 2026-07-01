@@ -127,10 +127,18 @@ var PreferAwaitToThenRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callee := ast.SkipOuterExpressions(node.AsCallExpression().Expression, skipTransparent)
-				if callee == nil || !ast.IsPropertyAccessExpression(callee) {
+				if callee == nil {
 					return
 				}
-				nameNode := callee.AsPropertyAccessExpression().Name()
+				var nameNode *ast.Node
+				switch {
+				case ast.IsPropertyAccessExpression(callee):
+					nameNode = callee.AsPropertyAccessExpression().Name()
+				case ast.IsElementAccessExpression(callee):
+					nameNode = ast.SkipOuterExpressions(callee.AsElementAccessExpression().ArgumentExpression, skipTransparent)
+				default:
+					return
+				}
 				if nameNode == nil || !ast.IsIdentifier(nameNode) {
 					return
 				}
