@@ -264,7 +264,7 @@ pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && p
 pnpm format && pnpm format:go
 ```
 
-**Options framework**: new rules with options MUST use `Schema0`/`Schema1` + `RunWithOptions` (declarative schema combinators in `internal/rule/schema.go`), not the legacy `Run` + hand-rolled `parseOptions`/`utils.GetOptionsMap` pattern. See [PORT_RULE.md § Handling Options](references/PORT_RULE.md#handling-options) and [SCHEMA_MANUAL.md](../port-rule-to-schema/references/SCHEMA_MANUAL.md).
+**Options framework**: new rules with options MUST use `Schema` + `RunWithOptions` (declarative schema combinators in `internal/rule/schema.go`), not the legacy `Run` + hand-rolled `parseOptions`/`utils.GetOptionsMap` pattern. See [PORT_RULE.md § Handling Options](references/PORT_RULE.md#handling-options) and [SCHEMA_MANUAL.md](../port-rule-to-schema/references/SCHEMA_MANUAL.md).
 
 ## References
 

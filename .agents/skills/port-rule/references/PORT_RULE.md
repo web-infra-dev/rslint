@@ -315,7 +315,7 @@ If ≥1 rule in the same plugin already defines a near-equivalent helper, you MU
 - `AreNodes*`, `IsSame*` — structural / reference AST comparison
 - `GetFunction*`, `TrimmedNodeText*`, `TrimNodeTextRange` — function head / trimmed source text
 - `IsShadowed`, `FindEnclosingScope`, `CollectBindingNames` — scope / binding queries
-- ~~`GetOptionsMap`~~ — legacy options parsing for the old `Run` callback; **new rules use the `Schema0`/`Schema1` + `RunWithOptions` framework instead** (see [Handling Options](#handling-options))
+- ~~`GetOptionsMap`~~ — legacy options parsing for the old `Run` callback; **new rules use the `Schema` + `RunWithOptions` framework instead** (see [Handling Options](#handling-options))
 - **Type-aware queries** (for `@typescript-eslint` rules that use `ctx.TypeChecker`): `Is*Type*` / `Get*Type*` — type-flag tests and classifications (`IsTypeAnyType`, `IsUnionType`, `GetTypeName`, `GetContextualType`, `GetConstraintInfo`); `IsPromise*` / `IsError*` / `IsReadonly*` — builtin-type detection; `NeedsToBeAwaited`, `GetCallSignatures`, `CollectAllCallSignatures` — signature / awaitability helpers; `IsUnsafeAssignment`, `DiscriminateAnyType` — any-type safety. See the `ts_api_utils.go` / `ts_eslint.go` / `builtin_symbol_likes.go` sections of [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the complete inventory — **do not re-implement type analysis inline**.
 
 See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you find a near-match that's missing some behavior, extend it in place** rather than writing a parallel implementation inline. Extraction is explicitly preferred over duplication (see _Helper Extraction_ below for criteria).
@@ -338,7 +338,7 @@ New rules MUST use the schema-driven `RunWithOptions` callback, not the legacy `
 var MyRuleRule = rule.CreateRule(rule.Rule{
     Name:             "my-rule",
     RequiresTypeInfo: true,
-    RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindSomeNode: func(node *ast.Node) {
                 // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
@@ -350,7 +350,7 @@ var MyRuleRule = rule.CreateRule(rule.Rule{
 // For typescript-eslint rules that do NOT use TypeChecker:
 var MyOtherRule = rule.CreateRule(rule.Rule{
     Name: "my-other-rule",
-    RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 })
@@ -358,19 +358,19 @@ var MyOtherRule = rule.CreateRule(rule.Rule{
 // For ESLint Core rules:
 var MyCoreRule = rule.Rule{
     Name: "my-core-rule",
-    RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 }
 ```
 
-If the rule takes no options at all, leave `Schema0`/`Schema1` unset — `options` is then always `nil` and the callback can ignore the parameter (see `promise/avoid-new` for a reference example).
+If the rule takes no options at all, specify `schema: rule.EmptyArray()` — `options` is then always an empty slice.
 
 **Key Points**:
 
 - `RuleListeners` is a map from `ast.Kind` to a callback function
 - Each callback receives a `*ast.Node` and reports diagnostics via `ctx.ReportNode()`
-- Options are validated and default-hydrated by the framework before `RunWithOptions` is called — cast the already-validated `options` value to the Go shape your `Schema0`/`Schema1` declares (see [Handling Options](#handling-options))
+- Options are validated and default-hydrated by the framework before `RunWithOptions` is called — cast the elements of the already-validated `options` slice to the Go shape your `Schema` expects (see [Handling Options](#handling-options))
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
 - **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
@@ -396,28 +396,27 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-New rules declare options as a **schema**, not as hand-rolled JSON parsing. Define `Schema0` (and `Schema1` for a second positional option, e.g. `eqeqeq`'s `["always", { "null": ... }]`) on the `rule.Rule` literal using the combinators in `internal/rule/schema.go`:
+New rules declare options as a **schema**, not as hand-rolled JSON parsing. Define a single `Schema` on the `rule.Rule` literal using the combinators in `internal/rule/schema.go`.
 
-- `rule.Bool()`, `rule.Int()`, `rule.String()` — primitives
-- `rule.Enum("a", "b", ...)` — string enum
-- `rule.Object(map[string]rule.Schema{ ... })` — option object
-- `rule.Array(itemSchema)` — list of a schema
-- `rule.Tuple(schemas...)` / `rule.Union(schemas...)` — fixed-shape / either-of
-- `.Default(value)` on any of the above — **always set this** so a missing option hydrates to the rule's documented default instead of the schema's zero value
+**The top-level schema must be one of: `rule.Tuple(...)`, `rule.Array(...)`, or `rule.EmptyArray()`.**
 
-The framework (`rule.ValidateAndHydrateOptions`, wired into the CLI, the IPC API, the LSP server, and `rule_tester`) validates the raw config against the schema and calls `RunWithOptions` with the already-validated, default-hydrated value — it handles both the CLI's bare-object single-option shape and the array-wrapped multi-option shape for you. **Do not write a `parseOptions`/`utils.GetOptionsMap` helper for a new rule** — that pattern is legacy, kept only for rules not yet migrated (see `.agents/skills/port-rule-to-schema/SKILL.md` if you ever need to migrate one).
+- Use `rule.EmptyArray()` if the rule accepts no configuration options.
+- Use `rule.Tuple(...)` if the rule expects a fixed positional array of option shapes.
+- Use `rule.Array(...)` if the rule expects a list of homogeneous items.
 
-Cast the validated `options` value inside `RunWithOptions` to the shape your schema guarantees:
+The framework (`rule.ValidateAndHydrateOptions`, wired into the CLI, the IPC API, the LSP server, and `rule_tester`) validates the raw config against the schema and calls `RunWithOptions` with the already-validated, default-hydrated slice (`[]any`). **Do not write a `parseOptions`/`utils.GetOptionsMap` helper for a new rule** — that pattern is legacy, kept only for rules not yet migrated (see `.agents/skills/port-rule-to-schema/SKILL.md` if you ever need to migrate one).
+
+Cast the validated elements inside `RunWithOptions`'s `options []any` slice to the shape your schema guarantees:
 
 ```go
 var MyRuleRule = rule.Rule{
     Name: "my-rule",
-    Schema0: rule.Object(map[string]rule.Schema{
+    Schema: rule.Tuple(rule.Object(map[string]rule.Schema{
         "allowFoo": rule.Bool().Default(false),
         "exclude":  rule.Array(rule.String()),
-    }),
-    RunWithOptions: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-        optsMap, _ := options.(map[string]any)
+    })),
+    RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+        optsMap, _ := options[0].(map[string]any)
         allowFoo, _ := optsMap["allowFoo"].(bool)
         excludeArr, _ := optsMap["exclude"].([]any)
         // ... build a typed Options struct from the asserted fields
@@ -425,9 +424,7 @@ var MyRuleRule = rule.Rule{
 }
 ```
 
-- `Schema0` is `rule.Object(...)` → `options` is `map[string]any`.
-- `Schema0` is `rule.Enum(...)`/`rule.String()`/`rule.Bool()` → `options` is that primitive Go type directly.
-- `Schema1` is also set (two positional options, e.g. `eqeqeq`) → `options` is always `[]any{val0, val1}`; assert `options.([]any)[0]` against `Schema0`'s type and `[1]` against `Schema1`'s.
+Refer to [SCHEMA_MANUAL.md](../../port-rule-to-schema/references/SCHEMA_MANUAL.md) for the complete list of schema combinators, default value hydration, and Go type mappings.
 
 **Edge case — empty arrays are a valid, non-nil value, not "absent".** `rule.Array(...)` validates an explicit `[]` to `[]any{}`, not to the schema's default — `.Default(...)` only applies when the option is omitted entirely. If a rule's documented default for an array option must survive an explicit `[]`, that fallback has to be coded explicitly in `RunWithOptions` (check `len(arr) > 0` before treating it as a real value), not assumed from `.Default()`.
 
@@ -544,9 +541,9 @@ These docstrings are how a reader (or `grep`) confirms a file is doing its assig
 - Use `map[string]interface{}` to pass options in Go tests.
 - Ensure `tsconfig.json` path uses `fixtures.GetRootDir()`.
 
-**Options coverage — MUST exercise the schema validation path.** `rule_tester.RunRuleTester` runs every test case's `Options` through `rule.ValidateAndHydrateOptions` exactly like the CLI/IPC/LSP do — there is no shortcut that bypasses it, so this is mostly automatic. What you still own: making sure every option your `Schema0`/`Schema1` declares is actually exercised, and that the _defaulting_ behavior is asserted, not just the happy path.
+**Options coverage — MUST exercise the schema validation path.** `rule_tester.RunRuleTester` runs every test case's `Options` through `rule.ValidateAndHydrateOptions` exactly like the CLI/IPC/LSP do — there is no shortcut that bypasses it, so this is mostly automatic. What you still own: making sure every option your `Schema` declares is actually exercised, and that the _defaulting_ behavior is asserted, not just the happy path.
 
-For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is `map[string]interface{}{...}` (bare object — matches the single-option CLI shape) or `[]interface{}{map[string]interface{}{...}}` (array-wrapped — matches the multi-element / rule_tester shape). Also cover:
+For every option your rule accepts, include **at least one** Valid case and **at least one** Invalid case whose `Options` field is wrapped in a slice `[]interface{}{...}` (e.g. `[]interface{}{map[string]interface{}{...}}`). Raw options maps must always be wrapped in a slice because schema-driven rules expect a slice payload matching a Tuple or Array schema. Also cover:
 
 - **Omitted option** → must hydrate to the schema's `.Default(...)` value.
 - **Explicit empty array** (for any `rule.Array(...)` option) → confirm whether it should fall back to the same default as omission, or genuinely mean "empty" for this rule, and assert whichever is correct (see the [Handling Options](#handling-options) edge case above — `.Default()` does not cover this case automatically).
