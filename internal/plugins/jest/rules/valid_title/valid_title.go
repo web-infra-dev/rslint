@@ -192,12 +192,12 @@ func parseCompiledOptions(options []any) compiledOptions {
 	}
 
 	co := compiledOptions{
-		ignoreSpaces:             m["ignoreSpaces"].(bool),
-		ignoreTypeOfDescribeName: m["ignoreTypeOfDescribeName"].(bool),
-		ignoreTypeOfTestName:     m["ignoreTypeOfTestName"].(bool),
+		ignoreSpaces:             rule.Must[bool](m["ignoreSpaces"]),
+		ignoreTypeOfDescribeName: rule.Must[bool](m["ignoreTypeOfDescribeName"]),
+		ignoreTypeOfTestName:     rule.Must[bool](m["ignoreTypeOfTestName"]),
 	}
 
-	if dw := m["disallowedWords"].([]any); len(dw) > 0 {
+	if dw := rule.Must[[]any](m["disallowedWords"]); len(dw) > 0 {
 		co.disallowedConcat, co.invalidPatterns = compileDisallowedWords(dw, co.invalidPatterns)
 	}
 

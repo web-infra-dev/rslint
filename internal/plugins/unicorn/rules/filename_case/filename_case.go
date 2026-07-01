@@ -73,10 +73,10 @@ type Options struct {
 func buildOptions(optsMap map[string]any) Options {
 	opts := Options{
 		Cases:                  []caseStyle{caseByKey["kebabCase"]},
-		MultipleFileExtensions: optsMap["multipleFileExtensions"].(bool),
+		MultipleFileExtensions: rule.Must[bool](optsMap["multipleFileExtensions"]),
 	}
 
-	if c, found := caseByKey[optsMap["case"].(string)]; found {
+	if c, found := caseByKey[rule.Must[string](optsMap["case"])]; found {
 		opts.Cases = []caseStyle{c}
 	} else if casesMap, ok := optsMap["cases"].(map[string]any); ok {
 		var chosen []caseStyle
@@ -90,8 +90,8 @@ func buildOptions(optsMap map[string]any) Options {
 		}
 	}
 
-	for _, item := range optsMap["ignore"].([]any) {
-		s := item.(string)
+	for _, item := range rule.Must[[]any](optsMap["ignore"]) {
+		s := rule.Must[string](item)
 		if re, err := regexp2.Compile(s, reOpts); err == nil {
 			opts.Ignores = append(opts.Ignores, re)
 		} else {

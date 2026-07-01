@@ -1,11 +1,22 @@
 package rule
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
 )
+
+// Must extracts a value of type T from a schema-validated any. Panics with a
+// descriptive message if the type is wrong, indicating a schema definition bug.
+func Must[T any](v any) T {
+	t, ok := v.(T)
+	if !ok {
+		panic(fmt.Sprintf("schema contract violated: expected %T, got %T", *new(T), v))
+	}
+	return t
+}
 
 // Schema defines the interface for options validators. It supports validating
 // raw configuration maps/slices, applying default values, and exporting
@@ -32,9 +43,6 @@ func Default(inner Schema, def any) *DefaultSchema {
 
 func (s *DefaultSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		if s.def == nil {
-			return nil, nil
-		}
 		return s.inner.Validate(s.def)
 	}
 	return s.inner.Validate(raw)
@@ -84,7 +92,7 @@ func (s *BoolSchema) Default(def bool) *DefaultSchema {
 
 func (s *BoolSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		return nil, fmt.Errorf("expected bool, got nil")
+		return nil, errors.New("expected bool, got nil")
 	}
 	b, ok := raw.(bool)
 	if !ok {
@@ -127,7 +135,7 @@ func (s *IntSchema) Max(maxVal int) *IntSchema {
 
 func (s *IntSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		return nil, fmt.Errorf("expected int, got nil")
+		return nil, errors.New("expected int, got nil")
 	}
 
 	var val int
@@ -170,7 +178,7 @@ func (s *StringSchema) Default(def string) *DefaultSchema {
 
 func (s *StringSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		return nil, fmt.Errorf("expected string, got nil")
+		return nil, errors.New("expected string, got nil")
 	}
 	str, ok := raw.(string)
 	if !ok {
@@ -202,7 +210,7 @@ func (s *EnumSchema) Default(def string) *DefaultSchema {
 
 func (s *EnumSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		return nil, fmt.Errorf("expected string, got nil")
+		return nil, errors.New("expected string, got nil")
 	}
 	str, ok := raw.(string)
 	if !ok {
@@ -264,7 +272,7 @@ func (s *ArraySchema) Validate(raw any) (any, error) {
 		if s.IsOptional() {
 			return []any{}, nil
 		}
-		return nil, fmt.Errorf("expected slice, got nil")
+		return nil, errors.New("expected slice, got nil")
 	}
 	var arr []any
 	val := reflect.ValueOf(raw)
@@ -445,7 +453,7 @@ func (s *UnionSchema) Default(def any) *DefaultSchema {
 
 func (s *UnionSchema) Validate(raw any) (any, error) {
 	if raw == nil {
-		return nil, fmt.Errorf("expected non-nil value, got nil")
+		return nil, errors.New("expected non-nil value, got nil")
 	}
 	var errors []error
 	for _, schema := range s.schemas {
