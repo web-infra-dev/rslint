@@ -105,22 +105,10 @@ func (o *consoleOptions) isAllowed(method string) bool {
 }
 
 func parseOptions(opts any) consoleOptions {
-	result := consoleOptions{
-		allow: make(map[string]bool),
+	optsMap := rule.Must[map[string]any](opts)
+	result := consoleOptions{allow: make(map[string]bool)}
+	for _, item := range rule.Must[[]any](optsMap["allow"]) {
+		result.allow[rule.Must[string](item)] = true
 	}
-
-	optsMap, ok := opts.(map[string]any)
-	if !ok {
-		return result
-	}
-
-	if allowArr, ok := optsMap["allow"].([]any); ok {
-		for _, item := range allowArr {
-			if str, ok := item.(string); ok {
-				result.allow[str] = true
-			}
-		}
-	}
-
 	return result
 }

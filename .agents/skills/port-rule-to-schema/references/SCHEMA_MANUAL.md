@@ -53,10 +53,33 @@ The top-level option container configured in `RslintConfig` (the `rules` block) 
 
 The framework parses and passes the validated options as `[]any` to the rule's `RunWithOptions` callback. Here is the mapping of schemas to Go types in `options []any`:
 
-| Schema Combinator                             | Validated Go Type                                            | Example Usage in Go                                                       |
-| --------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| `rule.EmptyArray()`                           | `[]any` (empty)                                              | _None (no options expected)_                                              |
-| `rule.Tuple(rule.Object(...))`                | `options[0]` is `map[string]any`                             | `optsMap, _ := options[0].(map[string]any)`                               |
-| `rule.Tuple(rule.String(), rule.Object(...))` | `options[0]` is `string`<br>`options[1]` is `map[string]any` | `mode := options[0].(string)`<br>`optsMap := options[1].(map[string]any)` |
-| `rule.Array(rule.String())`                   | `[]any` (homogeneous items)                                  | `for _, item := range options { str := item.(string) }`                   |
-| `rule.Union(rule.String(), ...)`              | Go type matching the matched union variant                   | `switch val := item.(type) { case string: ... }`                          |
+| Schema Combinator                             | Validated Go Type                                            | Example Usage in Go                                                                           |
+| --------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `rule.EmptyArray()`                           | `[]any` (empty)                                              | _None (no options expected)_                                                                  |
+| `rule.Tuple(rule.Object(...))`                | `options[0]` is `map[string]any`                             | `optsMap := rule.Must[map[string]any](options[0])`                                            |
+| `rule.Tuple(rule.String(), rule.Object(...))` | `options[0]` is `string`<br>`options[1]` is `map[string]any` | `mode := rule.Must[string](options[0])`<br>`optsMap := rule.Must[map[string]any](options[1])` |
+| `rule.Array(rule.String())`                   | `[]any` (homogeneous items)                                  | `for _, item := range options { str := rule.Must[string](item) }`                             |
+| `rule.Union(rule.String(), ...)`              | Go type matching the matched union variant                   | `switch val := item.(type) { case string: ... }`                                              |
+
+---
+
+## 4. Retrieving Typed Options (`rule.Must[T]`)
+
+To retrieve values from schema-validated `any` fields, use **`rule.Must[T](val)`** instead of raw Go type assertions (e.g., `val.(T)`).
+
+```go
+func Must[T any](v any) T
+```
+
+### Why use `rule.Must[T]`?
+
+1. **Defensive Programming**: Since options are guaranteed to match the schema by the validation engine at runtime, a mismatch indicates a schema definition bug. `rule.Must[T]` panics with a descriptive error detailing the mismatch.
+2. **Linter Compliance**: Avoids triggering `forcetypeassert` errors in `golangci-lint` without requiring `//nolint:forcetypeassert` bypass comments at every call site.
+
+### Example
+
+```go
+optsMap := rule.Must[map[string]any](options[0])
+allowFoo := rule.Must[bool](optsMap["allowFoo"])
+excludeArr := rule.Must[[]any](optsMap["exclude"])
+```

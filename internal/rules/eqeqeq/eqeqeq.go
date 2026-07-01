@@ -115,9 +115,9 @@ var EqeqeqRule = rule.Rule{
 		}),
 	),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		mode, _ := options[0].(string)
-		optsMap, _ := options[1].(map[string]any)
-		nullOption, _ := optsMap["null"].(string)
+		mode := rule.Must[string](options[0])
+		optsMap := rule.Must[map[string]any](options[1])
+		nullOption := rule.Must[string](optsMap["null"])
 
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {

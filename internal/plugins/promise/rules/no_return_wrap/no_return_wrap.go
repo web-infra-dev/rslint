@@ -135,8 +135,8 @@ var NoReturnWrapRule = rule.Rule{
 		"allowReject": rule.Bool().Default(false),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		optsMap, _ := options[0].(map[string]any)
-		allowReject, _ := optsMap["allowReject"].(bool)
+		optsMap := rule.Must[map[string]any](options[0])
+		allowReject := rule.Must[bool](optsMap["allowReject"])
 		opts := Options{
 			AllowReject: allowReject,
 		}

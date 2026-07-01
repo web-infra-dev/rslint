@@ -416,9 +416,9 @@ var MyRuleRule = rule.Rule{
         "exclude":  rule.Array(rule.String()),
     })),
     RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-        optsMap, _ := options[0].(map[string]any)
-        allowFoo, _ := optsMap["allowFoo"].(bool)
-        excludeArr, _ := optsMap["exclude"].([]any)
+        optsMap := rule.Must[map[string]any](options[0])
+        allowFoo := rule.Must[bool](optsMap["allowFoo"])
+        excludeArr := rule.Must[[]any](optsMap["exclude"])
         // ... build a typed Options struct from the asserted fields
     },
 }

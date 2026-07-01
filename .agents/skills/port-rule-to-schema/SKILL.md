@@ -64,16 +64,16 @@ RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners { .
 
 ```go
 for _, item := range options {
-    s, _ := item.(string) // or whatever the element type is
+    s := rule.Must[string](item) // or whatever the element type is
 }
 ```
 
-Type-assert each element to the Go type that corresponds to its schema:
+Use `rule.Must[T]` to extract and assert elements to the Go type that corresponds to its schema (this avoids `forcetypeassert` linter warnings and panics descriptively on schema mismatch):
 
-- `rule.Object` → `map[string]any`
-- `rule.Enum` / `rule.String` → `string`
-- `rule.Bool` → `bool`
-- `rule.Array(rule.String())` → `[]any` (elements are `string`)
+- `rule.Object` → `rule.Must[map[string]any](val)`
+- `rule.Enum` / `rule.String` → `rule.Must[string](val)`
+- `rule.Bool` → `rule.Must[bool](val)`
+- `rule.Array(...)` / `rule.Tuple(...)` → `rule.Must[[]any](val)`
 
 ### 5. Update Tests and Custom Call Sites
 
@@ -103,10 +103,10 @@ var AccessorPairsRule = rule.Rule{
 		"setWithoutGet": rule.Bool().Default(true),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		optsMap, _ := options[0].(map[string]any)
+		optsMap := rule.Must[map[string]any](options[0])
 		opts := Options{
-			GetWithoutSet: optsMap["getWithoutSet"].(bool),
-			SetWithoutGet: optsMap["setWithoutGet"].(bool),
+			GetWithoutSet: rule.Must[bool](optsMap["getWithoutSet"]),
+			SetWithoutGet: rule.Must[bool](optsMap["setWithoutGet"]),
 		}
 		// ... rule logic using opts
 	},
@@ -134,8 +134,8 @@ var NoRestrictedGlobalsRule = rule.Rule{
 			case string:
 				// plain name
 			case map[string]any:
-				name, _ := v["name"].(string)
-				msg, _ := v["message"].(string)
+				name := rule.Must[string](v["name"])
+				msg := rule.Must[string](v["message"])
 				_ = name
 				_ = msg
 			}
@@ -159,9 +159,9 @@ var EqeqeqRule = rule.Rule{
 		}),
 	),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		mode, _ := options[0].(string)
-		optsMap, _ := options[1].(map[string]any)
-		nullOption, _ := optsMap["null"].(string)
+		mode := rule.Must[string](options[0])
+		optsMap := rule.Must[map[string]any](options[1])
+		nullOption := rule.Must[string](optsMap["null"])
 
 		// ... rule logic using mode & nullOption
 	},

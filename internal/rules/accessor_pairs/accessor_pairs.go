@@ -370,11 +370,11 @@ var AccessorPairsRule = rule.Rule{
 		"enforceForTSTypes":      rule.Bool().Default(false),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		optsMap, _ := options[0].(map[string]any)
-		getWithoutSet, _ := optsMap["getWithoutSet"].(bool)
-		setWithoutGet, _ := optsMap["setWithoutGet"].(bool)
-		enforceForClassMembers, _ := optsMap["enforceForClassMembers"].(bool)
-		enforceForTSTypes, _ := optsMap["enforceForTSTypes"].(bool)
+		optsMap := rule.Must[map[string]any](options[0])
+		getWithoutSet := rule.Must[bool](optsMap["getWithoutSet"])
+		setWithoutGet := rule.Must[bool](optsMap["setWithoutGet"])
+		enforceForClassMembers := rule.Must[bool](optsMap["enforceForClassMembers"])
+		enforceForTSTypes := rule.Must[bool](optsMap["enforceForTSTypes"])
 		opts := Options{
 			GetWithoutSet:          getWithoutSet,
 			SetWithoutGet:          setWithoutGet,

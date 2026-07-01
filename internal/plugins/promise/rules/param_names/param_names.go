@@ -72,9 +72,9 @@ var ParamNamesRule = rule.Rule{
 		"rejectPattern":  rule.String().Default("^_?reject$"),
 	})),
 	RunWithOptions: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
-		optsMap, _ := options[0].(map[string]any)
-		resolvePattern, _ := optsMap["resolvePattern"].(string)
-		rejectPattern, _ := optsMap["rejectPattern"].(string)
+		optsMap := rule.Must[map[string]any](options[0])
+		resolvePattern := rule.Must[string](optsMap["resolvePattern"])
+		rejectPattern := rule.Must[string](optsMap["rejectPattern"])
 		opts := Options{
 			ResolvePattern: resolvePattern,
 			RejectPattern:  rejectPattern,
