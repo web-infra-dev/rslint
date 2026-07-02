@@ -6,6 +6,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_nested_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_conditional_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_confusing_set_timeout"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_deprecated_functions"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
@@ -48,6 +49,7 @@ func GetAllRules() []rule.Rule {
 		max_nested_describe.MaxNestedDescribeRule,
 		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
+		no_conditional_expect.NoConditionalExpectRule,
 		no_confusing_set_timeout.NoConfusingSetTimeoutRule,
 		no_deprecated_functions.NoDeprecatedFunctionsRule,
 		no_disabled_tests.NoDisabledTestsRule,

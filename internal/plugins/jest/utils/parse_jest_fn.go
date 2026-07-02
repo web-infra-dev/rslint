@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	internalUtils "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type ParsedJestFnCall struct {
@@ -439,4 +440,73 @@ func ReceiverBeforeInvocation(matcherCall *ast.Node) *ast.Node {
 	default:
 		return nil
 	}
+}
+
+// TestCallbackInfo describes a Jest test callback passed by reference (e.g. it('foo', getValue)).
+type TestCallbackInfo struct {
+	FunctionNode *ast.Node
+	Name         string
+}
+
+// ResolveTestCallbackFunction resolves the callback function node for a Jest test call.
+// Inline callbacks are not returned; they are tracked via the enclosing test call.
+func ResolveTestCallbackFunction(ctx rule.RuleContext, callExpr *ast.CallExpression) TestCallbackInfo {
+	if callExpr == nil || callExpr.Arguments == nil || len(callExpr.Arguments.Nodes) < 2 {
+		return TestCallbackInfo{}
+	}
+
+	callback := ast.SkipParentheses(callExpr.Arguments.Nodes[1])
+	if callback == nil || ast.IsFunctionExpressionOrArrowFunction(callback) {
+		return TestCallbackInfo{}
+	}
+	if callback.Kind != ast.KindIdentifier {
+		return TestCallbackInfo{}
+	}
+
+	name := callback.AsIdentifier().Text
+	decl := internalUtils.GetDeclaration(ctx.TypeChecker, callback)
+	if decl == nil {
+		return TestCallbackInfo{Name: name}
+	}
+
+	switch decl.Kind {
+	case ast.KindFunctionDeclaration:
+		fn := decl.AsFunctionDeclaration()
+		if fn == nil {
+			return TestCallbackInfo{Name: name}
+		}
+		return TestCallbackInfo{FunctionNode: fn.AsNode(), Name: name}
+	case ast.KindVariableDeclaration:
+		vd := decl.AsVariableDeclaration()
+		if vd == nil {
+			return TestCallbackInfo{Name: name}
+		}
+		if fn := testCallbackInitializerFunction(vd.Initializer); fn != nil {
+			return TestCallbackInfo{FunctionNode: fn, Name: name}
+		}
+		return TestCallbackInfo{Name: name}
+	default:
+		return TestCallbackInfo{Name: name}
+	}
+}
+
+func testCallbackInitializerFunction(initializer *ast.Node) *ast.Node {
+	if initializer == nil {
+		return nil
+	}
+	init := ast.SkipParentheses(initializer)
+	if ast.IsFunctionExpressionOrArrowFunction(init) {
+		return init
+	}
+	return nil
+}
+
+// ResolveNamedFunctionCallback returns the function declaration node and name when
+// a Jest test call uses a named function reference as its callback (e.g. it('foo', getValue)).
+func ResolveNamedFunctionCallback(ctx rule.RuleContext, callExpr *ast.CallExpression) (*ast.Node, string) {
+	info := ResolveTestCallbackFunction(ctx, callExpr)
+	if info.FunctionNode != nil && info.FunctionNode.Kind == ast.KindFunctionDeclaration {
+		return info.FunctionNode, info.Name
+	}
+	return nil, info.Name
 }
