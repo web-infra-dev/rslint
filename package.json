@@ -43,7 +43,7 @@
     "prettier": "3.8.1",
     "typescript": "5.9.3",
     "zx": "8.8.5",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20260701.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -59,6 +59,6 @@
   },
   "files": [],
   "dependencies": {
-    "@types/react": "^19.2.14"
+    "@types/react": "^19.2.17"
   }
 }
