@@ -504,6 +504,9 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/valid-expect.test.ts',
     './tests/eslint-plugin-jest/rules/valid-title.test.ts',
 
+    // eslint-plugin-n
+    './tests/eslint-plugin-n/rules/no-deprecated-api.test.ts',
+
     // eslint-plugin-promise
     './tests/eslint-plugin-promise/rules/always-return.test.ts',
     './tests/eslint-plugin-promise/rules/avoid-new.test.ts',

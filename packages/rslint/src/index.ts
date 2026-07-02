@@ -9,6 +9,7 @@ export {
   reactPlugin,
   reactHooksPlugin,
   importPlugin,
+  nPlugin,
   promisePlugin,
   jestPlugin,
   unicornPlugin,
