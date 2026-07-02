@@ -1197,7 +1197,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// resolve gap files, the fallback Program, and the type-info set (the
 	// type-aware gate's only input) identically. cwd == currentDirectory here
 	// (see above), so passing currentDirectory preserves prior behavior.
-	programs, typeInfoFiles, fallbackProgramIndex, capturedGapFiles := buildProgramsWithGapFallback(
+	programs, typeInfoFiles, capturedGapFiles := buildProgramsWithGapFallback(
 		programs, configMap, rslintConfig, currentDirectory, fs, allowFiles, allowDirs, parseCache, singleThreaded,
 	)
 
@@ -1208,38 +1208,37 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	parseCache.RetainOnly(programs)
 
 	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
-	// Returns the program slice and the index of the fallback gap-file program
-	// (or -1 if none), so callers can mark it skipped during type-check.
-	createPrograms := func() ([]*compiler.Program, int, error) {
+	// The gap-file fallback is appended last, but callers no longer need its
+	// index: buildTypeCheckSkipMask reads each program's ConfigFilePath to decide
+	// what to exclude from type-check.
+	createPrograms := func() ([]*compiler.Program, error) {
 		var baseProgs []*compiler.Program
 		if configMap != nil {
 			seen := make(map[string]struct{})
 			for configDir, entries := range configMap {
 				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen, parseCache)
 				if exitCode != 0 {
-					return nil, -1, fmt.Errorf("failed to create programs for %s", configDir)
+					return nil, fmt.Errorf("failed to create programs for %s", configDir)
 				}
 				baseProgs = append(baseProgs, progs...)
 			}
 		} else {
 			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 			if exitCode != 0 {
-				return nil, -1, errors.New("failed to create programs")
+				return nil, errors.New("failed to create programs")
 			}
 			baseProgs = append(baseProgs, progs...)
 		}
 
 		// Rebuild fallback Program for gap files (content may have changed after fixes).
-		fallbackIdx := -1
 		if len(capturedGapFiles) > 0 {
 			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs, parseCache)
 			if fallback != nil {
 				baseProgs = append(baseProgs, fallback)
-				fallbackIdx = len(baseProgs) - 1
 			}
 		}
 
-		return baseProgs, fallbackIdx, nil
+		return baseProgs, nil
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -1277,12 +1276,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	//   - config `ignores` exclusion (applies to rules and counts)
 	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
 
-	// fallback gap program (if any) is excluded from --type-check: its
-	// CompilerOptions are synthesized defaults, not the user's tsconfig,
-	// so semantic diagnostics there would be unreliable. This honors the
-	// commitment in website/docs/en/guide/type-checking.md ("Files Without
-	// tsconfig Coverage").
-	skipTypeCheck := buildTypeCheckSkipMask(len(programs), fallbackProgramIndex)
+	// Programs not backed by a real tsconfig (the gap-file fallback AND the
+	// no-tsconfig directory-scan program) are excluded from --type-check: their
+	// CompilerOptions are synthesized defaults, not the user's tsconfig, so
+	// semantic diagnostics there would be unreliable. This honors the "Gap files"
+	// contract in website/docs/en/guide/type-checking.md.
+	skipTypeCheck := buildTypeCheckSkipMask(programs)
 
 	// In --type-check-only mode, skip the lint phase entirely by passing
 	// nil for GetRulesForFile. RunLinter's Phase 1 is gated on this being
@@ -1369,7 +1368,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
 		// Skip if nothing was fixed in the first pass (no need to re-lint).
 		for pass := 1; pass < maxFixPasses && fixedCount > 0; pass++ {
-			newPrograms, newFallbackIdx, err := createPrograms()
+			newPrograms, err := createPrograms()
 			if err != nil || len(newPrograms) == 0 {
 				break
 			}
@@ -1385,7 +1384,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Re-lint: collect remaining diagnostics.
 			// Rebuild file filters for the new programs (ownership + ignores).
 			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
-			fixSkipMask := buildTypeCheckSkipMask(len(newPrograms), newFallbackIdx)
+			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			var passDiags []rule.RuleDiagnostic
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
