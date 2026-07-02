@@ -152,10 +152,9 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// type-aware rules off no-type-info files. Identical to the CLI via the
 	// shared helper. configMap is nil: the --api path is always single-config
 	// (the JS side resolves any multi-config merge into one entry list).
-	// fallbackProgramIndex is unused here — the --api path never runs the
-	// type-check phase (RunLinterOptions.TypeCheck stays false), so there is no
-	// per-program type-check skip mask to build.
-	programs, typeInfoFiles, _, _ := buildProgramsWithGapFallback(
+	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
+	// stays false), so there is no per-program type-check skip mask to build.
+	programs, typeInfoFiles, _ := buildProgramsWithGapFallback(
 		programs, nil, rslintConfig, configDirectory, fs, allowedFiles, nil, parseCache, false,
 	)
 

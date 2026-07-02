@@ -83,7 +83,8 @@ type LintResult struct {
 //   - SkipTypeCheckPrograms=nil           → every program participates in
 //     type-check. When non-nil, must be parallel to Programs; entries set
 //     to true mark the corresponding program to be skipped (typically the
-//     gap-file fallback program with synthesized CompilerOptions).
+//     gap-file fallback or no-tsconfig fallback Program with synthesized
+//     CompilerOptions).
 //   - OnDiagnostic=nil                    → diagnostics are dropped
 //
 // Thread-safety: OnDiagnostic is invoked from multiple goroutines
