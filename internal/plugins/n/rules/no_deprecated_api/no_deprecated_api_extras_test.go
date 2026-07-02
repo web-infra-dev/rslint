@@ -59,6 +59,11 @@ func TestNoDeprecatedApiExtras(t *testing.T) {
 			{Code: `process.nextTick(() => {})`, Options: v6},
 			// ---- Real-user(n#65): trailing-slash specifier is userland, not core ----
 			{Code: `require('punycode/');`, Options: map[string]interface{}{"version": "7.0.0"}},
+
+			// ---- Locks in upstream ReferenceTracker._iterateLhsReferences: unresolved assignment target ----
+			// A sloppy/global assignment target does not resolve to a variable in
+			// ESLint's scope graph, so the require result is not propagated to b.exists.
+			{Code: `b = require('fs'); b.exists`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parenthesized receiver (tsgo keeps ParenthesizedExpression) ----
@@ -91,6 +96,40 @@ func TestNoDeprecatedApiExtras(t *testing.T) {
 			{
 				Code:   `require('fs')?.exists;`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 1}},
+			},
+
+			// ---- Locks in upstream iterateProcessGetBuiltinModuleReferences trace map ----
+			{
+				Code:   `process['getBuiltinModule']('fs').exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 1}},
+			},
+			{
+				Code:   `const { getBuiltinModule } = process; getBuiltinModule('fs').exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 39}},
+			},
+			{
+				Code:   `const { getBuiltinModule: gbm } = process; gbm('fs').exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 44}},
+			},
+			{
+				Code:   `const getBuiltinModule = process.getBuiltinModule; getBuiltinModule('fs').exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 52}},
+			},
+			{
+				Code:   `const getBuiltinModule = process['getBuiltinModule']; getBuiltinModule('fs').exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 55}},
+			},
+
+			// ---- Locks in upstream ReferenceTracker._iterateLhsReferences: resolved assignment target ----
+			{
+				Code:   `let b; b = require('fs'); b.exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 27}},
+			},
+			// Object assignment-destructuring still reports the deprecated member at
+			// the destructured property, even when the target binding is unresolved.
+			{
+				Code:   `({ exists } = require('fs')); exists`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "deprecated", Message: "'fs.exists' was deprecated since v4.0.0. Use 'fs.stat()' or 'fs.access()' instead.", Line: 1, Column: 4}},
 			},
 
 			// ---- Locks in isPassThrough: comma sequence (last operand) ----

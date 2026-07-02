@@ -99,6 +99,17 @@ export const PLUGIN_REGISTRY: PluginMeta[] = [
     ],
   },
   {
+    prefix: 'n',
+    group: 'eslint-plugin-n',
+    importName: 'nPlugin',
+    presets: [
+      {
+        name: 'nPlugin.configs.recommended',
+        description: 'Node.js rules',
+      },
+    ],
+  },
+  {
     prefix: 'promise',
     group: 'eslint-plugin-promise',
     importName: 'promisePlugin',

@@ -339,6 +339,9 @@ func (t *referenceTracker) iterateLhsReferences(pat *ast.Node, path []string, tm
 	}
 	switch pat.Kind {
 	case ast.KindIdentifier:
+		if !t.hasResolvableLhsBinding(pat) {
+			return
+		}
 		t.iterateVariableReferences(pat, path, tm, false)
 
 	case ast.KindObjectBindingPattern:
@@ -394,6 +397,27 @@ func (t *referenceTracker) iterateLhsReferences(pat *ast.Node, path []string, tm
 			t.iterateLhsReferences(target, np, nextMap)
 		}
 	}
+}
+
+// hasResolvableLhsBinding mirrors ReferenceTracker._iterateLhsReferences'
+// `findVariable(...) != null` guard for Identifier patterns. A sloppy
+// assignment target such as `b = require("fs")` has no variable in ESLint's
+// scope graph, so the require result must not be propagated to later `b.*`
+// reads. Declaration identifiers are bindings by construction; assignment
+// targets need to resolve to an existing checker symbol (or, in the no-checker
+// fallback, a visible local/global binding).
+func (t *referenceTracker) hasResolvableLhsBinding(id *ast.Node) bool {
+	if id == nil || id.Kind != ast.KindIdentifier {
+		return false
+	}
+	if utils.IsDeclarationIdentifier(id) {
+		return true
+	}
+	if t.checker != nil {
+		return utils.GetReferenceSymbol(id, t.checker) != nil
+	}
+	name := id.AsIdentifier().Text
+	return utils.IsShadowed(id, name) || globals[name] != nil
 }
 
 // iterateVariableReferences mirrors ReferenceTracker._iterateVariableReferences:

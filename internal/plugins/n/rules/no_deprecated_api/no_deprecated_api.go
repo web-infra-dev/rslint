@@ -127,16 +127,26 @@ func reportItem(ctx rule.RuleContext, version semverRange, node *ast.Node, name 
 	})
 }
 
-// iterateProcessGetBuiltinModuleReferences handles
-// `process.getBuiltinModule('X').Y` chains, mirroring upstream's util of the
-// same name: resolve the module from the string argument, then track property
-// references off the call expression.
+var processGetBuiltinModuleCallTrace = map[string]*traceMap{
+	"process": {children: map[string]*traceMap{
+		"getBuiltinModule": {call: &deprecatedInfo{}},
+	}},
+}
+
+// iterateProcessGetBuiltinModuleReferences handles `process.getBuiltinModule`
+// chains by first tracking the `process.getBuiltinModule()` call with the same
+// ReferenceTracker machinery used for globals. This mirrors upstream's
+// `iterateProcessGetBuiltinModuleReferences` helper, including aliases,
+// destructuring, and computed member keys for `getBuiltinModule`.
 func (t *referenceTracker) iterateProcessGetBuiltinModuleReferences(tm map[string]*traceMap) {
-	for _, procId := range t.collectGlobalRefs("process") {
-		callNode := getBuiltinModuleCall(procId)
-		if callNode == nil {
+	calls := t.capture(func() {
+		t.iterateGlobalReferences(processGetBuiltinModuleCallTrace)
+	})
+	for _, call := range calls {
+		if call.typ != refCall {
 			continue
 		}
+		callNode := call.node
 		key := moduleNameArg(callNode)
 		if key == "" {
 			continue
@@ -151,28 +161,6 @@ func (t *referenceTracker) iterateProcessGetBuiltinModuleReferences(tm map[strin
 		}
 		t.iteratePropertyReferences(callNode, path, nextMap)
 	}
-}
-
-// getBuiltinModuleCall returns the `process.getBuiltinModule(...)` CallExpression
-// for which `procId` is the `process` reference, or nil.
-func getBuiltinModuleCall(procId *ast.Node) *ast.Node {
-	node := procId
-	for isPassThrough(node) {
-		node = node.Parent
-	}
-	pa := node.Parent
-	if pa == nil || pa.Kind != ast.KindPropertyAccessExpression {
-		return nil
-	}
-	paExpr := pa.AsPropertyAccessExpression()
-	if paExpr.Expression != node {
-		return nil
-	}
-	name := paExpr.Name()
-	if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "getBuiltinModule" {
-		return nil
-	}
-	return callFromCallee(pa)
 }
 
 var NoDeprecatedApiRule = rule.Rule{
