@@ -283,7 +283,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 	RunLinterInProgram(programLib, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
-			if d.SourceFile.FileName() == libPath {
+			if d.FilePath == libPath {
 				singleDiags++
 			}
 		}, nil, nil,
@@ -299,7 +299,7 @@ func TestRunLinter_DiagnosticsNotDuplicated(t *testing.T) {
 		true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
 		false, func(d rule.RuleDiagnostic) {
-			if d.SourceFile.FileName() == libPath {
+			if d.FilePath == libPath {
 				multiDiags++
 			}
 		}, nil, nil,

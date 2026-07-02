@@ -2,6 +2,7 @@ import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 
 import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
+import { SKIP_WIN32_NAPI_TEARDOWN } from './win32-napi-teardown.js';
 
 /**
  * WorkerPool end-to-end — multi-config (monorepo) dispatch: a single
@@ -12,12 +13,9 @@ import { WorkerPool } from '../../src/eslint-plugin/worker-pool.js';
  * forwarded through onLog (LSP-visible).
  */
 
-// Skipped on windows: tearing down a worker that has oxc (a napi addon)
-// loaded aborts below the JS layer there (nodejs/node#34567) and crashes
-// the rstest worker running this file. These e2e tests spawn real
-// workers and tear them down, so they are windows-skipped; they still
-// run on linux/macOS.
-describe.skipIf(process.platform === 'win32')(
+// win32 teardown is gated by SKIP_WIN32_NAPI_TEARDOWN (see that file for the
+// nodejs/node#34567 rationale); the flag is false so these run on win32 too.
+describe.skipIf(SKIP_WIN32_NAPI_TEARDOWN && process.platform === 'win32')(
   'WorkerPool end-to-end with a local fixture plugin',
   () => {
     // Multi-config (monorepo) dispatch — a single worker holds TWO
@@ -312,7 +310,7 @@ describe.skipIf(process.platform === 'win32')(
       await fs.writeFile(
         cfgPath,
         `import p from './_r4-bad-fix-plugin.mjs';
-export default [{ eslintPlugins: { r4: p } }];
+export default [{ plugins: { r4: p } }];
 `,
         'utf8',
       );
@@ -337,19 +335,40 @@ export default [{ eslintPlugins: { r4: p } }];
           },
         ]);
 
-        // The forwarded log line must contain the rule name + a hint at
-        // the failure path. Pre-R4 the string went to raw stderr and
-        // logs would not contain it.
-        const errLogs = logs.filter((r) => r.level === 'error');
-        const matched = errLogs.find((r) =>
-          /r4\/bad-fix.*fix\(\) threw.*R4_FIX_BOOM/.test(r.text),
-        );
+        // The forwarded error log rides the worker's stderr STREAM
+        // (spawnWorker wires `stderr.on('data')` to onLog), delivered
+        // INDEPENDENTLY of the `result` message that resolves lintBatch
+        // above: two separate async channels with no ordering guarantee,
+        // so the log chunk can still be in flight when the await settles
+        // (reliably so on Windows, where pipe scheduling differs from
+        // Linux). Drive the worker to exit first — shutdown() posts
+        // {kind:'shutdown'} → parentPort.close() → stderr EOF →
+        // flushOnEnd, forcing every buffered chunk out regardless of pipe
+        // buffering — then poll to absorb the residual gap between the
+        // worker's 'exit' (which shutdown awaits) and the host stream
+        // draining its final 'data' events.
+        await pool.shutdown();
+        // The forwarded line must carry the rule name + a failure-path
+        // hint; pre-R4 it went to raw stderr and never reached `logs`.
+        const findMatch = () =>
+          logs
+            .filter((r) => r.level === 'error')
+            .find((r) =>
+              /r4\/bad-fix.*fix\(\) threw.*R4_FIX_BOOM/.test(r.text),
+            );
+        let matched = findMatch();
+        for (let i = 0; !matched && i < 200; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          matched = findMatch();
+        }
         expect(matched).toBeDefined();
         // Source must be 'plugin' (runner-side console.error from
-        // diagnostic-builder running inside the worker, fed through the
-        // patched console).
+        // diagnostic-builder running inside the worker, forwarded through
+        // the worker's captured stderr stream).
         expect(matched!.source).toBe('plugin');
       } finally {
+        // Idempotent (this.closed guard) — the in-body shutdown already
+        // ran on the happy path; this also covers an early throw before it.
         await pool.shutdown();
         await Promise.all([
           fs.rm(pluginPath, { force: true }),

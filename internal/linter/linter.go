@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -69,18 +70,26 @@ type runProgramOptions struct {
 	ExcludePaths    []string
 	FileFilter      FileFilter
 	GetRulesForFile RuleHandler
+	// SingleThreaded, when true, lints this program's file shards
+	// sequentially on the calling goroutine instead of in parallel workers.
+	SingleThreaded bool
 	// TypeInfoFiles is the set of files with reliable type information.
 	// Gap files (not in this set) get a nil TypeChecker passed to rule
 	// contexts as defense-in-depth — type-aware rules are already filtered
 	// out by GetRulesForFile, this just guards rules with optional
 	// TypeChecker usage. nil = no gap-file distinction.
 	TypeInfoFiles map[string]struct{}
-	OnDiagnostic DiagnosticHandler
+	OnDiagnostic  DiagnosticHandler
 }
 
 // runLintRulesInProgram lints files in a single Program. Files are filtered
 // through ExcludePaths, Scope (Files+Dirs), and FileFilter before rule
 // execution. Pass FileFilter=nil to disable that layer.
+//
+// Unless SingleThreaded is set, files are linted in parallel shards — one
+// worker per pool checker, each worker owning its checker exclusively and
+// processing the files associated to it (see the sharding comment in the
+// function body for the invariants this preserves).
 //
 // This is the post-refactor internal implementation behind both RunLinter and
 // LintSingleFile. It does NOT run type-check — type-check is a program-level
@@ -94,42 +103,10 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		return 0
 	}
 
-	// Pre-compute FileInfo for Scope.Files once to avoid N×M stat calls in the loop.
-	var allowFileInfos []os.FileInfo
-	if opts.Scope.Files != nil {
-		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
-	}
-
-	// Collect files to lint (applying all filters).
-	var filesToLint []*ast.SourceFile
-	for _, file := range opts.Program.GetSourceFiles() {
-		p := string(file.Path())
-		// skip lint node_modules and bundled files
-		// FIXME: we may have better api to tell whether a file is a bundled file or not
-		skipFile := false
-		for _, skipPattern := range opts.ExcludePaths {
-			if strings.Contains(p, skipPattern) {
-				skipFile = true
-				break
-			}
-		}
-		if skipFile {
-			continue
-		}
-		// Filter by Scope.Files / Scope.Dirs (OR logic: match either one).
-		if opts.Scope.Files != nil || opts.Scope.Dirs != nil {
-			fileAllowed := opts.Scope.Files != nil && isFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
-			dirAllowed := opts.Scope.Dirs != nil && isDirAllowed(file.FileName(), opts.Scope.Dirs)
-			if !fileAllowed && !dirAllowed {
-				continue
-			}
-		}
-		// Caller-supplied filter (multi-config ownership / config `ignores`).
-		if opts.FileFilter != nil && !opts.FileFilter(file.FileName()) {
-			continue
-		}
-		filesToLint = append(filesToLint, file)
-	}
+	// Collect files to lint (applying all filters). Shared with
+	// CollectLintTargets so the eslint-plugin dispatch path observes the
+	// exact same file set as native linting.
+	filesToLint := collectFilesToLint(opts)
 
 	lintedFileCount := int32(len(filesToLint))
 
@@ -140,14 +117,17 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		return 0
 	}
 
-	// Run lint rules. Acquires a checker from the pool for type-aware rules.
-	checker, done := opts.Program.GetTypeChecker(context.Background())
-	for _, file := range filesToLint {
+	// lintFile lints one file with the given checker. All per-file state
+	// (listener map, comments, DisableManager, rule contexts) lives inside
+	// this function, so concurrent calls for different files are independent;
+	// the checker is the only shared resource and is owned exclusively by the
+	// calling worker (see the sharding below).
+	lintFile := func(file *ast.SourceFile, chk *checker.Checker) {
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
 		rules := getRulesForFile(file)
 		if len(rules) == 0 {
-			continue
+			return
 		}
 
 		comments := make([]*ast.CommentRange, 0)
@@ -160,7 +140,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		// as defense-in-depth. Type-aware rules are already filtered out by
 		// getRulesForFile, but this ensures rules with optional TypeChecker
 		// usage degrade gracefully.
-		fileChecker := checker
+		fileChecker := chk
 		if opts.TypeInfoFiles != nil {
 			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
 				fileChecker = nil
@@ -183,6 +163,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:      textRange,
 						Message:    msg,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -196,6 +177,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:    msg,
 						FixesPtr:   &fixes,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -209,6 +191,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:     msg,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -222,6 +205,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Range:      trimmedRange,
 						Message:    msg,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -236,6 +220,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:    msg,
 						FixesPtr:   &fixes,
 						SourceFile: file,
+						FilePath:   file.FileName(),
 						Severity:   r.Severity,
 					})
 				},
@@ -250,6 +235,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						Message:     msg,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -265,6 +251,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -279,6 +266,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 						FixesPtr:    &fixes,
 						Suggestions: &suggestions,
 						SourceFile:  file,
+						FilePath:    file.FileName(),
 						Severity:    r.Severity,
 					})
 				},
@@ -369,7 +357,46 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		file.Node.ForEachChild(childVisitor)
 		clear(registeredListeners)
 	}
-	done()
+
+	// Phase 1 parallelism is per-file within the program: files are grouped
+	// by the checker the pool associated to them (for the compiler pool this
+	// is the stable index%N mapping built in checkerpool.go), and each group
+	// is linted serially by ONE worker holding that checker exclusively.
+	// This keeps three invariants:
+	//   - a checker is never used by two goroutines at once (pool contract:
+	//     checkers must not be accessed concurrently);
+	//   - every file's diagnostics are emitted by a single worker, so the
+	//     file-internal diagnostic order stays deterministic — the fixer's
+	//     tie-breaking and reporters rely on this;
+	//   - Phase 2 type-check visits files through the same association,
+	//     reusing the type caches warmed during lint.
+	// The LSP project pool builds its file association dynamically on first
+	// GetChecker instead of precomputing index%N — with this loop's
+	// acquire/release probing, a fresh project pool associates every file
+	// to the first checker, so the grouping collapses to a single group
+	// (no intra-program parallelism on that path; today it is only reached
+	// via LintSingleFile, where one file means one group anyway).
+	// Correctness never depends on the grouping: each worker only uses the
+	// checker it acquired exclusively for its own shard.
+	ctx := context.Background()
+	checkerGroups := make(map[*checker.Checker][]*ast.SourceFile)
+	for _, file := range filesToLint {
+		chk, release := opts.Program.GetTypeCheckerForFile(ctx, file)
+		release()
+		checkerGroups[chk] = append(checkerGroups[chk], file)
+	}
+
+	wg := core.NewWorkGroup(opts.SingleThreaded)
+	for _, files := range checkerGroups {
+		wg.Queue(func() {
+			chk, done := opts.Program.GetTypeCheckerForFileExclusive(ctx, files[0])
+			defer done()
+			for _, file := range files {
+				lintFile(file, chk)
+			}
+		})
+	}
+	wg.RunAndWait()
 
 	return lintedFileCount
 }
@@ -381,6 +408,9 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 // Phase 1 — lint rules: each program is processed via
 // runLintRulesInProgram, with files filtered through opts.ExcludePaths,
 // opts.Scope, opts.PerProgramFilter and the program's own owned-file set.
+// Within a program, files are linted in parallel shards (one per pool
+// checker); diagnostics therefore arrive in nondeterministic cross-file
+// order and callers that print them should impose an explicit order.
 // When opts.GetRulesForFile is nil, Phase 1 is skipped entirely — no work
 // group is created, no per-program goroutines are spawned, and no
 // owned-file sets are built. This is how callers run a pure type-check
@@ -433,6 +463,7 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 				ExcludePaths:    opts.ExcludePaths,
 				FileFilter:      filter,
 				GetRulesForFile: trackedGetRules,
+				SingleThreaded:  opts.SingleThreaded,
 				TypeInfoFiles:   opts.TypeInfoFiles,
 				OnDiagnostic:    opts.OnDiagnostic,
 			}
@@ -461,6 +492,90 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 	}, nil
 }
 
+// collectFilesToLint applies the ExcludePaths / Scope / FileFilter layers
+// to a program's source files. Shared by runLintRulesInProgram (native
+// lint) and CollectLintTargets (eslint-plugin dispatch) so both observe an
+// identical file set.
+func collectFilesToLint(opts runProgramOptions) []*ast.SourceFile {
+	var allowFileInfos []os.FileInfo
+	if opts.Scope.Files != nil {
+		allowFileInfos = precomputeAllowFileInfos(opts.Scope.Files)
+	}
+	var filesToLint []*ast.SourceFile
+	for _, file := range opts.Program.GetSourceFiles() {
+		p := string(file.Path())
+		// skip lint node_modules and bundled files
+		skipFile := false
+		for _, skipPattern := range opts.ExcludePaths {
+			if strings.Contains(p, skipPattern) {
+				skipFile = true
+				break
+			}
+		}
+		if skipFile {
+			continue
+		}
+		// Filter by Scope.Files / Scope.Dirs (OR logic: match either one).
+		if opts.Scope.Files != nil || opts.Scope.Dirs != nil {
+			fileAllowed := opts.Scope.Files != nil && isFileAllowed(file.FileName(), opts.Scope.Files, allowFileInfos)
+			dirAllowed := opts.Scope.Dirs != nil && isDirAllowed(file.FileName(), opts.Scope.Dirs)
+			if !fileAllowed && !dirAllowed {
+				continue
+			}
+		}
+		// Caller-supplied filter (multi-config ownership / config `ignores`).
+		if opts.FileFilter != nil && !opts.FileFilter(file.FileName()) {
+			continue
+		}
+		filesToLint = append(filesToLint, file)
+	}
+	return filesToLint
+}
+
+// LintTarget is one file paired with the rules configured for it, as
+// resolved by RunLinterOptions.GetRulesForFile.
+type LintTarget struct {
+	File  *ast.SourceFile
+	Rules []ConfiguredRule
+}
+
+// CollectLintTargets resolves, for every file RunLinter would lint, the
+// rules configured for it — WITHOUT running them. The CLI/LSP host uses it
+// to split out eslint-plugin rules and dispatch them to the Node worker in
+// parallel with native linting, reusing the exact same file-set filtering
+// as RunLinter (ExcludePaths / Scope / per-program ownership + ignores).
+func CollectLintTargets(opts RunLinterOptions) []LintTarget {
+	if opts.GetRulesForFile == nil {
+		return nil
+	}
+	excludePaths := opts.ExcludePaths
+	if excludePaths == nil {
+		excludePaths = utils.ExcludePaths
+	}
+	var targets []LintTarget
+	for i, program := range opts.Programs {
+		var perProgramFilter FileFilter
+		if i < len(opts.PerProgramFilter) {
+			perProgramFilter = opts.PerProgramFilter[i]
+		}
+		filter := composeOwnedFilter(perProgramFilter, buildOwnedFileSet(program))
+		files := collectFilesToLint(runProgramOptions{
+			Program:      program,
+			Scope:        opts.Scope,
+			ExcludePaths: excludePaths,
+			FileFilter:   filter,
+		})
+		for _, file := range files {
+			rules := opts.GetRulesForFile(file)
+			if len(rules) == 0 {
+				continue
+			}
+			targets = append(targets, LintTarget{File: file, Rules: rules})
+		}
+	}
+	return targets
+}
+
 // LintSingleFile runs lint rules against a single file in a single program.
 // Designed for IDE / LSP per-keystroke usage. Does not run type-check.
 func LintSingleFile(opts LintSingleFileOptions) {
@@ -475,7 +590,10 @@ func LintSingleFile(opts LintSingleFileOptions) {
 		Scope:           FileScope{Files: []string{opts.File}},
 		ExcludePaths:    opts.ExcludePaths,
 		GetRulesForFile: opts.GetRulesForFile,
-		OnDiagnostic:    opts.OnDiagnostic,
+		// A single file is a single shard — run it on the calling goroutine
+		// instead of spawning a worker.
+		SingleThreaded: true,
+		OnDiagnostic:   opts.OnDiagnostic,
 	})
 }
 

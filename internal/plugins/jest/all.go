@@ -2,12 +2,16 @@ package jest
 
 import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/expect_expect"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_expects"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/max_nested_describe"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_alias_methods"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_commented_out_tests"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_confusing_set_timeout"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_deprecated_functions"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_done_callback"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_duplicate_hooks"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_export"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_identical_title"
@@ -15,11 +19,20 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_mocks_import"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_standalone_expect"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_unneeded_async_expect_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_called_with"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_each"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_equality_matcher"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_expect_resolves"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_in_order"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_hooks_on_top"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_jest_mocked"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_spy_on"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_be"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_contain"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_been_called"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_been_called_times"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_to_have_length"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_todo"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
@@ -31,12 +44,16 @@ import (
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
 		expect_expect.ExpectExpectRule,
+		max_expects.MaxExpectsRule,
+		max_nested_describe.MaxNestedDescribeRule,
 		no_alias_methods.NoAliasMethodsRule,
 		no_commented_out_tests.NoCommentedOutTestsRule,
+		no_confusing_set_timeout.NoConfusingSetTimeoutRule,
 		no_deprecated_functions.NoDeprecatedFunctionsRule,
 		no_disabled_tests.NoDisabledTestsRule,
 		no_done_callback.NoDoneCallbackRule,
 		no_duplicate_hooks.NoDuplicateHooksRule,
+		no_export.NoExportRule,
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
 		no_identical_title.NoIdenticalTitleRule,
@@ -44,10 +61,19 @@ func GetAllRules() []rule.Rule {
 		no_mocks_import.NoMocksImportRule,
 		no_standalone_expect.NoStandaloneExpectRule,
 		no_test_prefixes.NoTestPrefixesRule,
+		no_unneeded_async_expect_function.NoUnneededAsyncExpectFunctionRule,
 		prefer_called_with.PreferCalledWithRule,
+		prefer_each.PreferEachRule,
+		prefer_equality_matcher.PreferEqualityMatcherRule,
+		prefer_expect_resolves.PreferExpectResolvesRule,
+		prefer_hooks_in_order.PreferHooksInOrderRule,
+		prefer_hooks_on_top.PreferHooksOnTopRule,
+		prefer_spy_on.PreferSpyOnRule,
+		prefer_jest_mocked.PreferJestMockedRule,
 		prefer_strict_equal.PreferStrictEqualRule,
 		prefer_to_be.PreferToBeRule,
 		prefer_to_contain.PreferToContainRule,
+		prefer_to_have_been_called_times.PreferToHaveBeenCalledTimesRule,
 		prefer_to_have_been_called.PreferToHaveBeenCalledRule,
 		prefer_to_have_length.PreferToHaveLengthRule,
 		prefer_todo.PreferTodoRule,

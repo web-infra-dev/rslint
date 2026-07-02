@@ -1,5 +1,9 @@
 import { describe, test, expect } from '@rstest/core';
-import { loadConfigFile, normalizeConfig } from '../src/config-loader.js';
+import {
+  loadConfigFile,
+  normalizeConfig,
+  collectPluginMeta,
+} from '../src/config/config-loader.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -157,5 +161,204 @@ describe('normalizeConfig', () => {
     expect(result).toHaveLength(1);
     expect(result[0].files).toBeUndefined();
     expect(result[0].ignores).toBeUndefined();
+  });
+});
+
+describe('normalizeConfig — community plugins (object-form)', () => {
+  type NormalizedPluginEntry = {
+    eslintPlugins?: Record<string, { ruleNames: string[] }>;
+    plugins?: string[];
+  };
+  const mockPlugin = {
+    meta: { name: 'p' },
+    rules: { 'no-foo': {}, 'no-bar': {} },
+  };
+
+  test('object-form plugins: strips live objects, emits sorted {ruleNames} meta', () => {
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { local: mockPlugin },
+        rules: { 'local/no-foo': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toEqual({
+      local: { ruleNames: ['no-bar', 'no-foo'] },
+    });
+    // The prefix is merged into the string `plugins` set Go's gate keys off.
+    expect(entry.plugins).toContain('local');
+    // The live plugin object (carrying `meta`/`create`) must not leak into
+    // the serializable payload sent to Go.
+    expect(JSON.stringify(entry)).not.toContain('meta');
+  });
+
+  test('array-form plugins: native names pass through as the string[] gate, no carrier', () => {
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: ['@typescript-eslint', 'import'],
+        rules: {},
+      },
+    ]) as NormalizedPluginEntry[];
+    // Array form is the native-name whitelist: it reaches Go as the plugins
+    // string[] and emits NO community-plugin carrier (no live objects).
+    expect(entry.plugins).toEqual(['@typescript-eslint', 'import']);
+    expect(entry.eslintPlugins).toBeUndefined();
+  });
+
+  test('multiple object-form plugin prefixes in one entry', () => {
+    // The normal object-form usage mounts more than one community plugin; each
+    // prefix's ruleNames + the prefix gate must be collected independently.
+    const pluginB = { meta: { name: 'b' }, rules: { 'no-baz': {} } };
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { local: mockPlugin, other: pluginB },
+        rules: { 'local/no-foo': 'error', 'other/no-baz': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toEqual({
+      local: { ruleNames: ['no-bar', 'no-foo'] },
+      other: { ruleNames: ['no-baz'] },
+    });
+    expect(entry.plugins).toEqual(['local', 'other']);
+  });
+
+  test('throws when a mounted plugin has no rules object', () => {
+    expect(() =>
+      normalizeConfig([
+        { files: ['**/*.ts'], plugins: { bad: { meta: {} } }, rules: {} },
+      ]),
+    ).toThrow(/must expose a "rules" object/);
+  });
+
+  test('throws when an object-form prefix collides with a native plugin name', () => {
+    // Asymmetry: a native NAME is legal in the array form (previous test) but
+    // illegal as an object-form KEY — native rules always win, so mounting a
+    // community plugin under a native prefix would silently shadow it.
+    expect(() =>
+      normalizeConfig([
+        {
+          files: ['**/*.ts'],
+          plugins: { '@typescript-eslint': mockPlugin },
+          rules: {},
+        },
+      ]),
+    ).toThrow(/collides with the built-in plugin/);
+  });
+
+  const RESERVED_DECL_ALIASES = [
+    'eslint-plugin-import',
+    'eslint-plugin-jest',
+    'eslint-plugin-jsx-a11y',
+    'eslint-plugin-promise',
+    'eslint-plugin-react-hooks',
+    'eslint-plugin-unicorn',
+  ];
+  for (const alias of RESERVED_DECL_ALIASES) {
+    test(`throws when an object-form prefix is the native decl-name ${alias}`, () => {
+      // Each `eslint-plugin-*` alias normalizes to a native prefix in Go, so a
+      // community plugin mounted under it would otherwise pass the JS guard but
+      // be silently dropped by the Go gate. Reject it loudly.
+      expect(() =>
+        normalizeConfig([
+          { files: ['**/*.ts'], plugins: { [alias]: mockPlugin }, rules: {} },
+        ]),
+      ).toThrow(/collides with the built-in plugin/);
+    });
+  }
+
+  test('accepts an eslint-plugin-* key that is NOT a native decl-name', () => {
+    // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
+    // so reserving it would wrongly false-reject a legitimate community mount.
+    // The asymmetry must be exact: only the 6 aliased names are reserved.
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts'],
+        plugins: { 'eslint-plugin-react': mockPlugin },
+        rules: { 'eslint-plugin-react/no-foo': 'error' },
+      },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.plugins).toContain('eslint-plugin-react');
+    expect(entry.eslintPlugins).toEqual({
+      'eslint-plugin-react': { ruleNames: ['no-bar', 'no-foo'] },
+    });
+  });
+
+  test('entries with no plugins carry no community-plugin field', () => {
+    const [entry] = normalizeConfig([
+      { files: ['**/*.ts'], rules: {} },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toBeUndefined();
+    expect(entry.plugins).toEqual([]);
+  });
+
+  test('empty object-form plugins {} is a no-op (no carrier, empty gate)', () => {
+    const [entry] = normalizeConfig([
+      { files: ['**/*.ts'], plugins: {}, rules: {} },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toBeUndefined();
+    expect(entry.plugins).toEqual([]);
+  });
+});
+
+describe('collectPluginMeta', () => {
+  const mockPlugin = {
+    meta: { name: 'p' },
+    rules: { 'no-foo': {}, 'no-bar': {} },
+  };
+
+  test('aggregates entries + descriptors, only for plugin-mounting configs', () => {
+    const { eslintPluginEntries, pluginConfigs } = collectPluginMeta([
+      {
+        configPath: '/proj/rslint.config.mjs',
+        configDirectory: '/proj',
+        entries: normalizeConfig([
+          {
+            files: ['**/*.ts'],
+            plugins: { local: mockPlugin },
+            rules: {},
+          },
+        ]),
+      },
+      {
+        configPath: '/proj/sub/rslint.config.mjs',
+        configDirectory: '/proj/sub',
+        entries: normalizeConfig([{ files: ['**/*.ts'], rules: {} }]),
+      },
+    ]);
+    expect(eslintPluginEntries).toEqual([
+      { prefix: 'local', ruleNames: ['no-bar', 'no-foo'] },
+    ]);
+    // Only the plugin-mounting config gets a worker-pool descriptor; the plain
+    // config stays zero-overhead (no worker spun up for it).
+    expect(pluginConfigs).toEqual([
+      { configPath: '/proj/rslint.config.mjs', configDirectory: '/proj' },
+    ]);
+  });
+
+  test('ruleNames are merged across configs sharing a prefix (per-config-unique rules still register)', () => {
+    // Go registers ONE global placeholder set per prefix but the worker routes
+    // per-config; a rule mounted only by /b's `local` (zzz) must still register,
+    // or Go never dispatches it for files under /b (silent false-green).
+    const { eslintPluginEntries } = collectPluginMeta([
+      {
+        configPath: '/a/rslint.config.mjs',
+        configDirectory: '/a',
+        entries: normalizeConfig([
+          { plugins: { local: mockPlugin }, rules: {} },
+        ]),
+      },
+      {
+        configPath: '/b/rslint.config.mjs',
+        configDirectory: '/b',
+        entries: normalizeConfig([
+          { plugins: { local: { rules: { zzz: {} } } }, rules: {} },
+        ]),
+      },
+    ]);
+    expect(eslintPluginEntries).toEqual([
+      { prefix: 'local', ruleNames: ['no-bar', 'no-foo', 'zzz'] },
+    ]);
   });
 });

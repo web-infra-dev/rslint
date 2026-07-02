@@ -66,13 +66,6 @@ var extrasValid = []rule_tester.ValidTestCase{
 		}
 	`, Tsx: true},
 
-	// `as` cast on a dep is allowed — should normalize to the underlying chain.
-	{Code: `
-		function MyComponent({ id }: { id: number }) {
-			useEffect(() => { console.log(id); }, [id as number]);
-		}
-	`, Tsx: true},
-
 	// Non-null assertion `!` on receiver inside the callback. Mirrors
 	// upstream: the dep key for `user!.name` is the receiver `user` (the
 	// NonNullExpression breaks the receiver walk in `getDependency`),
@@ -365,6 +358,27 @@ var extrasInvalid = []rule_tester.InvalidTestCase{
 				useEffect(() => { console.log((id as number) + 1); }, [id]);
 			}
 		`}}},
+		},
+	},
+
+	// `as` cast on a deps-array ELEMENT is a complex expression (upstream's
+	// analyzePropertyChain has no `as`/`satisfies` case so it throws); the
+	// underlying `id` is then a missing dependency. Matches v4/v7.
+	{
+		Code: `
+				function MyComponent({ id }: { id: number }) {
+					useEffect(() => { console.log(id); }, [id as number]);
+				}
+			`,
+		Tsx: true,
+		Errors: []rule_tester.InvalidTestCaseError{
+			{Message: "React Hook useEffect has a missing dependency: 'id'. Either include it or remove the dependency array.",
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{Output: `
+				function MyComponent({ id }: { id: number }) {
+					useEffect(() => { console.log(id); }, [id]);
+				}
+			`}}},
+			{Message: "React Hook useEffect has a complex expression in the dependency array. Extract it to a separate variable so it can be statically checked."},
 		},
 	},
 

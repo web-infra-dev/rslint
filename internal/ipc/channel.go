@@ -36,9 +36,8 @@ type NotificationHandler func(msg *Message)
 // A write failure or a read fault is terminal: the channel closes and every
 // in-flight request fails with a stable error (mirrors the Node side).
 type Channel struct {
-	reader    *bufio.Reader
-	rawReader io.Reader // original reader, closed on shutdown to unblock readLoop
-	writer    io.Writer
+	reader *bufio.Reader
+	writer io.Writer
 
 	// writeTimeout bounds a single frame write (0 = none; defaulted in
 	// NewChannel). requestTimeout is the default deadline applied to a
@@ -75,7 +74,6 @@ func NewChannel(r io.Reader, w io.Writer) *Channel {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Channel{
 		reader:         bufio.NewReader(r),
-		rawReader:      r,
 		writer:         w,
 		pending:        make(map[int]chan *Message),
 		nextID:         1, // requests use id > 0; notifications use 0
@@ -353,9 +351,26 @@ func (c *Channel) isClosed() bool {
 }
 
 // closeWith shuts the channel down: marks closed, records the cause, cancels
-// inbound ctx, unblocks every pending SendRequest (they select on c.done),
-// and closes the underlying reader so readLoop's ReadFrame returns instead of
-// blocking forever. Idempotent.
+// inbound ctx, and unblocks every pending SendRequest (they select on c.done).
+// Idempotent.
+//
+// It deliberately does NOT close the underlying reader. readLoop may be parked
+// in a blocked ReadFrame on the peer's stdout pipe when the channel is closed
+// (the normal CLI shutdown order: lint done → shutdown acked → Close, while the
+// peer waits for THIS process to exit before closing its write end). Closing the
+// reader to interrupt that read is only reliable on pollable fds; on a Windows
+// synchronous-I/O stdin pipe (*os.File).Close blocks in semacquire until the
+// in-flight ReadFile returns — which it never will, since the peer is waiting on
+// us — so an inline close deadlocks the exit path and a backgrounded close just
+// leaks a second goroutine wedged the same way.
+//
+// Interrupting readLoop is unnecessary. This Channel is used only by the CLI
+// (cmd/rslint/ipc_cli.go), which always terminates via os.Exit (main.go); that
+// reaps a parked readLoop goroutine instantly. Everything other code observes on
+// close — closeErr, c.done, inbound ctx cancellation — is published here
+// regardless, so SendRequest waiters and Done() consumers wake exactly as
+// before. When readLoop itself originates the close (a ReadFrame error), its
+// reader has already returned and the goroutine exits on its own.
 func (c *Channel) closeWith(cause error) {
 	c.mu.Lock()
 	if c.closed {
@@ -373,12 +388,6 @@ func (c *Channel) closeWith(cause error) {
 
 	c.inCancel()
 	close(c.done)
-	// Unblock readLoop: closing the underlying reader makes its blocked
-	// ReadFrame return so the goroutine exits, instead of hanging until the
-	// peer happens to close its write end.
-	if rc, ok := c.rawReader.(io.Closer); ok {
-		_ = rc.Close()
-	}
 }
 
 // Close shuts the channel down. Pending requests fail with a stable error.

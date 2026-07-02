@@ -26,12 +26,11 @@ import { defineConfig } from '@rslib/core';
  *    pays a filesystem-open + parse cost per extra chunk; modules can't be
  *    reused across isolates). The ESLint-compat libs (`@typescript-eslint/
  *    scope-manager`, `eslint-scope`, `esquery`) are devDependencies imported
- *    statically so they bundle in; consumers need none at runtime. The only
- *    external left is `@rslint/native` — its `.node` can't be inlined, the napi
- *    loader resolves the platform binary at runtime.
- *
- * Because the worker imports `@rslint/native`, any context running `build:js`
- * now needs the napi `index.d.ts` (a `napi build` artifact) present.
+ *    statically so they bundle in; consumers need none at runtime. The native
+ *    parser loader (`src/eslint-plugin/native/load-binding.ts`) bundles in too,
+ *    but the platform `.node` it loads stays external: the loader selects the
+ *    `@rslint/native-<tuple>` package at runtime via `createRequire`, which
+ *    rspack can't statically follow (so the binary is never inlined — intended).
  */
 const librarySurface = {
   format: 'esm' as const,
@@ -45,10 +44,10 @@ const librarySurface = {
     tsconfigPath: './tsconfig.lib.json',
     entry: {
       index: './src/index.ts',
-      browser: './src/browser.ts',
-      service: './src/service.ts',
-      'config-loader': './src/config-loader.ts',
-      cli: './src/cli.ts',
+      service: './src/service/service.ts',
+      internal: './src/internal/node.ts',
+      'config-loader': './src/config/config-loader.ts',
+      cli: './src/cli/cli.ts',
     },
   },
   dts: { bundle: true },

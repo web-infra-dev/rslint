@@ -53,6 +53,7 @@ bref
 brefs
 Buttom
 cachedvfs
+callbackify
 callees
 callsite
 callsites
@@ -65,6 +66,7 @@ categorisation
 Cbar
 centralising
 CHARCLASS
+checkerpool
 classnames
 CLASSSET
 clazz
@@ -76,6 +78,7 @@ co-locate
 codemod
 codemods
 codepoint
+codequality
 codspeed
 CODSPEED
 colcount
@@ -100,6 +103,7 @@ datepicker
 deboucne
 dedup
 dedupe
+dedups
 deprec
 Deque
 describedby
@@ -126,7 +130,9 @@ esmodule
 espree
 estree
 fontstack
+parsecache
 stroustrup
+zeebo
 Éurströmming
 exclam
 execdir
@@ -186,6 +192,7 @@ gojs
 golangci
 GOMAXPROCS
 goroutines
+gosec
 gotest
 graphlib
 handl
@@ -325,6 +332,8 @@ preresolved
 Prettier
 prioritises
 progressbar
+promisify
+promisifying
 promiseutil
 propertyassignment
 proptypes
@@ -395,6 +404,7 @@ scopemanager
 sectionhead
 Seeked
 segs
+sonarjs
 setsize
 setstate
 Setstate
@@ -581,3 +591,19 @@ unenroll
 unprefix
 userland
 wasi
+lockfiles
+smajobber
+isatty
+semacquire
+pollable
+unpark
+acked
+backgrounded
+resolv
+unref
+acking
+multifile
+outputfixes
+pendings
+relskip
+ruleopts

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import picomatch from 'picomatch';
-import { globSync as tinyglobbySync } from 'tinyglobby';
-import { type RslintConfigEntry } from '../define-config.ts';
+import { glob } from 'tinyglobby';
+import { type RslintConfigEntry } from '../config/define-config.ts';
 
 export const JS_CONFIG_FILES = [
   'rslint.config.js',
@@ -37,21 +37,23 @@ export function findJSConfigUp(startDir: string): string | null {
 /**
  * Recursively scan a directory for all rslint JS/TS config files.
  * Skips node_modules and .git directories (aligned with ESLint defaults).
- * Uses tinyglobby (fdir-backed) for fast directory traversal.
+ * Uses tinyglobby's async glob; the directory walk is I/O-bound, so an async
+ * crawl parallelizes it across the libuv thread pool.
  *
  * tinyglobby returns POSIX-style paths even on Windows, so the result is
  * normalized through path.normalize to match the native separator that
  * findJSConfigUp / path.join produce. Without this, Map<configPath, ...>
  * dedupe against findJSConfigUp results fails on Windows.
  */
-export function findJSConfigsInDir(startDir: string): string[] {
+export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
   const resolved = path.resolve(startDir);
-  return tinyglobbySync(['**/rslint.config.{js,mjs,ts,mts}'], {
+  const matches = await glob(['**/rslint.config.{js,mjs,ts,mts}'], {
     cwd: resolved,
     absolute: true,
     dot: true,
     ignore: ['**/node_modules/**', '**/.git/**'],
-  }).map((p) => path.normalize(p));
+  });
+  return matches.map((p) => path.normalize(p));
 }
 
 /**
@@ -65,12 +67,12 @@ export function findJSConfigsInDir(startDir: string): string[] {
  * ensures sub-package configs in a monorepo are discovered when linting
  * from the root.
  */
-export function discoverConfigs(
+export async function discoverConfigs(
   files: string[],
   dirs: string[],
   cwd: string,
   explicitConfig: string | null,
-): Map<string, string> {
+): Promise<Map<string, string>> {
   // Map: configPath -> configDirectory
   const configs = new Map<string, string>();
 
@@ -116,8 +118,12 @@ export function discoverConfigs(
 
   // Scan for nested configs within the target scope (no-args and dir-args).
   // Broken configs are tolerated by runWithJSConfigs (skipped with warning).
+  // Serial await (not Promise.all over scanDirs): a single async glob already
+  // saturates the libuv thread pool, so parallelizing across scanDirs adds no
+  // speed — it only creates I/O contention when scanDirs overlap (e.g. `.` plus
+  // a nested subdir each crawling the shared subtree at the same time).
   for (const dir of scanDirs) {
-    for (const configPath of findJSConfigsInDir(dir)) {
+    for (const configPath of await findJSConfigsInDir(dir)) {
       addConfig(configPath);
     }
   }
@@ -139,7 +145,13 @@ function isGlobalIgnoreEntry(
   return (
     entry.files == null &&
     entry.rules == null &&
-    entry.plugins == null &&
+    // No meaningful plugins: absent, an empty array-form whitelist, or an empty
+    // object-form map. `plugins` is a union (string[] native names XOR a live
+    // community-plugin object), so branch on the shape before measuring length.
+    (entry.plugins == null ||
+      (Array.isArray(entry.plugins)
+        ? entry.plugins.length === 0
+        : Object.keys(entry.plugins).length === 0)) &&
     entry.languageOptions == null &&
     entry.settings == null
   );

@@ -10,13 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// skipAssertionsAndParens strips parentheses and all TS assertion wrappers
-// (as, satisfies, !, <T>) from an expression, matching ESLint's
-// unwrapTSAsExpression(uncast(node)) pattern.
-func skipAssertionsAndParens(node *ast.Node) *ast.Node {
-	return ast.SkipOuterExpressions(node, ast.OEKParentheses|ast.OEKAssertions)
-}
-
 // getName extracts a static string name from a node. For Identifiers returns
 // the text, for StringLiterals returns the text, for NumericLiterals returns
 // the string representation, for NoSubstitutionTemplateLiterals returns the
@@ -25,7 +18,7 @@ func getName(node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
-	node = skipAssertionsAndParens(node)
+	node = utils.SkipAssertionsAndParens(node)
 	switch node.Kind {
 	case ast.KindIdentifier:
 		return node.AsIdentifier().Text
@@ -49,7 +42,7 @@ func isThisExpression(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	return skipAssertionsAndParens(node).Kind == ast.KindThisKeyword
+	return utils.SkipAssertionsAndParens(node).Kind == ast.KindThisKeyword
 }
 
 // isSetStateCall checks if a node is a this.setState(...) call.
@@ -58,7 +51,7 @@ func isSetStateCall(node *ast.Node) bool {
 		return false
 	}
 	call := node.AsCallExpression()
-	callee := skipAssertionsAndParens(call.Expression)
+	callee := utils.SkipAssertionsAndParens(call.Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
@@ -175,7 +168,7 @@ func (ci *classInfo) isStateReference(node *ast.Node) bool {
 	if ci == nil || ci.abandoned {
 		return false
 	}
-	node = skipAssertionsAndParens(node)
+	node = utils.SkipAssertionsAndParens(node)
 
 	// Direct: this.state
 	if node.Kind == ast.KindPropertyAccessExpression {
@@ -374,7 +367,7 @@ func (ci *classInfo) handleAssignment(left, right *ast.Node) {
 	if ci == nil || ci.abandoned {
 		return
 	}
-	right = skipAssertionsAndParens(right)
+	right = utils.SkipAssertionsAndParens(right)
 
 	switch left.Kind {
 	case ast.KindIdentifier:
@@ -465,7 +458,7 @@ func walkES6Component(ci *classInfo, classNode *ast.Node) {
 func processPropertyDeclaration(ci *classInfo, member *ast.Node) {
 	pd := member.AsPropertyDeclaration()
 	nameNode := pd.Name()
-	init := skipAssertionsAndParens(pd.Initializer)
+	init := utils.SkipAssertionsAndParens(pd.Initializer)
 
 	isStatic := ast.IsStatic(member)
 
@@ -561,7 +554,7 @@ func processGDSFPBody(ci *classInfo, fn *ast.Node) {
 		}
 		if n.Kind == ast.KindPropertyAccessExpression {
 			pa := n.AsPropertyAccessExpression()
-			obj := skipAssertionsAndParens(pa.Expression)
+			obj := utils.SkipAssertionsAndParens(pa.Expression)
 			if isStateParam(obj) {
 				ci.addUsedStateField(pa.Name())
 			}
@@ -668,7 +661,7 @@ func processGetInitialState(ci *classInfo, prop *ast.Node) {
 	if rs.Expression == nil {
 		return
 	}
-	retVal := skipAssertionsAndParens(rs.Expression)
+	retVal := utils.SkipAssertionsAndParens(rs.Expression)
 	if retVal.Kind == ast.KindObjectLiteralExpression {
 		ci.addStateFields(retVal)
 	}
@@ -745,7 +738,7 @@ func processNode(ci *classInfo, node *ast.Node) {
 // processCallExpression handles this.setState() calls.
 func processCallExpression(ci *classInfo, node *ast.Node) {
 	call := node.AsCallExpression()
-	unwrappedNode := skipAssertionsAndParens(node)
+	unwrappedNode := utils.SkipAssertionsAndParens(node)
 	if unwrappedNode.Kind != ast.KindCallExpression {
 		return
 	}
@@ -758,14 +751,14 @@ func processCallExpression(ci *classInfo, node *ast.Node) {
 	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
 		return
 	}
-	firstArg := skipAssertionsAndParens(callExpr.Arguments.Nodes[0])
+	firstArg := utils.SkipAssertionsAndParens(callExpr.Arguments.Nodes[0])
 
 	switch firstArg.Kind {
 	case ast.KindObjectLiteralExpression:
 		ci.addStateFields(firstArg)
 	case ast.KindArrowFunction:
 		af := firstArg.AsArrowFunction()
-		body := skipAssertionsAndParens(af.Body)
+		body := utils.SkipAssertionsAndParens(af.Body)
 		if body != nil && body.Kind == ast.KindObjectLiteralExpression {
 			ci.addStateFields(body)
 		}
@@ -799,8 +792,8 @@ func processAssignmentExpression(ci *classInfo, node *ast.Node) {
 		return
 	}
 
-	left := skipAssertionsAndParens(bin.Left)
-	right := skipAssertionsAndParens(bin.Right)
+	left := utils.SkipAssertionsAndParens(bin.Left)
+	right := utils.SkipAssertionsAndParens(bin.Right)
 
 	// Check for `this.state = { ... }`
 	if left.Kind == ast.KindPropertyAccessExpression {
@@ -857,7 +850,7 @@ func processVariableDeclarator(ci *classInfo, node *ast.Node) {
 // `this.state.foo` and `alias.foo`.
 func processMemberExpression(ci *classInfo, node *ast.Node) {
 	pa := node.AsPropertyAccessExpression()
-	obj := skipAssertionsAndParens(pa.Expression)
+	obj := utils.SkipAssertionsAndParens(pa.Expression)
 
 	if ci.isStateReference(obj) {
 		// Record that we saw this property being accessed
@@ -877,14 +870,14 @@ func processMemberExpression(ci *classInfo, node *ast.Node) {
 // `this.state['foo']` and `this.state[expr]`.
 func processElementAccess(ci *classInfo, node *ast.Node) {
 	ea := node.AsElementAccessExpression()
-	obj := skipAssertionsAndParens(ea.Expression)
+	obj := utils.SkipAssertionsAndParens(ea.Expression)
 
 	if ci.isStateReference(obj) {
 		argExpr := ea.ArgumentExpression
 		if argExpr == nil {
 			return
 		}
-		argExpr = skipAssertionsAndParens(argExpr)
+		argExpr = utils.SkipAssertionsAndParens(argExpr)
 		// If the access key is a static literal, record the used field.
 		// In ESTree, true/false/null are Literals, so ESLint's
 		// `node.property.type !== 'Literal'` check does NOT give up on them.

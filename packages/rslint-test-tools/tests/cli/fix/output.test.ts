@@ -107,7 +107,7 @@ describe('CLI --fix output', () => {
   test('cascade --fix → neither rule shown after fix', async () => {
     const tempDir = await createFixTestDir(
       {
-        '@typescript-eslint/ban-types': 'error',
+        '@typescript-eslint/no-wrapper-object-types': 'error',
         '@typescript-eslint/no-inferrable-types': 'error',
       },
       {
@@ -119,7 +119,7 @@ describe('CLI --fix output', () => {
     try {
       const result = await runRslint(['--fix', 'index.ts'], tempDir);
       // Both rules' diagnostics should NOT appear (all fixed via cascade)
-      expect(result.stdout).not.toContain('ban-types');
+      expect(result.stdout).not.toContain('no-wrapper-object-types');
       expect(result.stdout).not.toContain('no-inferrable-types');
       expect(result.stdout).toContain('Found 0 errors');
       expect(result.stdout).toContain('fixed 4 issues');

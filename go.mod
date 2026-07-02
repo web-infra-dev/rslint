@@ -16,6 +16,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/jsonrpc => ./shim/jsonrpc
 	github.com/microsoft/typescript-go/shim/ls => ./shim/ls
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
+	github.com/microsoft/typescript-go/shim/parser => ./shim/parser
 	github.com/microsoft/typescript-go/shim/project => ./shim/project
 	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
 	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms => ./shim/transformers/jsxtransforms
@@ -41,6 +42,7 @@ require (
 	github.com/microsoft/typescript-go/shim/evaluator v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/jsonrpc v0.0.0
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
+	github.com/microsoft/typescript-go/shim/parser v0.0.0-00010101000000-000000000000
 	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
 	github.com/microsoft/typescript-go/shim/transformers/jsxtransforms v0.0.0
@@ -52,9 +54,10 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/vfsmatch v0.0.0
 	github.com/rivo/uniseg v0.4.7
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
-	golang.org/x/sync v0.20.0
-	golang.org/x/sys v0.45.0
-	golang.org/x/tools v0.45.0
+	github.com/zeebo/xxh3 v1.1.0
+	golang.org/x/sync v0.21.0
+	golang.org/x/sys v0.46.0
+	golang.org/x/tools v0.46.0
 	gotest.tools/v3 v3.5.2
 )
 
@@ -65,14 +68,13 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/mod v0.36.0 // indirect
+	golang.org/x/mod v0.37.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.12.0
 	github.com/fxamacker/cbor/v2 v2.9.0
-	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
-	github.com/microsoft/typescript-go v0.0.0-20260521185404-d99f6b2a5ff8 // indirect
-	golang.org/x/text v0.37.0
+	github.com/go-json-experiment/json v0.0.0-20260601182631-00ed12fed2a6
+	github.com/microsoft/typescript-go v0.0.0-20260616000920-dd6bceb4d5b5 // indirect
+	golang.org/x/text v0.38.0
 )

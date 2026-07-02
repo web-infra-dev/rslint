@@ -6,7 +6,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_ts_comment"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_tslint_comment"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/class_methods_use_this"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/consistent_generic_constructors"
@@ -31,6 +30,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_confusing_non_null_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_confusing_void_expression"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_deprecated"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_enum_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_type_constituents"
@@ -66,6 +66,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_restricted_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_shadow"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_type_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_condition"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_parameter_property_assignment"
@@ -140,7 +141,6 @@ func GetAllRules() []rule.Rule {
 		await_thenable.AwaitThenableRule,
 		ban_ts_comment.BanTsCommentRule,
 		ban_tslint_comment.BanTslintCommentRule,
-		ban_types.BanTypesRule,
 		class_literal_property_style.ClassLiteralPropertyStyleRule,
 		class_methods_use_this.ClassMethodsUseThisRule,
 		consistent_generic_constructors.ConsistentGenericConstructorsRule,
@@ -165,6 +165,7 @@ func GetAllRules() []rule.Rule {
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_non_null_assertion.NoConfusingNonNullAssertionRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
+		no_deprecated.NoDeprecatedRule,
 		no_dupe_class_members.NoDupeClassMembersRule,
 		no_duplicate_enum_values.NoDuplicateEnumValuesRule,
 		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
@@ -196,6 +197,7 @@ func GetAllRules() []rule.Rule {
 		no_redeclare.NoRedeclareRule,
 		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
 		no_this_alias.NoThisAliasRule,
+		no_type_alias.NoTypeAliasRule,
 		no_require_imports.NoRequireImportsRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_types.NoRestrictedTypesRule,

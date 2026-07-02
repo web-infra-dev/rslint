@@ -15,7 +15,7 @@ import _ "unsafe"
 
 type APISnapshotRequest = project.APISnapshotRequest
 type ATAStateChange = project.ATAStateChange
-type CheckerPool = project.CheckerPool
+type CheckerPoolOptions = project.CheckerPoolOptions
 type Client = project.Client
 type ConfigFileRegistry = project.ConfigFileRegistry
 type CreateProgramResult = project.CreateProgramResult

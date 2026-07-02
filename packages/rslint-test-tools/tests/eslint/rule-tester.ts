@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
-import { lint, type LintResponse } from '@rslint/core';
+import { lint, type LintResponse } from '@rslint/core/internal';
 import assert from 'node:assert';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
@@ -71,10 +71,20 @@ export interface InvalidTestCase {
 }
 
 function filterSnapshot(diags: LintResponse & { code?: string }): LintResponse {
+  // Drop fields that are noise or range-unstable for a rule's diagnostic
+  // snapshot: warningCount/fixable*Count are constant or fix-related; fixes &
+  // suggestions carry byte-offset ranges that ⑥ rewrites to UTF-16.
+  const top = diags as unknown as Record<string, unknown>;
+  delete top.warningCount;
+  delete top.fixableErrorCount;
+  delete top.fixableWarningCount;
+  delete top.lintedFiles;
   for (const diag of diags.diagnostics ?? []) {
     const d = diag as unknown as Record<string, unknown>;
     delete d.filePath;
     delete d.fixes;
+    delete d.severity;
+    delete d.suggestions;
   }
   return diags;
 }
@@ -107,27 +117,27 @@ export class RuleTester {
             typeof validCase === 'object' ? validCase.options : undefined;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
-          const { configPath, cleanup } = await buildConfigForSettings(
-            config,
-            undefined,
-          );
-          let diags;
-          try {
-            diags = await lint({
-              config: configPath,
-              workingDirectory: cwd,
-              fileContents: { [virtual_entry]: code },
-              ruleOptions: {
-                [ruleName]: options
-                  ? Array.isArray(options)
-                    ? options
-                    : [options]
-                  : [],
-              } as any,
-            });
-          } finally {
-            cleanup();
-          }
+          const { config: resolvedConfig, configDirectory } =
+            await buildConfigForSettings(config, undefined);
+          const ruleArgs = options
+            ? Array.isArray(options)
+              ? options
+              : [options]
+            : [];
+          const diags = await lint({
+            config: [
+              ...resolvedConfig,
+              {
+                rules: {
+                  [ruleName]:
+                    ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',
+                },
+              },
+            ] as any,
+            configDirectory,
+            workingDirectory: cwd,
+            fileContents: { [virtual_entry]: code },
+          });
 
           assert(
             diags.diagnostics?.length === 0,
@@ -144,27 +154,27 @@ export class RuleTester {
           const { code, errors, options } = item;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
-          const { configPath, cleanup } = await buildConfigForSettings(
-            config,
-            undefined,
-          );
-          let diags;
-          try {
-            diags = await lint({
-              config: configPath,
-              workingDirectory: cwd,
-              fileContents: { [virtual_entry]: code },
-              ruleOptions: {
-                [ruleName]: options
-                  ? Array.isArray(options)
-                    ? options
-                    : [options]
-                  : [],
-              } as any,
-            });
-          } finally {
-            cleanup();
-          }
+          const { config: resolvedConfig, configDirectory } =
+            await buildConfigForSettings(config, undefined);
+          const ruleArgs = options
+            ? Array.isArray(options)
+              ? options
+              : [options]
+            : [];
+          const diags = await lint({
+            config: [
+              ...resolvedConfig,
+              {
+                rules: {
+                  [ruleName]:
+                    ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',
+                },
+              },
+            ] as any,
+            configDirectory,
+            workingDirectory: cwd,
+            fileContents: { [virtual_entry]: code },
+          });
 
           assert(
             diags.diagnostics?.length > 0,

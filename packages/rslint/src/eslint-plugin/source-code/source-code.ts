@@ -82,6 +82,7 @@ export interface ESTreeNode {
 export interface SourceCode {
   text: string;
   ast: ESTreeNode;
+  isESTree: boolean;
   lines: string[];
   hasBOM: boolean;
   scopeManager: unknown;
@@ -182,6 +183,13 @@ export interface SourceCode {
   getCommentsAfter(node: ESTreeNode): Comment[];
   getCommentsInside(node: ESTreeNode): Comment[];
   getAllComments(): Comment[];
+  /**
+   * All code tokens AND comments merged into one stream sorted by `range[0]`
+   * — ESLint's `SourceCode#tokensAndComments`. Stylistic whitespace rules
+   * (`comma-spacing`, `no-multi-spaces`, `indent`, `indent-binary-ops`,
+   * `space-in-parens`, ...) read this array directly.
+   */
+  readonly tokensAndComments: readonly Token[];
   // NOTE: `getJSDocComment(node)` was removed in ESLint v10 with no
   // replacement; rslint mirrors that removal. Rules that need adjacent
   // JSDoc can walk `getCommentsBefore(node)` themselves.
@@ -313,7 +321,7 @@ export interface SourceCodeBuildInput {
     end: number;
   }>;
   /**
-   * Native-parser token stream in columnar form (`@rslint/native`'s `parse()`:
+   * Native-parser token stream in columnar form (the napi parser's `parse()`:
    * `tokenTypes`/`tokenStarts`/`tokenEnds`, all UTF-16 offsets). The token
    * getters lazily rebuild `Token[]` from these via {@link token-builder.buildTokens} on
    * first use. When omitted, the token stream is empty (the main lint path always supplies
@@ -569,6 +577,12 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
   const sc: SourceCode = {
     text,
     ast,
+    // ESLint sets `isESTree = (ast.type === "Program")` on ESTree-backed
+    // SourceCode (eslint/lib/languages/js/source-code/source-code.js:316).
+    // Stylistic's `indent` rule (alone among the 97 rules) guards
+    // `if (!isESTreeSourceCode(...)) return {}` and would otherwise register
+    // zero listeners under rslint. Mirror ESLint's exact predicate.
+    isESTree: ast.type === 'Program',
     get lines(): string[] {
       // ESLint splits on ALL ECMAScript line terminators (LF, CR, CRLF,
       // U+2028, U+2029) — see `LINE_TERMINATOR_RE`. Splitting on `\n`
@@ -582,6 +596,12 @@ export function createSourceCode(input: SourceCodeBuildInput): SourceCode {
     hasBOM,
     get scopeManager(): unknown {
       return getScopeManager();
+    },
+    // ESLint's `SourceCode#tokensAndComments`: the code-token stream merged
+    // with comments, sorted by `range[0]`. Reuses the lazy/cached `streamFor`
+    // merge (same array `getTokens(..., {includeComments:true})` uses).
+    get tokensAndComments(): readonly Token[] {
+      return streamFor(true);
     },
     // Full ESTree + TypeScript visitor-keys map (vendored from
     // oxc-parser 0.133, drift-guarded against ESLint's keys; see

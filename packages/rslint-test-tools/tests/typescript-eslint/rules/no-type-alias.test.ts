@@ -585,6 +585,20 @@ type KeyNames = keyof typeof SCALARS;
       options: [{ allowAliases: 'never' }],
     },
     {
+      code: 'type Foo = unique symbol;',
+      errors: [
+        {
+          column: 12,
+          data: {
+            alias: 'unhandled',
+          },
+          line: 1,
+          messageId: 'noTypeAlias',
+        },
+      ],
+      options: [{ allowAliases: 'always' }],
+    },
+    {
       code: "type Foo = 'a' | 'b';",
       errors: [
         {

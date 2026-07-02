@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -185,6 +186,7 @@ func createTestDiagnostic(t *testing.T, source string, startOffset, endOffset in
 	diagnostic := rule.RuleDiagnostic{
 		RuleName:   "test-rule",
 		SourceFile: sourceFile,
+		FilePath:   sourceFile.FileName(),
 		Range:      core.NewTextRange(startOffset, endOffset),
 		Message:    rule.RuleMessage{Id: "test", Description: "Test diagnostic"},
 		Severity:   rule.SeverityError,
@@ -211,7 +213,7 @@ func renderDiagnostic(t *testing.T, d rule.RuleDiagnostic, opts tspath.ComparePa
 func TestPrintDiagnosticFold(t *testing.T) {
 	// Generate a source file with many lines
 	var sb strings.Builder
-	sb.WriteString("const a = 1;\n")                // line 1
+	sb.WriteString("const a = 1;\n") // line 1
 	for i := 2; i <= 20; i++ {
 		fmt.Fprintf(&sb, "const v%d = %d;\n", i, i) // lines 2-20
 	}
@@ -920,5 +922,114 @@ func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 	got = collectAllowFileWarnings([]string{}, nil, nil, nil, "/work")
 	if got != nil {
 		t.Errorf("empty allowFiles (non-nil slice) should still produce nil, got %+v", got)
+	}
+}
+
+// TestGitlabReportState_EmptyProducesEmptyArray verifies a run with no
+// diagnostics still produces a valid (empty) JSON array, not an empty file.
+func TestGitlabReportState_EmptyProducesEmptyArray(t *testing.T) {
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	state := newGitlabReportState()
+	state.finish(w)
+	w.Flush()
+
+	if got := buf.String(); got != "[]\n" {
+		t.Errorf("expected %q, got %q", "[]\n", got)
+	}
+}
+
+// TestPrintDiagnosticGitLab verifies the gitlab format emits a single valid
+// JSON array with the fields GitLab's Code Quality report requires:
+// https://docs.gitlab.com/ci/testing/code_quality/
+func TestPrintDiagnosticGitLab(t *testing.T) {
+	source := "const unused = 42;\n"
+	startOffset := strings.Index(source, "unused")
+	diagWarning, opts := createTestDiagnostic(t, source, startOffset, startOffset+len("unused"))
+	diagWarning.Severity = rule.SeverityWarning
+	diagWarning.RuleName = "no-unused-vars"
+	diagWarning.Message = rule.RuleMessage{Id: "test", Description: "'unused' is never read."}
+
+	diagError, _ := createTestDiagnostic(t, source, 0, len("const"))
+	diagError.Severity = rule.SeverityError
+	diagError.RuleName = "prefer-const"
+	diagError.Message = rule.RuleMessage{Id: "test", Description: "Use const."}
+
+	var buf bytes.Buffer
+	w := bufio.NewWriter(&buf)
+	state := newGitlabReportState()
+	printDiagnosticGitLab(diagWarning, w, opts, state)
+	printDiagnosticGitLab(diagError, w, opts, state)
+	state.finish(w)
+	w.Flush()
+
+	var issues []struct {
+		Description string `json:"description"`
+		CheckName   string `json:"check_name"`
+		Fingerprint string `json:"fingerprint"`
+		Severity    string `json:"severity"`
+		Location    struct {
+			Path  string `json:"path"`
+			Lines struct {
+				Begin int `json:"begin"`
+				End   int `json:"end"`
+			} `json:"lines"`
+			Positions struct {
+				Begin struct {
+					Line   int `json:"line"`
+					Column int `json:"column"`
+				} `json:"begin"`
+				End struct {
+					Line   int `json:"line"`
+					Column int `json:"column"`
+				} `json:"end"`
+			} `json:"positions"`
+		} `json:"location"`
+	}
+	if err := json.Unmarshal(buf.Bytes(), &issues); err != nil {
+		t.Fatalf("output is not a valid JSON array: %v\noutput: %s", err, buf.String())
+	}
+	if len(issues) != 2 {
+		t.Fatalf("expected 2 issues, got %d", len(issues))
+	}
+
+	if issues[0].Severity != "minor" {
+		t.Errorf("warning should map to severity 'minor', got %q", issues[0].Severity)
+	}
+	if issues[1].Severity != "major" {
+		t.Errorf("error should map to severity 'major', got %q", issues[1].Severity)
+	}
+	if issues[0].CheckName != "no-unused-vars" {
+		t.Errorf("unexpected check_name: %q", issues[0].CheckName)
+	}
+	if issues[0].Location.Path != "index.ts" {
+		t.Errorf("expected relative path 'index.ts', got %q", issues[0].Location.Path)
+	}
+	if issues[0].Fingerprint == "" || issues[0].Fingerprint == issues[1].Fingerprint {
+		t.Errorf("each issue should have a distinct, non-empty fingerprint, got %q and %q", issues[0].Fingerprint, issues[1].Fingerprint)
+	}
+	if issues[0].Location.Positions.Begin.Line != 1 {
+		t.Errorf("expected 1-based line number, got %d", issues[0].Location.Positions.Begin.Line)
+	}
+}
+
+// TestGitlabFingerprint_CollisionsDeterministicallyDistinguished verifies
+// that two diagnostics with identical inputs (same file, rule, message,
+// position) still get distinct fingerprints, since GitLab's MR widget merges
+// issues sharing a fingerprint into a single entry.
+func TestGitlabFingerprint_CollisionsDeterministicallyDistinguished(t *testing.T) {
+	seen := make(map[string]int)
+	a := gitlabFingerprint(seen, "f.ts", "rule", "msg", 1, 1, 1, 5)
+	b := gitlabFingerprint(seen, "f.ts", "rule", "msg", 1, 1, 1, 5)
+	if a == b {
+		t.Errorf("identical inputs should still produce distinct fingerprints, got %q twice", a)
+	}
+
+	// Same inputs in a fresh run should reproduce the same first fingerprint
+	// (no randomness), so report diffs across CI runs stay stable.
+	seen2 := make(map[string]int)
+	a2 := gitlabFingerprint(seen2, "f.ts", "rule", "msg", 1, 1, 1, 5)
+	if a != a2 {
+		t.Errorf("fingerprint should be deterministic, got %q then %q", a, a2)
 	}
 }

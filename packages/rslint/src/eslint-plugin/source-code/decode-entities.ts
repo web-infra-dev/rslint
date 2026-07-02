@@ -5,7 +5,7 @@
  * ESLint's default parser (espree) lexes JSX through acorn-jsx, which
  * resolves character references while reading JSX text (`jsx_readText`)
  * and attribute strings (`jsx_readString`). The runner's native parser
- * (`@rslint/native`) leaves both `.value` and `.raw` as the verbatim source, so
+ * (napi/oxc) leaves both `.value` and `.raw` as the verbatim source, so
  * the runner must reproduce acorn-jsx's decoding to make JSX node /
  * token `.value`s byte-identical to ESLint v10.
  *

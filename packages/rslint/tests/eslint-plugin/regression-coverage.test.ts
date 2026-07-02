@@ -20,7 +20,7 @@ import { createSourceCode } from '../../src/eslint-plugin/source-code/source-cod
 import { lintFile } from '../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../src/eslint-plugin/linter/context.js';
-import { parse as nativeParse } from '@rslint/native';
+import { parse as nativeParse } from '../../src/eslint-plugin/native/load-binding.js';
 
 import { buildTokens } from '../../src/eslint-plugin/source-code/token-builder.js';
 import {
@@ -1569,7 +1569,7 @@ describe('applyOptionDefaults clones user-supplied option objects', () => {
     const { applyOptionDefaults } =
       await import('../../src/eslint-plugin/linter/options-defaults.js');
     // Single user-supplied object shared across multiple lint calls
-    // (matches the in-process `compat-task-builder` pattern where
+    // (matches the in-process `plugin-lint-protocol` pattern where
     // `sharedRules` lands on every file's task by reference).
     const sharedUserOpt = { allow: ['Array'] };
     const sharedUserOptions = [sharedUserOpt];

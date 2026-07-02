@@ -152,20 +152,46 @@ func nodeText(sf *ast.SourceFile, node *ast.Node) string {
 // rule reports them as "complex expression" rather than treating them as
 // transparent.
 func analyzePropertyChainText(node *ast.Node, optionalChains map[string]bool) (string, bool) {
+	return analyzePropertyChain(node, optionalChains, false)
+}
+
+// analyzeDepsArrayElement applies upstream's STRICT `analyzePropertyChain`
+// semantics for elements of the dependency array. Upstream has no case for
+// type assertions (`as` / `satisfies`) or non-null assertions (`!`), so any
+// of them makes the element a "complex expression". Non-optional computed
+// access (`foo[bar]`) is also complex, while optional computed access
+// (`foo?.[bar]`) with an analyzable (non-literal) key is a valid chain — a
+// quirk of upstream's `ChainExpression` branch, which doesn't re-check
+// `computed`. The callback-collection path stays lenient (it strips `as`),
+// so the strict behavior is confined to this entry point.
+func analyzeDepsArrayElement(node *ast.Node, optionalChains map[string]bool) (string, bool) {
+	return analyzePropertyChain(node, optionalChains, true)
+}
+
+func analyzePropertyChain(node *ast.Node, optionalChains map[string]bool, strict bool) (string, bool) {
 	if node == nil {
 		return "", false
 	}
 	n := ast.SkipParentheses(node)
-	for {
+	if strict {
+		// Upstream throws on these node kinds -> "complex expression".
 		switch n.Kind {
-		case ast.KindAsExpression:
-			n = ast.SkipParentheses(n.AsAsExpression().Expression)
-			continue
-		case ast.KindSatisfiesExpression:
-			n = ast.SkipParentheses(n.AsSatisfiesExpression().Expression)
-			continue
+		case ast.KindAsExpression, ast.KindSatisfiesExpression, ast.KindNonNullExpression:
+			return "", false
 		}
-		break
+	} else {
+		// Callback path: `as` / `satisfies` are transparent.
+		for {
+			switch n.Kind {
+			case ast.KindAsExpression:
+				n = ast.SkipParentheses(n.AsAsExpression().Expression)
+				continue
+			case ast.KindSatisfiesExpression:
+				n = ast.SkipParentheses(n.AsSatisfiesExpression().Expression)
+				continue
+			}
+			break
+		}
 	}
 	switch n.Kind {
 	case ast.KindIdentifier:
@@ -181,7 +207,7 @@ func analyzePropertyChainText(node *ast.Node, optionalChains map[string]bool) (s
 		return "", false
 	case ast.KindPropertyAccessExpression:
 		pae := n.AsPropertyAccessExpression()
-		object, ok := analyzePropertyChainText(pae.Expression, optionalChains)
+		object, ok := analyzePropertyChain(pae.Expression, optionalChains, strict)
 		if !ok {
 			return "", false
 		}
@@ -193,6 +219,32 @@ func analyzePropertyChainText(node *ast.Node, optionalChains map[string]bool) (s
 		if optionalChains != nil {
 			optional := pae.QuestionDotToken != nil
 			markOptionalChain(optionalChains, result, optional)
+		}
+		return result, true
+	case ast.KindElementAccessExpression:
+		// Computed access. Upstream only accepts it as part of an optional
+		// chain (`foo?.[bar]`) whose key is itself an analyzable chain
+		// (Identifier / member access, never a literal). Non-optional
+		// `foo[bar]` and literal keys are "complex". The callback path never
+		// reaches here (it resolves computed reads via scope analysis).
+		if !strict {
+			return "", false
+		}
+		eae := n.AsElementAccessExpression()
+		if eae.QuestionDotToken == nil {
+			return "", false
+		}
+		object, ok := analyzePropertyChain(eae.Expression, optionalChains, strict)
+		if !ok {
+			return "", false
+		}
+		property, ok := analyzePropertyChain(eae.ArgumentExpression, nil, strict)
+		if !ok {
+			return "", false
+		}
+		result := object + "." + property
+		if optionalChains != nil {
+			markOptionalChain(optionalChains, result, true)
 		}
 		return result, true
 	}
@@ -671,6 +723,26 @@ func isObjectLiteralShorthandReference(id *ast.Node) bool {
 	return id.Parent.Name() == id && !utils.IsInDestructuringAssignment(id.Parent)
 }
 
+// resolveValueSymbol resolves an identifier to its value symbol. For
+// object-literal shorthand reads (`{ value }`), tsgo's TypeChecker reports the
+// ShorthandPropertyAssignment's own property symbol instead of the outer
+// binding, so we first ask for the shorthand value symbol and only fall back
+// to the plain lookup. Sharing this across every reference-collection path
+// keeps shorthand reads resolving identically whether they are scanned
+// directly in the effect body or recursively inside a local function (the
+// latter previously missed them, masking captured reactive values).
+func resolveValueSymbol(tc *checker.Checker, id *ast.Node) *ast.Symbol {
+	if tc == nil {
+		return nil
+	}
+	if isObjectLiteralShorthandReference(id) {
+		if sym := tc.GetShorthandAssignmentValueSymbol(id.Parent); sym != nil {
+			return sym
+		}
+	}
+	return tc.GetSymbolAtLocation(id)
+}
+
 // isReferenceIdentifier reports whether the given Identifier appears in a
 // value-reference position (as opposed to a property name, label, declaration
 // name, etc).
@@ -1134,11 +1206,6 @@ func isUsedOutsideHook(name *ast.Node, hookCallback *ast.Node, depsNode *ast.Nod
 	}
 	visit(scope)
 	return used
-}
-
-// isComponentOrHookFunction delegates to the shared classifier.
-func isComponentOrHookFunction(fn *ast.Node) bool {
-	return react_hooksutil.IsComponentOrHookFn(fn)
 }
 
 // getUnknownDependenciesMessage mirrors upstream's same-named helper.

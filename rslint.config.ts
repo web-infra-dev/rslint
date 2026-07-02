@@ -1,30 +1,33 @@
-import { defineConfig, ts } from '@rslint/core';
+import { defineConfig, globalIgnores, ts } from '@rslint/core';
 
 export default defineConfig([
-  {
-    ignores: [
-      'node_modules/**',
-      '**/dist/**',
-      'typescript-go/**',
+  globalIgnores([
+    'node_modules/**',
+    '**/dist/**',
+    'typescript-go/**',
 
-      // Test fixtures — not real source code
-      '**/fixtures/**',
-      'packages/rslint-test-tools/tests/**',
-      'packages/rslint/tests/eslint-plugin/**',
+    // Release CI artifacts (downloaded binaries + tsgo lib files copied
+    // into the npm publish shells) — keep in sync with .prettierignore
+    'binaries/**',
+    'npm/**',
 
-      // VSCode extension test artifacts
-      'packages/vscode-extension/__tests__/**',
-      'packages/vscode-extension/.vscode-test/**',
+    // Test fixtures — not real source code
+    '**/fixtures/**',
+    'packages/rslint-test-tools/tests/**',
+    'packages/rslint/tests/eslint-plugin/**',
 
-      // Generated / build artifacts
-      'website/doc_build/**',
-      'website/generated/**',
+    // VSCode extension test artifacts
+    'packages/vscode-extension/__tests__/**',
+    'packages/vscode-extension/.vscode-test/**',
 
-      // Files that need special handling
-      'packages/rslint-wasm/src/worker.ts',
-      'packages/rule-tester/src/index.ts',
-    ],
-  },
+    // Generated / build artifacts
+    'website/doc_build/**',
+    'website/generated/**',
+
+    // Files that need special handling
+    'packages/rslint-wasm/src/worker.ts',
+    'packages/rule-tester/src/index.ts',
+  ]),
   // Start from recommended preset, then override rules and parserOptions
   ts.configs.recommended,
   {

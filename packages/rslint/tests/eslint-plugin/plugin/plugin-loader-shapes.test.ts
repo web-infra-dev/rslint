@@ -1,7 +1,7 @@
 /**
  * Plugin-loader input-shape tests.
  *
- * `eslintPlugins` / `plugins` map values can arrive at the loader in
+ * Object-form `plugins` map values can arrive at the loader in
  * several shapes depending on how the user wrote their imports and how
  * the plugin package is published. We must accept every shape that's
  * routinely produced by Node's ESM/CJS interop without silently
@@ -73,7 +73,7 @@ describe('plugin-loader input shapes', () => {
       {
         'rslint.config.mjs': `
           const plugin = { rules: { demo: ${RULE_DEMO_BODY} } };
-          export default [{ eslintPlugins: { p: plugin } }];
+          export default [{ plugins: { p: plugin } }];
         `,
       },
       async (dir) => {
@@ -103,7 +103,7 @@ describe('plugin-loader input shapes', () => {
           const plugin = { rules: { demo: ${RULE_DEMO_BODY} } };
           // Simulate the shape \`import * as p from 'pkg'\` produces.
           const namespaceLike = { default: plugin };
-          export default [{ eslintPlugins: { p: namespaceLike } }];
+          export default [{ plugins: { p: namespaceLike } }];
         `,
       },
       async (dir) => {
@@ -135,7 +135,7 @@ describe('plugin-loader input shapes', () => {
           const a = { rules: { ruleA: ${RULE_DEMO_BODY} } };
           const b = { rules: { ruleB: ${RULE_DEMO_BODY} } };
           export default [{
-            eslintPlugins: {
+            plugins: {
               direct: a,
               wrapped: { default: b },
             },
@@ -161,11 +161,11 @@ describe('plugin-loader input shapes', () => {
     );
   });
 
-  test('object-form `plugins` field accepts the same shapes as `eslintPlugins`', async () => {
-    // The loader scans BOTH `eslintPlugins` and an object-form
-    // `plugins: { prefix: pluginValue }` (the latter is the
-    // ESLint-flat-config shape). Same unwrap logic applies to both —
-    // a regression in one path should be visible here.
+  test('object-form `plugins` accepts a `{ default: plugin }` wrapped value', async () => {
+    // Object-form `plugins: { prefix: pluginValue }` is the standard
+    // ESLint-flat-config shape; the loader unwraps a `{ default: ... }`
+    // CJS-interop wrapper before reading `.rules`. A regression in that
+    // unwrap should be visible here.
     await withTempDir(
       {
         'rslint.config.mjs': `
@@ -197,7 +197,7 @@ describe('plugin-loader input shapes', () => {
         'rslint.config.mjs': `
           const valid = { rules: { okRule: ${RULE_DEMO_BODY} } };
           export default [{
-            eslintPlugins: {
+            plugins: {
               broken: null,
               alsoBroken: 'not an object',
               valid,
@@ -235,7 +235,7 @@ describe('plugin-loader input shapes', () => {
         `,
         'rslint.config.mjs': `
           import * as p from './plugin.mjs';
-          export default [{ eslintPlugins: { p } }];
+          export default [{ plugins: { p } }];
         `,
       },
       async (dir) => {
@@ -259,8 +259,8 @@ describe('loadPluginsFromConfigs merges configs sharing a directory', () => {
       {
         'plugin-pa.mjs': `export default { meta: { name: 'pa' }, rules: { 'no-foo': { create() { return {}; } } } };`,
         'plugin-pb.mjs': `export default { meta: { name: 'pb' }, rules: { 'no-bar': { create() { return {}; } } } };`,
-        'config-a.mjs': `import p from './plugin-pa.mjs'; export default [{ eslintPlugins: { pa: p } }];`,
-        'config-b.mjs': `import p from './plugin-pb.mjs'; export default [{ eslintPlugins: { pb: p } }];`,
+        'config-a.mjs': `import p from './plugin-pa.mjs'; export default [{ plugins: { pa: p } }];`,
+        'config-b.mjs': `import p from './plugin-pb.mjs'; export default [{ plugins: { pb: p } }];`,
       },
       async (dir) => {
         const map = await loadPluginsFromConfigs([

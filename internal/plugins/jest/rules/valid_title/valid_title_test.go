@@ -88,7 +88,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e2e', () => {
 	            it('is another test #jest4life', () => {});
 	          });
@@ -397,7 +397,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e4e', () => {
 	            it('is another test #e2e #jest4life', () => {});
 	          });
@@ -412,14 +412,14 @@ func TestValidTitleRule(t *testing.T) {
 		{
 			Code: `
 	        import { describe, describe as context, it as thisTest } from '@jest/globals';
-	
+
 	        describe('things to test', () => {
 	          context('unit tests #unit', () => {
 	            thisTest('is true', () => {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          context('e2e tests #e4e', () => {
 	            thisTest('is another test #e2e #jest4life', () => {});
 	          });
@@ -439,7 +439,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e4e', () => {
 	            it('is another test #e2e #jest4life', () => {});
 	          });
@@ -462,7 +462,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e4e', () => {
 	            it('is another test #e2e #jest4life', () => {});
 	          });
@@ -484,7 +484,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e4e', () => {
 	            it('is another test #e2e #jest4life', () => {});
 	          });
@@ -508,7 +508,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e4e', () => {
 	            it('is another test #e2e #jest4life', () => {});
 	          });
@@ -530,7 +530,7 @@ func TestValidTitleRule(t *testing.T) {
 	              expect(true).toBe(true);
 	            });
 	          });
-	
+
 	          describe('e2e tests #e4e', () => {
 	            it('is another test #e2e #jest4life', () => {});
 	          });
@@ -799,12 +799,12 @@ func TestValidTitleRule(t *testing.T) {
 		{
 			Code: `
 	        import { test as testThat } from '@jest/globals';
-	
+
 	        testThat('foo works ', () => {});
 	      `,
 			Output: []string{`
 	        import { test as testThat } from '@jest/globals';
-	
+
 	        testThat('foo works', () => {});
 	      `},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "accidentalSpace"}},

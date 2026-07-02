@@ -59,6 +59,29 @@ func ParseSeverity(level string) DiagnosticSeverity {
 	}
 }
 
+// NormalizeOptions returns a rule's options in ESLint context.options form
+// ([]any). Rules receive the value of the resolved config's `rules` entry minus
+// the severity level; config.rules unwraps a single configured option to a bare
+// value (see config.parseArrayRuleConfig), so a rule that expects the
+// eslint-format array (e.g. reads optArray[0]) would silently miss a
+// single-option config. Re-wrapping a bare value lets every rule read
+// options[0] uniformly, whether the option arrived wrapped (multi-option or an
+// explicit array) or unwrapped (a single option).
+//
+// It returns an empty (non-nil) slice when no options were configured, so both
+// native rules (which key on `len == 0 → defaults`) and the eslint-plugin host
+// (which serializes context.options to JSON and needs `[]`, not `null`) share a
+// single normalization path.
+func NormalizeOptions(raw any) []any {
+	if raw == nil {
+		return []any{}
+	}
+	if arr, ok := raw.([]interface{}); ok {
+		return arr
+	}
+	return []any{raw}
+}
+
 const (
 	lastTokenKind                        ast.Kind = 1000
 	lastOnExitTokenKind                  ast.Kind = 2000
@@ -85,7 +108,12 @@ type RuleListeners map[ast.Kind](func(node *ast.Node))
 type Rule struct {
 	Name             string
 	RequiresTypeInfo bool
-	Run              func(ctx RuleContext, options any) RuleListeners
+	// IsEslintPluginRule marks a placeholder rule whose actual execution
+	// happens in a Node worker — an ESLint-plugin rule mounted via the
+	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
+	// splits these out and dispatches them to the plugin-lint host.
+	IsEslintPluginRule bool
+	Run                func(ctx RuleContext, options any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
@@ -157,8 +185,18 @@ type RuleDiagnostic struct {
 	FixesPtr *[]RuleFix
 	// nil if no suggestions were provided
 	Suggestions *[]RuleSuggestion
-	SourceFile  *ast.SourceFile
-	Severity    DiagnosticSeverity
+	// SourceFile is the file this diagnostic anchors to. It is the
+	// ast.SourceFileLike interface (Text + ECMALineMap) rather than a
+	// concrete *ast.SourceFile so that ESLint-plugin diagnostics — which
+	// are produced in a Node worker and have no ts-go AST — can supply a
+	// lightweight text-only implementation (internal/linter.textSourceFile)
+	// and still render line/column through the scanner.
+	SourceFile ast.SourceFileLike
+	// FilePath is the diagnostic's file name. Stored separately because
+	// ast.SourceFileLike exposes no FileName(); native diagnostics set it
+	// from SourceFile.FileName(), plugin diagnostics from the wire path.
+	FilePath string
+	Severity DiagnosticSeverity
 	// PreFormatted indicates that Message.Description already contains
 	// structured formatting (e.g. indented continuation lines from tsc diagnostics).
 	// The renderer will use a simple 2-space indent instead of the │ border style.

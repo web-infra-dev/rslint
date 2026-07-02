@@ -1,6 +1,9 @@
 package config
 
 import (
+	"slices"
+	"strings"
+
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -62,10 +65,12 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				ruleConfigCopy := ruleConfig
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
-					Name:             ruleName,
-					Settings:         CloneSettings(mergedConfig.Settings),
-					Severity:         ruleConfig.GetSeverity(),
-					RequiresTypeInfo: ruleImpl.RequiresTypeInfo,
+					Name:               ruleName,
+					Settings:           CloneSettings(mergedConfig.Settings),
+					Severity:           ruleConfig.GetSeverity(),
+					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
+					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
+					Options:            ruleConfigCopy.Options,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
 					},
@@ -73,6 +78,14 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 			}
 		}
 	}
+
+	// mergedConfig.Rules is a map, so the collection order above is random
+	// per process. Sort by rule name to make listener registration — and
+	// with it the emission order of same-position diagnostics from
+	// different rules — deterministic across runs.
+	slices.SortFunc(enabledRules, func(a, b linter.ConfiguredRule) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 
 	return enabledRules, mergedConfig
 }

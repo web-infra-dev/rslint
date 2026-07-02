@@ -16,9 +16,8 @@ import (
 	reactHooksPlugin "github.com/web-infra-dev/rslint/internal/plugins/react_hooks"
 	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
-	coreRules "github.com/web-infra-dev/rslint/internal/rules"
-
 	"github.com/web-infra-dev/rslint/internal/rule"
+	coreRules "github.com/web-infra-dev/rslint/internal/rules"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -37,9 +36,34 @@ type ConfigEntry struct {
 // Settings represents shared settings accessible to rules
 type Settings map[string]interface{}
 
-// LanguageOptions contains language-specific configuration options
+// LanguageOptions contains language-specific configuration options.
 type LanguageOptions struct {
 	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+	// Raw retains the full languageOptions object as authored (sourceType,
+	// globals, parserOptions.ecmaFeatures, …) — fields the Go core does not
+	// model but the Node eslint-plugin worker needs. Go computes the
+	// per-file merged value via GetConfigForFile and forwards it on the
+	// wire; it is not (de)serialized through this struct's own field tags.
+	Raw map[string]any `json:"-"`
+}
+
+// UnmarshalJSON captures both the typed ParserOptions and the full raw
+// object (the latter for forwarding to the eslint-plugin worker).
+func (lo *LanguageOptions) UnmarshalJSON(data []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	type parserShape struct {
+		ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+	}
+	var ps parserShape
+	if err := json.Unmarshal(data, &ps); err != nil {
+		return err
+	}
+	lo.ParserOptions = ps.ParserOptions
+	lo.Raw = raw
+	return nil
 }
 
 // ProjectPaths represents project paths that can be either a single string or an array of strings
@@ -227,8 +251,18 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 	if len(ruleArray) > 1 {
 		remaining := ruleArray[1:]
 		if len(remaining) == 1 {
-			// Single option element: pass directly (string, map, etc.)
-			ruleConfig.Options = remaining[0]
+			if _, isArray := remaining[0].([]interface{}); isArray {
+				// A lone option that is itself an array (e.g. ["error",
+				// ["a","b"]]): keep the outer wrapper so it stays distinguishable
+				// from a multi-element option list and maps to context.options ==
+				// [["a","b"]]. Unwrapping would collapse it to ["a","b"],
+				// indistinguishable from ["error","a","b"] — and the eslint-plugin
+				// dispatch would then drop a nesting level.
+				ruleConfig.Options = remaining
+			} else {
+				// Single non-array option: pass the value directly (string, map).
+				ruleConfig.Options = remaining[0]
+			}
 		} else {
 			// Multiple option elements: pass as array (e.g. ["both", {blockScopedFunctions: "disallow"}])
 			ruleConfig.Options = remaining
@@ -315,50 +349,6 @@ func registerAllCoreEslintRules() {
 	}
 }
 
-// isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
-// Later patterns override earlier ones; a `!` prefix negates (re-includes) a previously
-// ignored file. This aligns with ESLint v10's ignore semantics.
-//
-// For directory-level blocking (dir/** prevents traversal entirely), use isDirPathBlocked.
-func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
-	if cwd == "" {
-		return isFileIgnoredSimple(filePath, ignorePatterns)
-	}
-
-	// Normalize the file path relative to cwd
-	normalizedPath := normalizePath(filePath, cwd)
-	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-
-	// Evaluate patterns sequentially. Later patterns override earlier ones.
-	// A `!` prefix negates (re-includes) a previously ignored file.
-	// This aligns with ESLint v10's ignore semantics.
-	ignored := false
-	for _, pattern := range ignorePatterns {
-		negated := false
-		if strings.HasPrefix(pattern, "!") {
-			negated = true
-			pattern = pattern[1:]
-		}
-
-		normalizedPattern := normalizePattern(pattern)
-
-		// Match against the relative path only. Do NOT fall back to the
-		// absolute filePath — patterns with **/ prefix (e.g., **/tmp/**/*)
-		// would incorrectly match system directory names in the absolute path
-		// (e.g., /tmp/ on Linux/macOS).
-		matched := matchGlob(normalizedPattern, normalizedPath)
-		// Windows path separator fallback.
-		if !matched && unixPath != normalizedPath {
-			matched = matchGlob(normalizedPattern, unixPath)
-		}
-
-		if matched {
-			ignored = !negated
-		}
-	}
-	return ignored
-}
-
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
@@ -368,24 +358,16 @@ func matchGlob(pattern, path string) bool {
 	return err == nil && m
 }
 
-// isFileLevelPattern returns true if the pattern only matches files (not directories).
-// File-level patterns end with /**/* or /* (but not /**).
-// These do NOT block directory traversal in ESLint v10's isDirectoryIgnored.
-func isFileLevelPattern(pattern string) bool {
-	return strings.HasSuffix(pattern, "/**/*") ||
-		(strings.HasSuffix(pattern, "/*") && !strings.HasSuffix(pattern, "/**"))
-}
-
 func normalizePattern(pattern string) string {
 	return tspath.NormalizePath(pattern)
 }
 
 // isDirBlockedByIgnores checks if the file's directory is blocked by a
-// directory-level ignore pattern (e.g., `dir/**`). File-level patterns
-// (`dir/**/*`, `dir/*`) and negation patterns are skipped.
-// This aligns with ESLint v10: `dir/**` blocks directory traversal entirely,
-// and `!` negation cannot undo it.
-func isDirBlockedByIgnores(filePath string, ignorePatterns []string, cwd string) bool {
+// directory-level ignore pattern (e.g., `dir/**`). File-level patterns and
+// negation patterns are excluded (by Kind) in isDirAbsolutelyBlocked. This
+// aligns with ESLint v10: `dir/**` blocks directory traversal entirely, and
+// `!` negation cannot undo it.
+func isDirBlockedByIgnores(filePath string, patterns []IgnorePattern, cwd string) bool {
 	var dirPath string
 	if cwd != "" {
 		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
@@ -397,39 +379,7 @@ func isDirBlockedByIgnores(filePath string, ignorePatterns []string, cwd string)
 	if dirPath == "" || dirPath == "." {
 		return false
 	}
-	return isDirPathBlocked(dirPath, ignorePatterns)
-}
-
-// isDirPathBlocked checks if a directory path is blocked by any directory-level ignore
-// pattern. Shared between GetConfigForFile and DiscoverGapFiles.
-//
-// A directory is blocked if a pattern matches the path itself or any parent segment.
-// For example, pattern "dir1/**" blocks "dir1", "dir1/sub", and "dir1/sub/deep".
-// File-level patterns (ending with /**/* or /*) and negation (!) patterns are skipped —
-// directory blocking is absolute and cannot be negated.
-func isDirPathBlocked(dirPath string, ignorePatterns []string) bool {
-	for _, pattern := range ignorePatterns {
-		if pattern == "" || strings.HasPrefix(pattern, "!") {
-			continue
-		}
-		if isFileLevelPattern(pattern) {
-			continue
-		}
-
-		normalizedPattern := normalizePattern(pattern)
-
-		if matchGlob(normalizedPattern, dirPath) || matchGlob(normalizedPattern, dirPath+"/x") {
-			return true
-		}
-		segments := strings.Split(dirPath, "/")
-		for i := 1; i < len(segments); i++ {
-			partial := strings.Join(segments[:i], "/")
-			if matchGlob(normalizedPattern, partial) || matchGlob(normalizedPattern, partial+"/x") {
-				return true
-			}
-		}
-	}
-	return false
+	return isDirAbsolutelyBlocked(dirPath, patterns)
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -438,23 +388,6 @@ func normalizePath(filePath, cwd string) string {
 		UseCaseSensitiveFileNames: true,
 		CurrentDirectory:          cwd,
 	}))
-}
-
-// isFileIgnoredSimple provides fallback matching when cwd is unavailable
-func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
-	ignored := false
-	for _, pattern := range ignorePatterns {
-		negated := false
-		if strings.HasPrefix(pattern, "!") {
-			negated = true
-			pattern = pattern[1:]
-		}
-		normalizedPattern := normalizePattern(pattern)
-		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
-			ignored = !negated
-		}
-	}
-	return ignored
 }
 
 // MergedConfig is the final computed configuration for a single file
@@ -525,8 +458,10 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			continue
 		}
 
-		// 3. Entry-level ignores
-		if isFileIgnored(filePath, entry.Ignores, cwd) {
+		// 3. Entry-level ignores. Parsed per entry; entry.Ignores is usually
+		// empty (ESLint configs put ignores in a dedicated global-ignore entry),
+		// so ParseIgnorePatterns returns nil and this is free in the common case.
+		if isFileIgnored(filePath, ParseIgnorePatterns(entry.Ignores), cwd) {
 			continue
 		}
 
@@ -643,6 +578,21 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			}
 			merged.ParserOptions = &po
 		}
+	}
+	// Shallow-merge the raw languageOptions map (override wins per key). This is
+	// intentionally shallow, NOT ESLint's recursive flat-config deepMerge of
+	// nested parserOptions/globals — matching that merge fidelity is a separate
+	// concern from wiring eslintPlugins and is out of scope here. merged is a
+	// shallow copy of base, so build a fresh map rather than mutating base.Raw.
+	if len(override.Raw) > 0 {
+		mergedRaw := make(map[string]any, len(base.Raw)+len(override.Raw))
+		for k, v := range base.Raw {
+			mergedRaw[k] = v
+		}
+		for k, v := range override.Raw {
+			mergedRaw[k] = v
+		}
+		merged.Raw = mergedRaw
 	}
 	return &merged
 }

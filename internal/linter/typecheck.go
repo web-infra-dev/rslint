@@ -102,6 +102,7 @@ func runTypeCheckForProgram(prog *compiler.Program, seen *sync.Map, typeInfoFile
 			Range:        d.Loc(),
 			Message:      rule.RuleMessage{Description: flattenDiagnosticMessage(d)},
 			SourceFile:   file,
+			FilePath:     file.FileName(),
 			Severity:     rule.SeverityError,
 			PreFormatted: true,
 		})

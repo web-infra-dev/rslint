@@ -4,14 +4,14 @@
  *
  * Each Worker calls {@link loadPluginsFromConfigs} once at startup to
  * import every rslint config file assigned to it. The config files
- * themselves carry live plugin instances on their `eslintPlugins` (or
- * object-form `plugins`) maps; the worker pulls them out, sorts them
+ * themselves carry live plugin instances on their object-form `plugins`
+ * maps; the worker pulls them out, sorts them
  * by prefix, and caches the resulting `LoadedPlugins` per config
  * directory for the worker's entire lifetime. Subsequent lint tasks
  * select the right `LoadedPlugins` via `configKey` (= config directory).
  *
  * CJS / ESM unwrap. ESLint plugins ship in both module systems and the
- * `eslintPlugins.<prefix>` value the user supplied can be either:
+ * `plugins.<prefix>` value the user supplied can be either:
  *
  *   - the plugin object directly (the conventional shape), or
  *   - a `{ default: pluginObj }` wrapper (when the user wrote
@@ -31,17 +31,21 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import type { ConfigDescriptor } from '../types.js';
+import {
+  selectPluginSource,
+  unwrapPluginModule,
+} from '../../config/plugin-source.js';
 
 /**
  * Extension-aware config loader for worker init. Mirrors the strategy
- * `packages/rslint/src/config-loader.ts::loadConfigFile` uses on the
+ * `packages/rslint/src/config/config-loader.ts::loadConfigFile` uses on the
  * main thread so a `.ts`/`.mts` config file loads identically in both
  * places.
  *
  * The previous implementation directly called `await import(url)` for
  * every extension; on Node 20 (declared support floor) `.ts` configs
  * have no native loader and a workspace that uses
- * `rslint.config.ts` + `eslintPlugins` would fail worker init even
+ * `rslint.config.ts` + object-form `plugins` would fail worker init even
  * though the main thread had already loaded the same file via jiti.
  *
  * Resolution order for `.ts`/`.mts`:
@@ -54,7 +58,7 @@ import type { ConfigDescriptor } from '../types.js';
  *
  * Cache-busting `?t=Date.now()`: NOT used here. Worker init imports
  * each config once per worker lifetime; long-running LSP sessions
- * rebuild the worker pool via CompatPool when configs change
+ * rebuild the worker pool via PluginLintPool when configs change
  * (host-side mtime + size fingerprint), so the host already controls
  * staleness. Re-importing with `?t=` would mean every reconfigure
  * pays a fresh module-graph build (≈300 ms for unicorn /
@@ -157,8 +161,8 @@ export class PluginLoaderError extends Error {
 /**
  * Load every plugin in `entries` and return them keyed by prefix, with a
  * Import the user's rslint config file directly and extract plugin
- * instances from its `eslintPlugins` (or object-form `plugins`)
- * map(s). Each worker calls this through {@link loadPluginsFromConfigs}
+ * instances from its object-form `plugins` map(s). Each worker calls
+ * this through {@link loadPluginsFromConfigs}
  * once per assigned config at init.
  *
  * Each worker independently imports the config (and transitively its
@@ -191,46 +195,28 @@ export async function loadPluginsFromConfigFile(
   }
 
   // Config file's default export is `RslintConfigEntry[]`; each entry may
-  // carry `eslintPlugins: { <prefix>: pluginObj }`.
+  // carry `plugins: { <prefix>: pluginObj }`.
   const exportedDefault =
     (configMod as { default?: unknown }).default ?? configMod;
   const configArray = Array.isArray(exportedDefault) ? exportedDefault : [];
 
-  // Track which prefixes we've already loaded so duplicate plugin
-  // declarations across config entries collapse to one LoadedPlugin
-  // (matches the host-side normalize step in
-  // packages/rslint/src/config-loader.ts).
+  // Track which prefixes we've already loaded: a re-declared prefix with the
+  // SAME plugin instance is deduped (collapse to one LoadedPlugin), while a
+  // DIFFERENT instance throws below. This worker-init check — NOT the host-side
+  // collectPluginMeta dedupe (which silently first-wins) — is where a genuine
+  // cross-entry prefix conflict is actually caught.
   const seenPrefix = new Set<string>();
 
-  // Source precedence per entry: explicit `eslintPlugins` overrides
-  // the object-form `plugins`. This mirrors `normalizeConfig` in
-  // packages/rslint/src/config-loader.ts — both paths must extract
-  // plugins from the same source, or the worker holds a plugin set
-  // that doesn't match what the main thread (or `loadPluginsFromConfigFile`
-  // alternative) believed was active. The object-form `plugins`
-  // fallback is critical: standard ESLint flat-config users set
-  // `plugins: { uc: unicornPlugin }` and never touch `eslintPlugins`
-  // — without folding, the worker would import zero plugins.
+  // Per entry, the live community plugins come from the object-form
+  // `plugins` map (`plugins: { uc: unicornPlugin }`), selected via the
+  // shared `selectPluginSource`. This mirrors `normalizeConfig` in
+  // packages/rslint/src/config/config-loader.ts — both paths must extract plugins
+  // from the same source, or the worker holds a plugin set that doesn't
+  // match what the main thread believed was active. Array-form `plugins`
+  // (the native-name whitelist) carries no live objects and yields no
+  // source here.
   for (const entry of configArray) {
-    if (entry == null || typeof entry !== 'object') continue;
-    const e = entry as {
-      eslintPlugins?: unknown;
-      plugins?: unknown;
-    };
-    let source: Record<string, unknown> | null = null;
-    if (
-      e.eslintPlugins != null &&
-      typeof e.eslintPlugins === 'object' &&
-      !Array.isArray(e.eslintPlugins)
-    ) {
-      source = e.eslintPlugins as Record<string, unknown>;
-    } else if (
-      e.plugins != null &&
-      typeof e.plugins === 'object' &&
-      !Array.isArray(e.plugins)
-    ) {
-      source = e.plugins as Record<string, unknown>;
-    }
+    const source = selectPluginSource(entry);
     if (source == null) continue;
     for (const prefix of Object.keys(source)) {
       const pluginObj = source[prefix];
@@ -244,7 +230,7 @@ export async function loadPluginsFromConfigFile(
       // by some bundler interop output) was returned unchanged with
       // its `.rules` still nested under `.default`, and every rule
       // for that prefix silently dropped from the dispatch map.
-      const plugin = unwrapPluginModule(pluginObj);
+      const plugin = unwrapPluginModule<LoadedPlugin['plugin']>(pluginObj);
       if (plugin == null || typeof plugin !== 'object') continue;
 
       // Cross-entry redefinition check, aligned with ESLint v10
@@ -371,20 +357,6 @@ function mergeLoadedPlugins(
     rules.set(key, rule);
   }
   return { plugins: [...a.plugins, ...b.plugins], rules };
-}
-
-/**
- * Unwrap CJS/ESM dual-shape: prefer `mod.default` if present (ESM/interop),
- * fall back to `mod` itself (legacy CJS without `default`).
- */
-function unwrapPluginModule(mod: unknown): LoadedPlugin['plugin'] | null {
-  if (mod == null || typeof mod !== 'object') return null;
-  // mod.default first if it exists
-  const m = mod as { default?: unknown };
-  if (m.default != null && typeof m.default === 'object') {
-    return m.default as LoadedPlugin['plugin'];
-  }
-  return mod as LoadedPlugin['plugin'];
 }
 
 function ensureNodeVersion(): void {

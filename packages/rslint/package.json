@@ -1,22 +1,26 @@
 {
   "name": "@rslint/core",
-  "version": "0.5.3",
+  "version": "0.6.4",
   "exports": {
     ".": {
       "@typescript/source": "./src/index.ts",
       "default": "./dist/index.js"
     },
-    "./browser": {
-      "@typescript/source": "./src/browser.ts",
-      "default": "./dist/browser.js"
-    },
     "./service": {
-      "@typescript/source": "./src/service.ts",
+      "@typescript/source": "./src/service/service.ts",
       "default": "./dist/service.js"
     },
+    "./internal": {
+      "@typescript/source": "./src/internal/node.ts",
+      "default": "./dist/internal.js"
+    },
     "./config-loader": {
-      "@typescript/source": "./src/config-loader.ts",
+      "@typescript/source": "./src/config/config-loader.ts",
       "default": "./dist/config-loader.js"
+    },
+    "./eslint-plugin": {
+      "@typescript/source": "./src/eslint-plugin/index.ts",
+      "default": "./dist/eslint-plugin/index.js"
     },
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
@@ -27,8 +31,8 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build:bin": "go build -v -o bin/ ../../cmd/rslint",
-    "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o bin/ ../../cmd/rslint ",
+    "build:bin": "node ../../scripts/place-host-build.mjs bin",
+    "build:debug": "node ../../scripts/place-host-build.mjs bin --debug",
     "build:js": "rslib build",
     "dev": "rslib build --watch",
     "build": "pnpm build:bin && pnpm build:js",
@@ -52,13 +56,11 @@
     "rslint",
     "linter",
     "typescript",
-    "go",
-    "browser",
-    "webworker"
+    "go"
   ],
   "devDependencies": {
-    "@eslint/plugin-kit": "0.3.5",
-    "@rslib/core": "0.21.2",
+    "@eslint/plugin-kit": "0.7.2",
+    "@rslib/core": "0.23.0",
     "@rslint/api": "workspace:*",
     "@types/node": "24.0.14",
     "@types/picomatch": "4.0.2",
@@ -92,7 +94,6 @@
     "@rslint/native-win32-x64-msvc": "workspace:*"
   },
   "dependencies": {
-    "@rslint/native": "workspace:*",
     "picomatch": "4.0.4"
   }
 }

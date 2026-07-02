@@ -16,6 +16,11 @@
   },
   {
     "type": "file",
+    "name": "eslint-plugins",
+    "label": "ESLint Plugin Compatibility"
+  },
+  {
+    "type": "file",
     "name": "inline-directives",
     "label": "Inline Directives"
   },
@@ -23,6 +28,11 @@
     "type": "file",
     "name": "cli",
     "label": "CLI Reference"
+  },
+  {
+    "type": "file",
+    "name": "node-api",
+    "label": "Node.js API"
   },
   {
     "type": "file",

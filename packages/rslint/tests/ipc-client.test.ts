@@ -512,7 +512,6 @@ describe('Schema parity with Go (smoke)', () => {
   test('all known message kinds are valid strings', () => {
     const kinds: MessageKind[] = [
       'lint',
-      'applyFixes',
       'getAstInfo',
       'response',
       'error',

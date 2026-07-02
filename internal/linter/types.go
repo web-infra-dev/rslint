@@ -11,7 +11,16 @@ type ConfiguredRule struct {
 	Settings         map[string]interface{}
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
-	Run              func(ctx rule.RuleContext) rule.RuleListeners
+	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint
+	// worker (mounted via the config's object-form `plugins`) rather than natively
+	// in Go. The linter splits these out and dispatches them; its Run is a
+	// no-op placeholder.
+	IsEslintPluginRule bool
+	// Options is the raw user-configured rule options (ESLint's
+	// post-severity args). Consumed when dispatching plugin rules to the
+	// Node worker; native rules read options through Run's closure instead.
+	Options any
+	Run     func(ctx rule.RuleContext) rule.RuleListeners
 }
 
 func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
@@ -78,9 +87,10 @@ type LintResult struct {
 //   - OnDiagnostic=nil                    → diagnostics are dropped
 //
 // Thread-safety: OnDiagnostic is invoked from multiple goroutines
-// concurrently — Phase 1 fans out per program, Phase 2 (type-check) does
-// the same. Callers MUST make their handler safe for concurrent calls
-// (channel send, mutex-guarded slice append, sync.Map, etc.).
+// concurrently — Phase 1 fans out per program AND per file shard within
+// each program (one worker per pool checker), Phase 2 (type-check) fans
+// out per program. Callers MUST make their handler safe for concurrent
+// calls (channel send, mutex-guarded slice append, sync.Map, etc.).
 type RunLinterOptions struct {
 	Programs       []*compiler.Program
 	SingleThreaded bool
