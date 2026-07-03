@@ -101,6 +101,7 @@ export default defineConfig({
     './tests/eslint/rules/no-irregular-whitespace.test.ts',
     './tests/eslint/rules/no-new.test.ts',
     './tests/eslint/rules/no-new-func.test.ts',
+    './tests/eslint/rules/no-new-native-nonconstructor.test.ts',
     './tests/eslint/rules/no-new-object.test.ts',
     './tests/eslint/rules/no-new-wrappers.test.ts',
     './tests/eslint/rules/no-param-reassign.test.ts',
