@@ -22,7 +22,7 @@
       "@typescript/source": "./src/eslint-plugin/index.ts",
       "default": "./dist/eslint-plugin/index.js"
     },
-    "./bin": "./bin/rslint.cjs",
+    "./bin": "./bin/rslint.js",
     "./package.json": "./package.json"
   },
   "type": "module",
@@ -40,11 +40,11 @@
     "test:update": "rstest run -u"
   },
   "files": [
-    "bin/rslint.cjs",
+    "bin/rslint.js",
     "dist/"
   ],
   "bin": {
-    "rslint": "./bin/rslint.cjs"
+    "rslint": "./bin/rslint.js"
   },
   "publishConfig": {
     "access": "public"

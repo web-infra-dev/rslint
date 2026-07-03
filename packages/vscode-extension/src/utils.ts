@@ -23,7 +23,7 @@ export const fileExists = async (uri: Uri): Promise<boolean> => {
 
 /**
  * Returns the ordered list of platform-package requests to try-resolve when
- * locating the bundled Go binary, mirroring `packages/rslint/bin/rslint.cjs`.
+ * locating the bundled Go binary, mirroring `packages/rslint/bin/rslint.js`.
  *
  * The Go binary lives in the `@rslint/native-{tuple}` subpackage, reached via
  * its `./bin` export. npm installs only the subpackage matching the host
