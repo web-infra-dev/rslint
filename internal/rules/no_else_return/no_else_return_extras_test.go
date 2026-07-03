@@ -58,6 +58,10 @@ func TestNoElseReturnExtras(t *testing.T) {
 			// Locks in upstream alwaysReturns false arm: the consequent contains
 			// no return-like statement, so the else is still necessary.
 			{Code: `function f() { if (bar) { foo(); } else { baz(); } }`},
+
+			// TypeScript declarations in an else block are handled structurally
+			// by the fixer only; the reporting decision still follows upstream.
+			{Code: `function f() { if (bar) { foo(); } else { type T = string; } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: declaration/container forms ----
@@ -116,6 +120,49 @@ func TestNoElseReturnExtras(t *testing.T) {
 				Code: `function f() { if (a) { return 1; } else function g() {} }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt(`function f() { if (a) { return 1; } else function g() {} }`, `function g() {}`),
+				},
+			},
+			// Switch clauses are valid statement-list parents. The existing
+			// direct lexical declaration blocks the fix because moving `let a`
+			// out of else would create a same-scope redeclaration.
+			{
+				Code: `function f(x) { switch (x) { case 1: let a; if (bar) { return true; } else { let a; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f(x) { switch (x) { case 1: let a; if (bar) { return true; } else { let a; } } }`, `{ let a; }`),
+				},
+			},
+			// Destructured parameters are also same-scope bindings after the
+			// else block is removed, so the diagnostic is intentionally no-fix.
+			{
+				Code: `function f({ a }) { if (bar) { return true; } else { let a; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f({ a }) { if (bar) { return true; } else { let a; } }`, `{ let a; }`),
+				},
+			},
+			// TS type aliases are block-scoped too. Moving this alias out of the
+			// else block would collide with the outer type alias.
+			{
+				Code: `function f() { type T = string; if (bar) { return true; } else { type T = number; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { type T = string; if (bar) { return true; } else { type T = number; } }`, `{ type T = number; }`),
+				},
+			},
+			// A TS type reference after the nested else would resolve differently
+			// if the alias were moved to the parent block, so the fix is skipped.
+			{
+				Code: `function f() { if (a) { if (b) { return 1; } else { type T = string; } let value: T; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (a) { if (b) { return 1; } else { type T = string; } let value: T; } }`, `{ type T = string; }`),
+				},
+			},
+			// Only direct declarations in the removed else block are hoisted to
+			// the parent. A nested block keeps its own `let a` scope, so the fix
+			// remains safe even when the parent already has `a`.
+			{
+				Code:   `function f() { let a; if (bar) { return true; } else { { let a; } } }`,
+				Output: []string{`function f() { let a; if (bar) { return true; }  { let a; }  }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { let a; if (bar) { return true; } else { { let a; } } }`, `{ { let a; } }`),
 				},
 			},
 		},

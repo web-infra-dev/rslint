@@ -1,11 +1,8 @@
 package no_else_return
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -29,12 +26,6 @@ func parseOptions(ruleOptions any) options {
 var unexpectedMessage = rule.RuleMessage{
 	Id:          "unexpected",
 	Description: "Unnecessary 'else' after 'return'.",
-}
-
-type tokenInfo struct {
-	kind       ast.Kind
-	start, end int
-	text       string
 }
 
 // https://eslint.org/docs/latest/rules/no-else-return
@@ -182,20 +173,20 @@ func buildFixes(ctx rule.RuleContext, elseNode *ast.Node) []rule.RuleFix {
 		return nil
 	}
 
-	startToken, ok := tokenAtOrAfter(sf, utils.TrimNodeTextRange(sf, elseNode).Pos())
+	startToken, ok := utils.TokenAtOrAfter(sf, utils.TrimNodeTextRange(sf, elseNode).Pos())
 	if !ok {
 		return nil
 	}
 	firstTokenOfElseBlock := startToken
-	if startToken.text == "{" {
+	if startToken.Text == "{" {
 		var found bool
-		firstTokenOfElseBlock, found = tokenAtOrAfter(sf, startToken.end)
+		firstTokenOfElseBlock, found = utils.TokenAtOrAfter(sf, startToken.End)
 		if !found {
 			return nil
 		}
 	}
 
-	lastIfToken, ok := previousTokenBefore(sf, elseNode.Parent, elseStart)
+	lastIfToken, ok := utils.PreviousTokenBefore(sf, elseNode.Parent, elseStart)
 	if !ok {
 		return nil
 	}
@@ -205,13 +196,13 @@ func buildFixes(ctx rule.RuleContext, elseNode *ast.Node) []rule.RuleFix {
 		return nil
 	}
 
-	ifBlockMaybeUnsafe := ifStmt.ThenStatement.Kind != ast.KindBlock && lastIfToken.text != ";"
-	elseBlockUnsafe := startsUnsafeForASI(firstTokenOfElseBlock.text)
+	ifBlockMaybeUnsafe := ifStmt.ThenStatement.Kind != ast.KindBlock && lastIfToken.Text != ";"
+	elseBlockUnsafe := startsUnsafeForASI(firstTokenOfElseBlock.Text)
 	if ifBlockMaybeUnsafe && elseBlockUnsafe {
 		return nil
 	}
 
-	elseTokens := tokensOf(sf, elseNode)
+	elseTokens := utils.TokensOfNode(sf, elseNode)
 	if len(elseTokens) == 0 {
 		return nil
 	}
@@ -220,18 +211,18 @@ func buildFixes(ctx rule.RuleContext, elseNode *ast.Node) []rule.RuleFix {
 	if len(elseTokens) > 1 {
 		lastTokenOfElseBlock = elseTokens[len(elseTokens)-2]
 	}
-	if lastTokenOfElseBlock.text != ";" {
-		if nextToken, found := tokenAtOrAfter(sf, endToken.end); found {
-			nextTokenUnsafe := startsUnsafeForASI(nextToken.text)
-			nextTokenOnSameLine := lineOf(sf, nextToken.start) == lineOf(sf, lastTokenOfElseBlock.start)
-			if nextTokenUnsafe || (nextTokenOnSameLine && nextToken.text != "}") {
+	if lastTokenOfElseBlock.Text != ";" {
+		if nextToken, found := utils.TokenAtOrAfter(sf, endToken.End); found {
+			nextTokenUnsafe := startsUnsafeForASI(nextToken.Text)
+			nextTokenOnSameLine := utils.IsSameLine(sf, nextToken.Start, lastTokenOfElseBlock.Start)
+			if nextTokenUnsafe || (nextTokenOnSameLine && nextToken.Text != "}") {
 				return nil
 			}
 		}
 	}
 
 	fixedSource := utils.TrimmedNodeText(sf, elseNode)
-	if startToken.text == "{" {
+	if startToken.Text == "{" {
 		trimmed := utils.TrimNodeTextRange(sf, elseNode)
 		if trimmed.End()-trimmed.Pos() >= 2 {
 			fixedSource = text[trimmed.Pos()+1 : trimmed.End()-1]
@@ -247,7 +238,7 @@ func buildFixes(ctx rule.RuleContext, elseNode *ast.Node) []rule.RuleFix {
 
 func enclosingFunctionStart(sf *ast.SourceFile, node *ast.Node) int {
 	for current := node.Parent; current != nil; current = current.Parent {
-		if ast.IsFunctionLikeDeclaration(current) || current.Kind == ast.KindClassStaticBlockDeclaration {
+		if ast.IsFunctionLikeOrClassStaticBlockDeclaration(current) {
 			return utils.TrimNodeTextRange(sf, current).Pos()
 		}
 	}
@@ -255,78 +246,25 @@ func enclosingFunctionStart(sf *ast.SourceFile, node *ast.Node) int {
 }
 
 func startsUnsafeForASI(text string) bool {
-	return strings.HasPrefix(text, "(") ||
-		strings.HasPrefix(text, "[") ||
-		strings.HasPrefix(text, "/") ||
-		strings.HasPrefix(text, "+") ||
-		strings.HasPrefix(text, "`") ||
-		strings.HasPrefix(text, "-")
-}
-
-func lineOf(sf *ast.SourceFile, pos int) int {
-	return scanner.ComputeLineOfPosition(sf.ECMALineMap(), pos)
-}
-
-func tokensOf(sf *ast.SourceFile, node *ast.Node) []tokenInfo {
-	tokens := []tokenInfo{}
-	sourceText := sf.Text()
-	utils.ForEachToken(node, func(token *ast.Node) {
-		trimmed := utils.TrimNodeTextRange(sf, token)
-		if trimmed.Pos() >= trimmed.End() {
-			return
-		}
-		tokens = append(tokens, tokenInfo{
-			kind:  token.Kind,
-			start: trimmed.Pos(),
-			end:   trimmed.End(),
-			text:  sourceText[trimmed.Pos():trimmed.End()],
-		})
-	}, sf)
-	return tokens
-}
-
-func tokenAtOrAfter(sf *ast.SourceFile, pos int) (tokenInfo, bool) {
-	sourceText := sf.Text()
-	start := scanner.SkipTrivia(sourceText, pos)
-	if start >= len(sourceText) {
-		return tokenInfo{}, false
+	if text == "" {
+		return false
 	}
-	r := scanner.GetRangeOfTokenAtPosition(sf, start)
-	if r.Pos() >= r.End() || r.End() > len(sourceText) {
-		return tokenInfo{}, false
+	switch text[0] {
+	case '(', '[', '/', '+', '`', '-':
+		return true
 	}
-	return tokenInfo{
-		kind:  scanner.ScanTokenAtPosition(sf, start),
-		start: r.Pos(),
-		end:   r.End(),
-		text:  sourceText[r.Pos():r.End()],
-	}, true
+	return false
 }
 
 func findElseKeywordStart(sf *ast.SourceFile, ifNode, elseNode *ast.Node) int {
 	elseNodeStart := utils.TrimNodeTextRange(sf, elseNode).Pos()
 	elseStart := -1
-	for _, token := range tokensOf(sf, ifNode) {
-		if token.kind == ast.KindElseKeyword && token.end <= elseNodeStart {
-			elseStart = token.start
+	for _, token := range utils.TokensOfNode(sf, ifNode) {
+		if token.Kind == ast.KindElseKeyword && token.End <= elseNodeStart {
+			elseStart = token.Start
 		}
 	}
 	return elseStart
-}
-
-func previousTokenBefore(sf *ast.SourceFile, node *ast.Node, pos int) (tokenInfo, bool) {
-	var prev tokenInfo
-	found := false
-	for _, token := range tokensOf(sf, node) {
-		if token.start >= pos {
-			break
-		}
-		if token.end <= pos {
-			prev = token
-			found = true
-		}
-	}
-	return prev, found
 }
 
 func isSafeFromNameCollisions(elseNode *ast.Node) bool {
@@ -395,10 +333,17 @@ func collectDirectBlockScopedStatementNames(stmt *ast.Node, names map[string]str
 				})
 			}
 		}
-	case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration:
-		if name := stmt.Name(); name != nil && name.Kind == ast.KindIdentifier {
-			names[name.Text()] = struct{}{}
-		}
+	case ast.KindFunctionDeclaration, ast.KindClassDeclaration,
+		ast.KindEnumDeclaration, ast.KindModuleDeclaration,
+		ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration,
+		ast.KindImportEqualsDeclaration:
+		collectDeclarationName(stmt, names)
+	}
+}
+
+func collectDeclarationName(decl *ast.Node, names map[string]struct{}) {
+	if name := decl.Name(); name != nil && name.Kind == ast.KindIdentifier {
+		names[name.Text()] = struct{}{}
 	}
 }
 
@@ -464,9 +409,18 @@ func hasDirectLexicalDeclaration(target *ast.Node, name string) bool {
 			if utils.HasVarDeclListWithName(varStmt.DeclarationList, name) {
 				return true
 			}
-		case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration:
+		case ast.KindFunctionDeclaration, ast.KindClassDeclaration,
+			ast.KindEnumDeclaration, ast.KindModuleDeclaration,
+			ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration,
+			ast.KindImportEqualsDeclaration:
 			if n := stmt.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
 				return true
+			}
+		case ast.KindImportDeclaration:
+			for _, binding := range utils.GetImportBindingNodes(stmt) {
+				if binding != nil && binding.Text() == name {
+					return true
+				}
 			}
 		}
 	}
@@ -513,7 +467,7 @@ func hasUnsafeReference(target, elseNode *ast.Node, name string) bool {
 		if node == nil || node == elseNode {
 			return false
 		}
-		if node.Kind == ast.KindIdentifier && node.Text() == name && isReferenceIdentifier(node) {
+		if node.Kind == ast.KindIdentifier && node.Text() == name && !utils.IsNonReferenceIdentifier(node) {
 			found = true
 			return true
 		}
@@ -524,25 +478,4 @@ func hasUnsafeReference(target, elseNode *ast.Node, name string) bool {
 	}
 	walk(target)
 	return found
-}
-
-func isReferenceIdentifier(node *ast.Node) bool {
-	if utils.IsDeclarationIdentifier(node) {
-		return false
-	}
-	parent := node.Parent
-	if parent == nil {
-		return true
-	}
-	switch parent.Kind {
-	case ast.KindPropertyAccessExpression:
-		return parent.AsPropertyAccessExpression().Name() != node
-	case ast.KindPropertyAssignment, ast.KindMethodDeclaration,
-		ast.KindGetAccessor, ast.KindSetAccessor, ast.KindPropertyDeclaration,
-		ast.KindEnumMember:
-		return parent.Name() != node
-	case ast.KindLabeledStatement, ast.KindBreakStatement, ast.KindContinueStatement:
-		return false
-	}
-	return true
 }

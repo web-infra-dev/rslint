@@ -88,6 +88,10 @@ function foo() {
 }
 ```
 
+## Autofix Safety
+
+This rule can remove unnecessary `else` wrappers automatically. The fixer is skipped when moving the `else` contents could change declaration scope or automatic semicolon insertion behavior.
+
 ## Original Documentation
 
 https://eslint.org/docs/latest/rules/no-else-return
