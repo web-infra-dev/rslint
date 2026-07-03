@@ -1,0 +1,4502 @@
+// Rstest Snapshot v1
+
+exports[`prefer-exponentiation-operator > invalid 1`] = `
+{
+  "code": "Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 2`] = `
+{
+  "code": "(Math).pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 3`] = `
+{
+  "code": "Math['pow'](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 4`] = `
+{
+  "code": "(Math)['pow'](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 5`] = `
+{
+  "code": "var x=Math
+.  pow( a, 
+ b )",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 6`] = `
+{
+  "code": "globalThis.Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 7`] = `
+{
+  "code": "globalThis.Math['pow'](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 8`] = `
+{
+  "code": "Math[\`pow\`](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 9`] = `
+{
+  "code": "Math[\`\${'pow'}\`](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 10`] = `
+{
+  "code": "Math['p' + 'o' + 'w'](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 11`] = `
+{
+  "code": "var x = Math.pow(a, b);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 12`] = `
+{
+  "code": "if(Math.pow(a, b)){}",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 13`] = `
+{
+  "code": "for(;Math.pow(a, b);){}",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 14`] = `
+{
+  "code": "switch(foo){ case Math.pow(a, b): break; }",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 15`] = `
+{
+  "code": "{ foo: Math.pow(a, b) }",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 16`] = `
+{
+  "code": "function foo(bar, baz = Math.pow(a, b), quux){}",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 17`] = `
+{
+  "code": "\`\${Math.pow(a, b)}\`",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 18`] = `
+{
+  "code": "class C extends Math.pow(a, b) {}",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 19`] = `
+{
+  "code": "+ Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 20`] = `
+{
+  "code": "- Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 21`] = `
+{
+  "code": "! Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 22`] = `
+{
+  "code": "typeof Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 23`] = `
+{
+  "code": "void Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 24`] = `
+{
+  "code": "Math.pow(a, b) .toString()",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 25`] = `
+{
+  "code": "Math.pow(a, b) ()",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 26`] = `
+{
+  "code": "Math.pow(a, b) \`\`",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 27`] = `
+{
+  "code": "(class extends Math.pow(a, b) {})",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 28`] = `
+{
+  "code": "+(Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 29`] = `
+{
+  "code": "(Math.pow(a, b)).toString()",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 30`] = `
+{
+  "code": "(class extends (Math.pow(a, b)) {})",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 31`] = `
+{
+  "code": "class C extends (Math.pow(a, b)) {}",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 32`] = `
+{
+  "code": "f(Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 33`] = `
+{
+  "code": "f(foo, Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 34`] = `
+{
+  "code": "f(Math.pow(a, b), foo)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 35`] = `
+{
+  "code": "f(foo, Math.pow(a, b), bar)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 36`] = `
+{
+  "code": "new F(Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 37`] = `
+{
+  "code": "new F(foo, Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 38`] = `
+{
+  "code": "new F(Math.pow(a, b), foo)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 39`] = `
+{
+  "code": "new F(foo, Math.pow(a, b), bar)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 40`] = `
+{
+  "code": "obj[Math.pow(a, b)]",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 41`] = `
+{
+  "code": "[foo, Math.pow(a, b), bar]",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 42`] = `
+{
+  "code": "a * Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 43`] = `
+{
+  "code": "Math.pow(a, b) * c",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 44`] = `
+{
+  "code": "a + Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 45`] = `
+{
+  "code": "Math.pow(a, b)/c",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 46`] = `
+{
+  "code": "a < Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 47`] = `
+{
+  "code": "Math.pow(a, b) > c",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 48`] = `
+{
+  "code": "a === Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 49`] = `
+{
+  "code": "a ? Math.pow(b, c) : d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 50`] = `
+{
+  "code": "a = Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 51`] = `
+{
+  "code": "a += Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 52`] = `
+{
+  "code": "function *f() { yield Math.pow(a, b) }",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 53`] = `
+{
+  "code": "a, Math.pow(b, c), d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 54`] = `
+{
+  "code": "a ** Math.pow(b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 55`] = `
+{
+  "code": "Math.pow(a, b) ** c",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 56`] = `
+{
+  "code": "Math.pow(a, b ** c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 57`] = `
+{
+  "code": "Math.pow(a ** b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 58`] = `
+{
+  "code": "a ** Math.pow(b ** c, d ** e) ** f",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 59`] = `
+{
+  "code": "(Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 60`] = `
+{
+  "code": "foo + (Math.pow(a, b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 61`] = `
+{
+  "code": "(Math.pow(a, b)) + foo",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 62`] = `
+{
+  "code": "\`\${(Math.pow(a, b))}\`",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 63`] = `
+{
+  "code": "Math.pow(2, 3)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 64`] = `
+{
+  "code": "Math.pow(a.foo, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 65`] = `
+{
+  "code": "Math.pow(a, b.foo)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 66`] = `
+{
+  "code": "Math.pow(a(), b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 67`] = `
+{
+  "code": "Math.pow(a, b())",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 68`] = `
+{
+  "code": "Math.pow(++a, ++b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 69`] = `
+{
+  "code": "Math.pow(a++, ++b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 70`] = `
+{
+  "code": "Math.pow(a--, b--)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 71`] = `
+{
+  "code": "Math.pow(--a, b--)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 72`] = `
+{
+  "code": "Math.pow((a), (b))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 73`] = `
+{
+  "code": "Math.pow(((a)), ((b)))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 74`] = `
+{
+  "code": "Math.pow((a.foo), b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 75`] = `
+{
+  "code": "Math.pow(a, (b.foo))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 76`] = `
+{
+  "code": "Math.pow((a()), b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 77`] = `
+{
+  "code": "Math.pow(a, (b()))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 78`] = `
+{
+  "code": "Math.pow(+a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 79`] = `
+{
+  "code": "Math.pow(a, +b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 80`] = `
+{
+  "code": "Math.pow(-a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 81`] = `
+{
+  "code": "Math.pow(a, -b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 82`] = `
+{
+  "code": "Math.pow(-2, 3)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 83`] = `
+{
+  "code": "Math.pow(2, -3)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 84`] = `
+{
+  "code": "async () => Math.pow(await a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 85`] = `
+{
+  "code": "async () => Math.pow(a, await b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 86`] = `
+{
+  "code": "Math.pow(a * b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 87`] = `
+{
+  "code": "Math.pow(a, b * c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 88`] = `
+{
+  "code": "Math.pow(a / b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 89`] = `
+{
+  "code": "Math.pow(a, b / c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 90`] = `
+{
+  "code": "Math.pow(a + b, 3)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 91`] = `
+{
+  "code": "Math.pow(2, a - b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 92`] = `
+{
+  "code": "Math.pow(a + b, c + d)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 93`] = `
+{
+  "code": "Math.pow(a = b, c = d)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 94`] = `
+{
+  "code": "Math.pow(a += b, c -= d)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 95`] = `
+{
+  "code": "Math.pow((a, b), (c, d))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 96`] = `
+{
+  "code": "function *f() { Math.pow(yield, yield) }",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 97`] = `
+{
+  "code": "Math.pow((a + b), (c + d))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 98`] = `
+{
+  "code": "a+Math.pow(b, c)+d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 99`] = `
+{
+  "code": "a+Math.pow(++b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 100`] = `
+{
+  "code": "(a)+(Math).pow((++b), c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 101`] = `
+{
+  "code": "Math.pow(a, b)in c",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 102`] = `
+{
+  "code": "Math.pow(a, (b))in (c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 103`] = `
+{
+  "code": "a+Math.pow(++b, c)in d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 104`] = `
+{
+  "code": "a+Math.pow( ++b, c )in d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 105`] = `
+{
+  "code": "a+ Math.pow(++b, c) in d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 106`] = `
+{
+  "code": "a+/**/Math.pow(++b, c)/**/in d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 107`] = `
+{
+  "code": "a+(Math.pow(++b, c))in d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 108`] = `
+{
+  "code": "+Math.pow(++a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 109`] = `
+{
+  "code": "Math.pow(a, b + c)in d",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 110`] = `
+{
+  "code": "Math.pow(a, b) + Math.pow(c,
+ d)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 111`] = `
+{
+  "code": "Math.pow(Math.pow(a, b), Math.pow(c, d))",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 112`] = `
+{
+  "code": "Math.pow(a, b)**Math.pow(c, d)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 113`] = `
+{
+  "code": "Math.pow()",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 114`] = `
+{
+  "code": "Math.pow(a)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 115`] = `
+{
+  "code": "Math.pow(a, b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 116`] = `
+{
+  "code": "Math.pow(a, b, c, d)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 117`] = `
+{
+  "code": "Math.pow(...a)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 118`] = `
+{
+  "code": "Math.pow(...a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 119`] = `
+{
+  "code": "Math.pow(a, ...b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 120`] = `
+{
+  "code": "Math.pow(a, b, ...c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 121`] = `
+{
+  "code": "/* comment */Math.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 122`] = `
+{
+  "code": "Math/**/.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 123`] = `
+{
+  "code": "Math//
+.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 124`] = `
+{
+  "code": "Math[//
+'pow'](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 125`] = `
+{
+  "code": "Math['pow'/**/](a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 126`] = `
+{
+  "code": "Math./**/pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 127`] = `
+{
+  "code": "Math.pow/**/(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 128`] = `
+{
+  "code": "Math.pow//
+(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 129`] = `
+{
+  "code": "Math.pow(/**/a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 130`] = `
+{
+  "code": "Math.pow(a,//
+ b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 131`] = `
+{
+  "code": "Math.pow(a, b/**/)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 132`] = `
+{
+  "code": "Math.pow(a, b//
+)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 133`] = `
+{
+  "code": "Math.pow(a, b)/* comment */;",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 134`] = `
+{
+  "code": "Math.pow(a, b)// comment
+;",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 135`] = `
+{
+  "code": "Math.pow?.(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 136`] = `
+{
+  "code": "Math?.pow(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 137`] = `
+{
+  "code": "Math?.pow?.(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 138`] = `
+{
+  "code": "(Math?.pow)(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 139`] = `
+{
+  "code": "(Math?.pow)?.(a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 140`] = `
+{
+  "code": "Math.pow(a, b as any)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 141`] = `
+{
+  "code": "Math.pow(a as any, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 142`] = `
+{
+  "code": "Math.pow(a, b) as any",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 143`] = `
+{
+  "code": "Math.pow({a:1}.a, 2);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 144`] = `
+{
+  "code": "Math.pow({a:1}.a, 2) + 100;",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 145`] = `
+{
+  "code": "(Math.pow({a:1}.a, 2));",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 146`] = `
+{
+  "code": "100 + Math.pow({a:1}.a, 2);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 147`] = `
+{
+  "code": "Math.pow({a:1}.a + 100, 2);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 148`] = `
+{
+  "code": "Math.pow(function(){return 2}(), 3);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 149`] = `
+{
+  "code": "Math.pow(function(){return 2}(), 3) + 100;",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 150`] = `
+{
+  "code": "(Math.pow(function(){return 2}(), 3));",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 151`] = `
+{
+  "code": "100 + Math.pow(function(){return 2}(), 3);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 152`] = `
+{
+  "code": "Math.pow(function(){return 2}() + 100, 3);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 153`] = `
+{
+  "code": "Math.pow(class{static x=2}.x, 4);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 154`] = `
+{
+  "code": "Math.pow(class{static x=2}.x, 4) + 100;",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 155`] = `
+{
+  "code": "(Math.pow(class{static x=2}.x, 4));",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 156`] = `
+{
+  "code": "100 + Math.pow(class{static x=2}.x, 4);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 157`] = `
+{
+  "code": "Math.pow(class{static x=2}.x + 100, 4);",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 158`] = `
+{
+  "code": "foo
+Math.pow(a + b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 159`] = `
+{
+  "code": "foo
+Math.pow(+a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 160`] = `
+{
+  "code": "foo
+Math.pow(-a, b)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 161`] = `
+{
+  "code": "foo
+Math.pow({a:1}.a, 2)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 162`] = `
+{
+  "code": "foo
+Math.pow((a).b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 163`] = `
+{
+  "code": "foo
+Math.pow([a, b].find(fn), c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 164`] = `
+{
+  "code": "foo
+Math.pow(/regex/, 2)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 165`] = `
+{
+  "code": "foo
+Math.pow(\`template literal\`, 2)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 166`] = `
+{
+  "code": "foo
+100 + Math.pow((a).b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 167`] = `
+{
+  "code": "foo
+Math.pow(a.b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 168`] = `
+{
+  "code": "Math.pow((a).b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 169`] = `
+{
+  "code": "foo;
+Math.pow((a).b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-exponentiation-operator > invalid 170`] = `
+{
+  "code": "if (foo) {}
+Math.pow((a).b, c)",
+  "diagnostics": [
+    {
+      "message": "Use the '**' operator instead of 'Math.pow'.",
+      "messageId": "useExponentiation",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "prefer-exponentiation-operator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
