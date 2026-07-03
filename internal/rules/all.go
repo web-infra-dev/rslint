@@ -71,6 +71,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_nested_ternary"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_func"
+	"github.com/web-infra-dev/rslint/internal/rules/no_new_native_nonconstructor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_object"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
@@ -194,6 +195,7 @@ func GetAllRules() []rule.Rule {
 		no_misleading_character_class.NoMisleadingCharacterClassRule,
 		no_new.NoNewRule,
 		no_new_func.NoNewFuncRule,
+		no_new_native_nonconstructor.NoNewNativeNonconstructorRule,
 		no_new_wrappers.NoNewWrappersRule,
 		no_restricted_imports.NoRestrictedImportsRule,
 		no_restricted_syntax.NoRestrictedSyntaxRule,
