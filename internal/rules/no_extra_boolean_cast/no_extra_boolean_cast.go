@@ -260,26 +260,6 @@ func maybePrefixSpace(sourceFile *ast.SourceFile, replaceRange core.TextRange, r
 	return replacement
 }
 
-// hasCommentsInSpan reports whether any `//` or `/*` sequence appears in
-// the half-open source range [start, end). `utils.HasCommentsInRange`
-// only surfaces comments anchored at the range start, so a raw text
-// scan is required to catch comments sprinkled *between* children
-// (e.g. `!!/* keep */foo`).
-func hasCommentsInSpan(src string, start, end int) bool {
-	if start < 0 {
-		start = 0
-	}
-	if end > len(src) {
-		end = len(src)
-	}
-	for i := start; i+1 < end; i++ {
-		if src[i] == '/' && (src[i+1] == '/' || src[i+1] == '*') {
-			return true
-		}
-	}
-	return false
-}
-
 // buildNegationFix returns the fix for a redundant `!!expr`. outerUnary
 // is the outer `!` of `!!expr`.
 func buildNegationFix(ctx rule.RuleContext, outerUnary *ast.Node) []rule.RuleFix {
@@ -293,7 +273,7 @@ func buildNegationFix(ctx rule.RuleContext, outerUnary *ast.Node) []rule.RuleFix
 	}
 
 	replaceRange := utils.TrimNodeTextRange(ctx.SourceFile, outerUnary)
-	if hasCommentsInSpan(ctx.SourceFile.Text(), replaceRange.Pos(), replaceRange.End()) {
+	if utils.HasCommentInSpan(ctx.SourceFile, replaceRange.Pos(), replaceRange.End()) {
 		return nil
 	}
 
@@ -331,13 +311,13 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 		if parent != nil && parent.Kind == ast.KindPrefixUnaryExpression &&
 			parent.AsPrefixUnaryExpression().Operator == ast.KindExclamationToken {
 			parentRange := utils.TrimNodeTextRange(ctx.SourceFile, parent)
-			if hasCommentsInSpan(ctx.SourceFile.Text(), parentRange.Pos(), parentRange.End()) {
+			if utils.HasCommentInSpan(ctx.SourceFile, parentRange.Pos(), parentRange.End()) {
 				return nil
 			}
 			return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, parent, maybePrefixSpace(ctx.SourceFile, parentRange, "true"))}
 		}
 
-		if hasCommentsInSpan(ctx.SourceFile.Text(), callRange.Pos(), callRange.End()) {
+		if utils.HasCommentInSpan(ctx.SourceFile, callRange.Pos(), callRange.End()) {
 			return nil
 		}
 		return []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, callNode, maybePrefixSpace(ctx.SourceFile, callRange, "false"))}
@@ -348,7 +328,7 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 		if ast.IsSpreadElement(arg) {
 			return nil
 		}
-		if hasCommentsInSpan(ctx.SourceFile.Text(), callRange.Pos(), callRange.End()) {
+		if utils.HasCommentInSpan(ctx.SourceFile, callRange.Pos(), callRange.End()) {
 			return nil
 		}
 		// Peel parens to match ESLint's paren-less AST; see buildNegationFix.
