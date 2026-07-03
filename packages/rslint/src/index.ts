@@ -1,5 +1,6 @@
 export { defineConfig, globalIgnores } from './config/define-config.js';
 export type {
+  RslintConfig,
   RslintConfigEntry,
   ESLintPlugin,
 } from './config/define-config.js';
