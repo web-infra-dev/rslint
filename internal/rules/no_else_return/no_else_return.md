@@ -2,7 +2,9 @@
 
 ## Rule Details
 
-Disallows `else` blocks after `return` statements in `if` statements. When every preceding branch returns, the `else` block is unnecessary and its contents can be placed after the `if` statement.
+Disallow `else` blocks after `return` statements in `if` statements. When every
+preceding branch returns, the `else` block is unnecessary and its contents can
+be placed after the `if` statement.
 
 Examples of **incorrect** code for this rule:
 
@@ -87,10 +89,6 @@ function foo() {
   }
 }
 ```
-
-## Autofix Safety
-
-This rule can remove unnecessary `else` wrappers automatically. The fixer is skipped when moving the `else` contents could change declaration scope or automatic semicolon insertion behavior.
 
 ## Original Documentation
 
