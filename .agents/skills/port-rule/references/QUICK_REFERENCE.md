@@ -12,7 +12,7 @@ A quick reference for common commands, file locations, and checklists when porti
 | ------------------------ | ------------------------------------------------------------------------------------------------ |
 | Create branch            | `git checkout -b feat/port-rule-<name>-$(date +%Y%m%d)`                                          |
 | Go unit test             | `go test -count=1 ./internal/rules/<rule_name>`                                                  |
-| Go full test             | `go test -count=1 ./internal/rules/...`                                                          |
+| Go related tests         | `go test -count=1 <changed package dirs and direct consumer package dirs>`                       |
 | Build binary             | `cd packages/rslint && pnpm run build:bin`                                                       |
 | JS unit test             | `cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>`                |
 | Type check               | `pnpm typecheck`                                                                                 |
@@ -105,7 +105,7 @@ import (
 
 ## Checklist Before Submission
 
-- [ ] Go tests pass (`go test -count=1 ./internal/rules/<name>`)
+- [ ] Go tests pass for the rule package and any changed-related Go package directories (see Phase 4 Step 2 in `PORT_RULE.md`)
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
 - [ ] JS snapshots generated (`npx rstest run <name> -u`)
 - [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)

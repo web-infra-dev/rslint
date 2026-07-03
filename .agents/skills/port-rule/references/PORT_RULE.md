@@ -661,17 +661,13 @@ Follow this **strict order** — each step depends on the previous one:
    go test -count=1 ./internal/plugins/<plugin>/rules/<rule_name>
    ```
 
-   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also rerun every rule that consumes it. When in doubt about the blast radius, rerun the whole plugin or the whole tree:
+   **Related-rule regression**: if this port introduced or modified any exported symbol in a shared package (e.g. `internal/plugins/<plugin>/<plugin>util/`, or `internal/utils/`), you MUST also run tests for the changed package and the direct consumer packages that import or call the changed API. Keep the scope related to the changed Go code; do not run whole-plugin or whole-tree Go tests as part of the port-rule workflow.
 
    ```bash
-   # When you extracted a helper to or modified <plugin>util/:
-   go test -count=1 ./internal/plugins/<plugin>/...
-
-   # When you touched internal/utils/ (cross-plugin shared):
-   go test -count=1 ./internal/...
+   go test -count=1 <changed-package-dir> <direct-consumer-package-dir>
    ```
 
-   Extracting / renaming a helper is a silent-regression hotspot; running the narrower `./rules/<rule_name>` in isolation is not enough.
+   Extracting / renaming a helper is a silent-regression hotspot; running only the new rule package is not enough when another package consumes the helper. Identify direct consumers with `rg` / `git grep`, run their package tests, and do not fall back to `go test ./internal/...`, `go test ./internal/plugins/<plugin>/...`, or `pnpm run test:go`.
 
 3. **Build binary** (REQUIRED before JS tests — they spawn the binary via IPC):
 
