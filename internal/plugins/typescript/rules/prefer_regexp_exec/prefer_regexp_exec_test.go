@@ -59,6 +59,11 @@ reg.exec(value);`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
 		},
 		{
+			Code:   `const value = "foo"; value.match("(?i:foo)bar");`,
+			Output: []string{`const value = "foo"; /(?i:foo)bar/.exec(value);`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
+		},
+		{
 			Code:   `const value = "foo"; value.match("a\nb");`,
 			Output: []string{`const value = "foo"; /a\nb/.exec(value);`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
