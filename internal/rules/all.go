@@ -117,6 +117,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_with"
 	"github.com/web-infra-dev/rslint/internal/rules/object_shorthand"
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_arrow_callback"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
@@ -248,6 +249,7 @@ func GetAllRules() []rule.Rule {
 		require_atomic_updates.RequireAtomicUpdatesRule,
 		object_shorthand.ObjectShorthandRule,
 		one_var.OneVarRule,
+		prefer_arrow_callback.PreferArrowCallbackRule,
 		no_dupe_else_if.NoDupeElseIfRule,
 		no_throw_literal.NoThrowLiteralRule,
 		no_useless_backreference.NoUselessBackreferenceRule,
