@@ -94,6 +94,23 @@ func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool
 	return false
 }
 
+// HasCommentInsideNode reports whether node contains a real line or block
+// comment. It walks parser-owned tokens, so comment-like text inside strings,
+// templates, or regex literals is ignored.
+func HasCommentInsideNode(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	if sourceFile == nil || node == nil {
+		return false
+	}
+	nodeRange := TrimNodeTextRange(sourceFile, node)
+	hasComment := false
+	ForEachComment(node, func(comment *ast.CommentRange) {
+		if comment.Pos() >= nodeRange.Pos() && comment.End() <= nodeRange.End() {
+			hasComment = true
+		}
+	}, sourceFile)
+	return hasComment
+}
+
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
 	if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
 		for _, subtype := range t.Types() {

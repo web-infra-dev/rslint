@@ -119,6 +119,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/one_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_regex_literals"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
@@ -223,6 +224,7 @@ func GetAllRules() []rule.Rule {
 		no_undef_init.NoUndefInitRule,
 		prefer_const.PreferConstRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
+		prefer_regex_literals.PreferRegexLiteralsRule,
 		prefer_template.PreferTemplateRule,
 		no_this_before_super.NoThisBeforeSuperRule,
 		no_var.NoVarRule,

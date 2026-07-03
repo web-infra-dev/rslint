@@ -1,6 +1,12 @@
 package utils
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+)
 
 func TestExtractRegexPatternAndFlags(t *testing.T) {
 	tests := []struct {
@@ -23,6 +29,82 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 			t.Errorf("ExtractRegexPatternAndFlags(%q) = (%q, %q), want (%q, %q)", tt.input, p, f, tt.pattern, tt.flags)
 		}
 	}
+}
+
+func TestIsValidRegexLiteral(t *testing.T) {
+	tests := []struct {
+		name    string
+		literal string
+		want    bool
+	}{
+		{name: "basic", literal: `/abc/g`, want: true},
+		{name: "unicode sets", literal: `/[[A--B]]/v`, want: true},
+		{name: "inline modifier", literal: `/(?i:foo)bar/`, want: true},
+		{name: "annex b decimal escape", literal: `/\78\126\5934/`, want: true},
+		{name: "invalid unicode property", literal: `/\p{NotAProperty}/u`, want: false},
+		{name: "invalid v set", literal: `/[[A&&&]]/v`, want: false},
+		{name: "invalid flag", literal: `/a/-`, want: false},
+		{name: "conflicting unicode flags", literal: `/a/uv`, want: false},
+		{name: "unterminated class", literal: `/[a/`, want: false},
+		{name: "not a literal", literal: `abc`, want: false},
+	}
+	for _, tt := range tests {
+		if got := IsValidRegexLiteral(tt.literal); got != tt.want {
+			t.Errorf("%s: IsValidRegexLiteral(%q) = %v, want %v", tt.name, tt.literal, got, tt.want)
+		}
+	}
+}
+
+func TestHasCommentInsideNode(t *testing.T) {
+	source := "const a = \"https://example.com/*x*/\";\n" +
+		"const b = /\\/\\//;\n" +
+		"const c = `// raw`;\n" +
+		"const d = 1 /* keep */ + 2;\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name string
+		text string
+		want bool
+	}{
+		{name: "string containing comment-like text", text: "\"https://example.com/*x*/\"", want: false},
+		{name: "regex containing slash text", text: "/\\/\\//", want: false},
+		{name: "template containing line-comment text", text: "`// raw`", want: false},
+		{name: "actual block comment", text: "1 /* keep */ + 2", want: true},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		if got := HasCommentInsideNode(sourceFile, node); got != tt.want {
+			t.Errorf("%s: HasCommentInsideNode() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func findNodeWithText(t *testing.T, sourceFile *ast.SourceFile, text string) *ast.Node {
+	t.Helper()
+	var found *ast.Node
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if found != nil || node == nil {
+			return
+		}
+		if TrimmedNodeText(sourceFile, node) == text {
+			found = node
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return found != nil
+		})
+	}
+	visit(&sourceFile.Node)
+	if found == nil {
+		t.Fatalf("missing node with text %q", text)
+	}
+	return found
 }
 
 func TestDefaultIgnoreDirGlobs(t *testing.T) {
