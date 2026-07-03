@@ -41,6 +41,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_imports"
+	"github.com/web-infra-dev/rslint/internal/rules/no_else_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
@@ -175,6 +176,7 @@ func GetAllRules() []rule.Rule {
 		no_dupe_keys.NoDupeKeysRule,
 		no_duplicate_case.NoDuplicateCaseRule,
 		no_duplicate_imports.NoDuplicateImportsRule,
+		no_else_return.NoElseReturnRule,
 		no_empty.NoEmptyRule,
 		no_empty_pattern.NoEmptyPatternRule,
 		no_eval.NoEvalRule,
