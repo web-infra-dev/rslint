@@ -109,6 +109,7 @@ export default defineConfig({
     './tests/eslint/rules/no-undef-init.test.ts',
     './tests/eslint/rules/no-var.test.ts',
     './tests/eslint/rules/one-var.test.ts',
+    './tests/eslint/rules/prefer-arrow-callback.test.ts',
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',

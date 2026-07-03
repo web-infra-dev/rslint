@@ -1,0 +1,1359 @@
+// Rstest Snapshot v1
+
+exports[`prefer-arrow-callback > invalid 1`] = `
+{
+  "code": "foo(function bar() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 2`] = `
+{
+  "code": "foo(function() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 3`] = `
+{
+  "code": "foo(function bar() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 4`] = `
+{
+  "code": "foo(function() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 5`] = `
+{
+  "code": "foo(nativeCb || function() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 6`] = `
+{
+  "code": "foo(bar ? function() {} : function() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 7`] = `
+{
+  "code": "foo(function() { (function() { this; }); });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 8`] = `
+{
+  "code": "foo(function() { this; }.bind(this));",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 9`] = `
+{
+  "code": "foo(bar || function() { this; }.bind(this));",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 10`] = `
+{
+  "code": "foo(function() { (() => this); }.bind(this));",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 11`] = `
+{
+  "code": "foo(function bar(a) { a; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 12`] = `
+{
+  "code": "foo(function(a) { a; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 13`] = `
+{
+  "code": "foo(function(arguments) { arguments; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 14`] = `
+{
+  "code": "foo(function() { this; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 15`] = `
+{
+  "code": "foo(function() { (() => this); });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 16`] = `
+{
+  "code": "qux(function(foo, bar, baz) { return foo * 2; })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 17`] = `
+{
+  "code": "qux(function(foo, bar, baz) { return foo * bar; }.bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 18`] = `
+{
+  "code": "qux(function(foo, bar, baz) { return foo * this.qux; }.bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 19`] = `
+{
+  "code": "foo(function() {}.bind(this, somethingElse))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 20`] = `
+{
+  "code": "qux(function(foo = 1, [bar = 2] = [], {qux: baz = 3} = {foo: 'bar'}) { return foo + bar; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 91,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 21`] = `
+{
+  "code": "qux(function(baz, baz) { })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 22`] = `
+{
+  "code": "qux(function( /* no params */ ) { })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 23`] = `
+{
+  "code": "qux(function( /* a */ foo /* b */ , /* c */ bar /* d */ , /* e */ baz /* f */ ) { return foo; })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 96,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 24`] = `
+{
+  "code": "qux(async function (foo = 1, bar = 2, baz = 3) { return baz; })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 25`] = `
+{
+  "code": "qux(async function (foo = 1, bar = 2, baz = 3) { return this; }.bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 26`] = `
+{
+  "code": "foo(async function /*
+*/ () { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 27`] = `
+{
+  "code": "foo(async function // c
+ () { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 28`] = `
+{
+  "code": "foo(async function
+ () { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 29`] = `
+{
+  "code": "foo(async function /* c */ () { return 1; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 30`] = `
+{
+  "code": "foo((bar || function() {}).bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 31`] = `
+{
+  "code": "foo(function() {}.bind(this).bind(obj))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 32`] = `
+{
+  "code": "foo?.(function() {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 33`] = `
+{
+  "code": "foo?.(function() { return this; }.bind(this));",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 34`] = `
+{
+  "code": "foo(function() { return this; }?.bind(this));",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 35`] = `
+{
+  "code": "foo((function() { return this; }?.bind)(this));",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 36`] = `
+{
+  "code": "
+            test(
+                function ()
+                { }
+            );
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 37`] = `
+{
+  "code": "
+            test(
+                function (
+                    ...args
+                ) /* Lorem ipsum
+                dolor sit amet. */ {
+                    return args;
+                }
+            );
+            ",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 8,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 38`] = `
+{
+  "code": "foo(function(a:string) {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 39`] = `
+{
+  "code": "foo(function bar(a:string) { a; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 40`] = `
+{
+  "code": "foo(function(a:any) { a; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 41`] = `
+{
+  "code": "foo(function(arguments:any) { arguments; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 42`] = `
+{
+  "code": "foo(function(a:string) { this; });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 43`] = `
+{
+  "code": "qux(function(foo:string, bar:number, baz:string) { return foo * 2; })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 44`] = `
+{
+  "code": "qux(function(foo:number, bar:number, baz:number) { return foo * bar; }.bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 45`] = `
+{
+  "code": "qux(function(foo:any, bar:any, baz:any) { return foo * this.qux; }.bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 46`] = `
+{
+  "code": "qux(function(baz:string, baz:string) { })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 47`] = `
+{
+  "code": "qux(function( /* a */ foo:string /* b */ , /* c */ bar:string /* d */ , /* e */ baz:string /* f */ ) { return foo; })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 117,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 48`] = `
+{
+  "code": "qux(async function (foo:number = 1, bar:number = 2, baz:number = 3) { return baz; })",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 84,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 49`] = `
+{
+  "code": "qux(async function (foo:number = 1, bar:number = 2, baz:number = 3) { return this; }.bind(this))",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 85,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 50`] = `
+{
+  "code": "foo(function():string { return 'foo' });",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-arrow-callback > invalid 51`] = `
+{
+  "code": "test('foo', function (this: any) {});",
+  "diagnostics": [
+    {
+      "message": "Unexpected function expression.",
+      "messageId": "preferArrowCallback",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-arrow-callback",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
