@@ -112,6 +112,7 @@ export default defineConfig({
     './tests/eslint/rules/one-var.test.ts',
     './tests/eslint/rules/prefer-arrow-callback.test.ts',
     './tests/eslint/rules/prefer-const.test.ts',
+    './tests/eslint/rules/prefer-exponentiation-operator.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',
     './tests/eslint/rules/prefer-spread.test.ts',
