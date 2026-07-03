@@ -55,13 +55,36 @@ func TestNoElseReturnExtras(t *testing.T) {
 			// Locks in upstream checkIfWithElse arm: no alternate means no report
 			// even when allowElseIf is disabled.
 			{Code: `function f() { if (bar) return; }`, Options: map[string]interface{}{"allowElseIf": false}},
+			// ---- Options contract: empty object keeps ESLint default allowElseIf=true ----
+			{
+				Code:    `function f() { if (error) { return "failed"; } else if (loading) { return "loading"; } }`,
+				Options: map[string]interface{}{},
+			},
+			{
+				Code:    `function f() { if (error) { return "failed"; } else if (loading) { return "loading"; } }`,
+				Options: []interface{}{map[string]interface{}{}},
+			},
 			// Locks in upstream alwaysReturns false arm: the consequent contains
 			// no return-like statement, so the else is still necessary.
 			{Code: `function f() { if (bar) { foo(); } else { baz(); } }`},
+			// Locks in upstream alwaysReturns() shallow semantics: a return in
+			// a nested function or a throw statement is not a branch return.
+			{Code: `function f() { if (bar) { function g() { return 1; } } else { return 2; } }`},
+			{Code: `function f() { if (bar) { throw err; } else { return 2; } }`},
+			// Locks in upstream naiveHasReturn() arm: for nested if blocks,
+			// only the last direct child of each nested branch counts.
+			{Code: `function f() { if (bar) { if (baz) { foo(); } else { return 2; } } else { return 3; } }`},
 
 			// TypeScript declarations in an else block are handled structurally
 			// by the fixer only; the reporting decision still follows upstream.
 			{Code: `function f() { if (bar) { foo(); } else { type T = string; } }`},
+
+			// ---- Dimension 4: nesting / traversal boundaries ----
+			// Labels, loop bodies, and do bodies accept only one child statement.
+			// Splitting the if/else into two statements would be invalid there.
+			{Code: `function f() { label: if (bar) return; else baz(); }`},
+			{Code: `function f() { for (;;) if (bar) return; else baz(); }`},
+			{Code: `function f() { do if (bar) return; else baz(); while (ok); }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: declaration/container forms ----
@@ -93,6 +116,37 @@ func TestNoElseReturnExtras(t *testing.T) {
 					unexpectedAt(`function *f() { if (a) { return 1; } else { return 2; } }`, `{ return 2; }`),
 				},
 			},
+			{
+				Code:   `const f = function() { if (a) return 1; else return 2; };`,
+				Output: []string{`const f = function() { if (a) return 1; return 2; };`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`const f = function() { if (a) return 1; else return 2; };`, `return 2;`),
+				},
+			},
+			{
+				Code:   `const obj = { m() { if (a) return 1; else return 2; } };`,
+				Output: []string{`const obj = { m() { if (a) return 1; return 2; } };`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`const obj = { m() { if (a) return 1; else return 2; } };`, `return 2;`),
+				},
+			},
+			{
+				Code:   `async function *f() { if (a) { return 1; } else { return 2; } }`,
+				Output: []string{`async function *f() { if (a) { return 1; }  return 2;  }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`async function *f() { if (a) { return 1; } else { return 2; } }`, `{ return 2; }`),
+				},
+			},
+
+			// ---- Options contract: empty object is identical to omitted options ----
+			{
+				Code:    `function f() { if (a) { return 1; } else if (b) { return 2; } else { return 3; } }`,
+				Output:  []string{`function f() { if (a) { return 1; } else if (b) { return 2; }  return 3;  }`},
+				Options: map[string]interface{}{},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (a) { return 1; } else if (b) { return 2; } else { return 3; } }`, `{ return 3; }`),
+				},
+			},
 
 			// Locks in upstream alwaysReturns BlockStatement arm: any return-like
 			// statement in the consequent block is enough, not only the final one.
@@ -101,6 +155,19 @@ func TestNoElseReturnExtras(t *testing.T) {
 				Output: []string{`function f() { if (a) { return 1; foo(); }  foo();  }`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt(`function f() { if (a) { return 1; foo(); } else { foo(); } }`, `{ foo(); }`),
+				},
+			},
+			// Locks in upstream alwaysReturns() arm where a nested if returns on
+			// both paths and therefore makes the outer else unnecessary.
+			{
+				Code: `function f() { if (a) { if (b) return 1; else return 2; } else { return 3; } }`,
+				Output: []string{
+					`function f() { if (a) { if (b) return 1; return 2; } else { return 3; } }`,
+					`function f() { if (a) { if (b) return 1; return 2; }  return 3;  }`,
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (a) { if (b) return 1; else return 2; } else { return 3; } }`, `return 2;`),
+					unexpectedAt(`function f() { if (a) { if (b) return 1; else return 2; } else { return 3; } }`, `{ return 3; }`),
 				},
 			},
 			// Locks in upstream checkIfWithElse arm: allowElseIf false reports
@@ -131,6 +198,13 @@ func TestNoElseReturnExtras(t *testing.T) {
 					unexpectedAt(`function f(x) { switch (x) { case 1: let a; if (bar) { return true; } else { let a; } } }`, `{ let a; }`),
 				},
 			},
+			{
+				Code:   `function f(x) { switch (x) { default: if (bar) { return true; } else { baz(); } } }`,
+				Output: []string{`function f(x) { switch (x) { default: if (bar) { return true; }  baz();  } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f(x) { switch (x) { default: if (bar) { return true; } else { baz(); } } }`, `{ baz(); }`),
+				},
+			},
 			// Destructured parameters are also same-scope bindings after the
 			// else block is removed, so the diagnostic is intentionally no-fix.
 			{
@@ -155,6 +229,18 @@ func TestNoElseReturnExtras(t *testing.T) {
 					unexpectedAt(`function f() { if (a) { if (b) { return 1; } else { type T = string; } let value: T; } }`, `{ type T = string; }`),
 				},
 			},
+			{
+				Code: `function f() { interface I {} if (bar) { return true; } else { interface I {} } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { interface I {} if (bar) { return true; } else { interface I {} } }`, `{ interface I {} }`),
+				},
+			},
+			{
+				Code: `function f() { if (a) { if (b) { return 1; } else { interface I {} } let value: I; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (a) { if (b) { return 1; } else { interface I {} } let value: I; } }`, `{ interface I {} }`),
+				},
+			},
 			// Only direct declarations in the removed else block are hoisted to
 			// the parent. A nested block keeps its own `let a` scope, so the fix
 			// remains safe even when the parent already has `a`.
@@ -163,6 +249,90 @@ func TestNoElseReturnExtras(t *testing.T) {
 				Output: []string{`function f() { let a; if (bar) { return true; }  { let a; }  }`},
 				Errors: []rule_tester.InvalidTestCaseError{
 					unexpectedAt(`function f() { let a; if (bar) { return true; } else { { let a; } } }`, `{ { let a; } }`),
+				},
+			},
+
+			// Locks in upstream fixer ASI guard: an unbraced consequent without
+			// a semicolon cannot be followed by else contents starting with
+			// punctuation that can continue the previous statement.
+			{
+				Code: "function f() { if (a) return b\nelse { (foo).bar(); } }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt("function f() { if (a) return b\nelse { (foo).bar(); } }", `{ (foo).bar(); }`),
+				},
+			},
+			{
+				Code: "function f() { if (a) return b\nelse { +foo; } }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt("function f() { if (a) return b\nelse { +foo; } }", `{ +foo; }`),
+				},
+			},
+			{
+				Code: "function f() { if (a) return b\nelse { -foo; } }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt("function f() { if (a) return b\nelse { -foo; } }", `{ -foo; }`),
+				},
+			},
+			{
+				Code: "function f() { if (a) return b\nelse { /foo/.test(bar); } }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt("function f() { if (a) return b\nelse { /foo/.test(bar); } }", `{ /foo/.test(bar); }`),
+				},
+			},
+			{
+				Code: "function f() { if (a) return b\nelse { `tmpl`; } }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt("function f() { if (a) return b\nelse { `tmpl`; } }", "{ `tmpl`; }"),
+				},
+			},
+			// Same-line `}` after an unterminated else body is explicitly safe
+			// in upstream's fixer.
+			{
+				Code:   `function f() { if (a) return; else { foo() } }`,
+				Output: []string{`function f() { if (a) return;  foo()  }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (a) return; else { foo() } }`, `{ foo() }`),
+				},
+			},
+			// But a following token that can continue the statement is not safe.
+			{
+				Code: "function f() { if (a) return; else { foo() }\n(bar)() }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt("function f() { if (a) return; else { foo() }\n(bar)() }", `{ foo() }`),
+				},
+			},
+
+			// Name-collision safety must distinguish property keys from real
+			// references after the else block is removed.
+			{
+				Code:   `function f() { if (bar) { if (baz) { return true; } else { let a; } const o = { a: 1 }; obj.a; } }`,
+				Output: []string{`function f() { if (bar) { if (baz) { return true; }  let a;  const o = { a: 1 }; obj.a; } }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (bar) { if (baz) { return true; } else { let a; } const o = { a: 1 }; obj.a; } }`, `{ let a; }`),
+				},
+			},
+			{
+				Code: `function f() { if (bar) { if (baz) { return true; } else { let a; } const o = { a }; } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function f() { if (bar) { if (baz) { return true; } else { let a; } const o = { a }; } }`, `{ let a; }`),
+				},
+			},
+
+			// ---- Real-user: Express-style guard clauses ----
+			{
+				Code:   `function handler(req, res, next) { if (!req.user) { return res.status(401).end(); } else { next(); } }`,
+				Output: []string{`function handler(req, res, next) { if (!req.user) { return res.status(401).end(); }  next();  }`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function handler(req, res, next) { if (!req.user) { return res.status(401).end(); } else { next(); } }`, `{ next(); }`),
+				},
+			},
+			// ---- Real-user: config fallback with allowElseIf disabled ----
+			{
+				Code:    `function load(config) { if (!config) { return defaults; } else if (config.extends) { return merge(config); } }`,
+				Output:  []string{`function load(config) { if (!config) { return defaults; } if (config.extends) { return merge(config); } }`},
+				Options: map[string]interface{}{"allowElseIf": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					unexpectedAt(`function load(config) { if (!config) { return defaults; } else if (config.extends) { return merge(config); } }`, `if (config.extends) { return merge(config); }`),
 				},
 			},
 		},

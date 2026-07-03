@@ -467,6 +467,13 @@ func hasUnsafeReference(target, elseNode *ast.Node, name string) bool {
 		if node == nil || node == elseNode {
 			return false
 		}
+		if node.Kind == ast.KindShorthandPropertyAssignment && !utils.IsInDestructuringAssignment(node) {
+			shorthand := node.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.Name() != nil && shorthand.Name().Text() == name {
+				found = true
+				return true
+			}
+		}
 		if node.Kind == ast.KindIdentifier && node.Text() == name && !utils.IsNonReferenceIdentifier(node) {
 			found = true
 			return true
