@@ -374,19 +374,6 @@ func getCallbackInfo(node *ast.Node) callbackInfo {
 	return ret
 }
 
-func hasCommentInRange(sf *ast.SourceFile, start, end int) bool {
-	// utils.HasCommentsInRange checks comments anchored at the range start.
-	// This rule needs ESLint's commentsExistBetween semantics over arbitrary
-	// token pairs such as `.bind(/* comment */ this)`, so scan all comments.
-	found := false
-	utils.ForEachComment(sf.AsNode(), func(comment *ast.CommentRange) {
-		if comment.Pos() >= start && comment.End() <= end {
-			found = true
-		}
-	}, sf)
-	return found
-}
-
 func findTokenRange(sf *ast.SourceFile, start, end int, kind ast.Kind) (core.TextRange, bool) {
 	s := scanner.GetScannerForSourceFile(sf, start)
 	for s.Token() != ast.KindEndOfFile && s.TokenStart() < end {
@@ -473,13 +460,13 @@ func buildFixes(ctx rule.RuleContext, node *ast.Node, scope scopeInfo, info call
 		object := info.bindMember.AsPropertyAccessExpression().Expression
 		removeStart := scanner.SkipTrivia(text, object.End())
 		removeEnd := utils.TrimNodeTextRange(sf, info.bindCall).End()
-		if removeStart < 0 || removeStart >= removeEnd || hasCommentInRange(sf, removeStart, removeEnd) {
+		if removeStart < 0 || removeStart >= removeEnd || utils.HasCommentInSpan(sf, removeStart, removeEnd) {
 			return nil
 		}
 		fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(removeStart, removeEnd)))
 	}
 
-	if hasCommentInRange(sf, functionToken.End(), leftParenToken.Pos()) {
+	if utils.HasCommentInSpan(sf, functionToken.End(), leftParenToken.Pos()) {
 		fixes = append(fixes, rule.RuleFixRemoveRange(functionToken))
 		if name := node.Name(); name != nil {
 			fixes = append(fixes, rule.RuleFixRemove(sf, name))

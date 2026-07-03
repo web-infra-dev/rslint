@@ -3,6 +3,7 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -82,5 +83,41 @@ func TestForEachComment_ReuseFactoryReportsAllCommentsPerToken(t *testing.T) {
 		if seen[text] != 1 {
 			t.Errorf("comment %q expected exactly once, got %d (factory reuse smeared/dropped?)", text, seen[text])
 		}
+	}
+}
+
+func TestHasCommentInSpan(t *testing.T) {
+	src := `const a = "/* not a comment */"; const b = 1 /* real */ + 2;`
+
+	tmpDir := t.TempDir()
+	file := filepath.Join(tmpDir, "f.ts")
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	host := CreateCompilerHost(tmpDir, fs)
+	prog, err := CreateProgramFromOptions(true, &core.CompilerOptions{}, []string{file}, host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sf := prog.GetSourceFile(file)
+	if sf == nil {
+		t.Fatal("source file not found")
+	}
+
+	commentGapStart := strings.Index(src, "1")
+	commentGapEnd := strings.Index(src, "+")
+	if !HasCommentInSpan(sf, commentGapStart, commentGapEnd) {
+		t.Fatal("expected real block comment in numeric-expression gap")
+	}
+
+	stringStart := strings.Index(src, `"/*`)
+	stringEnd := strings.Index(src, `*/"`) + len(`*/"`)
+	if HasCommentInSpan(sf, stringStart, stringEnd) {
+		t.Fatal("string literal comment markers must not count as comments")
+	}
+
+	if HasCommentInSpan(sf, commentGapStart, commentGapStart) {
+		t.Fatal("empty span must not contain comments")
 	}
 }

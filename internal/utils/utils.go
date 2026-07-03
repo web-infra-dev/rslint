@@ -111,6 +111,30 @@ func HasCommentInsideNode(sourceFile *ast.SourceFile, node *ast.Node) bool {
 	return hasComment
 }
 
+// HasCommentInSpan reports whether any parsed comment overlaps the half-open
+// source span [start, end). Unlike HasCommentsInRange, this scans the whole
+// file's comment table, so callers can use it for ESLint-style
+// commentsExistBetween checks over arbitrary token gaps.
+func HasCommentInSpan(sourceFile *ast.SourceFile, start int, end int) bool {
+	if sourceFile == nil || start >= end {
+		return false
+	}
+	if start < 0 {
+		start = 0
+	}
+	if end > len(sourceFile.Text()) {
+		end = len(sourceFile.Text())
+	}
+
+	found := false
+	ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
+		if comment.Pos() < end && comment.End() > start {
+			found = true
+		}
+	}, sourceFile)
+	return found
+}
+
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
 	if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
 		for _, subtype := range t.Types() {
