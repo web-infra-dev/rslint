@@ -108,20 +108,20 @@ func checkIfWithoutElse(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 
-	consequents := []*ast.Node{}
+	thenStatements := []*ast.Node{}
 	var alternate *ast.Node
 	for current := node; current != nil && current.Kind == ast.KindIfStatement; {
 		ifStmt := current.AsIfStatement()
 		if ifStmt == nil || ifStmt.ElseStatement == nil {
 			return
 		}
-		consequents = append(consequents, ifStmt.ThenStatement)
+		thenStatements = append(thenStatements, ifStmt.ThenStatement)
 		alternate = ifStmt.ElseStatement
 		current = ifStmt.ElseStatement
 	}
 
-	for _, consequent := range consequents {
-		if !alwaysReturns(consequent) {
+	for _, thenStatement := range thenStatements {
+		if !alwaysReturns(thenStatement) {
 			return
 		}
 	}

@@ -196,10 +196,10 @@ func TestNoElseReturnUpstream(t *testing.T) {
 				},
 			},
 			{
-				Code:   "function foo17() { if (foo) return bar \nelse { baz() } \nqaz() }",
-				Output: []string{"function foo17() { if (foo) return bar \n baz()  \nqaz() }"},
+				Code:   "function foo17() { if (foo) return bar \nelse { baz() } \n" + "qaz() }",
+				Output: []string{"function foo17() { if (foo) return bar \n baz()  \n" + "qaz() }"},
 				Errors: []rule_tester.InvalidTestCaseError{
-					unexpectedAt("function foo17() { if (foo) return bar \nelse { baz() } \nqaz() }", "{ baz() }"),
+					unexpectedAt("function foo17() { if (foo) return bar \nelse { baz() } \n"+"qaz() }", "{ baz() }"),
 				},
 			},
 			{
