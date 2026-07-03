@@ -750,12 +750,26 @@ Follow this **strict order** — each step depends on the previous one:
    # Spell check (catches typos in comments and strings)
    pnpm -w run check-spell
 
-   # Format and Go lint checks
-   pnpm format:check && pnpm lint:go
+   # Format check
+   pnpm format:check
+
+   # Go lint (packages containing changed Go files only)
+   changed_go_dirs="$(
+     {
+       git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.go'
+       git diff --name-only --diff-filter=ACMR --cached -- '*.go'
+       git diff --name-only --diff-filter=ACMR -- '*.go'
+       git ls-files --others --exclude-standard -- '*.go'
+     } | sort -u | grep -E '^(cmd|internal)/' | while IFS= read -r file; do dirname "$file"; done | sort -u
+   )"
+   if [ -n "$changed_go_dirs" ]; then
+     printf '%s\n' "$changed_go_dirs" | xargs golangci-lint run --new-from-rev=origin/main --timeout=10m
+   fi
    ```
 
    These are BLOCKING. If any fails, fix before moving on — **do not** commit, push, or open a PR with any of them red.
-   - **Unknown-word failures from `check-spell`**: add the word to `scripts/dictionary.txt` (repo convention for ESLint-ecosystem identifiers that aren't real English). Use the original case.
+   - **Go lint scope**: lint only packages containing changed `.go` files under `cmd/` and `internal/` during port-rule pre-commit verification, with `--new-from-rev=origin/main` so only issues introduced by the branch are reported. Do not run `pnpm lint:go` here; it lints the full `cmd/` and `internal/` trees and is reserved for explicit full-tree checks / CI. Do not pass changed files from multiple directories to one `golangci-lint run` invocation; named file arguments must all be in one directory and can also produce typecheck false positives when a file depends on sibling files.
+   - **Unknown-word failures from `check-spell`**: inspect each reported word in context before changing anything. Fix misspellings, invented words, or other accidental text in the source. Add a word to `scripts/dictionary.txt` only when it is intentional: a valid standard word, ESLint ecosystem identifier, Go module/package name, API name, or similar technical token. Use the original case. Do not add `cspell` ignore comments in Markdown files; they can cause documentation compilation failures.
    - **Format failures**: auto-fix (`pnpm format && pnpm format:go`); never silence.
    - **Lint failures**: fix the code. Don't bypass with `//nolint`, `// eslint-disable`, or equivalent, unless the exception is already justified by an in-file comment pattern this repo uses.
 

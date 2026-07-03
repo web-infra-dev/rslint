@@ -8,20 +8,20 @@ A quick reference for common commands, file locations, and checklists when porti
 
 ## Commands Cheatsheet
 
-| Task          | Command                                                                           |
-| ------------- | --------------------------------------------------------------------------------- |
-| Create branch | `git checkout -b feat/port-rule-<name>-$(date +%Y%m%d)`                           |
-| Go unit test  | `go test -count=1 ./internal/rules/<rule_name>`                                   |
-| Go full test  | `go test -count=1 ./internal/rules/...`                                           |
-| Build binary  | `cd packages/rslint && pnpm run build:bin`                                        |
-| JS unit test  | `cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>` |
-| Type check    | `pnpm typecheck`                                                                  |
-| Lint check    | `pnpm lint`                                                                       |
-| Format check  | `pnpm format:check`                                                               |
-| Format fix    | `pnpm format`                                                                     |
-| Spell check   | `pnpm -w run check-spell`                                                         |
-| Go lint check | `pnpm lint:go`                                                                    |
-| Go format fix | `pnpm format:go`                                                                  |
+| Task                     | Command                                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------------------------ |
+| Create branch            | `git checkout -b feat/port-rule-<name>-$(date +%Y%m%d)`                                          |
+| Go unit test             | `go test -count=1 ./internal/rules/<rule_name>`                                                  |
+| Go full test             | `go test -count=1 ./internal/rules/...`                                                          |
+| Build binary             | `cd packages/rslint && pnpm run build:bin`                                                       |
+| JS unit test             | `cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>`                |
+| Type check               | `pnpm typecheck`                                                                                 |
+| Lint check               | `pnpm lint`                                                                                      |
+| Format check             | `pnpm format:check`                                                                              |
+| Format fix               | `pnpm format`                                                                                    |
+| Spell check              | `pnpm -w run check-spell`                                                                        |
+| Go lint changed packages | `golangci-lint run --new-from-rev=origin/main --timeout=10m <dirs containing changed .go files>` |
+| Go format fix            | `pnpm format:go`                                                                                 |
 
 ---
 
@@ -114,7 +114,7 @@ import (
 - [ ] Lint check passes (`pnpm lint`)
 - [ ] Spell check passes (`pnpm -w run check-spell`)
 - [ ] Format check passes (`pnpm format:check`)
-- [ ] Go lint check passes (`pnpm lint:go`)
+- [ ] Changed-package Go lint passes (packages containing changed `.go` files under `cmd/` and `internal/`; see Phase 4 Step 7 in `PORT_RULE.md`)
 - [ ] Rule registered (in the appropriate `all.go`: `internal/rules/all.go` for core, `internal/plugins/<plugin>/all.go` otherwise)
 - [ ] Test file registered (`packages/rslint-test-tools/rstest.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
