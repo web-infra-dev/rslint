@@ -138,7 +138,7 @@ Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
 2. **Phase 1: Preparation** - Collect test cases, walk Dimensions 1–4 edge cases (including the universal edge-shape checklist), and do an upstream semantic walk that enumerates each branch in the ESLint source
 3. **Phase 2: Implementation** - Before writing helpers, grep same-plugin neighbors and extract any near-duplicates to `<plugin>util/`. Then write Go rule, two-file test split (`<rule>_upstream_test.go` for Layer 1 + `<rule>_extras_test.go` for Layers 2 + 3 — see PORT_RULE.md Testing Philosophy), and documentation (see the "Differences from ESLint" writing rules in PORT_RULE.md Phase 2 Step 3 — user-facing only, no implementation talk)
 4. **Phase 3: Integration** - Add JS tests and register rule
-5. **Phase 4: Verification** - Build binary; run the rule's Go + JS tests; if a shared helper (`<plugin>util/`, `internal/utils/`) was added or modified, also rerun the whole plugin (or whole tree) test suite; then run the BLOCKING pre-commit gate: `pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && pnpm lint:go`
+5. **Phase 4: Verification** - Build binary; run the rule's Go + JS tests; if a shared helper (`<plugin>util/`, `internal/utils/`) was added or modified, also rerun the whole plugin (or whole tree) test suite; then run the BLOCKING pre-commit gate from Phase 4 Step 7, with Go lint restricted to changed Go files
 6. **Phase 5: Submission** - Commit and create PR
 
 For each phase: mark its task as `in_progress` (via `TaskUpdate`) before starting, and `completed` after finishing. Update the text checklist as well.
@@ -257,7 +257,8 @@ go test -count=1 ./internal/rules/<rule_name>
 cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
 
 # Pre-commit gate (BLOCKING — all must pass before commit)
-pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check && pnpm lint:go
+pnpm typecheck && pnpm lint && pnpm -w run check-spell && pnpm format:check
+# Then run changed-package Go lint from PORT_RULE.md Phase 4 Step 7.
 
 # Auto-fix formatting issues
 pnpm format && pnpm format:go
