@@ -45,6 +45,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_else_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_eval"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
@@ -181,6 +182,7 @@ func GetAllRules() []rule.Rule {
 		no_duplicate_imports.NoDuplicateImportsRule,
 		no_else_return.NoElseReturnRule,
 		no_empty.NoEmptyRule,
+		no_empty_function.NoEmptyFunctionRule,
 		no_empty_pattern.NoEmptyPatternRule,
 		no_eval.NoEvalRule,
 		no_ex_assign.NoExAssignRule,

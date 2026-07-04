@@ -1149,6 +1149,25 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 	return sourceFile.Text()[r.Pos():r.End()], MemberNameTypeExpression
 }
 
+// GetPropertyDisplayName resolves a property-name node to the diagnostic name
+// ESLint emits for statically-known member keys. Private identifiers keep their
+// leading "#"; dynamic computed keys return "".
+func GetPropertyDisplayName(name *ast.Node) string {
+	if name == nil {
+		return ""
+	}
+	if name.Kind == ast.KindIdentifier {
+		return name.AsIdentifier().Text
+	}
+	if name.Kind == ast.KindPrivateIdentifier {
+		return name.AsPrivateIdentifier().Text
+	}
+	if s, ok := GetStaticPropertyName(name); ok {
+		return s
+	}
+	return ""
+}
+
 // GetPropertyInfo extracts the property node and formatted property name from a PropertyAccessExpression
 // or ElementAccessExpression. Returns the property node and a formatted string like ".propertyName" or "[index]".
 // Returns (nil, "") if the node is neither a property access nor an element access expression.

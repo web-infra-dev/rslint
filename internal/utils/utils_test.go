@@ -172,6 +172,40 @@ func TestResolveLegacyMaxOption(t *testing.T) {
 	}
 }
 
+func TestGetPropertyDisplayName(t *testing.T) {
+	source := "const obj = {\n" +
+		"  id() {},\n" +
+		"  \"quoted\"() {},\n" +
+		"  0() {},\n" +
+		"  [`computed`]() {},\n" +
+		"  [dynamic]() {},\n" +
+		"};\n" +
+		"class C { #private() {} }\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name       string
+		memberText string
+		want       string
+	}{
+		{name: "identifier", memberText: "id() {}", want: "id"},
+		{name: "string literal", memberText: `"quoted"() {}`, want: "quoted"},
+		{name: "numeric literal", memberText: "0() {}", want: "0"},
+		{name: "static computed template", memberText: "[`computed`]() {}", want: "computed"},
+		{name: "dynamic computed", memberText: "[dynamic]() {}", want: ""},
+		{name: "private identifier", memberText: "#private() {}", want: "#private"},
+	}
+	for _, tt := range tests {
+		member := findNodeWithText(t, sourceFile, tt.memberText)
+		if got := GetPropertyDisplayName(member.Name()); got != tt.want {
+			t.Errorf("%s: GetPropertyDisplayName() = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestIsThisVoidParameter(t *testing.T) {
 	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
 		FileName: "/test.ts",
