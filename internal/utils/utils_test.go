@@ -83,6 +83,36 @@ func TestHasCommentInsideNode(t *testing.T) {
 	}
 }
 
+func TestGetStaticStringLiteralValue(t *testing.T) {
+	source := "const empty = \"\";\n" +
+		"const template = `raw`;\n" +
+		"const number = 0;\n" +
+		"const parenthesized = (\"x\");\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name     string
+		text     string
+		want     string
+		wantOkay bool
+	}{
+		{name: "empty string", text: `""`, want: "", wantOkay: true},
+		{name: "no substitution template", text: "`raw`", want: "raw", wantOkay: true},
+		{name: "numeric literal", text: "0", want: "", wantOkay: false},
+		{name: "parentheses are caller controlled", text: `("x")`, want: "", wantOkay: false},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		got, ok := GetStaticStringLiteralValue(node)
+		if got != tt.want || ok != tt.wantOkay {
+			t.Errorf("%s: GetStaticStringLiteralValue() = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.wantOkay)
+		}
+	}
+}
+
 func findNodeWithText(t *testing.T, sourceFile *ast.SourceFile, text string) *ast.Node {
 	t.Helper()
 	var found *ast.Node

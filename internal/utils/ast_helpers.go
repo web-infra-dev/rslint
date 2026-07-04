@@ -39,20 +39,64 @@ func IsCallee(node *ast.Node) bool {
 	return false
 }
 
+// GetStaticStringLiteralValue returns the string value and a presence flag if
+// node is a string literal or a no-substitution template literal. It does not
+// unwrap parentheses or TS assertions; callers choose which wrappers are
+// transparent for their rule.
+func GetStaticStringLiteralValue(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text, true
+	}
+	return "", false
+}
+
 // GetStaticStringValue returns the string value if the node is a string literal
 // or a no-substitution template literal. Returns "" if the value cannot be
 // statically determined.
 func GetStaticStringValue(node *ast.Node) string {
-	if node == nil {
-		return ""
+	value, _ := GetStaticStringLiteralValue(node)
+	return value
+}
+
+// IsGlobalParseIntCallee reports whether callee references the built-in
+// `parseInt` or `Number.parseInt` function. It mirrors ESLint's
+// astUtils.isSpecificId / isSpecificMemberAccess shape: outer parentheses and
+// optional chaining are transparent, TS-only assertion wrappers are not.
+func IsGlobalParseIntCallee(callee *ast.Node) bool {
+	callee = ast.SkipParentheses(callee)
+	if callee == nil {
+		return false
 	}
+
+	if ast.IsIdentifier(callee) {
+		return callee.AsIdentifier().Text == "parseInt" && !IsShadowed(callee, "parseInt")
+	}
+
+	if !IsSpecificMemberAccess(callee, "Number", "parseInt") {
+		return false
+	}
+
+	obj := memberAccessObject(callee)
+	obj = ast.SkipParentheses(obj)
+	return obj != nil && ast.IsIdentifier(obj) &&
+		obj.AsIdentifier().Text == "Number" &&
+		!IsShadowed(obj, "Number")
+}
+
+func memberAccessObject(node *ast.Node) *ast.Node {
 	switch node.Kind {
-	case ast.KindStringLiteral:
-		return node.AsStringLiteral().Text
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return node.AsNoSubstitutionTemplateLiteral().Text
+	case ast.KindPropertyAccessExpression:
+		return node.AsPropertyAccessExpression().Expression
+	case ast.KindElementAccessExpression:
+		return node.AsElementAccessExpression().Expression
 	}
-	return ""
+	return nil
 }
 
 // IsNonReferenceIdentifier checks if an identifier is NOT a value reference
