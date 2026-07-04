@@ -9,8 +9,9 @@ import (
 )
 
 // StaticStringEvaluator folds expressions to string constants. It wraps tsgo's
-// evaluator and adds local const identifier resolution through the TypeChecker.
-// Create one evaluator per linted file; it keeps a small recursion guard.
+// evaluator and adds stable local variable resolution through the TypeChecker.
+// Create one evaluator per linted file; it keeps write-reference and recursion
+// state for that file.
 type StaticStringEvaluator struct {
 	typeChecker       *checker.Checker
 	sourceFile        *ast.SourceFile
@@ -44,9 +45,10 @@ type staticEvalResult struct {
 
 // Eval returns the static string value of node, if it can be determined. It
 // covers the string-producing subset of ESLint's getStaticValue that rules use
-// for computed property names and key arguments, including nested conditionals,
-// logical short-circuiting, String(), String.raw, and local variables with
-// stable initializers.
+// for computed property names, key arguments, constructor arguments, and other
+// string-only rule inputs. It includes nested conditionals, logical
+// short-circuiting, String(), String.raw, and local variables with stable
+// initializers.
 func (staticEvaluator *StaticStringEvaluator) Eval(node *ast.Node) (string, bool) {
 	if staticEvaluator == nil || node == nil {
 		return "", false
@@ -108,44 +110,64 @@ func (staticEvaluator *StaticStringEvaluator) evalValue(node *ast.Node) staticEv
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalIdentifier(node *ast.Node) staticEvalResult {
-	if staticEvaluator.typeChecker == nil {
-		return staticEvalResult{}
-	}
-
-	expr := SkipAssertionsAndParens(node)
-	if expr == nil || expr.Kind != ast.KindIdentifier {
-		return staticEvalResult{}
-	}
-
-	symbol := GetReferenceSymbol(expr, staticEvaluator.typeChecker)
-	if symbol == nil || len(symbol.Declarations) != 1 || staticEvaluator.resolving[symbol] {
-		return staticEvalResult{}
-	}
-
-	declarationNode := symbol.Declarations[0]
-	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
-		return staticEvalResult{}
-	}
-
-	declaration := declarationNode.AsVariableDeclaration()
-	if declaration == nil || declaration.Initializer == nil || !isIdentifierWithText(declaration.Name(), expr.AsIdentifier().Text) {
-		return staticEvalResult{}
-	}
-
-	declarationList := declarationNode.Parent
-	if declarationList == nil || declarationList.Kind != ast.KindVariableDeclarationList {
-		return staticEvalResult{}
-	}
-	if ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) {
-		return staticEvalResult{}
-	}
-	if !ast.IsVarConst(declarationList) && staticEvaluator.hasWrites(symbol) {
+	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
+	if !ok || staticEvaluator.resolving[symbol] {
 		return staticEvalResult{}
 	}
 
 	staticEvaluator.resolving[symbol] = true
 	defer delete(staticEvaluator.resolving, symbol)
-	return staticEvaluator.evalValue(declaration.Initializer)
+	return staticEvaluator.evalValue(initializer)
+}
+
+// ResolveIdentifierInitializer resolves an identifier to a stable variable
+// initializer: const bindings, or let/var bindings with no write references in
+// the current source file. It returns false for destructuring, using bindings,
+// ambiguous symbols, or files where let/var writes cannot be checked.
+func (staticEvaluator *StaticStringEvaluator) ResolveIdentifierInitializer(node *ast.Node) (*ast.Node, bool) {
+	if staticEvaluator == nil {
+		return nil, false
+	}
+	initializer, _, ok := staticEvaluator.resolveIdentifierInitializer(node)
+	return initializer, ok
+}
+
+func (staticEvaluator *StaticStringEvaluator) resolveIdentifierInitializer(node *ast.Node) (*ast.Node, *ast.Symbol, bool) {
+	if staticEvaluator == nil || staticEvaluator.typeChecker == nil {
+		return nil, nil, false
+	}
+
+	expr := SkipAssertionsAndParens(node)
+	if expr == nil || expr.Kind != ast.KindIdentifier {
+		return nil, nil, false
+	}
+
+	symbol := GetReferenceSymbol(expr, staticEvaluator.typeChecker)
+	if symbol == nil || len(symbol.Declarations) != 1 {
+		return nil, nil, false
+	}
+
+	declarationNode := symbol.Declarations[0]
+	if declarationNode == nil || declarationNode.Kind != ast.KindVariableDeclaration {
+		return nil, nil, false
+	}
+
+	declaration := declarationNode.AsVariableDeclaration()
+	if declaration == nil || declaration.Initializer == nil || !isIdentifierWithText(declaration.Name(), expr.AsIdentifier().Text) {
+		return nil, nil, false
+	}
+
+	declarationList := declarationNode.Parent
+	if declarationList == nil || declarationList.Kind != ast.KindVariableDeclarationList {
+		return nil, nil, false
+	}
+	if ast.IsVarUsing(declarationList) || ast.IsVarAwaitUsing(declarationList) {
+		return nil, nil, false
+	}
+	if !ast.IsVarConst(declarationList) && staticEvaluator.hasWrites(symbol) {
+		return nil, nil, false
+	}
+	return declaration.Initializer, symbol, true
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalTemplateExpression(node *ast.Node) staticEvalResult {
@@ -321,7 +343,7 @@ func (staticEvaluator *StaticStringEvaluator) evalStringCall(node *ast.Node) sta
 
 func (staticEvaluator *StaticStringEvaluator) evalStringRawTag(node *ast.Node) staticEvalResult {
 	tagged := node.AsTaggedTemplateExpression()
-	if tagged == nil || tagged.Template == nil || !isStringRawTag(tagged.Tag) {
+	if tagged == nil || tagged.Template == nil || !staticEvaluator.isStringRawTag(tagged.Tag) {
 		return staticEvalResult{}
 	}
 
@@ -335,7 +357,7 @@ func (staticEvaluator *StaticStringEvaluator) evalStringRawTag(node *ast.Node) s
 	}
 }
 
-func isStringRawTag(tag *ast.Node) bool {
+func (staticEvaluator *StaticStringEvaluator) isStringRawTag(tag *ast.Node) bool {
 	tag = ast.SkipOuterExpressions(tag, ast.OEKParentheses|ast.OEKAssertions)
 	if tag == nil || tag.Kind != ast.KindPropertyAccessExpression {
 		return false
@@ -348,7 +370,24 @@ func isStringRawTag(tag *ast.Node) bool {
 	}
 
 	object := ast.SkipOuterExpressions(propertyAccess.Expression, ast.OEKParentheses|ast.OEKAssertions)
-	return isIdentifierWithText(object, "String") && !IsShadowed(object, "String")
+	return staticEvaluator.isBuiltinStringValue(object, map[*ast.Symbol]bool{})
+}
+
+func (staticEvaluator *StaticStringEvaluator) isBuiltinStringValue(node *ast.Node, resolvingAliases map[*ast.Symbol]bool) bool {
+	node = SkipAssertionsAndParens(node)
+	if node == nil {
+		return false
+	}
+	if isIdentifierWithText(node, "String") && !IsShadowed(node, "String") {
+		return true
+	}
+	initializer, symbol, ok := staticEvaluator.resolveIdentifierInitializer(node)
+	if !ok || resolvingAliases[symbol] {
+		return false
+	}
+	resolvingAliases[symbol] = true
+	defer delete(resolvingAliases, symbol)
+	return staticEvaluator.isBuiltinStringValue(initializer, resolvingAliases)
 }
 
 func (staticEvaluator *StaticStringEvaluator) evalWithTsgo(node *ast.Node) (result staticEvalResult) {
@@ -394,7 +433,7 @@ func (staticEvaluator *StaticStringEvaluator) computeWriteRefs() {
 			return
 		}
 		if node.Kind == ast.KindIdentifier && IsWriteReference(node) {
-			if symbol := staticEvaluator.typeChecker.GetSymbolAtLocation(node); symbol != nil {
+			if symbol := GetReferenceSymbol(node, staticEvaluator.typeChecker); symbol != nil {
 				staticEvaluator.writeRefs[symbol] = true
 			}
 		}

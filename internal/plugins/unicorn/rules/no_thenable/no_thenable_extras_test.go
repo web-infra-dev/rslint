@@ -46,6 +46,8 @@ func TestNoThenableExtras(t *testing.T) {
 			tsValid(`const prefix = "th"; const foo = {[prefix + suffix]: 1}`),
 			tsValid(`const key = flag ? "then" : "no"; const foo = {[key]: 1}`),
 			tsValid(`{ const String = value => "then"; Object.defineProperty(foo, String("x"), {value: 1}) }`),
+			tsValid("{ const String = { raw: () => \"then\" }; const foo = {[String.raw`then`]: 1} }"),
+			tsValid("let RawString = String; RawString = {raw: () => \"then\"} as any; const foo = {[RawString.raw`then`]: 1}"),
 			tsValid(`let key = "then"; key = "other"; const foo = {[key]: 1}`),
 
 			// ---- Dimension 4: non-assignment member access is allowed ----
@@ -91,6 +93,7 @@ func TestNoThenableExtras(t *testing.T) {
 			tsClassInvalid(`const key = "" || "then"; class Foo {[key]() {}}`, `key`, 2),
 			tsObjectInvalid(`const key = "then" && "then"; foo[key] = 1`, `key`, 2),
 			tsObjectInvalid("const key = String.raw`then`; Object.defineProperty(foo, key, {value: 1})", `key`, 2),
+			tsObjectInvalid("const RawString = String; const foo = {[RawString.raw`then`]: 1}", "RawString.raw`then`"),
 			tsObjectInvalid(`const key = String("then"); Object.fromEntries([[key, 1]])`, `key`, 2),
 			tsObjectInvalid(`let key = "then"; const foo = {[key]: 1}`, `key`, 2),
 			tsObjectInvalid(`var key = "then"; Object.defineProperty(foo, key, {value: 1})`, `key`, 2),

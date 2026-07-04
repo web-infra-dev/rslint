@@ -33,7 +33,15 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"const stringNoArgumentCall = String();\n" +
 		"const stringRaw = String.raw`then`;\n" +
 		"const stringRawSubstitution = String.raw`th${\"e\"}n`;\n" +
+		"const RawString = String;\n" +
+		"const stringRawAlias = RawString.raw`then`;\n" +
+		"let MutableRawString = String;\n" +
+		"MutableRawString = {raw: value => \"then\"} as any;\n" +
+		"const stringRawMutableAlias = MutableRawString.raw`then`;\n" +
+		"const typedRawStringAlias: StringConstructor = fake;\n" +
+		"const stringRawTypedAlias = typedRawStringAlias.raw`then`;\n" +
 		"{ const String = value => \"then\"; const shadowedStringCall = String(\"then\"); }\n" +
+		"{ const String = { raw: value => \"then\" }; const shadowedStringRaw = String.raw`then`; }\n" +
 		"let letStatic = \"then\";\n" +
 		"var varStatic = \"then\";\n" +
 		"const letStaticUse = letStatic;\n" +
@@ -44,6 +52,9 @@ func TestStaticStringEvaluator(t *testing.T) {
 		"var varWritten = \"then\";\n" +
 		"varWritten++;\n" +
 		"const varWrittenUse = varWritten;\n" +
+		"let destructuredWritten = \"then\";\n" +
+		"({destructuredWritten} = other);\n" +
+		"const destructuredWrittenUse = destructuredWritten;\n" +
 		"const notThen = \"not-then\";\n" +
 		"const cycle = cycle;\n" +
 		"let letValue = \"then\";\n" +
@@ -86,7 +97,11 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "stringNoArgumentCall", want: "", ok: true},
 		{name: "stringRaw", want: "then", ok: true},
 		{name: "stringRawSubstitution", want: "then", ok: true},
+		{name: "stringRawAlias", want: "then", ok: true},
+		{name: "stringRawMutableAlias"},
+		{name: "stringRawTypedAlias"},
 		{name: "shadowedStringCall"},
+		{name: "shadowedStringRaw"},
 		{name: "letStatic", want: "then", ok: true},
 		{name: "varStatic", want: "then", ok: true},
 		{name: "letStaticUse", want: "then", ok: true},
@@ -95,6 +110,8 @@ func TestStaticStringEvaluator(t *testing.T) {
 		{name: "letWrittenUse"},
 		{name: "varWritten", want: "then", ok: true},
 		{name: "varWrittenUse"},
+		{name: "destructuredWritten", want: "then", ok: true},
+		{name: "destructuredWrittenUse"},
 		{name: "notThen", want: "not-then", ok: true},
 		{name: "cycle"},
 		{name: "letUse", want: "then", ok: true},
