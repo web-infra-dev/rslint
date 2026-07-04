@@ -224,9 +224,11 @@ func TestNoConditionalExpectRule(t *testing.T) {
 				Code: `
         it('foo', () => {
           something && expect(something).toHaveBeenCalled();
+          otherThing && expect(otherThing).toHaveBeenCalled();
         })
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
 					{MessageId: "conditionalExpect"},
 				},
 			},
@@ -700,6 +702,46 @@ func TestNoConditionalExpectRule(t *testing.T) {
             .then(() => { throw new Error('oh noes!'); })
             .catch(error => expect(error).toBeInstanceOf(Error));
         });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `
+        it('works', async () => {
+          await Promise.resolve()
+            .catch(error => {
+              expect(error).toBeInstanceOf(Error);
+              expect(error.message).toBe('oh noes!');
+            });
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `
+        it('works', async () => {
+          await Promise.resolve()
+            .catch(error => {
+              if (error) {
+                expect(error).toBeInstanceOf(Error);
+              }
+            });
+        });
+      `,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "conditionalExpect"},
+					{MessageId: "conditionalExpect"},
+				},
+			},
+			{
+				Code: `
+        Promise.resolve()
+          .catch(error => expect(error).toBeInstanceOf(Error));
       `,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "conditionalExpect"},

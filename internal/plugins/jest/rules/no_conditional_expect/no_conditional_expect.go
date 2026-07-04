@@ -139,10 +139,7 @@ var NoConditionalExpectRule = rule.Rule{
 		testCallbackFunctions := collectTestFunctionCallbacks(ctx)
 		testCaseDepth := 0
 		conditionalDepth := 0
-		promiseCatchDepth := 0
-		// eslint-plugin-jest parity tests expect one diagnostic per test block even
-		// when multiple conditional expects exist (e.g. chained .catch handlers).
-		reportedInCurrentTest := false
+		inPromiseCatch := false
 		callExpressionFrames := map[*ast.Node]callExpressionFrame{}
 
 		inTestCase := func() bool {
@@ -150,9 +147,6 @@ var NoConditionalExpectRule = rule.Rule{
 		}
 
 		enterTestCase := func() {
-			if testCaseDepth == 0 {
-				reportedInCurrentTest = false
-			}
 			testCaseDepth++
 		}
 
@@ -160,17 +154,6 @@ var NoConditionalExpectRule = rule.Rule{
 			if testCaseDepth > 0 {
 				testCaseDepth--
 			}
-			if testCaseDepth == 0 {
-				reportedInCurrentTest = false
-			}
-		}
-
-		reportConditionalExpect := func(node *ast.Node) {
-			if reportedInCurrentTest {
-				return
-			}
-			ctx.ReportNode(node, buildConditionalExpectMessage())
-			reportedInCurrentTest = true
 		}
 
 		enterConditional := func(node *ast.Node) {
@@ -241,15 +224,18 @@ var NoConditionalExpectRule = rule.Rule{
 				}
 
 				if isCatch {
-					promiseCatchDepth++
+					inPromiseCatch = true
 				}
 
 				if jestFnCall == nil || jestFnCall.Kind != jestUtils.JestFnTypeExpect {
 					return
 				}
 
-				if inTestCase() && (conditionalDepth > 0 || promiseCatchDepth > 0) {
-					reportConditionalExpect(node)
+				if inTestCase() && conditionalDepth > 0 {
+					ctx.ReportNode(node, buildConditionalExpectMessage())
+				}
+				if inPromiseCatch {
+					ctx.ReportNode(node, buildConditionalExpectMessage())
 				}
 			},
 			rule.ListenerOnExit(ast.KindCallExpression): func(node *ast.Node) {
@@ -262,8 +248,8 @@ var NoConditionalExpectRule = rule.Rule{
 					exitTestCase()
 				}
 
-				if frame.isCatch && promiseCatchDepth > 0 {
-					promiseCatchDepth--
+				if frame.isCatch {
+					inPromiseCatch = false
 				}
 			},
 		}
