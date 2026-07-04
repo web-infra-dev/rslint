@@ -529,6 +529,7 @@ export default defineConfig({
     // eslint-plugin-unicorn
     './tests/eslint-plugin-unicorn/rules/filename-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/new-for-builtins.test.ts',
+    './tests/eslint-plugin-unicorn/rules/no-instanceof-builtins.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-static-only-class.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-thenable.test.ts',
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
