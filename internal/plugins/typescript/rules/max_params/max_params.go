@@ -2,7 +2,6 @@ package max_params
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -32,7 +31,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	check := func(node *ast.Node) {
 		params := node.Parameters()
 		effective := len(params)
-		if !opts.countVoidThis && len(params) > 0 && isThisVoidParam(params[0]) {
+		if !opts.countVoidThis && utils.IsThisVoidParameter(ast.GetThisParameter(node)) {
 			effective--
 		}
 		if effective <= opts.max {
@@ -67,17 +66,6 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	}
 }
 
-// isThisVoidParam reports whether `p` is a `this: void` parameter, which
-// the typescript-eslint rule strips from the parameter list before counting
-// (unless `countVoidThis: true`).
-func isThisVoidParam(p *ast.Node) bool {
-	if !ast.IsThisParameter(p) {
-		return false
-	}
-	t := p.Type()
-	return t != nil && t.Kind == ast.KindVoidKeyword
-}
-
 // parseOptions mirrors @typescript-eslint/max-params' schema: a single
 // optional object with `max`, `maximum`, and `countVoidThis`. Other shapes
 // (bare integer, integer-in-array) fall through to defaults — upstream
@@ -87,34 +75,15 @@ func isThisVoidParam(p *ast.Node) bool {
 // `option.maximum || option.max` follows JS truthy coercion: a present-but-
 // zero `maximum` falls through to `max`; a present-but-falsy value with no
 // fallback leaves `numParams = undefined` upstream, which makes every
-// `count > undefined` comparison false (effectively disabling the rule).
-// We model that case with MaxInt.
+// `count > undefined` comparison false. The shared legacy max helper models
+// that disabled state with MaxInt.
 func parseOptions(o any) ruleOptions {
 	out := ruleOptions{max: defaultMax}
 	m := utils.GetOptionsMap(o)
 	if m == nil {
 		return out
 	}
-	_, hasMaximum := m["maximum"]
-	_, hasMax := m["max"]
-	if hasMaximum || hasMax {
-		hasNum := false
-		if hasMaximum {
-			if n, ok := utils.CoerceInt(m["maximum"]); ok && n != 0 {
-				out.max = n
-				hasNum = true
-			}
-		}
-		if !hasNum && hasMax {
-			if n, ok := utils.CoerceInt(m["max"]); ok {
-				out.max = n
-				hasNum = true
-			}
-		}
-		if !hasNum {
-			out.max = math.MaxInt
-		}
-	}
+	out.max = utils.ResolveLegacyMaxOption(m, defaultMax)
 	if v, ok := m["countVoidThis"]; ok {
 		if b, ok := v.(bool); ok {
 			out.countVoidThis = b
@@ -122,4 +91,3 @@ func parseOptions(o any) ruleOptions {
 	}
 	return out
 }
-
