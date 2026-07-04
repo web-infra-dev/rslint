@@ -1,15 +1,16 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module';
+import os from 'node:os';
+
+const require = createRequire(import.meta.url);
 const startTime = Date.now();
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
-const os = require('node:os');
 
 function getBinPath() {
   // The Go binary lives in the @rslint/native-{tuple} platform package, reached
   // via its `./bin` export. Resolution is identical in dev and prod: `pnpm build`
   // drops the host binary into npm/rslint/{tuple}/, and npm installs only the
   // subpackage matching the host os/cpu/libc. On linux we just try gnu then musl
-  // and use whichever resolved — no libc sniffing (Go binaries are static, the
+  // and use whichever resolved - no libc sniffing (Go binaries are static, the
   // gnu/musl distinction doesn't matter to them).
   const arch = os.arch();
   const tuples =
@@ -31,9 +32,7 @@ function getBinPath() {
 
 async function main() {
   const binPath = getBinPath();
-  const { run } = await import(
-    pathToFileURL(path.resolve(__dirname, '../dist/cli.js')).href
-  );
+  const { run } = await import('../dist/cli.js');
   const exitCode = await run(binPath, process.argv.slice(2), startTime);
   // process.exit() would tear down before async-buffered stdout writes (pipes,
   // Windows TTYs) flush, truncating the lint tail. Setting exitCode lets the
