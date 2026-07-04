@@ -1270,6 +1270,8 @@ func IsSameReference(left, right *ast.Node) bool {
 
 // AccessExpressionStaticName returns the static property name of an access expression
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
+// Element access arguments are unwrapped through parentheses and TS assertions
+// because ESTree-based helpers treat those wrappers as transparent.
 func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -1278,7 +1280,7 @@ func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 			return name.Text(), true
 		}
 	case ast.KindElementAccessExpression:
-		return GetStaticExpressionValue(node.AsElementAccessExpression().ArgumentExpression)
+		return GetStaticExpressionValue(SkipAssertionsAndParens(node.AsElementAccessExpression().ArgumentExpression))
 	}
 	return "", false
 }
