@@ -96,8 +96,9 @@ export class RuleTester {
       valid: ValidTestCase[];
       invalid: InvalidTestCase[];
     },
+    testName = ruleName,
   ) {
-    describe(ruleName, () => {
+    describe(testName, () => {
       const cwd = path.resolve(import.meta.dirname);
       const config = path.resolve(cwd, './rslint.config.mjs');
 

@@ -1,0 +1,1617 @@
+// Rstest Snapshot v1
+
+exports[`prefer-numeric-literals invalid 1 > invalid 1`] = `
+{
+  "code": "parseInt("111110111", 2) === 503;",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 2`] = `
+{
+  "code": "parseInt("767", 8) === 503;",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 3`] = `
+{
+  "code": "parseInt("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 4`] = `
+{
+  "code": "Number.parseInt("111110111", 2) === 503;",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 5`] = `
+{
+  "code": "Number.parseInt("767", 8) === 503;",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 6`] = `
+{
+  "code": "Number.parseInt("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 7`] = `
+{
+  "code": "parseInt('7999', 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 8`] = `
+{
+  "code": "parseInt('1234', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 9`] = `
+{
+  "code": "parseInt('1234.5', 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 1 > invalid 10`] = `
+{
+  "code": "parseInt('\\u0031\\ufe0f\\u20e3\\u0033\\ufe0f\\u20e3\\u0033\\ufe0f\\u20e3\\u0037\\ufe0f\\u20e3', 16);",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 89,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 1`] = `
+{
+  "code": "Number.parseInt('7999', 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 2`] = `
+{
+  "code": "Number.parseInt('1234', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 3`] = `
+{
+  "code": "Number.parseInt('1234.5', 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 4`] = `
+{
+  "code": "Number.parseInt('\\u0031\\ufe0f\\u20e3\\u0033\\ufe0f\\u20e3\\u0033\\ufe0f\\u20e3\\u0037\\ufe0f\\u20e3', 16);",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 96,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 5`] = `
+{
+  "code": "parseInt(\`111110111\`, 2) === 503;",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 6`] = `
+{
+  "code": "parseInt(\`767\`, 8) === 503;",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 7`] = `
+{
+  "code": "parseInt(\`1F7\`, 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 8`] = `
+{
+  "code": "parseInt('', 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 9`] = `
+{
+  "code": "parseInt(\`\`, 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 2 > invalid 10`] = `
+{
+  "code": "parseInt(\`7999\`, 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 1`] = `
+{
+  "code": "parseInt(\`1234\`, 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 2`] = `
+{
+  "code": "parseInt(\`1234.5\`, 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 3`] = `
+{
+  "code": "parseInt('11', 2)",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 4`] = `
+{
+  "code": "Number.parseInt('67', 8)",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 5`] = `
+{
+  "code": "5+parseInt('A', 16)",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 6`] = `
+{
+  "code": "function *f(){ yield(Number).parseInt('11', 2) }",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of (Number).parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 7`] = `
+{
+  "code": "function *f(){ yield(Number.parseInt)('67', 8) }",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 8`] = `
+{
+  "code": "function *f(){ yield(parseInt)('A', 16) }",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 9`] = `
+{
+  "code": "function *f(){ yield Number.parseInt('11', 2) }",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 3 > invalid 10`] = `
+{
+  "code": "function *f(){ yield/**/Number.parseInt('67', 8) }",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 1`] = `
+{
+  "code": "function *f(){ yield(parseInt('A', 16)) }",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 2`] = `
+{
+  "code": "parseInt('11', 2)+5",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 3`] = `
+{
+  "code": "Number.parseInt('17', 8)+5",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 4`] = `
+{
+  "code": "parseInt('A', 16)+5",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 5`] = `
+{
+  "code": "parseInt('11', 2)in foo",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 6`] = `
+{
+  "code": "Number.parseInt('17', 8)in foo",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 7`] = `
+{
+  "code": "parseInt('A', 16)in foo",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 8`] = `
+{
+  "code": "parseInt('11', 2) in foo",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 9`] = `
+{
+  "code": "Number.parseInt('17', 8)/**/in foo",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 4 > invalid 10`] = `
+{
+  "code": "(parseInt('A', 16))in foo",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 1`] = `
+{
+  "code": "/* comment */Number.parseInt('11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 2`] = `
+{
+  "code": "Number/**/.parseInt('11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number/**/.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 3`] = `
+{
+  "code": "Number//
+.parseInt('11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number//
+.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 4`] = `
+{
+  "code": "Number./**/parseInt('11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number./**/parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 5`] = `
+{
+  "code": "Number.parseInt(/**/'11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 6`] = `
+{
+  "code": "Number.parseInt('11', /**/2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 7`] = `
+{
+  "code": "Number.parseInt('11', 2)/* comment */;",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 8`] = `
+{
+  "code": "parseInt/**/('11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 9`] = `
+{
+  "code": "parseInt(//
+'11', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 5 > invalid 10`] = `
+{
+  "code": "parseInt('11'/**/, 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 1`] = `
+{
+  "code": "parseInt(\`11\`/**/, 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 2`] = `
+{
+  "code": "parseInt('11', 2 /**/);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 3`] = `
+{
+  "code": "parseInt('11', 2)//comment
+;",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 4`] = `
+{
+  "code": "parseInt?.("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 5`] = `
+{
+  "code": "Number?.parseInt("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number?.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 6`] = `
+{
+  "code": "Number?.parseInt?.("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number?.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 7`] = `
+{
+  "code": "(Number?.parseInt)("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number?.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 8`] = `
+{
+  "code": "(Number?.parseInt)?.("1F7", 16) === 255;",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number?.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 9`] = `
+{
+  "code": "parseInt('1_0', 2);",
+  "diagnostics": [
+    {
+      "message": "Use binary literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 6 > invalid 10`] = `
+{
+  "code": "Number.parseInt('5_000', 8);",
+  "diagnostics": [
+    {
+      "message": "Use octal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 7 > invalid 1`] = `
+{
+  "code": "parseInt('0_1', 16);",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-numeric-literals invalid 7 > invalid 2`] = `
+{
+  "code": "Number.parseInt('0_0', 16);",
+  "diagnostics": [
+    {
+      "message": "Use hexadecimal literals instead of Number.parseInt().",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-numeric-literals",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

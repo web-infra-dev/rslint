@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"strings"
+	"unicode/utf8"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 )
@@ -58,6 +61,29 @@ func TokenAtOrAfter(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
 	}, true
 }
 
+// TokenBeforePosition returns the last non-trivia token whose end is not after
+// pos.
+func TokenBeforePosition(sourceFile *ast.SourceFile, pos int) (SourceToken, bool) {
+	sourceText := sourceFile.Text()
+	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
+
+	var previous SourceToken
+	found := false
+	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < pos {
+		if scan.TokenEnd() <= pos {
+			previous = SourceToken{
+				Kind:  scan.Token(),
+				Start: scan.TokenStart(),
+				End:   scan.TokenEnd(),
+				Text:  sourceTokenText(sourceText, scan.Token(), scan.TokenStart(), scan.TokenEnd()),
+			}
+			found = true
+		}
+		scan.Scan()
+	}
+	return previous, found
+}
+
 // PreviousTokenBefore returns the last token in node whose end is not after pos.
 func PreviousTokenBefore(sourceFile *ast.SourceFile, node *ast.Node, pos int) (SourceToken, bool) {
 	var previous SourceToken
@@ -72,6 +98,65 @@ func PreviousTokenBefore(sourceFile *ast.SourceFile, node *ast.Node, pos int) (S
 		}
 	}
 	return previous, found
+}
+
+// SafeReplacementText adds a single leading or trailing space when replacing
+// node with replacement would otherwise merge with an adjacent token.
+func SafeReplacementText(sourceFile *ast.SourceFile, node *ast.Node, replacement string) string {
+	nodeRange := TrimNodeTextRange(sourceFile, node)
+	output := replacement
+
+	if before, ok := TokenBeforePosition(sourceFile, nodeRange.Pos()); ok &&
+		before.End == nodeRange.Pos() &&
+		!CanTokenTextsBeAdjacent(before.Text, output) {
+		output = " " + output
+	}
+
+	if after, ok := TokenAtOrAfter(sourceFile, nodeRange.End()); ok &&
+		after.Start == nodeRange.End() &&
+		!CanTokenTextsBeAdjacent(output, after.Text) {
+		output += " "
+	}
+
+	return output
+}
+
+// CanTokenTextsBeAdjacent is a small source-text analogue of ESLint's
+// astUtils.canTokensBeAdjacent. It returns false for token pairs that would
+// merge into a different token if printed without whitespace.
+func CanTokenTextsBeAdjacent(left string, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	if left == "" || right == "" {
+		return true
+	}
+
+	leftRune, _ := utf8.DecodeLastRuneInString(left)
+	rightRune, _ := utf8.DecodeRuneInString(right)
+	if leftRune == utf8.RuneError || rightRune == utf8.RuneError {
+		return true
+	}
+
+	if scanner.IsIdentifierPart(leftRune) && scanner.IsIdentifierPart(rightRune) {
+		return false
+	}
+	if (leftRune == '+' && rightRune == '+') || (leftRune == '-' && rightRune == '-') {
+		return false
+	}
+	if leftRune == '/' && (rightRune == '/' || rightRune == '*' || scanner.IsIdentifierPart(rightRune)) {
+		return false
+	}
+	return true
+}
+
+func sourceTokenText(sourceText string, kind ast.Kind, start int, end int) string {
+	if start >= 0 && start < end && end <= len(sourceText) {
+		return sourceText[start:end]
+	}
+	if text := scanner.TokenToString(kind); text != "" {
+		return text
+	}
+	return kind.String()
 }
 
 // IsSameLine reports whether two positions are on the same ECMAScript line.
