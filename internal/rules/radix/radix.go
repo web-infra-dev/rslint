@@ -80,47 +80,6 @@ func isValidRadix(radix *ast.Node) bool {
 	return true
 }
 
-// isParseIntCallee reports whether a callee is a reference to the global
-// `parseInt` or `Number.parseInt` function that is not shadowed. Mirrors
-// ESLint's scope-based check, with the same constraints:
-//
-//   - `Number['parseInt']()` is NOT matched (ESLint's isParseIntMethod rejects
-//     computed member access).
-//   - `Number.#parseInt()` is NOT matched (PrivateIdentifier, not Identifier).
-//   - TS-only wrappers (`!`, `as`, `<T>`, `satisfies`) on the callee or on
-//     `Number` cause ESLint's check to fail because the callee node is no
-//     longer an Identifier. We mirror that by only peeling parentheses, not
-//     other outer expressions.
-func isParseIntCallee(callee *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if callee == nil {
-		return false
-	}
-
-	switch callee.Kind {
-	case ast.KindIdentifier:
-		return callee.AsIdentifier().Text == "parseInt" &&
-			!utils.IsShadowed(callee, "parseInt")
-
-	case ast.KindPropertyAccessExpression:
-		pae := callee.AsPropertyAccessExpression()
-		name := pae.Name()
-		if name == nil || !ast.IsIdentifier(name) {
-			return false
-		}
-		if name.AsIdentifier().Text != "parseInt" {
-			return false
-		}
-		obj := ast.SkipParentheses(pae.Expression)
-		if obj == nil || !ast.IsIdentifier(obj) {
-			return false
-		}
-		return obj.AsIdentifier().Text == "Number" &&
-			!utils.IsShadowed(obj, "Number")
-	}
-	return false
-}
-
 // hasTrailingComma reports whether the CallExpression source text has a
 // trailing comma after the last argument. It skips whitespace and comments
 // between the last argument and the closing paren.
@@ -139,7 +98,7 @@ var RadixRule = rule.Rule{
 				if call == nil {
 					return
 				}
-				if !isParseIntCallee(call.Expression) {
+				if !utils.IsGlobalParseIntCallee(call.Expression) {
 					return
 				}
 				checkArguments(ctx, node, call)

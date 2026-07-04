@@ -1,0 +1,105 @@
+// Rstest Snapshot v1
+
+exports[`no-new-native-nonconstructor > invalid 1`] = `
+{
+  "code": "var foo = new Symbol('foo');",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewNonconstructor",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-native-nonconstructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-native-nonconstructor > invalid 2`] = `
+{
+  "code": "function bar() { return function Symbol() {}; } var baz = new Symbol('baz');",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewNonconstructor",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 63,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-native-nonconstructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-native-nonconstructor > invalid 3`] = `
+{
+  "code": "var foo = new BigInt(9007199254740991);",
+  "diagnostics": [
+    {
+      "message": "\`BigInt\` cannot be called as a constructor.",
+      "messageId": "noNewNonconstructor",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-native-nonconstructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-native-nonconstructor > invalid 4`] = `
+{
+  "code": "function bar() { return function BigInt() {}; } var baz = new BigInt(9007199254740991);",
+  "diagnostics": [
+    {
+      "message": "\`BigInt\` cannot be called as a constructor.",
+      "messageId": "noNewNonconstructor",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 63,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-native-nonconstructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

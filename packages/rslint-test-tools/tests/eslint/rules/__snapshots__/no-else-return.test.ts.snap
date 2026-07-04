@@ -1,0 +1,2047 @@
+// Rstest Snapshot v1
+
+exports[`no-else-return > invalid 1`] = `
+{
+  "code": "function foo1() { if (true) { return x; } else { return y; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 2`] = `
+{
+  "code": "function foo2() { if (true) { var x = bar; return x; } else { var y = baz; return y; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 87,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 3`] = `
+{
+  "code": "function foo3() { if (true) return x; else return y; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 4`] = `
+{
+  "code": "function foo4() { if (true) { if (false) return x; else return y; } else { return z; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 87,
+          "line": 1,
+        },
+        "start": {
+          "column": 74,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 5`] = `
+{
+  "code": "function foo5() { if (true) { if (false) { if (true) return x; else { w = y; } } else { w = x; } } else { return z; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 79,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 6`] = `
+{
+  "code": "function foo6() { if (true) { if (false) { if (true) return x; else return y; } } else { return z; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 7`] = `
+{
+  "code": "function foo7() { if (true) { if (false) { if (true) return x; else return y; } return w; } else { return z; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 111,
+          "line": 1,
+        },
+        "start": {
+          "column": 98,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 8`] = `
+{
+  "code": "function foo8() { if (true) { if (false) { if (true) return x; else return y; } else { w = x; } } else { return z; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 96,
+          "line": 1,
+        },
+        "start": {
+          "column": 86,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 9`] = `
+{
+  "code": "function foo9() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 93,
+          "line": 1,
+        },
+        "start": {
+          "column": 76,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 10`] = `
+{
+  "code": "function foo9a() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 94,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 11`] = `
+{
+  "code": "function foo9b() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 89,
+          "line": 1,
+        },
+        "start": {
+          "column": 72,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 12`] = `
+{
+  "code": "function foo10() { if (foo) return bar; else (foo).bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 13`] = `
+{
+  "code": "function foo11() { if (foo) return bar
+else { [1, 2, 3].map(foo) } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 14`] = `
+{
+  "code": "function foo12() { if (foo) return bar
+else { baz() }
+[1, 2, 3].map(foo) }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 15`] = `
+{
+  "code": "function foo13() { if (foo) return bar;
+else { [1, 2, 3].map(foo) } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 16`] = `
+{
+  "code": "function foo14() { if (foo) return bar
+else { baz(); }
+[1, 2, 3].map(foo) }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 17`] = `
+{
+  "code": "function foo15() { if (foo) return bar; else { baz() } qaz() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 18`] = `
+{
+  "code": "function foo16() { if (foo) return bar
+else { baz() } qaz() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 19`] = `
+{
+  "code": "function foo17() { if (foo) return bar
+else { baz() }
+qaz() }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 20`] = `
+{
+  "code": "function foo18() { if (foo) return function() {}
+else [1, 2, 3].map(bar) }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 21`] = `
+{
+  "code": "function foo19() { if (true) { return x; } else if (false) { return y; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 22`] = `
+{
+  "code": "function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 94,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 23`] = `
+{
+  "code": "function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 94,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 24`] = `
+{
+  "code": "function foo() { var a; if (bar) { return true; } else { var a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 25`] = `
+{
+  "code": "function foo() { if (bar) { var a; if (baz) { return true; } else { var a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 26`] = `
+{
+  "code": "function foo() { let a; if (bar) { return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 27`] = `
+{
+  "code": "class foo { bar() { let a; if (baz) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 59,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 28`] = `
+{
+  "code": "function foo() { if (bar) { let a; if (baz) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 29`] = `
+{
+  "code": "function foo() {let a; if (bar) { if (baz) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 30`] = `
+{
+  "code": "function foo() { const a = 1; if (bar) { return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 31`] = `
+{
+  "code": "function foo() { if (bar) { const a = 1; if (baz) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 83,
+          "line": 1,
+        },
+        "start": {
+          "column": 73,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 32`] = `
+{
+  "code": "function foo() { let a; if (bar) { return true; } else { const a = 1 } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 33`] = `
+{
+  "code": "function foo() { if (bar) { let a; if (baz) { return true; } else { const a = 1; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 83,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 34`] = `
+{
+  "code": "function foo() { class a {}; if (bar) { return true; } else { const a = 1; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 35`] = `
+{
+  "code": "function foo() { if (bar) { class a {}; if (baz) { return true; } else { const a = 1; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 88,
+          "line": 1,
+        },
+        "start": {
+          "column": 72,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 36`] = `
+{
+  "code": "function foo() { const a = 1; if (bar) { return true; } else { class a {} } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 37`] = `
+{
+  "code": "function foo() { if (bar) { const a = 1; if (baz) { return true; } else { class a {} } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 87,
+          "line": 1,
+        },
+        "start": {
+          "column": 73,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 38`] = `
+{
+  "code": "function foo() { var a; if (bar) { return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 39`] = `
+{
+  "code": "function foo() { if (bar) { var a; return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 40`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let a; }  while (baz) { var a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 41`] = `
+{
+  "code": "function foo(a) { if (bar) { return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 42`] = `
+{
+  "code": "function foo(a = 1) { if (bar) { return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 43`] = `
+{
+  "code": "function foo(a, b = a) { if (bar) { return true; } else { let a; }  if (bar) { return true; } else { let b; }}",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 57,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 110,
+          "line": 1,
+        },
+        "start": {
+          "column": 100,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 44`] = `
+{
+  "code": "function foo(...args) { if (bar) { return true; } else { let args; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 45`] = `
+{
+  "code": "function foo() { try {} catch (a) { if (bar) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 68,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 46`] = `
+{
+  "code": "function foo() { try {} catch (a) { if (bar) { if (baz) { return true; } else { let a; } } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 89,
+          "line": 1,
+        },
+        "start": {
+          "column": 79,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 47`] = `
+{
+  "code": "function foo() { try {} catch ({bar, a = 1}) { if (baz) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 89,
+          "line": 1,
+        },
+        "start": {
+          "column": 79,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 48`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let arguments; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 49`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let arguments; } return arguments[0]; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 50`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let arguments; } if (baz) { return arguments[0]; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 51`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let arguments; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 52`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let a; } a; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 53`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let a; } if (baz) { a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 54`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } } a; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 55`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 56`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } if (quux) { a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 57`] = `
+{
+  "code": "function a() { if (foo) { return true; } else { let a; } a(); }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 58`] = `
+{
+  "code": "function a() { if (a) { return true; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 59`] = `
+{
+  "code": "function a() { if (foo) { return a; } else { let a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 60`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let a; } function baz() { a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 61`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } (() => a) } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 62`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let a; } var a; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 63`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } var a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 64`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } var { a } = {}; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 65`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } if (quux) { var a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 66`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { var a; } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 67`] = `
+{
+  "code": "function foo() { if (quux) { var a; } if (bar) { if (baz) { return true; } else { let a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 91,
+          "line": 1,
+        },
+        "start": {
+          "column": 81,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 68`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else { let a; } function a(){} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 69`] = `
+{
+  "code": "function foo() { if (baz) { if (bar) { return true; } else { let a; } function a(){} } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 70`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { function a(){}  } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 71`] = `
+{
+  "code": "function foo() { if (bar) { if (baz) { return true; } else { let a; } } function a(){} }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 72`] = `
+{
+  "code": "function foo() { let a; if (bar) { return true; } else { function a(){} } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 73`] = `
+{
+  "code": "function foo() { var a; if (bar) { return true; } else { function a(){} } }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 74`] = `
+{
+  "code": "function foo() { if (bar) { return true; } else function baz() {} };",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 75`] = `
+{
+  "code": "if (foo) { return true; } else { let a; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-else-return > invalid 76`] = `
+{
+  "code": "let a; if (foo) { return true; } else { let a; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary 'else' after 'return'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-else-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

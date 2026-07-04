@@ -1,0 +1,645 @@
+// Rstest Snapshot v1
+
+exports[`no-unused-labels > invalid 1`] = `
+{
+  "code": "A: var foo = 0;",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 2`] = `
+{
+  "code": "A: { foo(); bar(); }",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 3`] = `
+{
+  "code": "A: if (a) { foo(); bar(); }",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 4`] = `
+{
+  "code": "A: for (var i = 0; i < 10; ++i) { foo(); if (a) break; bar(); }",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 5`] = `
+{
+  "code": "A: for (var i = 0; i < 10; ++i) { foo(); if (a) continue; bar(); }",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 6`] = `
+{
+  "code": "A: for (var i = 0; i < 10; ++i) { B: break A; }",
+  "diagnostics": [
+    {
+      "message": "'B:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 7`] = `
+{
+  "code": "A: { var A = 0; console.log(A); }",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 8`] = `
+{
+  "code": "A: /* comment */ foo",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 9`] = `
+{
+  "code": "A /* comment */: foo",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 10`] = `
+{
+  "code": "A: "use strict"",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 11`] = `
+{
+  "code": ""use strict"; foo: "bar"",
+  "diagnostics": [
+    {
+      "message": "'foo:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 12`] = `
+{
+  "code": "A: ("use strict")",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 13`] = `
+{
+  "code": "A: \`use strict\`",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 14`] = `
+{
+  "code": "if (foo) { bar: 'baz' }",
+  "diagnostics": [
+    {
+      "message": "'bar:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 15`] = `
+{
+  "code": "A: B: 'foo'",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'B:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 16`] = `
+{
+  "code": "A: B: C: 'foo'",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'B:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'C:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 17`] = `
+{
+  "code": "A: B: C: D: 'foo'",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'B:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'C:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'D:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 18`] = `
+{
+  "code": "A: B: C: D: E: 'foo'",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'B:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'C:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'D:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+    {
+      "message": "'E:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-labels > invalid 19`] = `
+{
+  "code": "A: 42",
+  "diagnostics": [
+    {
+      "message": "'A:' is defined but never used.",
+      "messageId": "unused",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unused-labels",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

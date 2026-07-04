@@ -12,7 +12,7 @@ import (
 var NoUselessBackreferenceRule = rule.Rule{
 	Name: "no-useless-backreference",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		eval := newStaticEvalCtx(ctx)
+		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
 		return rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				if isRegexLiteralHandledByConstructor(ctx, node) {
@@ -37,7 +37,7 @@ var NoUselessBackreferenceRule = rule.Rule{
 	},
 }
 
-func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *ast.Node, args *ast.NodeList, eval *staticEvalCtx) {
+func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *ast.Node, args *ast.NodeList, eval *utils.StaticStringEvaluator) {
 	callee = ast.SkipParentheses(callee)
 	if !isBuiltinRegExpCallee(ctx, callee) {
 		return
@@ -51,17 +51,25 @@ func handleRegExpConstructor(ctx rule.RuleContext, callNode *ast.Node, callee *a
 		return
 	}
 
-	pattern, patternOk := eval.evalStaticString(patternNode)
-	if !patternOk {
-		return
+	flags := ""
+	var pattern string
+	if patternNode.Kind == ast.KindRegularExpressionLiteral {
+		pattern, flags = utils.ExtractRegexPatternAndFlags(patternNode.Text())
+	} else {
+		var patternOk bool
+		pattern, patternOk = eval.Eval(patternNode)
+		if !patternOk {
+			return
+		}
 	}
 
-	flags := ""
 	if len(args.Nodes) >= 2 {
 		flagsNode := ast.SkipParentheses(args.Nodes[1])
 		if flagsNode != nil {
-			if v, ok := eval.evalStaticString(flagsNode); ok {
+			if v, ok := eval.Eval(flagsNode); ok {
 				flags = v
+			} else {
+				flags = ""
 			}
 		}
 	}

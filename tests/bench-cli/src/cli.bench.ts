@@ -17,7 +17,7 @@ import {
 // 1) `cli@vscode`: parent start -> CLI process completion
 // 2) `cli@vscode_before_go_exec`: parent start -> first Go binary invocation
 const repoRoot = path.resolve(import.meta.dirname, '../../../');
-const cliEntrypoint = path.join(repoRoot, 'packages/rslint/bin/rslint.cjs');
+const cliEntrypoint = path.join(repoRoot, 'packages/rslint/bin/rslint.js');
 const vscodeRepoDir = path.join(os.tmpdir(), 'rslint-bench', 'vscode');
 const benchmarkTaskName = 'cli@vscode';
 const preBinaryBenchmarkName = 'cli@vscode_before_go_exec';

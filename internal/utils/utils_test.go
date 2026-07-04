@@ -1,6 +1,13 @@
 package utils
 
-import "testing"
+import (
+	"math"
+	"testing"
+
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
+)
 
 func TestExtractRegexPatternAndFlags(t *testing.T) {
 	tests := []struct {
@@ -23,6 +30,224 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 			t.Errorf("ExtractRegexPatternAndFlags(%q) = (%q, %q), want (%q, %q)", tt.input, p, f, tt.pattern, tt.flags)
 		}
 	}
+}
+
+func TestIsValidRegexLiteral(t *testing.T) {
+	tests := []struct {
+		name    string
+		literal string
+		want    bool
+	}{
+		{name: "basic", literal: `/abc/g`, want: true},
+		{name: "unicode sets", literal: `/[[A--B]]/v`, want: true},
+		{name: "inline modifier", literal: `/(?i:foo)bar/`, want: true},
+		{name: "annex b decimal escape", literal: `/\78\126\5934/`, want: true},
+		{name: "invalid unicode property", literal: `/\p{NotAProperty}/u`, want: false},
+		{name: "invalid v set", literal: `/[[A&&&]]/v`, want: false},
+		{name: "invalid flag", literal: `/a/-`, want: false},
+		{name: "conflicting unicode flags", literal: `/a/uv`, want: false},
+		{name: "unterminated class", literal: `/[a/`, want: false},
+		{name: "not a literal", literal: `abc`, want: false},
+	}
+	for _, tt := range tests {
+		if got := IsValidRegexLiteral(tt.literal); got != tt.want {
+			t.Errorf("%s: IsValidRegexLiteral(%q) = %v, want %v", tt.name, tt.literal, got, tt.want)
+		}
+	}
+}
+
+func TestHasCommentInsideNode(t *testing.T) {
+	source := "const a = \"https://example.com/*x*/\";\n" +
+		"const b = /\\/\\//;\n" +
+		"const c = `// raw`;\n" +
+		"const d = 1 /* keep */ + 2;\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name string
+		text string
+		want bool
+	}{
+		{name: "string containing comment-like text", text: "\"https://example.com/*x*/\"", want: false},
+		{name: "regex containing slash text", text: "/\\/\\//", want: false},
+		{name: "template containing line-comment text", text: "`// raw`", want: false},
+		{name: "actual block comment", text: "1 /* keep */ + 2", want: true},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		if got := HasCommentInsideNode(sourceFile, node); got != tt.want {
+			t.Errorf("%s: HasCommentInsideNode() = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestGetStaticStringLiteralValue(t *testing.T) {
+	source := "const empty = \"\";\n" +
+		"const template = `raw`;\n" +
+		"const number = 0;\n" +
+		"const parenthesized = (\"x\");\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name     string
+		text     string
+		want     string
+		wantOkay bool
+	}{
+		{name: "empty string", text: `""`, want: "", wantOkay: true},
+		{name: "no substitution template", text: "`raw`", want: "raw", wantOkay: true},
+		{name: "numeric literal", text: "0", want: "", wantOkay: false},
+		{name: "parentheses are caller controlled", text: `("x")`, want: "", wantOkay: false},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		got, ok := GetStaticStringLiteralValue(node)
+		if got != tt.want || ok != tt.wantOkay {
+			t.Errorf("%s: GetStaticStringLiteralValue() = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.wantOkay)
+		}
+	}
+}
+
+func TestAccessExpressionStaticName(t *testing.T) {
+	source := "object.property;\n" +
+		"object[\"property\"];\n" +
+		"object[(\"property\")];\n" +
+		"object[\"property\" as const];\n" +
+		"object[dynamic];\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name     string
+		text     string
+		want     string
+		wantOkay bool
+	}{
+		{name: "dot property", text: `object.property`, want: "property", wantOkay: true},
+		{name: "static string element", text: `object["property"]`, want: "property", wantOkay: true},
+		{name: "parenthesized element key", text: `object[("property")]`, want: "property", wantOkay: true},
+		{name: "asserted element key", text: `object["property" as const]`, want: "property", wantOkay: true},
+		{name: "dynamic element key", text: `object[dynamic]`, wantOkay: false},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		got, ok := AccessExpressionStaticName(node)
+		if got != tt.want || ok != tt.wantOkay {
+			t.Errorf("%s: AccessExpressionStaticName() = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.wantOkay)
+		}
+	}
+}
+
+func TestResolveLegacyMaxOption(t *testing.T) {
+	tests := []struct {
+		name       string
+		options    any
+		defaultMax int
+		want       int
+	}{
+		{name: "nil uses default", defaultMax: 3, want: 3},
+		{name: "empty array uses default", options: []interface{}{}, defaultMax: 3, want: 3},
+		{name: "bare number", options: 4, defaultMax: 3, want: 4},
+		{name: "array number", options: []interface{}{float64(5)}, defaultMax: 3, want: 5},
+		{name: "bare max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
+		{name: "array maximum object", options: []interface{}{map[string]interface{}{"maximum": 7, "max": 1}}, defaultMax: 3, want: 7},
+		{name: "zero maximum falls through to max", options: []interface{}{map[string]interface{}{"maximum": 0, "max": 8}}, defaultMax: 3, want: 8},
+		{name: "zero maximum without fallback disables", options: []interface{}{map[string]interface{}{"maximum": 0}}, defaultMax: 3, want: math.MaxInt},
+		{name: "nonnumeric max disables", options: map[string]interface{}{"max": "wide"}, defaultMax: 3, want: math.MaxInt},
+		{name: "object without max keys uses default", options: map[string]interface{}{"foo": 1}, defaultMax: 3, want: 3},
+	}
+
+	for _, tt := range tests {
+		if got := ResolveLegacyMaxOption(tt.options, tt.defaultMax); got != tt.want {
+			t.Errorf("%s: ResolveLegacyMaxOption() = %d, want %d", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestGetPropertyDisplayName(t *testing.T) {
+	source := "const obj = {\n" +
+		"  id() {},\n" +
+		"  \"quoted\"() {},\n" +
+		"  0() {},\n" +
+		"  [`computed`]() {},\n" +
+		"  [dynamic]() {},\n" +
+		"};\n" +
+		"class C { #private() {} }\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name       string
+		memberText string
+		want       string
+	}{
+		{name: "identifier", memberText: "id() {}", want: "id"},
+		{name: "string literal", memberText: `"quoted"() {}`, want: "quoted"},
+		{name: "numeric literal", memberText: "0() {}", want: "0"},
+		{name: "static computed template", memberText: "[`computed`]() {}", want: "computed"},
+		{name: "dynamic computed", memberText: "[dynamic]() {}", want: ""},
+		{name: "private identifier", memberText: "#private() {}", want: "#private"},
+	}
+	for _, tt := range tests {
+		member := findNodeWithText(t, sourceFile, tt.memberText)
+		if got := GetPropertyDisplayName(member.Name()); got != tt.want {
+			t.Errorf("%s: GetPropertyDisplayName() = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestIsThisVoidParameter(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, "function f(this: void, value: void) {}\nfunction g(this: Foo) {}\n", core.ScriptKindTS)
+
+	if IsThisVoidParameter(nil) {
+		t.Fatal("IsThisVoidParameter(nil) = true, want false")
+	}
+	if got := IsThisVoidParameter(findNodeWithText(t, sourceFile, "this: void")); !got {
+		t.Fatal("IsThisVoidParameter(this: void) = false, want true")
+	}
+	if got := IsThisVoidParameter(findNodeWithText(t, sourceFile, "value: void")); got {
+		t.Fatal("IsThisVoidParameter(value: void) = true, want false")
+	}
+	if got := IsThisVoidParameter(findNodeWithText(t, sourceFile, "this: Foo")); got {
+		t.Fatal("IsThisVoidParameter(this: Foo) = true, want false")
+	}
+}
+
+func findNodeWithText(t *testing.T, sourceFile *ast.SourceFile, text string) *ast.Node {
+	t.Helper()
+	var found *ast.Node
+	var visit func(*ast.Node)
+	visit = func(node *ast.Node) {
+		if found != nil || node == nil {
+			return
+		}
+		if TrimmedNodeText(sourceFile, node) == text {
+			found = node
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			visit(child)
+			return found != nil
+		})
+	}
+	visit(&sourceFile.Node)
+	if found == nil {
+		t.Fatalf("missing node with text %q", text)
+	}
+	return found
 }
 
 func TestDefaultIgnoreDirGlobs(t *testing.T) {

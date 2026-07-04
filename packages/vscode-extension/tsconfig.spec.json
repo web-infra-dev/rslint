@@ -5,7 +5,6 @@
     "module": "commonjs",
     "moduleResolution": "node",
     "rootDir": "./__tests__",
-    "noEmit": false,
     "skipLibCheck": true,
     "allowArbitraryExtensions": true,
     "allowImportingTsExtensions": false,
