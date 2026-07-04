@@ -47,8 +47,8 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			{Code: `var r = /[\u200D]/u`},
 
 			// ---- Non-RegExp / non-literal call paths ----
-			{Code: `new RegExp('[Á] [ ');`},           // syntax error in pattern → ignored
-			{Code: `var r = new RegExp('[Á] [ ');`},  // ditto
+			{Code: `new RegExp('[Á] [ ');`},         // syntax error in pattern → ignored
+			{Code: `var r = new RegExp('[Á] [ ');`}, // ditto
 			{Code: `var r = RegExp('{ [Á]', 'u');`}, // ditto
 			{Code: `var r = RegExp(` + "`" + `${x}[👍]` + "`" + `)`},
 			{Code: `var r = new RegExp('[🇯🇵]', ` + "`${foo}`" + `)`},
@@ -84,6 +84,10 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			{Code: `let pattern = "[abc]"; new RegExp(pattern);`},
 			// ---- let with emoji pair + u flag override — pattern is safe under u ----
 			{Code: `let pattern = "[👍]"; new RegExp(pattern, "u");`},
+			// ---- Regex literal handled through RegExp(..., static flags) ----
+			{Code: `const flags = "u"; RegExp(/[👍]/, flags);`},
+			// ---- Dynamic override flags make the constructor own the literal ----
+			{Code: `const flags = getFlags(); RegExp(/[👍]/, flags);`},
 
 			// ---- Breaker (\d) splits a would-be emoji modifier pair ----
 			{Code: `var r = /[👶\d🏻]/u`},
@@ -112,13 +116,14 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 			// ---- ESLint-aligned "don't resolve" cases (all valid) ----
 			// ESLint's getStaticValue does NOT resolve:
 			//   - method calls like `.repeat(n)`
-			//   - conditional expressions
+			//   - conditional expressions with an unknown test
 			//   - object / array destructuring bindings
 			// We match this behavior.
 			{Code: `new RegExp("[👍]".repeat(1));`},
 			{Code: `new RegExp(cond ? "[👍]" : "a");`},
 			{Code: `const {pattern} = {pattern: "[👍]"}; new RegExp(pattern);`},
 			{Code: `const [pattern] = ["[👍]"]; new RegExp(pattern);`},
+			{Code: "{ const String = { raw: () => \"[👍]\" }; new RegExp(String.raw`[👍]`); }"},
 
 			// ---- Breaker `\p{...}` splits a would-be emoji modifier pair ----
 			{Code: `var r = /[👶\p{Letter}🏻]/u`},
@@ -953,6 +958,38 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 					},
 				},
 			},
+			{
+				Code: "const RawString = String; new RegExp(RawString.raw`[👍]`)",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: "const RawString = String; new RegExp(RawString.raw`[👍]`, \"u\")"},
+						},
+					},
+				},
+			},
+			// ==== Static conditional pattern ====
+			{
+				Code: `new RegExp(true ? "[👍]" : "[a]");`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `new RegExp(true ? "[👍]" : "[a]", "u");`},
+						},
+					},
+				},
+			},
+			// ==== Static String() pattern ====
+			{
+				Code: `new RegExp(String("[👍]"));`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `new RegExp(String("[👍]"), "u");`},
+						},
+					},
+				},
+			},
 			// ==== let with literal initializer, no reassignments ====
 			{
 				Code: `let pattern = "[👍]"; new RegExp(pattern);`,
@@ -962,6 +999,23 @@ func TestNoMisleadingCharacterClassRule(t *testing.T) {
 							{MessageId: "suggestUnicodeFlag", Output: `let pattern = "[👍]"; new RegExp(pattern, "u");`},
 						},
 					},
+				},
+			},
+			{
+				Code: `const pattern = "[👍]" as string; new RegExp(pattern);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag",
+						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+							{MessageId: "suggestUnicodeFlag", Output: `const pattern = "[👍]" as string; new RegExp(pattern, "u");`},
+						},
+					},
+				},
+			},
+			// ==== Regex literal with static non-u flag override ====
+			{
+				Code: `const flags = ""; RegExp(/[👍]/, flags);`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "surrogatePairWithoutUFlag"},
 				},
 			},
 
