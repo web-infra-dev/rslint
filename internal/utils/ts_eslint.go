@@ -377,6 +377,134 @@ func GetFunctionNameWithKind(node *ast.Node) string {
 	return strings.Join(tokens, " ")
 }
 
+// GetFunctionNameWithKindCore mirrors ESLint core's astUtils.getFunctionNameWithKind.
+// It intentionally does not walk from a function expression or arrow function
+// to an enclosing variable declaration when resolving names. Core rules such
+// as complexity and max-params rely on that narrower behavior for message text.
+func GetFunctionNameWithKindCore(node *ast.Node) string {
+	if node.Kind == ast.KindConstructor {
+		return "constructor"
+	}
+
+	parent := node.Parent
+	if parent == nil {
+		return "function"
+	}
+
+	tokens := []string{}
+
+	isClassMember := isCoreDirectClassMember(node)
+	isClassFieldValue := isCoreClassFieldInitializer(node)
+	if isClassMember || isClassFieldValue {
+		owner := node
+		if isClassFieldValue {
+			owner = parent
+		}
+		if ast.HasSyntacticModifier(owner, ast.ModifierFlagsStatic) {
+			tokens = append(tokens, "static")
+		}
+		if name := owner.Name(); name != nil && name.Kind == ast.KindPrivateIdentifier {
+			tokens = append(tokens, "private")
+		}
+	}
+
+	flags := ast.GetFunctionFlags(node)
+	if flags&ast.FunctionFlagsAsync != 0 {
+		tokens = append(tokens, "async")
+	}
+	if flags&ast.FunctionFlagsGenerator != 0 {
+		tokens = append(tokens, "generator")
+	}
+
+	switch {
+	case node.Kind == ast.KindGetAccessor:
+		tokens = append(tokens, "getter")
+	case node.Kind == ast.KindSetAccessor:
+		tokens = append(tokens, "setter")
+	case node.Kind == ast.KindMethodDeclaration:
+		tokens = append(tokens, "method")
+	case parent.Kind == ast.KindPropertyAssignment:
+		tokens = append(tokens, "method")
+	case isClassFieldValue:
+		tokens = append(tokens, "method")
+	case node.Kind == ast.KindArrowFunction:
+		tokens = append(tokens, "arrow", "function")
+	default:
+		tokens = append(tokens, "function")
+	}
+
+	switch {
+	case parent.Kind == ast.KindPropertyAssignment:
+		appendCoreFunctionNameFromOwner(&tokens, parent, node)
+	case isClassFieldValue:
+		appendCoreFunctionNameFromOwner(&tokens, parent, node)
+	case node.Kind == ast.KindMethodDeclaration ||
+		node.Kind == ast.KindGetAccessor ||
+		node.Kind == ast.KindSetAccessor:
+		appendCoreFunctionNameFromOwner(&tokens, node, node)
+	default:
+		if id := coreFunctionNodeIdentifier(node); id != "" {
+			tokens = append(tokens, fmt.Sprintf("'%s'", id))
+		}
+	}
+
+	return strings.Join(tokens, " ")
+}
+
+func appendCoreFunctionNameFromOwner(tokens *[]string, owner *ast.Node, node *ast.Node) {
+	if name := owner.Name(); name != nil {
+		if name.Kind == ast.KindPrivateIdentifier {
+			*tokens = append(*tokens, fmt.Sprintf("'%s'", name.AsPrivateIdentifier().Text))
+			return
+		}
+		if s, ok := GetStaticPropertyName(name); ok {
+			*tokens = append(*tokens, fmt.Sprintf("'%s'", s))
+			return
+		}
+	}
+	if id := coreFunctionNodeIdentifier(node); id != "" {
+		*tokens = append(*tokens, fmt.Sprintf("'%s'", id))
+	}
+}
+
+func coreFunctionNodeIdentifier(node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		if n := node.AsFunctionDeclaration().Name(); n != nil && n.Kind == ast.KindIdentifier {
+			return n.AsIdentifier().Text
+		}
+	case ast.KindFunctionExpression:
+		if n := node.AsFunctionExpression().Name(); n != nil && n.Kind == ast.KindIdentifier {
+			return n.AsIdentifier().Text
+		}
+	}
+	return ""
+}
+
+func isCoreDirectClassMember(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || (parent.Kind != ast.KindClassDeclaration && parent.Kind != ast.KindClassExpression) {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+		return true
+	}
+	return false
+}
+
+func isCoreClassFieldInitializer(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil || parent.Kind != ast.KindPropertyDeclaration {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindArrowFunction, ast.KindFunctionExpression:
+		return parent.AsPropertyDeclaration().Initializer == node
+	}
+	return false
+}
+
 // getFunctionDisplayName resolves the user-visible name of a function-like
 // node — first by inspecting the node's own name, then by walking the parent
 // for variable / property / type binding sites that ESLint's `getName` covers.
@@ -1021,6 +1149,25 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 	return sourceFile.Text()[r.Pos():r.End()], MemberNameTypeExpression
 }
 
+// GetPropertyDisplayName resolves a property-name node to the diagnostic name
+// ESLint emits for statically-known member keys. Private identifiers keep their
+// leading "#"; dynamic computed keys return "".
+func GetPropertyDisplayName(name *ast.Node) string {
+	if name == nil {
+		return ""
+	}
+	if name.Kind == ast.KindIdentifier {
+		return name.AsIdentifier().Text
+	}
+	if name.Kind == ast.KindPrivateIdentifier {
+		return name.AsPrivateIdentifier().Text
+	}
+	if s, ok := GetStaticPropertyName(name); ok {
+		return s
+	}
+	return ""
+}
+
 // GetPropertyInfo extracts the property node and formatted property name from a PropertyAccessExpression
 // or ElementAccessExpression. Returns the property node and a formatted string like ".propertyName" or "[index]".
 // Returns (nil, "") if the node is neither a property access nor an element access expression.
@@ -1270,6 +1417,8 @@ func IsSameReference(left, right *ast.Node) bool {
 
 // AccessExpressionStaticName returns the static property name of an access expression
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
+// Element access arguments are unwrapped through parentheses and TS assertions
+// because ESTree-based helpers treat those wrappers as transparent.
 func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -1278,7 +1427,7 @@ func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 			return name.Text(), true
 		}
 	case ast.KindElementAccessExpression:
-		return GetStaticExpressionValue(node.AsElementAccessExpression().ArgumentExpression)
+		return GetStaticExpressionValue(SkipAssertionsAndParens(node.AsElementAccessExpression().ArgumentExpression))
 	}
 	return "", false
 }

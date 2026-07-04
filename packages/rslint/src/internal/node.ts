@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url);
 /**
  * Resolve the rslint Go binary from the matching `@rslint/native-<tuple>`
  * platform package (its `./bin` export) — the same resolution the CLI launcher
- * (`bin/rslint.cjs`) uses. Linux tries gnu then musl (Go is statically linked,
+ * (`bin/rslint.js`) uses. Linux tries gnu then musl (Go is statically linked,
  * so the libc split is irrelevant to it).
  */
 function resolveRslintBinary(): string {

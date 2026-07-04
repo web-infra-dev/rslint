@@ -3,7 +3,7 @@ import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 import os from 'node:os';
-import { writeFile, rm, mkdtemp } from 'node:fs/promises';
+import { writeFile, rm, mkdtemp, mkdir, readFile, cp } from 'node:fs/promises';
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures');
 
@@ -19,6 +19,66 @@ const arrayTypeConfig = [
 ];
 
 describe('Rslint class', () => {
+  test('published declarations expose async disposal under ES2022 consumer libs', async () => {
+    const distDir = path.resolve(import.meta.dirname, '../dist');
+    const packageJson = JSON.parse(
+      await readFile(
+        path.resolve(import.meta.dirname, '../package.json'),
+        'utf8',
+      ),
+    );
+    const distDts = await readFile(path.join(distDir, 'index.d.ts'), 'utf8');
+    expect(distDts).toContain('reference lib="esnext.disposable"');
+    expect(distDts).toContain('[Symbol.asyncDispose](): Promise<void>');
+
+    const ts = await import('typescript');
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-dts-consumer-'));
+    try {
+      const packageRoot = path.join(tmp, 'node_modules', '@rslint', 'core');
+      await mkdir(packageRoot, { recursive: true });
+      await writeFile(
+        path.join(packageRoot, 'package.json'),
+        JSON.stringify({
+          name: packageJson.name,
+          type: packageJson.type,
+          exports: {
+            '.': packageJson.exports['.'],
+          },
+        }),
+      );
+      await cp(distDir, path.join(packageRoot, 'dist'), { recursive: true });
+      const entry = path.join(tmp, 'index.ts');
+      await writeFile(
+        entry,
+        [
+          "import { Rslint } from '@rslint/core';",
+          'const rslint: Rslint = new Rslint();',
+          'rslint.close();',
+          '',
+        ].join('\n'),
+      );
+
+      const options = {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.NodeNext,
+        moduleResolution: ts.ModuleResolutionKind.NodeNext,
+        lib: ['lib.es2022.d.ts'],
+        noEmit: true,
+        strict: true,
+        skipLibCheck: false,
+      };
+      const program = ts.createProgram([entry], options);
+      const diagnostics = ts.getPreEmitDiagnostics(program);
+      const rendered = diagnostics
+        .map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'))
+        .join('\n');
+      expect(rendered).not.toContain('asyncDispose');
+      expect(diagnostics).toEqual([]);
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test('lintText returns ESLint-shaped LintResult[]', async () => {
     const rslint = new Rslint({
       cwd: fixturesDir,

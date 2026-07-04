@@ -15,7 +15,7 @@ interface CliTestResult {
 /**
  * Run the rslint entry point explicitly via `node`, matching how pnpm/.cmd
  * wrappers invoke it on Windows. This ensures the dynamic `import()` inside
- * bin/rslint.cjs is exercised — on Windows, bare `spawn('file.cjs')` may
+ * bin/rslint.js is exercised — on Windows, bare `spawn('file.js')` may
  * bypass Node.js entirely because shebangs are not supported.
  */
 function runRslintViaNode(
@@ -61,7 +61,7 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
   await fs.rm(tempDir, { recursive: true, force: true });
 }
 
-describe('Entry point (bin/rslint.cjs)', () => {
+describe('Entry point (bin/rslint.js)', () => {
   test('should load ESM cli module without ERR_UNSUPPORTED_ESM_URL_SCHEME', async () => {
     const result = await runRslintViaNode(['--help']);
     expect(result.stderr).not.toContain('ERR_UNSUPPORTED_ESM_URL_SCHEME');

@@ -85,7 +85,7 @@ function stageRuntimeAssets() {
   const distDir = path.join(__dirname, '../dist');
   const coreDir = path.dirname(require.resolve('@rslint/core/package.json'));
 
-  // 1. Launcher (`rslint.cjs`) from core/bin + the Go LSP binary. build:bin now
+  // 1. Launcher (`rslint.js`) from core/bin + the Go LSP binary. build:bin now
   //    lands the Go binary in the host platform package (not core/bin), so copy
   //    it from there. In CI, publish-marketplace.mjs overwrites dist/rslint with
   //    the target-platform binary; locally this makes `pnpm build` dev-ready.

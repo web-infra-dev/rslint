@@ -1,3 +1,5 @@
+/// <reference lib="esnext.disposable" preserve="true" />
+
 /**
  * The `Rslint` class — the ESLint-style programmatic API (issue #1106).
  *

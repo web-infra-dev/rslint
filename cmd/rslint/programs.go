@@ -173,8 +173,12 @@ func createFallbackProgram(
 // `files` patterns (or explicitly requested and matched by config) but absent
 // from every tsconfig Program — and appends one AST-only fallback Program for
 // them. It returns the (possibly extended) program slice, the type-info file
-// set, the index of the fallback Program within that slice (-1 if none), and
-// the gap files retained for --fix rebuilds.
+// set, and the gap files retained for --fix rebuilds.
+//
+// The appended fallback Program (like the no-tsconfig directory-scan Program)
+// carries synthesized CompilerOptions with no ConfigFilePath, which is how
+// buildTypeCheckSkipMask later recognizes and excludes it from the CLI
+// --type-check phase — no index needs to be threaded out of here.
 //
 // The type-info set is captured from the tsconfig Programs BEFORE the fallback
 // is appended, so fallback files are deliberately absent from it. That absence
@@ -198,10 +202,9 @@ func buildProgramsWithGapFallback(
 	allowDirs []string,
 	parseCache *utils.ParseCache,
 	singleThreaded bool,
-) ([]*compiler.Program, map[string]struct{}, int, []string) {
+) ([]*compiler.Program, map[string]struct{}, []string) {
 	var typeInfoFiles map[string]struct{}
 	var capturedGapFiles []string
-	fallbackProgramIndex := -1
 
 	programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
 
@@ -254,12 +257,11 @@ func buildProgramsWithGapFallback(
 			fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache)
 			if fallback != nil {
 				programs = append(programs, fallback)
-				fallbackProgramIndex = len(programs) - 1
 			}
 		}
 	}
 
-	return programs, typeInfoFiles, fallbackProgramIndex, capturedGapFiles
+	return programs, typeInfoFiles, capturedGapFiles
 }
 
 // buildFileOwnerMap determines which config directory "owns" each file across
@@ -357,17 +359,39 @@ func toFileFilters(in []func(string) bool) []linter.FileFilter {
 	return out
 }
 
-// buildTypeCheckSkipMask returns a parallel-to-Programs []bool where the entry
-// at fallbackIdx is true (skip type-check) and all others are false. Returns
-// nil when fallbackIdx is -1 (no fallback program), so callers don't allocate
-// an all-false slice.
-func buildTypeCheckSkipMask(numPrograms int, fallbackIdx int) []bool {
-	if fallbackIdx < 0 {
-		return nil
-	}
-	mask := make([]bool, numPrograms)
-	if fallbackIdx < numPrograms {
-		mask[fallbackIdx] = true
+// buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which
+// programs must be excluded from the type-check phase. A program is skipped
+// when it was NOT built from a real tsconfig on disk — i.e. its CompilerOptions
+// carry no ConfigFilePath. That covers both synthetic-options program kinds:
+//
+//   - the no-tsconfig directory-scan Program (createProgramsForConfig's else
+//     branch), built with default options for a config directory that has no
+//     tsconfig; and
+//   - the gap-file fallback Program (createFallbackProgram).
+//
+// Their options are synthesized, not the user's tsconfig, so semantic
+// diagnostics there are unreliable and must not be surfaced. Concretely, the
+// scan program sets neither Target nor Lib, so its default lib can lack modern
+// globals like Symbol.asyncDispose and emit spurious diagnostics against
+// typings pulled in from node_modules. This mirrors the type-checking boundary:
+// only Programs backed by parserOptions.project or the auto-detected
+// tsconfig.json participate in program-level --type-check diagnostics. Programs
+// built via utils.CreateProgram -> GetParsedCommandLineOfConfigFile carry a
+// non-empty ConfigFilePath.
+//
+// Returns nil when every program is tsconfig-backed, so callers don't allocate
+// an all-false slice. Deriving from the programs keeps the CLI initial build
+// and the --fix rebuild path consistent by construction.
+func buildTypeCheckSkipMask(programs []*compiler.Program) []bool {
+	var mask []bool
+	for i, prog := range programs {
+		opts := prog.Options()
+		if opts == nil || opts.ConfigFilePath == "" {
+			if mask == nil {
+				mask = make([]bool, len(programs))
+			}
+			mask[i] = true
+		}
 	}
 	return mask
 }

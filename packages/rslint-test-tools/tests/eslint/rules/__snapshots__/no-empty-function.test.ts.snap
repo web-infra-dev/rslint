@@ -1,0 +1,3491 @@
+// Rstest Snapshot v1
+
+exports[`no-empty-function > invalid 1`] = `
+{
+  "code": "function foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty function 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 2`] = `
+{
+  "code": "var foo = function () {
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 3`] = `
+{
+  "code": "var foo = () => {
+
+  }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty arrow function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 4`] = `
+{
+  "code": "var obj = {
+	foo() {
+	}
+}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 5`] = `
+{
+  "code": "class A { foo() { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 6`] = `
+{
+  "code": "function foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty function 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 7`] = `
+{
+  "code": "var foo = function() {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 8`] = `
+{
+  "code": "var obj = {foo: function() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 9`] = `
+{
+  "code": "var foo = () => {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty arrow function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 10`] = `
+{
+  "code": "function* foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator function 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 11`] = `
+{
+  "code": "var foo = function*() {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 12`] = `
+{
+  "code": "var obj = {foo: function*() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 13`] = `
+{
+  "code": "var obj = {foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 14`] = `
+{
+  "code": "class A {foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 15`] = `
+{
+  "code": "class A {static foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 16`] = `
+{
+  "code": "var A = class {foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 17`] = `
+{
+  "code": "var A = class {static foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 18`] = `
+{
+  "code": "var obj = {*foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 19`] = `
+{
+  "code": "class A {*foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 20`] = `
+{
+  "code": "class A {static *foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 21`] = `
+{
+  "code": "var A = class {*foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 22`] = `
+{
+  "code": "var A = class {static *foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 23`] = `
+{
+  "code": "var obj = {get foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 24`] = `
+{
+  "code": "class A {get foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 25`] = `
+{
+  "code": "class A {static get foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 26`] = `
+{
+  "code": "var A = class {get foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 27`] = `
+{
+  "code": "var A = class {static get foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 28`] = `
+{
+  "code": "var obj = {set foo(value) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 29`] = `
+{
+  "code": "class A {set foo(value) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 30`] = `
+{
+  "code": "class A {static set foo(value) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 31`] = `
+{
+  "code": "var A = class {set foo(value) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 32`] = `
+{
+  "code": "var A = class {static set foo(value) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 33`] = `
+{
+  "code": "class A {constructor() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 34`] = `
+{
+  "code": "var A = class {constructor() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 35`] = `
+{
+  "code": "const foo = { async method() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'method'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 36`] = `
+{
+  "code": "async function a(){}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async function 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 37`] = `
+{
+  "code": "const foo = async function () {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 38`] = `
+{
+  "code": "class Foo { async bar() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'bar'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 39`] = `
+{
+  "code": "const foo = async () => {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async arrow function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 40`] = `
+{
+  "code": "function foo() {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty function 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 41`] = `
+{
+  "code": "const foo = function(param: string) {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 42`] = `
+{
+  "code": "const obj = {foo: function(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 43`] = `
+{
+  "code": "const foo = (param: string) => {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty arrow function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 44`] = `
+{
+  "code": "function* foo(param: string) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator function 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 45`] = `
+{
+  "code": "const foo = function*(param: string) {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 46`] = `
+{
+  "code": "const obj = {foo: function*(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 47`] = `
+{
+  "code": "const obj = {foo(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 48`] = `
+{
+  "code": "class A { foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 49`] = `
+{
+  "code": "class A { private foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 50`] = `
+{
+  "code": "class A { protected foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 51`] = `
+{
+  "code": "class A { static foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 52`] = `
+{
+  "code": "class A { private static foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 53`] = `
+{
+  "code": "class A { protected static foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 54`] = `
+{
+  "code": "const A = class {foo(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 55`] = `
+{
+  "code": "const A = class {static foo(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 56`] = `
+{
+  "code": "const A = class {private static foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 57`] = `
+{
+  "code": "const A = class {protected static foo() {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 58`] = `
+{
+  "code": "class B { @decorator() foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 59`] = `
+{
+  "code": "const B = class { @decorator() foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 60`] = `
+{
+  "code": "class B extends C { override foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 61`] = `
+{
+  "code": "class B extends C { @decorator() override foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 62`] = `
+{
+  "code": "const obj = {*foo(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 63`] = `
+{
+  "code": "class A { *foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 64`] = `
+{
+  "code": "class A {static *foo(param: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 65`] = `
+{
+  "code": "class A {private static *foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 66`] = `
+{
+  "code": "class A {protected static *foo() {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 67`] = `
+{
+  "code": "const A = class {*foo(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 68`] = `
+{
+  "code": "const A = class {static *foo(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static generator method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 69`] = `
+{
+  "code": "const obj = {get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 70`] = `
+{
+  "code": "class A {get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 71`] = `
+{
+  "code": "class A {static get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 72`] = `
+{
+  "code": "const A = class {get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 73`] = `
+{
+  "code": "const A = class {static get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 74`] = `
+{
+  "code": "class A {@decorator() get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 75`] = `
+{
+  "code": "class A {@decorator() static get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 76`] = `
+{
+  "code": "const A = class {@decorator() get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 77`] = `
+{
+  "code": "const A = class {@decorator() static get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 78`] = `
+{
+  "code": "class A extends B {override get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 79`] = `
+{
+  "code": "class A extends B {static override get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 80`] = `
+{
+  "code": "const A = class extends B {override get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 81`] = `
+{
+  "code": "const A = class extends B {static override get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 82`] = `
+{
+  "code": "const obj = {set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 83`] = `
+{
+  "code": "class A {set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 84`] = `
+{
+  "code": "class A {static set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 85`] = `
+{
+  "code": "const A = class {set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 86`] = `
+{
+  "code": "const A = class {static set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 87`] = `
+{
+  "code": "class A {@decorator() set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 88`] = `
+{
+  "code": "class A {@decorator() static set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 89`] = `
+{
+  "code": "const A = class {@decorator() set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 90`] = `
+{
+  "code": "const A = class {@decorator() static set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 91`] = `
+{
+  "code": "class A extends B {override set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 92`] = `
+{
+  "code": "class A extends B {static override set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 59,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 93`] = `
+{
+  "code": "const A = class extends B {override set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 94`] = `
+{
+  "code": "const A = class extends B {static override set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 95`] = `
+{
+  "code": "class A { constructor(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 96`] = `
+{
+  "code": "class B { private constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 97`] = `
+{
+  "code": "class B { protected constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 98`] = `
+{
+  "code": "const A = class {constructor(param: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 99`] = `
+{
+  "code": "const B = class { private constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 100`] = `
+{
+  "code": "const B = class { protected constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 101`] = `
+{
+  "code": "const foo = { async method(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'method'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 102`] = `
+{
+  "code": "async function a(param: string){}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async function 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 103`] = `
+{
+  "code": "const foo = async function(param: string) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 104`] = `
+{
+  "code": "class A { async foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 105`] = `
+{
+  "code": "class A { @decorator() async foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 106`] = `
+{
+  "code": "class A extends B { override async foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 107`] = `
+{
+  "code": "const foo = async (): Promise<void> => {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async arrow function.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 108`] = `
+{
+  "code": "class A { private constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 109`] = `
+{
+  "code": "const A = class { private constructor() {} };",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 110`] = `
+{
+  "code": "class A { protected constructor() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 111`] = `
+{
+  "code": "const A = class { protected constructor() {} };",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 112`] = `
+{
+  "code": "class A { @decorator() foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 113`] = `
+{
+  "code": "const A = class { @decorator() foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 114`] = `
+{
+  "code": "class B {@decorator() get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 115`] = `
+{
+  "code": "class B {@decorator() static get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 116`] = `
+{
+  "code": "const B = class {@decorator() get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 117`] = `
+{
+  "code": "const B = class {@decorator() static get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 56,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 118`] = `
+{
+  "code": "class B {@decorator() set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 119`] = `
+{
+  "code": "class B {@decorator() static set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 120`] = `
+{
+  "code": "const B = class {@decorator() set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 121`] = `
+{
+  "code": "const B = class {@decorator() static set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 61,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 122`] = `
+{
+  "code": "class B { @decorator() async foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 123`] = `
+{
+  "code": "class A extends B { @decorator() override foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 124`] = `
+{
+  "code": "class B extends C {override get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 125`] = `
+{
+  "code": "class B extends C {static override get foo(): string {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 126`] = `
+{
+  "code": "const B = class extends C {override get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 127`] = `
+{
+  "code": "const B = class extends C {static override get foo(): string {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static getter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 128`] = `
+{
+  "code": "class B extends C {override set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 129`] = `
+{
+  "code": "class B extends C {static override set foo(value: string) {}}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 59,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 130`] = `
+{
+  "code": "const B = class extends C {override set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 60,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 131`] = `
+{
+  "code": "const B = class extends C {static override set foo(value: string) {}};",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static setter 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 67,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 132`] = `
+{
+  "code": "class B extends C { override async foo(param: string) {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty async method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 133`] = `
+{
+  "code": "class C extends D { @decorator() override foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-function > invalid 134`] = `
+{
+  "code": "class A extends B { override foo() {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty method 'foo'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-function",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
