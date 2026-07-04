@@ -113,6 +113,38 @@ func TestGetStaticStringLiteralValue(t *testing.T) {
 	}
 }
 
+func TestAccessExpressionStaticName(t *testing.T) {
+	source := "object.property;\n" +
+		"object[\"property\"];\n" +
+		"object[(\"property\")];\n" +
+		"object[\"property\" as const];\n" +
+		"object[dynamic];\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name     string
+		text     string
+		want     string
+		wantOkay bool
+	}{
+		{name: "dot property", text: `object.property`, want: "property", wantOkay: true},
+		{name: "static string element", text: `object["property"]`, want: "property", wantOkay: true},
+		{name: "parenthesized element key", text: `object[("property")]`, want: "property", wantOkay: true},
+		{name: "asserted element key", text: `object["property" as const]`, want: "property", wantOkay: true},
+		{name: "dynamic element key", text: `object[dynamic]`, wantOkay: false},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.text)
+		got, ok := AccessExpressionStaticName(node)
+		if got != tt.want || ok != tt.wantOkay {
+			t.Errorf("%s: AccessExpressionStaticName() = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.wantOkay)
+		}
+	}
+}
+
 func findNodeWithText(t *testing.T, sourceFile *ast.SourceFile, text string) *ast.Node {
 	t.Helper()
 	var found *ast.Node
