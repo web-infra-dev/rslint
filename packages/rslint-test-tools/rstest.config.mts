@@ -443,6 +443,7 @@ export default defineConfig({
     './tests/eslint/rules/max-lines.test.ts',
     './tests/eslint/rules/max-lines-per-function.test.ts',
     './tests/eslint/rules/max-nested-callbacks.test.ts',
+    './tests/eslint/rules/max-params.test.ts',
     './tests/eslint/rules/no-label-var.test.ts',
     './tests/eslint/rules/no-shadow.test.ts',
     './tests/eslint/rules/no-labels.test.ts',

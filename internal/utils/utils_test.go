@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"math"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -142,6 +143,52 @@ func TestAccessExpressionStaticName(t *testing.T) {
 		if got != tt.want || ok != tt.wantOkay {
 			t.Errorf("%s: AccessExpressionStaticName() = (%q, %v), want (%q, %v)", tt.name, got, ok, tt.want, tt.wantOkay)
 		}
+	}
+}
+
+func TestResolveLegacyMaxOption(t *testing.T) {
+	tests := []struct {
+		name       string
+		options    any
+		defaultMax int
+		want       int
+	}{
+		{name: "nil uses default", defaultMax: 3, want: 3},
+		{name: "empty array uses default", options: []interface{}{}, defaultMax: 3, want: 3},
+		{name: "bare number", options: 4, defaultMax: 3, want: 4},
+		{name: "array number", options: []interface{}{float64(5)}, defaultMax: 3, want: 5},
+		{name: "bare max object", options: map[string]interface{}{"max": 6}, defaultMax: 3, want: 6},
+		{name: "array maximum object", options: []interface{}{map[string]interface{}{"maximum": 7, "max": 1}}, defaultMax: 3, want: 7},
+		{name: "zero maximum falls through to max", options: []interface{}{map[string]interface{}{"maximum": 0, "max": 8}}, defaultMax: 3, want: 8},
+		{name: "zero maximum without fallback disables", options: []interface{}{map[string]interface{}{"maximum": 0}}, defaultMax: 3, want: math.MaxInt},
+		{name: "nonnumeric max disables", options: map[string]interface{}{"max": "wide"}, defaultMax: 3, want: math.MaxInt},
+		{name: "object without max keys uses default", options: map[string]interface{}{"foo": 1}, defaultMax: 3, want: 3},
+	}
+
+	for _, tt := range tests {
+		if got := ResolveLegacyMaxOption(tt.options, tt.defaultMax); got != tt.want {
+			t.Errorf("%s: ResolveLegacyMaxOption() = %d, want %d", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestIsThisVoidParameter(t *testing.T) {
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, "function f(this: void, value: void) {}\nfunction g(this: Foo) {}\n", core.ScriptKindTS)
+
+	if IsThisVoidParameter(nil) {
+		t.Fatal("IsThisVoidParameter(nil) = true, want false")
+	}
+	if got := IsThisVoidParameter(findNodeWithText(t, sourceFile, "this: void")); !got {
+		t.Fatal("IsThisVoidParameter(this: void) = false, want true")
+	}
+	if got := IsThisVoidParameter(findNodeWithText(t, sourceFile, "value: void")); got {
+		t.Fatal("IsThisVoidParameter(value: void) = true, want false")
+	}
+	if got := IsThisVoidParameter(findNodeWithText(t, sourceFile, "this: Foo")); got {
+		t.Fatal("IsThisVoidParameter(this: Foo) = true, want false")
 	}
 }
 

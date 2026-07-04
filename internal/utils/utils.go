@@ -2,6 +2,7 @@ package utils
 
 import (
 	"iter"
+	"math"
 	"slices"
 	"strings"
 	"unicode"
@@ -295,6 +296,17 @@ func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier 
 	})
 }
 
+// IsThisVoidParameter reports whether param is TypeScript's synthetic
+// `this: void` parameter. It delegates the `this` shape check to tsgo so
+// callers do not need to duplicate identifier/name assumptions.
+func IsThisVoidParameter(param *ast.Node) bool {
+	if param == nil || !ast.IsThisParameter(param) {
+		return false
+	}
+	t := param.Type()
+	return t != nil && t.Kind == ast.KindVoidKeyword
+}
+
 // Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
 func IsStrWhiteSpace(r rune) bool {
 	// This is different than stringutil.IsWhiteSpaceLike.
@@ -409,6 +421,49 @@ func GetOptionsMap(opts any) map[string]interface{} {
 	}
 
 	return optsMap
+}
+
+// ResolveLegacyMaxOption resolves ESLint's legacy maximum/max option shape.
+// It handles number forms (`3` / `[3]`) plus object forms (`{max: 3}` /
+// `[{maximum: 3}]`). `maximum` wins only when it coerces to a non-zero number;
+// otherwise `max` is used. If either key is present but neither yields a
+// numeric threshold, ESLint ends up comparing against `undefined`, which never
+// reports; MaxInt gives the same observable behavior in Go.
+func ResolveLegacyMaxOption(options any, defaultMax int) int {
+	if options == nil {
+		return defaultMax
+	}
+	if arr, ok := options.([]interface{}); ok {
+		if len(arr) == 0 {
+			return defaultMax
+		}
+		if n, ok := CoerceInt(arr[0]); ok {
+			return n
+		}
+	} else if n, ok := CoerceInt(options); ok {
+		return n
+	}
+
+	m := GetOptionsMap(options)
+	if m == nil {
+		return defaultMax
+	}
+	_, hasMaximum := m["maximum"]
+	_, hasMax := m["max"]
+	if !hasMaximum && !hasMax {
+		return defaultMax
+	}
+	if hasMaximum {
+		if n, ok := CoerceInt(m["maximum"]); ok && n != 0 {
+			return n
+		}
+	}
+	if hasMax {
+		if n, ok := CoerceInt(m["max"]); ok {
+			return n
+		}
+	}
+	return math.MaxInt
 }
 
 // CoerceInt converts a JSON-decoded numeric value to int. JSON numbers come in
