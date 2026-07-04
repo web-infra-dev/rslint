@@ -76,15 +76,20 @@ export async function discoverConfigs(
   // Map: configPath -> configDirectory
   const configs = new Map<string, string>();
 
-  const addConfig = (configPath: string): void => {
+  const addConfig = (
+    configPath: string,
+    configDirectory = path.dirname(configPath),
+  ): void => {
     if (!configs.has(configPath)) {
-      configs.set(configPath, path.dirname(configPath));
+      configs.set(configPath, configDirectory);
     }
   };
 
   if (explicitConfig) {
     const resolved = path.resolve(cwd, explicitConfig);
-    addConfig(resolved);
+    // Explicit --config follows ESLint flat config semantics: files, ignores,
+    // and project patterns resolve from the invocation cwd.
+    addConfig(resolved, cwd);
     return configs;
   }
 

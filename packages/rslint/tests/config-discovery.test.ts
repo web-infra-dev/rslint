@@ -34,19 +34,18 @@ describe('discoverConfigs', () => {
     }
   });
 
-  test('explicit config overrides discovery', async () => {
+  test('explicit config overrides discovery and uses cwd as configDirectory', async () => {
     const tmp = createTempDir();
-    const configFile = path.join(tmp, 'custom.config.js');
+    const cwd = path.join(tmp, 'project');
+    const configDir = path.join(tmp, 'wrapper');
+    const configFile = path.join(configDir, 'custom.config.js');
     try {
+      fs.mkdirSync(cwd);
+      fs.mkdirSync(configDir);
+      fs.writeFileSync(path.join(cwd, 'rslint.config.js'), 'export default []');
       fs.writeFileSync(configFile, 'export default []');
-      const result = await discoverConfigs(
-        ['/some/file.ts'],
-        ['/some/dir'],
-        tmp,
-        configFile,
-      );
-      expect(result.size).toBe(1);
-      expect([...result.keys()][0]).toBe(configFile);
+      const result = await discoverConfigs([], [], cwd, configFile);
+      expect([...result]).toEqual([[configFile, cwd]]);
     } finally {
       cleanup(tmp);
     }

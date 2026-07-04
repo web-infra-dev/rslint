@@ -60,6 +60,10 @@ You can also specify a config file explicitly (overrides automatic discovery):
 rslint --config path/to/rslint.config.ts .
 ```
 
+For automatically discovered configs, relative `files`, `ignores`, and `languageOptions.parserOptions.project` patterns are resolved from the config file's directory.
+
+For a config supplied with `--config`, those patterns are resolved from the current working directory.
+
 To generate a default config, run:
 
 ```bash
