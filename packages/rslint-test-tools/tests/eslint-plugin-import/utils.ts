@@ -11,3 +11,7 @@ export function test<T extends ValidTestCase | InvalidTestCase>(t: T): T {
 export function testFilePath(relativePath: string): string {
   return path.join(import.meta.dirname, 'files', relativePath);
 }
+
+export function testFixturePath(relativePath: string): string {
+  return path.join(import.meta.dirname, 'fixtures', relativePath);
+}

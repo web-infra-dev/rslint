@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
     "jsx": "preserve",
-    "target": "es5",
+    "target": "esnext",
     "module": "commonjs",
     "strict": true,
-    "esModuleInterop": false,
-    "lib": ["es2015", "es2017", "esnext"],
+    "esModuleInterop": true,
+    "lib": ["es2015", "es2017", "esnext", "DOM"],
     "allowJs": true,
     "experimentalDecorators": true
-  },
-  "include": ["files/**/*", "fixtures/**/*"]
+  }
 }
