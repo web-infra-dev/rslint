@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -46,7 +45,7 @@ var NoEmptyFunctionRule = rule.Rule{
 			ctx.ReportRangeWithSuggestions(bodyRange, message, rule.RuleSuggestion{
 				Message: suggestionMessage,
 				FixesArr: []rule.RuleFix{
-					rule.RuleFixReplaceRange(core.NewTextRange(bodyRange.Pos()+1, bodyRange.End()-1), " /* empty */ "),
+					rule.RuleFixReplaceRange(utils.BracedNodeInnerRange(ctx.SourceFile, body), " /* empty */ "),
 				},
 			})
 		}
