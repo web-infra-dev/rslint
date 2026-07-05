@@ -137,6 +137,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_template"
 	"github.com/web-infra-dev/rslint/internal/rules/radix"
 	"github.com/web-infra-dev/rslint/internal/rules/require_atomic_updates"
+	"github.com/web-infra-dev/rslint/internal/rules/require_await"
 	"github.com/web-infra-dev/rslint/internal/rules/require_yield"
 	"github.com/web-infra-dev/rslint/internal/rules/strict"
 	"github.com/web-infra-dev/rslint/internal/rules/symbol_description"
@@ -283,6 +284,7 @@ func GetAllRules() []rule.Rule {
 		no_useless_rename.NoUselessRenameRule,
 		no_useless_constructor.NoUselessConstructorRule,
 		no_prototype_builtins.NoPrototypeBuiltinsRule,
+		require_await.RequireAwaitRule,
 		require_yield.RequireYieldRule,
 		symbol_description.SymbolDescriptionRule,
 		no_unexpected_multiline.NoUnexpectedMultilineRule,

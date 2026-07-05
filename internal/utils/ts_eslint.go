@@ -275,6 +275,99 @@ func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRan
 	return TrimNodeTextRange(sourceFile, node)
 }
 
+// BodyLikeRange returns the [pos, end) execution span for function-like and
+// implicit scope-bearing nodes. Expressions in computed keys or decorators sit
+// outside this span, so callers can attribute await/yield-like nodes to the
+// enclosing runtime scope instead of the declaration they decorate.
+func BodyLikeRange(node *ast.Node) (int, int, bool) {
+	switch node.Kind {
+	case ast.KindFunctionDeclaration,
+		ast.KindFunctionExpression,
+		ast.KindMethodDeclaration,
+		ast.KindArrowFunction,
+		ast.KindGetAccessor,
+		ast.KindSetAccessor,
+		ast.KindConstructor:
+		body := node.Body()
+		if body == nil {
+			return 0, 0, false
+		}
+		pos := body.Pos()
+		if params := node.ParameterList(); params != nil {
+			pos = params.Loc.Pos()
+		}
+		return pos, body.End(), true
+	case ast.KindPropertyDeclaration:
+		init := node.AsPropertyDeclaration().Initializer
+		if init == nil {
+			return 0, 0, false
+		}
+		return init.Pos(), init.End(), true
+	case ast.KindClassStaticBlockDeclaration:
+		body := node.AsClassStaticBlockDeclaration().Body
+		if body == nil {
+			return 0, 0, false
+		}
+		return body.Pos(), body.End(), true
+	}
+	return 0, 0, false
+}
+
+// HasNonEmptyFunctionBody reports whether a function-like node has executable
+// body content. Expression-bodied arrows count as non-empty; empty blocks and
+// body-less declarations do not.
+func HasNonEmptyFunctionBody(node *ast.Node) bool {
+	body := node.Body()
+	if body == nil {
+		return false
+	}
+	if body.Kind != ast.KindBlock {
+		return true
+	}
+	block := body.AsBlock()
+	return block != nil && block.Statements != nil && len(block.Statements.Nodes) > 0
+}
+
+// IsStartOfExpressionStatement reports whether node starts an ancestor
+// ExpressionStatement without crossing a ParenthesizedExpression.
+func IsStartOfExpressionStatement(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
+	for current := node.Parent; current != nil; current = current.Parent {
+		if current.Kind == ast.KindParenthesizedExpression {
+			return false
+		}
+		if current.Kind == ast.KindExpressionStatement {
+			return nodeStart == TrimNodeTextRange(sourceFile, current).Pos()
+		}
+		if !ast.IsExpression(current) {
+			return false
+		}
+	}
+	return false
+}
+
+// NeedsPrecedingSemicolon mirrors ESLint's common ASI check for fixes that
+// make an expression-starter token begin a statement on a new line.
+func NeedsPrecedingSemicolon(sourceFile *ast.SourceFile, node *ast.Node) bool {
+	nodeStart := TrimNodeTextRange(sourceFile, node).Pos()
+
+	scan := scanner.GetScannerForSourceFile(sourceFile, 0)
+	prevKind := ast.KindUnknown
+	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
+		prevKind = scan.Token()
+		scan.Scan()
+	}
+	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
+		return false
+	}
+
+	switch prevKind {
+	case ast.KindSemicolonToken, ast.KindCloseBraceToken:
+		return false
+	}
+	return true
+}
+
 // GetFunctionNameWithKind mirrors ESLint's astUtils.getFunctionNameWithKind.
 // It produces a human-readable description of the function used in diagnostic
 // messages (e.g., `"function 'foo'"`, `"static private method '#bar'"`,

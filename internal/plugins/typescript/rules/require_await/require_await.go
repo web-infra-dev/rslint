@@ -43,8 +43,7 @@ var RequireAwaitRule = rule.CreateRule(rule.Rule{
 				upper:         currentScope,
 			}
 
-			body := node.Body()
-			if body != nil && (!ast.IsBlock(body) || len(body.AsBlock().Statements.Nodes) > 0) {
+			if utils.HasNonEmptyFunctionBody(node) {
 				currentScope.functionFlags = ast.GetFunctionFlags(node)
 			}
 		}

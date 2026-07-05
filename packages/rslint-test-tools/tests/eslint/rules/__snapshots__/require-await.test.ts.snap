@@ -1,0 +1,512 @@
+// Rstest Snapshot v1
+
+exports[`require-await > invalid 1`] = `
+{
+  "code": "async function foo() { doSomething() }",
+  "diagnostics": [
+    {
+      "message": "Async function 'foo' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 2`] = `
+{
+  "code": "(async function() { doSomething() })",
+  "diagnostics": [
+    {
+      "message": "Async function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 3`] = `
+{
+  "code": "async () => { doSomething() }",
+  "diagnostics": [
+    {
+      "message": "Async arrow function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 4`] = `
+{
+  "code": "async () => doSomething()",
+  "diagnostics": [
+    {
+      "message": "Async arrow function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 5`] = `
+{
+  "code": "({ async foo() { doSomething() } })",
+  "diagnostics": [
+    {
+      "message": "Async method 'foo' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 6`] = `
+{
+  "code": "class A { async foo() { doSomething() } }",
+  "diagnostics": [
+    {
+      "message": "Async method 'foo' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 7`] = `
+{
+  "code": "(class { async foo() { doSomething() } })",
+  "diagnostics": [
+    {
+      "message": "Async method 'foo' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 8`] = `
+{
+  "code": "(class { async ''() { doSomething() } })",
+  "diagnostics": [
+    {
+      "message": "Async method '' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 9`] = `
+{
+  "code": "async function foo() { async () => { await doSomething() } }",
+  "diagnostics": [
+    {
+      "message": "Async function 'foo' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 10`] = `
+{
+  "code": "async function foo() { await (async () => { doSomething() }) }",
+  "diagnostics": [
+    {
+      "message": "Async arrow function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 11`] = `
+{
+  "code": "const obj = { async: async function foo() { bar(); } }",
+  "diagnostics": [
+    {
+      "message": "Async method 'async' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 12`] = `
+{
+  "code": "async    /* test */ function foo() { doSomething() }",
+  "diagnostics": [
+    {
+      "message": "Async function 'foo' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 13`] = `
+{
+  "code": "class A {
+    a = 0
+    async [b](){ return 0; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 14`] = `
+{
+  "code": "class A {
+    a
+    async [b](){ return 0; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 15`] = `
+{
+  "code": "class A {
+    a = 0
+    async in(){ return 0; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method 'in' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 16`] = `
+{
+  "code": "const obj = {
+    foo,
+    async in(){ return 0; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method 'in' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 17`] = `
+{
+  "code": "foo
+    async () => { return 0; }
+",
+  "diagnostics": [
+    {
+      "message": "Async arrow function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 18`] = `
+{
+  "code": "class A {
+    foo() {}
+    async [bar] () { baz; }
+}",
+  "diagnostics": [
+    {
+      "message": "Async method has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 19`] = `
+{
+  "code": "async function run() { using resource = getResource(); }",
+  "diagnostics": [
+    {
+      "message": "Async function 'run' has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -475,6 +475,7 @@ export default defineConfig({
     './tests/eslint/rules/prefer-promise-reject-errors.test.ts',
     './tests/eslint/rules/radix.test.ts',
     './tests/eslint/rules/require-atomic-updates.test.ts',
+    './tests/eslint/rules/require-await.test.ts',
     './tests/eslint/rules/require-yield.test.ts',
     './tests/eslint/rules/symbol-description.test.ts',
 
