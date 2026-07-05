@@ -9,14 +9,14 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-var ruleMessage = rule.RuleMessage{
-	Id:          "no-loss-of-precision",
+var noLossOfPrecisionMessage = rule.RuleMessage{
+	Id:          "noLossOfPrecision",
 	Description: "This number literal will lose precision at runtime.",
 }
 
-// Regex patterns for parsing numbers
 var (
 	binaryPattern      = regexp.MustCompile(`(?i)^0b[01]+$`)
 	octalPattern       = regexp.MustCompile(`(?i)^0o[0-7]+$`)
@@ -24,42 +24,28 @@ var (
 	legacyOctalPattern = regexp.MustCompile(`^0[0-7]+$`)
 )
 
-// NoLossOfPrecisionRule disallows literal numbers that lose precision
 // https://eslint.org/docs/latest/rules/no-loss-of-precision
 var NoLossOfPrecisionRule = rule.Rule{
 	Name: "no-loss-of-precision",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
-				// Get the raw text directly from source
-				// We can't use numLiteral.Text because the parser normalizes numbers
-				start := node.Pos()
-				end := node.End()
-				text := ctx.SourceFile.Text()
-
-				if end <= start || end > len(text) {
-					return
-				}
-
-				raw := strings.TrimSpace(text[start:end])
-				if raw == "" {
-					return
-				}
-
+				// tsgo normalizes NumericLiteral.Text at parse time, so ESLint parity
+				// requires reading the raw token text to preserve prefixes, separators,
+				// exponent spelling, and trailing fractional zeros.
+				raw := utils.TrimmedNodeText(ctx.SourceFile, node)
 				if losesPrecision(raw) {
-					ctx.ReportNode(node, ruleMessage)
+					ctx.ReportNode(node, noLossOfPrecisionMessage)
 				}
 			},
 		}
 	},
 }
 
-// removeNumericSeparators removes underscore separators from numeric literals
 func removeNumericSeparators(s string) string {
 	return strings.ReplaceAll(s, "_", "")
 }
 
-// losesPrecision checks if the given numeric literal loses precision
 func losesPrecision(raw string) bool {
 	normalized := removeNumericSeparators(raw)
 
@@ -79,165 +65,189 @@ func losesPrecision(raw string) bool {
 	return baseTenLosesPrecision(normalized)
 }
 
-// notBaseTenLosesPrecision checks if a non-base-10 number loses precision
 func notBaseTenLosesPrecision(digits string, base int) bool {
-	// Parse as big.Int for arbitrary precision
 	original := new(big.Int)
 	_, ok := original.SetString(strings.ToLower(digits), base)
 	if !ok {
 		return false
 	}
 
-	// Convert to float64 (JavaScript Number)
 	f, _ := new(big.Float).SetInt(original).Float64()
-
-	// Check for infinity
 	if math.IsInf(f, 0) {
 		return true
 	}
 
-	// Convert float64 back to big.Int
 	reconstructed := new(big.Int)
 	bf := new(big.Float).SetFloat64(f)
 	bf.Int(reconstructed)
 
-	// Compare: if they differ, precision was lost
 	return original.Cmp(reconstructed) != 0
 }
 
-// baseTenLosesPrecision checks if a base-10 number loses precision
 func baseTenLosesPrecision(raw string) bool {
-	// Parse using big.Float for arbitrary precision
-	rawBigFloat, _, err := new(big.Float).SetPrec(256).Parse(raw, 10)
-	if err != nil {
+	rawNumber := strings.ToLower(raw)
+	value, err := strconv.ParseFloat(rawNumber, 64)
+	if err != nil && !math.IsInf(value, 0) {
 		return false
 	}
-
-	// Convert to float64 (this is what JavaScript does)
-	jsValue, _ := rawBigFloat.Float64()
-
-	// Check for infinity
-	if math.IsInf(jsValue, 0) {
+	if value == 0 {
+		return false
+	}
+	if math.IsInf(value, 0) {
 		return true
 	}
 
-	// Get significant info from raw
-	rawSigDigits, rawExp, rawPrecision := getSignificantInfo(raw)
-
-	// If raw precision exceeds JavaScript's ~17 significant digits, it's precision loss
-	if rawPrecision > 17 {
+	normalizedRawNumber := convertNumberToScientificNotation(rawNumber, false)
+	requestedPrecision := len(normalizedRawNumber.coefficient)
+	if requestedPrecision > 100 {
 		return true
 	}
 
-	// Get JS representation
-	precision := rawPrecision
-	if precision < 1 {
-		precision = 1
+	if requestedPrecision < 1 {
+		requestedPrecision = 1
 	}
-	jsStr := strconv.FormatFloat(jsValue, 'e', precision-1, 64)
-	jsSigDigits, jsExp, _ := getSignificantInfo(jsStr)
+	normalizedStoredNumber := numberToPrecisionScientific(value, requestedPrecision)
 
-	rawAbs := strings.TrimPrefix(rawSigDigits, "-")
-	jsAbs := strings.TrimPrefix(jsSigDigits, "-")
-
-	// Check sign
-	if strings.HasPrefix(rawSigDigits, "-") != strings.HasPrefix(jsSigDigits, "-") {
-		return true
-	}
-
-	// Handle zero
-	if rawAbs == "0" {
-		return jsAbs != "0"
-	}
-
-	// Check exponent
-	if rawExp != jsExp {
-		return true
-	}
-
-	// Compare significant digits (trimmed)
-	if len(rawAbs) <= len(jsAbs) {
-		return !strings.HasPrefix(jsAbs, rawAbs)
-	}
-
-	// rawAbs is longer than jsAbs
-	if !strings.HasPrefix(rawAbs, jsAbs) {
-		return true
-	}
-	extra := rawAbs[len(jsAbs):]
-	return strings.Trim(extra, "0") != ""
+	return normalizedRawNumber.magnitude != normalizedStoredNumber.magnitude ||
+		normalizedRawNumber.coefficient != normalizedStoredNumber.coefficient
 }
 
-// getSignificantInfo extracts significant digits, exponent, and precision from a number string
-func getSignificantInfo(raw string) (sigDigits string, exp int, rawPrecision int) {
-	negative := false
-	if strings.HasPrefix(raw, "-") {
-		negative = true
-		raw = raw[1:]
-	} else if strings.HasPrefix(raw, "+") {
-		raw = raw[1:]
-	}
+// scientificNotation matches the upstream rule's comparison shape: coefficient
+// digits with an implied decimal point after the first digit, plus magnitude.
+type scientificNotation struct {
+	coefficient string
+	magnitude   int
+}
 
-	// Handle scientific notation
-	var mantissa string
-	expOffset := 0
-	if idx := strings.IndexAny(raw, "eE"); idx >= 0 {
-		mantissa = raw[:idx]
-		expOffset, _ = strconv.Atoi(raw[idx+1:])
+func convertNumberToScientificNotation(stringNumber string, parseAsFloat bool) scientificNotation {
+	splitNumber := strings.Split(stringNumber, "e")
+	originalCoefficient := splitNumber[0]
+	var normalizedNumber scientificNotation
+	if parseAsFloat || strings.Contains(stringNumber, ".") {
+		normalizedNumber = normalizeFloat(originalCoefficient)
 	} else {
-		mantissa = raw
+		normalizedNumber = normalizeInteger(originalCoefficient)
+	}
+	if len(splitNumber) > 1 {
+		exponent, _ := strconv.Atoi(splitNumber[1])
+		normalizedNumber.magnitude += exponent
+	}
+	return normalizedNumber
+}
+
+func normalizeInteger(stringInteger string) scientificNotation {
+	trimmedInteger := removeLeadingZeros(stringInteger)
+	significantDigits := removeTrailingZeros(trimmedInteger)
+	return scientificNotation{
+		coefficient: significantDigits,
+		magnitude:   len(trimmedInteger) - 1,
+	}
+}
+
+func normalizeFloat(stringFloat string) scientificNotation {
+	trimmedFloat := removeLeadingZeros(stringFloat)
+	indexOfDecimalPoint := strings.Index(trimmedFloat, ".")
+
+	switch indexOfDecimalPoint {
+	case 0:
+		significantDigits := removeLeadingZeros(trimmedFloat[1:])
+		return scientificNotation{
+			coefficient: significantDigits,
+			magnitude:   len(significantDigits) - len(trimmedFloat),
+		}
+	case -1:
+		return scientificNotation{
+			coefficient: trimmedFloat,
+			magnitude:   len(trimmedFloat) - 1,
+		}
+	default:
+		return scientificNotation{
+			coefficient: strings.ReplaceAll(trimmedFloat, ".", ""),
+			magnitude:   indexOfDecimalPoint - 1,
+		}
+	}
+}
+
+func removeLeadingZeros(numberAsString string) string {
+	for i := range len(numberAsString) {
+		if numberAsString[i] != '0' {
+			return numberAsString[i:]
+		}
+	}
+	return numberAsString
+}
+
+func removeTrailingZeros(numberAsString string) string {
+	for i := len(numberAsString) - 1; i >= 0; i-- {
+		if numberAsString[i] != '0' {
+			return numberAsString[:i+1]
+		}
+	}
+	return numberAsString
+}
+
+// numberToPrecisionScientific mirrors the part of Number#toPrecision() the
+// rule compares against. strconv.FormatFloat is close, but it doesn't preserve
+// JS toPrecision's observable rounding on literals such as 255.10000610351562,
+// so this rounds the exact float64 rational to the requested significant digit
+// count before normalizing.
+func numberToPrecisionScientific(value float64, precision int) scientificNotation {
+	rat := new(big.Rat).SetFloat64(math.Abs(value))
+	if rat == nil {
+		return scientificNotation{}
 	}
 
-	// Split by decimal point
-	var intPart, fracPart string
-	if dotIdx := strings.Index(mantissa, "."); dotIdx >= 0 {
-		intPart = mantissa[:dotIdx]
-		fracPart = mantissa[dotIdx+1:]
+	magnitude := int(math.Floor(math.Log10(math.Abs(value))))
+	for rat.Cmp(pow10Rat(magnitude)) < 0 {
+		magnitude--
+	}
+	for rat.Cmp(pow10Rat(magnitude+1)) >= 0 {
+		magnitude++
+	}
+
+	scaled := new(big.Rat).Set(rat)
+	scaleExponent := precision - 1 - magnitude
+	if scaleExponent >= 0 {
+		scaled.Mul(scaled, new(big.Rat).SetInt(pow10Int(scaleExponent)))
 	} else {
-		intPart = mantissa
-		fracPart = ""
+		scaled.Quo(scaled, new(big.Rat).SetInt(pow10Int(-scaleExponent)))
 	}
 
-	// Combine all digits
-	allDigits := intPart + fracPart
-
-	// Find first non-zero digit
-	firstNonZero := 0
-	for firstNonZero < len(allDigits) && allDigits[firstNonZero] == '0' {
-		firstNonZero++
+	rounded := roundRatHalfUp(scaled)
+	coefficient := rounded.String()
+	if len(coefficient) > precision {
+		magnitude += len(coefficient) - precision
+		coefficient = coefficient[:precision]
+	}
+	for len(coefficient) < precision {
+		coefficient = "0" + coefficient
 	}
 
-	if firstNonZero == len(allDigits) {
-		return "0", 0, 1
+	return scientificNotation{
+		coefficient: coefficient,
+		magnitude:   magnitude,
 	}
+}
 
-	// Calculate exponent
-	exp = len(intPart) - firstNonZero - 1 + expOffset
+func roundRatHalfUp(r *big.Rat) *big.Int {
+	quotient := new(big.Int)
+	remainder := new(big.Int)
+	quotient.QuoRem(r.Num(), r.Denom(), remainder)
 
-	// Get significant digits
-	sigDigitsWithZeros := allDigits[firstNonZero:]
-	sigDigits = strings.TrimRight(sigDigitsWithZeros, "0")
-	if sigDigits == "" {
-		sigDigits = "0"
+	doubleRemainder := new(big.Int).Mul(remainder, big.NewInt(2))
+	if doubleRemainder.Cmp(r.Denom()) >= 0 {
+		quotient.Add(quotient, big.NewInt(1))
 	}
+	return quotient
+}
 
-	// Check if trailing zeros in fractional part represent precision
-	// This happens when there's a non-zero digit in the fractional part
-	// followed by trailing zeros (e.g., ".1230000...")
-	fracPartTrimmed := strings.TrimRight(fracPart, "0")
-	fracHasNonZero := len(strings.TrimLeft(fracPart, "0")) > 0
-
-	if fracHasNonZero && len(fracPart) > len(fracPartTrimmed) {
-		// Trailing zeros after non-zero digit in fractional part = precision intent
-		rawPrecision = len(sigDigitsWithZeros)
-	} else {
-		// No precision intent from trailing zeros
-		rawPrecision = len(sigDigits)
+func pow10Rat(exponent int) *big.Rat {
+	if exponent >= 0 {
+		return new(big.Rat).SetInt(pow10Int(exponent))
 	}
+	return new(big.Rat).SetFrac(big.NewInt(1), pow10Int(-exponent))
+}
 
-	if negative {
-		sigDigits = "-" + sigDigits
-	}
-
-	return sigDigits, exp, rawPrecision
+func pow10Int(exponent int) *big.Int {
+	return new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(exponent)), nil)
 }
