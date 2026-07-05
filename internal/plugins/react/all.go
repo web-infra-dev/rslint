@@ -18,6 +18,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_equals_spacing"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_filename_extension"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_first_prop_new_line"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_fragments"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_handler_names"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_indent"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_indent_props"
@@ -96,6 +97,7 @@ func GetAllRules() []rule.Rule {
 		jsx_equals_spacing.JsxEqualsSpacingRule,
 		jsx_filename_extension.JsxFilenameExtensionRule,
 		jsx_first_prop_new_line.JsxFirstPropNewLineRule,
+		jsx_fragments.JsxFragmentsRule,
 		jsx_handler_names.JsxHandlerNamesRule,
 		jsx_indent.JsxIndentRule,
 		jsx_indent_props.JsxIndentPropsRule,
