@@ -11,6 +11,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_elements"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_foreign_prop_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forbid_prop_types"
+	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/forward_ref_uses_ref"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_boolean_value"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_bracket_location"
 	"github.com/web-infra-dev/rslint/internal/plugins/react/rules/jsx_closing_tag_location"
@@ -88,6 +89,7 @@ func GetAllRules() []rule.Rule {
 		forbid_elements.ForbidElementsRule,
 		forbid_foreign_prop_types.ForbidForeignPropTypesRule,
 		forbid_prop_types.ForbidPropTypesRule,
+		forward_ref_uses_ref.ForwardRefUsesRefRule,
 		jsx_boolean_value.JsxBooleanValueRule,
 		jsx_closing_bracket_location.JsxClosingBracketLocationRule,
 		jsx_closing_tag_location.JsxClosingTagLocationRule,
