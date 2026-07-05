@@ -111,6 +111,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unused_expressions"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unused_labels"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_backreference"
 	"github.com/web-infra-dev/rslint/internal/rules/no_useless_call"
@@ -267,6 +268,7 @@ func GetAllRules() []rule.Rule {
 		no_unreachable.NoUnreachableRule,
 		require_atomic_updates.RequireAtomicUpdatesRule,
 		object_shorthand.ObjectShorthandRule,
+		no_unused_expressions.NoUnusedExpressionsRule,
 		no_unused_labels.NoUnusedLabelsRule,
 		one_var.OneVarRule,
 		prefer_arrow_callback.PreferArrowCallbackRule,
