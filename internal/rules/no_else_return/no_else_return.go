@@ -223,10 +223,8 @@ func buildFixes(ctx rule.RuleContext, elseNode *ast.Node) []rule.RuleFix {
 
 	fixedSource := utils.TrimmedNodeText(sf, elseNode)
 	if startToken.Text == "{" {
-		trimmed := utils.TrimNodeTextRange(sf, elseNode)
-		if trimmed.End()-trimmed.Pos() >= 2 {
-			fixedSource = text[trimmed.Pos()+1 : trimmed.End()-1]
-		}
+		innerRange := utils.BracedNodeInnerRange(sf, elseNode)
+		fixedSource = text[innerRange.Pos():innerRange.End()]
 	}
 
 	retainStart := enclosingFunctionStart(sf, elseNode)

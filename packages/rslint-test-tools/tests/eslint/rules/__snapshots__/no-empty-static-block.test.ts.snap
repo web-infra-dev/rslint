@@ -1,0 +1,160 @@
+// Rstest Snapshot v1
+
+exports[`no-empty-static-block > invalid 1`] = `
+{
+  "code": "class Foo { static {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static block.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-static-block",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-static-block > invalid 2`] = `
+{
+  "code": "class Foo { static { } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static block.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-static-block",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-static-block > invalid 3`] = `
+{
+  "code": "class Foo { static { 
+
+ } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static block.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-static-block",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-static-block > invalid 4`] = `
+{
+  "code": "class Foo { static { bar(); } static {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static block.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-static-block",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-static-block > invalid 5`] = `
+{
+  "code": "class Foo { static // comment
+ {} }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static block.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-empty-static-block",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-static-block > invalid 6`] = `
+{
+  "code": "class Foo { static /* empty */ {} /* empty */ }",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty static block.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-static-block",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

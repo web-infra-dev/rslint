@@ -18,6 +18,17 @@ func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRang
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
+// BracedNodeInnerRange returns the span between a braced node's opening and
+// closing braces. Callers should pass Block-like nodes whose trimmed text starts
+// with "{" and ends with "}".
+func BracedNodeInnerRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	nodeRange := TrimNodeTextRange(sourceFile, node)
+	if nodeRange.End() <= nodeRange.Pos()+1 {
+		return core.NewTextRange(nodeRange.Pos(), nodeRange.Pos())
+	}
+	return core.NewTextRange(nodeRange.Pos()+1, nodeRange.End()-1)
+}
+
 // GetVarKeywordRange returns the range of the kind keyword (`var`/`let`/`const`/
 // `using` or `await` for `await using`) inside a VariableStatement or
 // VariableDeclarationList. For VariableStatement it skips the modifier list

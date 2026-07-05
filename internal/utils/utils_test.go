@@ -84,6 +84,37 @@ func TestHasCommentInsideNode(t *testing.T) {
 	}
 }
 
+func TestBracedNodeInnerRange(t *testing.T) {
+	source := "class Foo { static {} }\n" +
+		"class Bar {\n" +
+		"  static {\n" +
+		"    \n" +
+		"  }\n" +
+		"}\n" +
+		"function work() { doWork(); }\n"
+	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+		FileName: "/test.ts",
+		Path:     "/test.ts",
+	}, source, core.ScriptKindTS)
+
+	tests := []struct {
+		name      string
+		blockText string
+		want      string
+	}{
+		{name: "empty one-line block", blockText: "{}", want: ""},
+		{name: "whitespace-only multiline block", blockText: "{\n    \n  }", want: "\n    \n  "},
+		{name: "non-empty function block", blockText: "{ doWork(); }", want: " doWork(); "},
+	}
+	for _, tt := range tests {
+		node := findNodeWithText(t, sourceFile, tt.blockText)
+		gotRange := BracedNodeInnerRange(sourceFile, node)
+		if got := sourceFile.Text()[gotRange.Pos():gotRange.End()]; got != tt.want {
+			t.Errorf("%s: BracedNodeInnerRange() text = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestGetStaticStringLiteralValue(t *testing.T) {
 	source := "const empty = \"\";\n" +
 		"const template = `raw`;\n" +

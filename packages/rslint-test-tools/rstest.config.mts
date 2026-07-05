@@ -81,6 +81,7 @@ export default defineConfig({
     './tests/eslint/rules/no-empty.test.ts',
     './tests/eslint/rules/no-empty-function.test.ts',
     './tests/eslint/rules/no-empty-pattern.test.ts',
+    './tests/eslint/rules/no-empty-static-block.test.ts',
     './tests/eslint/rules/no-eval.test.ts',
     './tests/eslint/rules/no-implicit-coercion.test.ts',
     './tests/eslint/rules/no-implied-eval.test.ts',
