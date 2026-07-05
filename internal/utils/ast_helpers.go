@@ -123,10 +123,19 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 		return true
 	}
 
-	// Re-export specifiers: export { x } from 'mod'
-	// All identifiers are source module names, not local references.
-	if parent.Kind == ast.KindExportSpecifier && isReExportSpecifier(parent) {
-		return true
+	// export { local as exported }: only `local` can read a runtime value.
+	if parent.Kind == ast.KindExportSpecifier {
+		if ast.IsTypeOnlyImportOrExportDeclaration(parent) || isReExportSpecifier(parent) {
+			return true
+		}
+		es := parent.AsExportSpecifier()
+		if es == nil {
+			return false
+		}
+		if es.PropertyName != nil {
+			return es.PropertyName != node
+		}
+		return es.Name() != node
 	}
 
 	// ast.IsDeclarationName covers: variable, function, class, parameter,
@@ -134,10 +143,6 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 	if ast.IsDeclarationName(node) {
 		// ShorthandPropertyAssignment { x } — x IS a reference to the variable.
 		if parent.Kind == ast.KindShorthandPropertyAssignment {
-			return false
-		}
-		// export { x } (no rename, local) — x IS a reference to the local/global variable.
-		if parent.Kind == ast.KindExportSpecifier && parent.AsExportSpecifier().PropertyName == nil {
 			return false
 		}
 		return true
@@ -167,6 +172,13 @@ func IsNonReferenceIdentifier(node *ast.Node) bool {
 	}
 
 	return false
+}
+
+// IsInAmbientContext reports whether node was parsed inside an ambient
+// context. TypeScript-Go propagates this through declaration files and
+// `declare` contexts via NodeFlagsAmbient.
+func IsInAmbientContext(node *ast.Node) bool {
+	return node != nil && node.Flags&ast.NodeFlagsAmbient != 0
 }
 
 // CouldBeError reports whether a node could plausibly evaluate to an Error

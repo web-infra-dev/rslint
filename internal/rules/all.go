@@ -101,6 +101,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_throw_literal"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unassigned_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef_init"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unexpected_multiline"
@@ -236,6 +237,7 @@ func GetAllRules() []rule.Rule {
 		no_unneeded_ternary.NoUnneededTernaryRule,
 		no_undef.NoUndefRule,
 		no_undef_init.NoUndefInitRule,
+		no_unassigned_vars.NoUnassignedVarsRule,
 		prefer_const.PreferConstRule,
 		prefer_exponentiation_operator.PreferExponentiationOperatorRule,
 		prefer_numeric_literals.PreferNumericLiteralsRule,
