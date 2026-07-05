@@ -1,0 +1,1283 @@
+// Rstest Snapshot v1
+
+exports[`no-unused-private-class-members > invalid 1`] = `
+{
+  "code": "class Foo {
+    #unusedMember = 5;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 2`] = `
+{
+  "code": "class Foo {
+    /** docs */
+    #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 3`] = `
+{
+  "code": "class Foo {
+    // remove me
+    #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 4`] = `
+{
+  "code": "class Foo {
+    /* remove */ #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 5`] = `
+{
+  "code": "class Foo {
+    /* keep */ #unusedMember = 1; foo = 1
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 6`] = `
+{
+  "code": "class C {
+    #unused1; /* keep */ foo;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused1' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 7`] = `
+{
+  "code": "class C {
+    bar; #unused2; // keep
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused2' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 8`] = `
+{
+  "code": "class C {
+    // comment
+    #unused; foo;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 9`] = `
+{
+  "code": "class C {
+    // comment
+    #unused; /*
+    */ foo;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 10`] = `
+{
+  "code": "class Foo {
+    #unusedMember = 1; // trailing
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 11`] = `
+{
+  "code": "class Foo {
+    foo = 1; /*
+    */ #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 12`] = `
+{
+  "code": "class Foo {
+    foo = 1; // keep this
+    #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 13`] = `
+{
+  "code": "class First {}
+class Second {
+    #unusedMemberInSecondClass = 5;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMemberInSecondClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 14`] = `
+{
+  "code": "class First {
+    #unusedMemberInFirstClass = 5;
+}
+class Second {}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMemberInFirstClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 15`] = `
+{
+  "code": "class First {
+    #firstUnusedMemberInSameClass = 5;
+    #secondUnusedMemberInSameClass = 5;
+}",
+  "diagnostics": [
+    {
+      "message": "'#firstUnusedMemberInSameClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+    {
+      "message": "'#secondUnusedMemberInSameClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 16`] = `
+{
+  "code": "class Foo {
+    #usedOnlyInWrite = 5;
+    method() {
+        this.#usedOnlyInWrite = 42;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#usedOnlyInWrite' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 17`] = `
+{
+  "code": "class Foo {
+    #usedOnlyInWriteStatement = 5;
+    method() {
+        this.#usedOnlyInWriteStatement += 42;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#usedOnlyInWriteStatement' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 18`] = `
+{
+  "code": "class C {
+    #usedOnlyInIncrement;
+
+    foo() {
+        this.#usedOnlyInIncrement++;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#usedOnlyInIncrement' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 19`] = `
+{
+  "code": "class C {
+    #unusedInOuterClass;
+
+    foo() {
+        return class {
+            #unusedInOuterClass;
+
+            bar() {
+                return this.#unusedInOuterClass;
+            }
+        };
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedInOuterClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 20`] = `
+{
+  "code": "class C {
+    #unusedOnlyInSecondNestedClass;
+
+    foo() {
+        return class {
+            #unusedOnlyInSecondNestedClass;
+
+            bar() {
+                return this.#unusedOnlyInSecondNestedClass;
+            }
+        };
+    }
+
+    baz() {
+        return this.#unusedOnlyInSecondNestedClass;
+    }
+
+    bar() {
+        return class {
+            #unusedOnlyInSecondNestedClass;
+        }
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedOnlyInSecondNestedClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 20,
+        },
+        "start": {
+          "column": 13,
+          "line": 20,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 21`] = `
+{
+  "code": "class Foo {
+    #unusedMethod() {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMethod' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 22`] = `
+{
+  "code": "class Foo {
+    #unusedMethod() {}
+    #usedMethod() {
+        return 42;
+    }
+    publicMethod() {
+        return this.#usedMethod();
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMethod' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 23`] = `
+{
+  "code": "class Foo {
+    set #unusedSetter(value) {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedSetter' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 24`] = `
+{
+  "code": "class Foo {
+    get #unusedAccessor() {
+        return 1;
+    }
+    set #unusedAccessor(value) {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedAccessor' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 25`] = `
+{
+  "code": "class Foo {
+    #unusedForInLoop;
+    method() {
+        for (this.#unusedForInLoop in bar) {
+
+        }
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedForInLoop' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 26`] = `
+{
+  "code": "class Foo {
+    #unusedForOfLoop;
+    method() {
+        for (this.#unusedForOfLoop of bar) {
+
+        }
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedForOfLoop' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 27`] = `
+{
+  "code": "class Foo {
+    #unusedInDestructuring;
+    method() {
+        ({ x: this.#unusedInDestructuring } = bar);
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedInDestructuring' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 28`] = `
+{
+  "code": "class Foo {
+    #unusedInRestPattern;
+    method() {
+        [...this.#unusedInRestPattern] = bar;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedInRestPattern' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 29`] = `
+{
+  "code": "class Foo {
+    #unusedInAssignmentPattern;
+    method() {
+        [this.#unusedInAssignmentPattern = 1] = bar;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedInAssignmentPattern' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 30`] = `
+{
+  "code": "class Foo {
+    #unusedInAssignmentPattern;
+    method() {
+        [this.#unusedInAssignmentPattern] = bar;
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedInAssignmentPattern' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 31`] = `
+{
+  "code": "class Foo {
+    foo = 1
+    #unusedMethod() {}
+    [0]() {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMethod' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 32`] = `
+{
+  "code": "class Foo {
+    foo = 1
+    #unusedMethod() {}
+    *generator() {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMethod' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 33`] = `
+{
+  "code": "class Foo {
+    foo = 1
+    #unusedMethod() {}
+    in = 2
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMethod' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 34`] = `
+{
+  "code": "class Foo {
+    foo = 1
+    #unused
+    instanceof() {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 35`] = `
+{
+  "code": "class C {
+    foo = () => {}
+    #unused
+    [bar]
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 36`] = `
+{
+  "code": "class C {
+    foo
+    #unused
+    [bar]
+}",
+  "diagnostics": [
+    {
+      "message": "'#unused' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 37`] = `
+{
+  "code": "class Foo {
+    foo = 1
+    /** docs */
+    #unusedMethod() {}
+    [0]() {}
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMethod' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 38`] = `
+{
+  "code": "class Foo {
+    // keep
+
+    /** remove */
+    #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 39`] = `
+{
+  "code": "class Foo {
+    // keep one
+    // keep two
+
+    /** remove */
+    #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 40`] = `
+{
+  "code": "class Foo {
+    // maybe unrelated
+
+    #unusedMember = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "'#unusedMember' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unused-private-class-members > invalid 41`] = `
+{
+  "code": "class C {
+    #usedOnlyInTheSecondInnerClass;
+
+    method(a) {
+        return class {
+            #usedOnlyInTheSecondInnerClass;
+
+            method2(b) {
+                foo = b.#usedOnlyInTheSecondInnerClass;
+            }
+
+            method3(b) {
+                foo = b.#usedOnlyInTheSecondInnerClass;
+            }
+        }
+    }
+}",
+  "diagnostics": [
+    {
+      "message": "'#usedOnlyInTheSecondInnerClass' is defined but never used.",
+      "messageId": "unusedPrivateClassMember",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unused-private-class-members",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
