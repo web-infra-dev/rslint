@@ -283,22 +283,6 @@ func parenthesizeIfShould(text string, shouldParenthesize bool) string {
 	return text
 }
 
-func isStartOfExpressionStatement(sf *ast.SourceFile, node *ast.Node) bool {
-	nodeStart := utils.TrimNodeTextRange(sf, node).Pos()
-	for current := node.Parent; current != nil; current = current.Parent {
-		if current.Kind == ast.KindParenthesizedExpression {
-			return false
-		}
-		if current.Kind == ast.KindExpressionStatement {
-			return nodeStart == utils.TrimNodeTextRange(sf, current).Pos()
-		}
-		if !ast.IsExpression(current) {
-			return false
-		}
-	}
-	return false
-}
-
 func firstTokenKind(sf *ast.SourceFile, node *ast.Node) ast.Kind {
 	node = unparenthesized(node)
 	if node == nil {
@@ -387,26 +371,6 @@ func nextAdjacentTokenText(sf *ast.SourceFile, pos int) (string, bool) {
 	return text[pos:end], true
 }
 
-func needsPrecedingSemicolon(sf *ast.SourceFile, node *ast.Node) bool {
-	nodeStart := utils.TrimNodeTextRange(sf, node).Pos()
-
-	scan := scanner.GetScannerForSourceFile(sf, 0)
-	prevKind := ast.KindUnknown
-	for scan.Token() != ast.KindEndOfFile && scan.TokenStart() < nodeStart {
-		prevKind = scan.Token()
-		scan.Scan()
-	}
-	if prevKind == ast.KindUnknown || scan.TokenStart() != nodeStart || !scan.HasPrecedingLineBreak() {
-		return false
-	}
-
-	switch prevKind {
-	case ast.KindSemicolonToken, ast.KindCloseBraceToken:
-		return false
-	}
-	return true
-}
-
 func buildFix(sf *ast.SourceFile, node *ast.Node) *rule.RuleFix {
 	call := node.AsCallExpression()
 	if call == nil || call.Arguments == nil {
@@ -431,7 +395,7 @@ func buildFix(sf *ast.SourceFile, node *ast.Node) *rule.RuleFix {
 	exponentText := expressionText(sf, exponent)
 	shouldParenthesizeBase := doesBaseNeedParens(base)
 	shouldParenthesizeExponent := doesExponentNeedParens(exponent)
-	isStart := isStartOfExpressionStatement(sf, node)
+	isStart := utils.IsStartOfExpressionStatement(sf, node)
 	shouldParenthesizeAll := doesExponentiationExpressionNeedParens(node)
 
 	if !shouldParenthesizeAll && !shouldParenthesizeBase && isStart && isBaseStartThatNeedsWholeParens(sf, base) {
@@ -463,7 +427,7 @@ func buildFix(sf *ast.SourceFile, node *ast.Node) *rule.RuleFix {
 	exponentReplacement := parenthesizeIfShould(exponentText, shouldParenthesizeExponent)
 	replacement := parenthesizeIfShould(baseReplacement+"**"+exponentReplacement, shouldParenthesizeAll)
 
-	if prefix == "" && isStart && len(replacement) > 0 && continuationChars[replacement[0]] && needsPrecedingSemicolon(sf, node) {
+	if prefix == "" && isStart && len(replacement) > 0 && continuationChars[replacement[0]] && utils.NeedsPrecedingSemicolon(sf, node) {
 		prefix = ";"
 	}
 
