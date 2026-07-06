@@ -1,7 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { Socket } from 'node:net';
-import { createRequire } from 'node:module';
 import { RSLintService } from '../service/service.js';
+import { resolveRslintBinary } from './resolve-binary.js';
 import type {
   RslintServiceInterface,
   RSlintOptions,
@@ -10,35 +10,6 @@ import type {
   LintOptions,
   LintResponse,
 } from '../types.js';
-
-const require = createRequire(import.meta.url);
-
-/**
- * Resolve the rslint Go binary from the matching `@rslint/native-<tuple>`
- * platform package (its `./bin` export) — the same resolution the CLI launcher
- * (`bin/rslint.js`) uses. Linux tries gnu then musl (Go is statically linked,
- * so the libc split is irrelevant to it).
- */
-function resolveRslintBinary(): string {
-  const arch = process.arch;
-  const tuples =
-    process.platform === 'linux'
-      ? [`linux-${arch}-gnu`, `linux-${arch}-musl`]
-      : process.platform === 'win32'
-        ? [`win32-${arch}-msvc`]
-        : [`${process.platform}-${arch}`];
-  for (const tuple of tuples) {
-    try {
-      return require.resolve(`@rslint/native-${tuple}/bin`);
-    } catch {
-      // not installed for this tuple; try the next
-    }
-  }
-  throw new Error(
-    `rslint: no native binary for ${process.platform}-${arch} ` +
-      `(looked for @rslint/native-{${tuples.join(',')}})`,
-  );
-}
 
 /**
  * Node.js implementation of RslintService using child processes
