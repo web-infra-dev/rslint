@@ -11,6 +11,15 @@ import {
   filterConfigsByParentIgnores,
   type ConfigEntry,
 } from '../utils/config-discovery.js';
+import { resolveRslintBinary } from '../internal/resolve-binary.js';
+
+export type RunCLIOptions = {
+  /**
+   * The command-line arguments to parse, matching the shape of Node.js `process.argv`
+   * @default process.argv
+   */
+  argv?: string[];
+};
 
 /**
  * Load multiple JS/TS configs and run them through the Go binary over IPC.
@@ -158,4 +167,13 @@ export async function run(
     : goArgs;
   const { runEngine } = await import('./engine.js');
   return runEngine({ binPath, goArgs: jsonGoArgs, configs: [], cwd });
+}
+
+export async function runCLI({
+  argv = process.argv,
+}: RunCLIOptions = {}): Promise<void> {
+  const startTime = Date.now();
+  const exitCode = await run(resolveRslintBinary(), argv.slice(2), startTime);
+  // Let stdout/stderr flush naturally instead of terminating the process.
+  process.exitCode = exitCode;
 }
