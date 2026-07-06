@@ -598,3 +598,5 @@ pendings
 relskip
 ruleopts
 anyfunc
+errrr
+supa
