@@ -350,19 +350,10 @@ func IsCompilerNonNode(node *ast.Node) bool {
 	return ast.IsBigIntLiteral(n)
 }
 
-// IsFunctionLikeContainer reports whether `node` is one of the
-// function-like kinds the upstream rules treat as a "code path"
-// boundary.
+// IsFunctionLikeContainer keeps the react-hooks shared API while delegating to
+// the repository-wide function-scope boundary helper.
 func IsFunctionLikeContainer(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return true
-	}
-	return false
+	return utils.IsFunctionLikeContainer(node)
 }
 
 // FindEnclosingFunction walks up from `node` and returns the nearest
@@ -496,11 +487,11 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 	return nil
 }
 
-// GetForwardRefOrMemoCallbackCall returns the CallExpression when `fn` is the
-// immediate argument of a call whose callee is `<name>` or `React.<name>`.
+// GetReactCallbackCall returns the CallExpression when `fn` is the immediate
+// argument of a call whose callee is `<name>` or `React.<name>`.
 // Parenthesized callback expressions are transparent: `memo((() => null))` is
 // the same callback shape as `memo(() => null)`.
-func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
+func GetReactCallbackCall(fn *ast.Node, name string) *ast.Node {
 	if fn == nil {
 		return nil
 	}
@@ -532,6 +523,12 @@ func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
 		return nil
 	}
 	return p
+}
+
+// GetForwardRefOrMemoCallbackCall is kept for existing callers that only check
+// React's `memo` / `forwardRef` callback shapes.
+func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
+	return GetReactCallbackCall(fn, name)
 }
 
 // IsForwardRefOrMemoCallback reports whether `fn` is the immediate

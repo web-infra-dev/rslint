@@ -852,7 +852,7 @@ func isStandaloneAssignment(identNode *ast.Node) bool {
 
 	// GetAssignmentTarget may return a default value's BinaryExpression
 	// (e.g. [x = 5] returns x=5, not [x=5]=[1]). If so, find the outer destructuring.
-	if target.Kind == ast.KindBinaryExpression && isDefaultValueInDestructuring(target) {
+	if utils.IsDefaultValueInDestructuringAssignment(target) {
 		target = ast.FindAncestor(target.Parent, func(n *ast.Node) bool {
 			return ast.IsDestructuringAssignment(n)
 		})
@@ -867,29 +867,4 @@ func isStandaloneAssignment(identNode *ast.Node) bool {
 		parent = parent.Parent
 	}
 	return parent != nil && parent.Kind == ast.KindExpressionStatement
-}
-
-// isDefaultValueInDestructuring checks if a BinaryExpression(=) node is a default
-// value inside a destructuring assignment target (e.g., x = 5 in [x = 5] = [1]
-// or val: x = 5 in ({val: x = 5} = {val: 1})).
-func isDefaultValueInDestructuring(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-	switch parent.Kind {
-	case ast.KindArrayLiteralExpression:
-		// [x = 5] — default in array destructuring target
-		return utils.IsInDestructuringAssignment(parent)
-	case ast.KindPropertyAssignment:
-		// {val: x = 5} — default in object destructuring rename
-		pa := parent.AsPropertyAssignment()
-		if pa != nil && pa.Initializer == node {
-			return utils.IsInDestructuringAssignment(parent)
-		}
-	case ast.KindSpreadElement:
-		// [...x = 5] — unlikely but handle for completeness
-		return utils.IsInDestructuringAssignment(parent)
-	}
-	return false
 }
