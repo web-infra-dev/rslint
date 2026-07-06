@@ -170,6 +170,7 @@ export default defineConfig({
     './tests/eslint-plugin-react/rules/jsx-no-undef.test.ts',
     './tests/eslint-plugin-react/rules/jsx-pascal-case.test.ts',
     './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-props-no-spread-multi.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-bracket-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
     './tests/eslint-plugin-react/rules/jsx-curly-brace-presence.test.ts',
