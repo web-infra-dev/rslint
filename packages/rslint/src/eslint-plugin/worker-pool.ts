@@ -36,6 +36,8 @@
 import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { fileURLToPath } from 'node:url';
 import { StringDecoder } from 'node:string_decoder';
+import path from 'node:path';
+import nodeModule from 'node:module';
 
 import { CancelFlagPool } from './cancel-flag.js';
 import type {
@@ -174,6 +176,54 @@ const resolveWorkerFile = (): string =>
  * see the native-abort note on `terminateWorker`.
  */
 const WORKER_EXIT_GRACE_MS = 5_000;
+
+let nodeCompileCacheDir: string | undefined;
+let nodeCompileCacheDirResolved = false;
+
+/**
+ * Give worker threads the same Node compile cache as the host process.
+ * Workers need NODE_COMPILE_CACHE before their entry module loads, otherwise
+ * the large bundled lint-worker.js has already been compiled too early to
+ * cache.
+ */
+function getNodeCompileCacheDir(): string | undefined {
+  if (nodeCompileCacheDirResolved) {
+    return nodeCompileCacheDir;
+  }
+  nodeCompileCacheDirResolved = true;
+
+  if (process.env.NODE_DISABLE_COMPILE_CACHE) {
+    return undefined;
+  }
+
+  if (process.env.NODE_COMPILE_CACHE) {
+    nodeCompileCacheDir = process.env.NODE_COMPILE_CACHE;
+    return nodeCompileCacheDir;
+  }
+
+  const { enableCompileCache, getCompileCacheDir } = nodeModule;
+  if (!enableCompileCache || !getCompileCacheDir) {
+    return undefined;
+  }
+
+  try {
+    enableCompileCache();
+    const cacheDirectory = getCompileCacheDir();
+    nodeCompileCacheDir = cacheDirectory
+      ? path.dirname(cacheDirectory)
+      : undefined;
+    return nodeCompileCacheDir;
+  } catch {
+    return undefined;
+  }
+}
+
+function workerEnvWithCompileCache(): NodeJS.ProcessEnv | undefined {
+  const directory = getNodeCompileCacheDir();
+  return directory
+    ? { ...process.env, NODE_COMPILE_CACHE: directory }
+    : undefined;
+}
 
 /**
  * Terminate a worker, closing its piped stdout/stderr FIRST.
@@ -683,6 +733,7 @@ export class WorkerPool {
           cancelSab: this.cancelPool.sharedBuffer,
           configs: this.opts.configs,
         },
+        env: workerEnvWithCompileCache(),
         // Capture worker stdout/stderr instead of letting them inherit
         // the parent's. Native console behavior inside plugin code is
         // preserved (plugins still call the unpatched `console.log`),
