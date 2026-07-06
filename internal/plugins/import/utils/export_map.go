@@ -11,6 +11,93 @@ import (
 
 const defaultExportName = "default"
 
+type ExportMeta struct {
+	Namespace *ExportMap
+}
+
+// ExportMap records the statically visible exports of an ES module. It does
+// not synthesize default exports from compiler interop settings; HasExport
+// keeps that looser existence check for rules that need it.
+type ExportMap struct {
+	exports    map[string]*ExportMeta
+	hasUnknown bool
+}
+
+func NewExportMap() *ExportMap {
+	return &ExportMap{
+		exports: make(map[string]*ExportMeta),
+	}
+}
+
+func (m *ExportMap) Size() int {
+	if m == nil {
+		return 0
+	}
+	size := len(m.exports)
+	if m.hasUnknown {
+		size++
+	}
+	return size
+}
+
+func (m *ExportMap) Has(name string) bool {
+	if m == nil {
+		return false
+	}
+	if _, ok := m.exports[name]; ok {
+		return true
+	}
+	return m.hasUnknown
+}
+
+func (m *ExportMap) Get(name string) *ExportMeta {
+	if m == nil {
+		return nil
+	}
+	return m.exports[name]
+}
+
+func (m *ExportMap) Set(name string, meta *ExportMeta) {
+	if m == nil || name == "" {
+		return
+	}
+	if meta == nil {
+		meta = &ExportMeta{}
+	}
+	m.exports[name] = meta
+}
+
+func (m *ExportMap) AddUnknown() {
+	if m != nil {
+		m.hasUnknown = true
+	}
+}
+
+func (m *ExportMap) MergeFrom(other *ExportMap, includeDefault bool) {
+	if m == nil || other == nil {
+		return
+	}
+	for name, meta := range other.exports {
+		if !includeDefault && name == defaultExportName {
+			continue
+		}
+		m.Set(name, meta)
+	}
+	if other.hasUnknown {
+		m.AddUnknown()
+	}
+}
+
+// GetExportMap resolves moduleSpecifier from ctx.SourceFile and returns a
+// recursive export map. The second result is false when no export map is
+// available, matching eslint-plugin-import's "imports == null" branch.
+func GetExportMap(ctx rule.RuleContext, moduleSpecifier *ast.Node) (*ExportMap, bool) {
+	if ctx.SourceFile == nil {
+		return nil, false
+	}
+	return getExportMap(ctx, ctx.SourceFile, moduleSpecifier, make(map[string]*ExportMap))
+}
+
 // HasDefaultExport resolves moduleSpecifier from ctx.SourceFile and reports
 // whether the resolved module has a statically visible default export. The
 // second result is false when no export map is available, matching
@@ -49,6 +136,266 @@ func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *as
 	}
 
 	return sourceFileHasExport(ctx, sourceFile, exportName, seen)
+}
+
+func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, seen map[string]*ExportMap) (*ExportMap, bool) {
+	if ctx.Program == nil || origin == nil || moduleSpecifier == nil || !ast.IsStringLiteralLike(moduleSpecifier) {
+		return nil, false
+	}
+
+	resolved := ctx.Program.GetResolvedModuleFromModuleSpecifier(origin, moduleSpecifier)
+	if resolved == nil || resolved.ResolvedFileName == "" {
+		return nil, false
+	}
+
+	sourceFile := ctx.Program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)
+	if sourceFile == nil {
+		return nil, false
+	}
+	if IsImportPathIgnored(ctx.Settings, sourceFile.FileName()) {
+		return nil, false
+	}
+	if !ast.IsExternalModule(sourceFile) {
+		return nil, false
+	}
+
+	return sourceFileExportMap(ctx, sourceFile, seen), true
+}
+
+func sourceFileExportMap(ctx rule.RuleContext, sourceFile *ast.SourceFile, seen map[string]*ExportMap) *ExportMap {
+	if sourceFile == nil {
+		return NewExportMap()
+	}
+	if existing := seen[sourceFile.FileName()]; existing != nil {
+		return existing
+	}
+
+	exports := NewExportMap()
+	seen[sourceFile.FileName()] = exports
+
+	if sourceFile.Statements == nil {
+		return exports
+	}
+
+	for _, stmt := range sourceFile.Statements.Nodes {
+		addStatementExports(ctx, exports, sourceFile, stmt, seen, false)
+	}
+
+	return exports
+}
+
+func addStatementExports(ctx rule.RuleContext, exports *ExportMap, sourceFile *ast.SourceFile, stmt *ast.Node, seen map[string]*ExportMap, ambientNamespace bool) {
+	if stmt == nil {
+		return
+	}
+
+	if exportedDeclarationHasNameForMap(stmt, ambientNamespace) {
+		addExportedDeclaration(ctx, exports, stmt, ambientNamespace)
+		return
+	}
+
+	switch stmt.Kind {
+	case ast.KindExportAssignment:
+		if !stmt.AsExportAssignment().IsExportEquals {
+			if meta, ok := localNamespaceImportMeta(ctx, sourceFile, stmt.AsExportAssignment().Expression, seen); ok {
+				exports.Set(defaultExportName, meta)
+			} else {
+				exports.Set(defaultExportName, nil)
+			}
+		}
+	case ast.KindNamespaceExportDeclaration:
+		if name := stmt.Name(); name != nil {
+			exports.Set(name.Text(), nil)
+		}
+	case ast.KindExportDeclaration:
+		addExportDeclarationExports(ctx, exports, sourceFile, stmt.AsExportDeclaration(), seen)
+	}
+}
+
+func exportedDeclarationHasNameForMap(stmt *ast.Node, ambientNamespace bool) bool {
+	if stmt == nil {
+		return false
+	}
+	switch stmt.Kind {
+	case ast.KindVariableStatement,
+		ast.KindFunctionDeclaration,
+		ast.KindClassDeclaration,
+		ast.KindInterfaceDeclaration,
+		ast.KindTypeAliasDeclaration,
+		ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration:
+		return ambientNamespace || ast.HasSyntacticModifier(stmt, ast.ModifierFlagsExport)
+	}
+	return false
+}
+
+func addExportedDeclaration(ctx rule.RuleContext, exports *ExportMap, stmt *ast.Node, ambientNamespace bool) {
+	if ast.HasSyntacticModifier(stmt, ast.ModifierFlagsDefault) {
+		exports.Set(defaultExportName, nil)
+		return
+	}
+
+	switch stmt.Kind {
+	case ast.KindVariableStatement:
+		collectVariableStatementNames(stmt, func(name string) {
+			exports.Set(name, nil)
+		})
+	case ast.KindFunctionDeclaration,
+		ast.KindClassDeclaration,
+		ast.KindInterfaceDeclaration,
+		ast.KindTypeAliasDeclaration,
+		ast.KindEnumDeclaration:
+		if name := stmt.Name(); name != nil {
+			exports.Set(name.Text(), nil)
+		}
+	case ast.KindModuleDeclaration:
+		if name := stmt.Name(); name != nil {
+			exports.Set(name.Text(), nil)
+		}
+	}
+}
+
+func collectVariableStatementNames(stmt *ast.Node, visit func(name string)) {
+	if stmt == nil || visit == nil {
+		return
+	}
+	declList := stmt.AsVariableStatement().DeclarationList
+	if declList == nil || !ast.IsVariableDeclarationList(declList) {
+		return
+	}
+	for _, decl := range declList.AsVariableDeclarationList().Declarations.Nodes {
+		if decl == nil || !ast.IsVariableDeclaration(decl) {
+			continue
+		}
+		rslint_utils.CollectBindingNames(decl.AsVariableDeclaration().Name(), func(_ *ast.Node, bindingName string) {
+			visit(bindingName)
+		})
+	}
+}
+
+func addExportDeclarationExports(ctx rule.RuleContext, exports *ExportMap, sourceFile *ast.SourceFile, exportDecl *ast.ExportDeclaration, seen map[string]*ExportMap) {
+	if exportDecl == nil {
+		return
+	}
+
+	if exportDecl.ExportClause == nil {
+		if exportDecl.ModuleSpecifier == nil {
+			return
+		}
+		dependency, ok := getExportMap(ctx, sourceFile, exportDecl.ModuleSpecifier, seen)
+		if !ok {
+			exports.AddUnknown()
+			return
+		}
+		exports.MergeFrom(dependency, false)
+		return
+	}
+
+	switch exportDecl.ExportClause.Kind {
+	case ast.KindNamedExports:
+		addNamedExportDeclarationExports(ctx, exports, sourceFile, exportDecl, seen)
+	case ast.KindNamespaceExport:
+		namespaceExport := exportDecl.ExportClause.AsNamespaceExport()
+		if namespaceExport == nil || namespaceExport.Name() == nil {
+			return
+		}
+		name, ok := moduleExportName(namespaceExport.Name())
+		if !ok {
+			return
+		}
+		exports.Set(name, nil)
+	}
+}
+
+func addNamedExportDeclarationExports(ctx rule.RuleContext, exports *ExportMap, sourceFile *ast.SourceFile, exportDecl *ast.ExportDeclaration, seen map[string]*ExportMap) {
+	namedExports := exportDecl.ExportClause.AsNamedExports()
+	if namedExports == nil || namedExports.Elements == nil {
+		return
+	}
+
+	var dependency *ExportMap
+	dependencyResolved := false
+	if exportDecl.ModuleSpecifier != nil {
+		dependency, dependencyResolved = getExportMap(ctx, sourceFile, exportDecl.ModuleSpecifier, seen)
+	}
+
+	for _, spec := range namedExports.Elements.Nodes {
+		if spec == nil || spec.Kind != ast.KindExportSpecifier {
+			continue
+		}
+		exportSpec := spec.AsExportSpecifier()
+		exportedName, ok := moduleExportName(exportSpec.Name())
+		if !ok {
+			continue
+		}
+
+		sourceName := exportSpec.PropertyName
+		if sourceName == nil {
+			sourceName = exportSpec.Name()
+		}
+
+		if exportDecl.ModuleSpecifier == nil {
+			if meta, ok := localNamespaceImportMeta(ctx, sourceFile, sourceName, seen); ok {
+				exports.Set(exportedName, meta)
+			} else {
+				exports.Set(exportedName, nil)
+			}
+			continue
+		}
+
+		localName, ok := moduleExportName(sourceName)
+		if !ok {
+			continue
+		}
+
+		if !dependencyResolved {
+			exports.Set(exportedName, nil)
+			continue
+		}
+		if !dependency.Has(localName) {
+			continue
+		}
+		exports.Set(exportedName, dependency.Get(localName))
+	}
+}
+
+func localNamespaceImportMeta(ctx rule.RuleContext, sourceFile *ast.SourceFile, exported *ast.Node, seen map[string]*ExportMap) (*ExportMeta, bool) {
+	exported = ast.SkipParentheses(exported)
+	if sourceFile == nil || sourceFile.Statements == nil || exported == nil || exported.Kind != ast.KindIdentifier {
+		return nil, false
+	}
+
+	localName := exported.AsIdentifier().Text
+	for _, stmt := range sourceFile.Statements.Nodes {
+		if stmt == nil || stmt.Kind != ast.KindImportDeclaration {
+			continue
+		}
+		importDecl := stmt.AsImportDeclaration()
+		if importDecl == nil || importDecl.ImportClause == nil {
+			continue
+		}
+
+		imports, ok := getExportMap(ctx, sourceFile, importDecl.ModuleSpecifier, seen)
+		if !ok {
+			continue
+		}
+
+		importClause := importDecl.ImportClause.AsImportClause()
+		if importClause == nil {
+			continue
+		}
+		if importClause.NamedBindings == nil {
+			continue
+		}
+		if importClause.NamedBindings.Kind == ast.KindNamespaceImport {
+			namespaceImport := importClause.NamedBindings.AsNamespaceImport()
+			if namespaceImport != nil && namespaceImport.Name() != nil && namespaceImport.Name().Text() == localName {
+				return &ExportMeta{Namespace: imports}, true
+			}
+		}
+	}
+
+	return nil, false
 }
 
 // IsImportPathIgnored matches eslint-plugin-import's shared `import/ignore`

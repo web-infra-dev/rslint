@@ -16,6 +16,7 @@ import (
 //   - For-statement `let`/`const` init (scoped to the loop).
 //   - For-in / for-of `let`/`const` init (scoped to the loop).
 //   - Class declaration/expression names (scoped to the class body).
+//   - Enum declaration names.
 //
 // Use this when a rule tracks a specific declaration (e.g. a parameter, class,
 // or function name) and needs to ignore references that were shadowed before
@@ -63,7 +64,7 @@ func IsNameShadowedBetween(node *ast.Node, boundary *ast.Node, name string) bool
 				HasVarDeclListWithName(stmt.Initializer, name) {
 				return true
 			}
-		case ast.KindClassDeclaration, ast.KindClassExpression:
+		case ast.KindClassDeclaration, ast.KindClassExpression, ast.KindEnumDeclaration:
 			if n := current.Name(); n != nil && n.Kind == ast.KindIdentifier && n.Text() == name {
 				return true
 			}
