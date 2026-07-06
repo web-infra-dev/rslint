@@ -381,22 +381,6 @@ func LineContentEnd(text string, nextLineStart int) int {
 // Used by RunLinterInProgram to skip files during program source file iteration.
 var ExcludePaths = []string{"/node_modules/", "bundled:"}
 
-// DefaultExcludeDirNames contains directory names that are always excluded
-// from file scanning. This is the single source of truth for default directory
-// exclusions, used by DiscoverGapFiles and the no-tsconfig fallback.
-// Aligned with JS-side SCAN_EXCLUDE_DIRS: new Set(['node_modules', '.git']).
-var DefaultExcludeDirNames = []string{"node_modules", ".git"}
-
-// DefaultIgnoreDirGlobs returns glob patterns derived from DefaultExcludeDirNames,
-// suitable for use with ignore pattern matching (e.g., DiscoverGapFiles).
-func DefaultIgnoreDirGlobs() []string {
-	globs := make([]string, len(DefaultExcludeDirNames))
-	for i, name := range DefaultExcludeDirNames {
-		globs[i] = name + "/**"
-	}
-	return globs
-}
-
 func Must[T any](v T, err error) T {
 	if err != nil {
 		panic(err)

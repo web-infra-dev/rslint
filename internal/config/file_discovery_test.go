@@ -487,15 +487,16 @@ func TestDiscoverGapFiles_DoubleStarDirIgnoreBlocksNested(t *testing.T) {
 	}
 }
 
-// --- Default excludes (node_modules, .git) ---
+// --- Default excludes (.git only — node_modules has no built-in default) ---
 
-func TestDiscoverGapFiles_DefaultExcludesNodeModules(t *testing.T) {
+func TestDiscoverGapFiles_NodeModulesHasNoDefaultExclusion(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"node_modules/pkg/index.ts",
 	})
 
-	// No global ignores at all — defaults should still exclude node_modules
+	// No global ignores and no .gitignore — node_modules has no hard-coded
+	// default exclusion, so it is discovered like any other directory.
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
@@ -503,19 +504,13 @@ func TestDiscoverGapFiles_DefaultExcludesNodeModules(t *testing.T) {
 	gapFiles, _ := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false, true)
 
 	assert.Assert(t, gapFiles != nil)
-	for _, f := range gapFiles {
-		if f == paths["node_modules/pkg/index.ts"] {
-			t.Error("node_modules should be excluded by default even without user ignores")
-		}
-	}
-	// src/index.ts should still be discovered
 	found := false
 	for _, f := range gapFiles {
-		if f == paths["src/index.ts"] {
+		if f == paths["node_modules/pkg/index.ts"] {
 			found = true
 		}
 	}
-	assert.Assert(t, found, "src/index.ts should be discovered")
+	assert.Assert(t, found, "node_modules/pkg/index.ts should be discovered absent a default exclusion")
 }
 
 func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
@@ -541,8 +536,8 @@ func TestDiscoverGapFiles_DefaultExcludesGitDir(t *testing.T) {
 // --- Directory pruning verification (spy vfs) ---
 // These tests verify that WalkDir actually skips excluded directories at the
 // walk level (fs.SkipDir), not just filters files after entering them.
-// This is critical for performance: entering node_modules with 10,000+ files
-// is the difference between <100ms and 7s.
+// This is critical for performance: entering a large ignored directory with
+// 10,000+ files is the difference between <100ms and 7s.
 
 // spyFS wraps a vfs.FS and records which directories had their contents listed.
 // GetAccessibleEntries is called by vfsAdapter.ReadDir only when the walker
@@ -570,7 +565,7 @@ func (s *spyFS) snapshotAccessedDirs() []string {
 	return out
 }
 
-func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
+func TestDiscoverGapFiles_EntersNodeModulesAtWalkLevelAbsentIgnore(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
 		"node_modules/pkg/index.ts",
@@ -578,6 +573,30 @@ func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	})
 
 	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	spy := &spyFS{FS: osvfs.FS()}
+	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
+
+	entered := false
+	for _, dir := range spy.snapshotAccessedDirs() {
+		if strings.Contains(dir, "node_modules") {
+			entered = true
+		}
+	}
+	assert.Assert(t, entered, "node_modules should be walked absent a default exclusion or .gitignore/config ignore")
+}
+
+func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevelWhenIgnored(t *testing.T) {
+	configDir, _ := setupDiscoveryFixture(t, []string{
+		"src/index.ts",
+		"node_modules/pkg/index.ts",
+		"node_modules/pkg/nested/deep.ts",
+	})
+
+	config := RslintConfig{
+		{Ignores: []string{"node_modules/**"}},
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
@@ -1167,6 +1186,36 @@ func TestDiscoverGapFiles_AllowFilesFastPathSorted(t *testing.T) {
 			assert.Equal(t, got[j], expected[j], "run %d, idx %d: not in lexical order", i, j)
 		}
 	}
+}
+
+func TestDiscoverGapFiles_AllowFilesFastPathRespectsNestedGitignore(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"sub/ignored.ts",
+		"sub/kept.ts",
+	})
+	if err := os.WriteFile(filepath.Join(configDir, "sub", ".gitignore"), []byte("ignored.ts\n"), 0644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},
+	}
+	programFiles := map[string]struct{}{}
+
+	// An explicitly-passed file (e.g. lint-staged) under a subdirectory whose
+	// own .gitignore ignores it must not be treated as a gap file, even
+	// though the fast path skips the full walkDir traversal.
+	gapFiles, _ := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles,
+		[]string{paths["sub/ignored.ts"]}, nil, false, false)
+	assert.Equal(t, len(gapFiles), 0)
+
+	// A sibling file not matched by that nested .gitignore is still
+	// discovered.
+	gapFiles, _ = DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles,
+		[]string{paths["sub/kept.ts"]}, nil, false, false)
+	assert.Assert(t, gapFiles != nil)
+	assert.Equal(t, len(gapFiles), 1)
+	assert.Equal(t, gapFiles[0], paths["sub/kept.ts"])
 }
 
 // walkPool must hold concurrent execution of `work` to at most `workers`

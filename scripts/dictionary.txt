@@ -231,6 +231,7 @@ ldflags
 ldquo
 libsyncrpc
 lifecycles
+lintable
 lintedfile
 listitem
 llms

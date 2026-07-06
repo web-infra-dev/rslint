@@ -11,7 +11,6 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // sourceFileExtensions are the extensions walkDir treats as lintable source
@@ -47,8 +46,8 @@ type walkJob struct {
 //     case; when a config entry sets `files`, the pattern itself is the only
 //     filter, matching pre-existing behavior for e.g. `files: ["**/*"]`).
 //     ".git" is the only hard-coded directory skip; everything else,
-//     including node_modules, is controlled by ignore patterns the caller
-//     folds into staticIgnores (see utils.DefaultIgnoreDirGlobs).
+//     including node_modules, is only excluded if matched by a .gitignore
+//     or the user's own config `ignores` — there is no built-in default.
 //   - every .gitignore-derived glob pattern discovered during the walk
 //     (flat, in top-down discovery order), for callers that need to fold them
 //     into a config's global ignores for consumers outside this walk (e.g.
@@ -186,6 +185,49 @@ func walkDir(
 	return files, gitignoreGlobs
 }
 
+// collectNestedGitignoreChain reads the .gitignore files, if any, in each
+// directory strictly between configDir (exclusive — the caller reads
+// configDir's own .gitignore separately) and the directory containing
+// filePath (inclusive), in root-to-leaf order. This mirrors the order walkDir
+// would encounter them while descending, so a deeper .gitignore's rules are
+// appended after — and can override — a shallower one's.
+//
+// Returns the chain as parsed IgnorePatterns (ready to combine with other
+// ignore sources) and as raw glob strings (for folding into the config's
+// global ignores, matching what walkDir returns for the directories it
+// visits).
+func collectNestedGitignoreChain(filePath, configDir string, fsys vfs.FS) (chain []IgnorePattern, globs []string) {
+	normalizedConfigDir := normalizeGlobPath(configDir)
+	fileDir := path.Dir(normalizeGlobPath(filePath))
+	if fileDir == normalizedConfigDir || !tspath.StartsWithDirectory(fileDir, normalizedConfigDir, true) {
+		return nil, nil
+	}
+
+	rel := strings.TrimPrefix(fileDir, normalizedConfigDir+"/")
+	var segments []string
+	for rel != "" && rel != "." {
+		segments = append(segments, rel)
+		rel = path.Dir(rel)
+	}
+	for i, j := 0, len(segments)-1; i < j; i, j = i+1, j-1 {
+		segments[i], segments[j] = segments[j], segments[i]
+	}
+
+	for _, seg := range segments {
+		content, ok := fsys.ReadFile(normalizedConfigDir + "/" + seg + "/.gitignore")
+		if !ok {
+			continue
+		}
+		localGlobs := convertGitignoreToGlobs(content, seg)
+		if len(localGlobs) == 0 {
+			continue
+		}
+		globs = append(globs, localGlobs...)
+		chain = append(chain, ParseIgnorePatterns(localGlobs)...)
+	}
+	return chain, globs
+}
+
 // DiscoverGapFiles discovers files that should get a fallback (AST-only, no
 // type info) Program: they are not already covered by any tsconfig-backed
 // Program, but the linter would still assign them rules.
@@ -249,12 +291,12 @@ func DiscoverGapFiles(
 		}
 	}
 
-	// staticIgnores (default dir excludes + the user's own config `ignores`)
-	// must always be evaluated AFTER gitignore-derived patterns, so a user's
-	// `!` can override a gitignore rule regardless of where that rule came
-	// from. See walkDir's doc comment for why these stay as two separate
-	// lists instead of one pre-merged seed.
-	staticIgnores := append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), configIgnores...)
+	// staticIgnores (the user's own config `ignores`) must always be
+	// evaluated AFTER gitignore-derived patterns, so a user's `!` can
+	// override a gitignore rule regardless of where that rule came from. See
+	// walkDir's doc comment for why these stay as two separate lists instead
+	// of one pre-merged seed.
+	staticIgnores := configIgnores
 
 	normalizedConfigDirForGitignore := normalizeGlobPath(configDir)
 	ancestorGlobs := collectAncestorGitignoreGlobs(normalizedConfigDirForGitignore, fsys)
@@ -267,9 +309,11 @@ func DiscoverGapFiles(
 	// path skips walkDir entirely, so it wouldn't otherwise see any
 	// .gitignore at all — read configDir's own .gitignore directly (one
 	// extra file read, not a tree walk) so the common case (a single
-	// top-level .gitignore) still works. Nested .gitignore files in
-	// subdirectories under configDir are NOT discovered by this path — that
-	// would require a walk, defeating the point of the fast path.
+	// top-level .gitignore) still works. For a file nested under configDir,
+	// the .gitignore files in directories between configDir and the file are
+	// also read directly (one read per intervening directory, not a walk of
+	// the whole tree) via collectNestedGitignoreChain, so an explicitly-passed
+	// nested file is still correctly reported as ignored.
 	if allowFileSet != nil && allowDirs == nil {
 		ownGlobs, _ := fsys.ReadFile(normalizedConfigDirForGitignore + "/.gitignore")
 		fastGitignore := gitignoreSeed
@@ -281,7 +325,7 @@ func DiscoverGapFiles(
 				rootGlobs = append(append([]string{}, ancestorGlobs...), converted...)
 			}
 		}
-		fastIgnores := append(append([]IgnorePattern{}, fastGitignore...), staticIgnores...)
+		seenNestedGlobs := make(map[string]struct{})
 		for f := range allowFileSet {
 			// See the same check in the walk path below for why this only
 			// applies when hasTsConfig is true.
@@ -290,6 +334,15 @@ func DiscoverGapFiles(
 					continue
 				}
 			}
+			nestedChain, nestedGlobs := collectNestedGitignoreChain(f, configDir, fsys)
+			for _, g := range nestedGlobs {
+				if _, exists := seenNestedGlobs[g]; !exists {
+					seenNestedGlobs[g] = struct{}{}
+					rootGlobs = append(rootGlobs, g)
+				}
+			}
+			fastIgnores := append(append([]IgnorePattern{}, fastGitignore...), nestedChain...)
+			fastIgnores = append(fastIgnores, staticIgnores...)
 			if isFileIgnored(f, fastIgnores, configDir) {
 				continue
 			}

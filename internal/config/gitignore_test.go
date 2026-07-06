@@ -238,17 +238,41 @@ func TestReadGitignoreAsGlobs_PrunesGitignoredDirs(t *testing.T) {
 	}
 }
 
-func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
+func TestReadGitignoreAsGlobs_NodeModulesHasNoBuiltInDefault(t *testing.T) {
+	// There is no hard-coded default exclusion for node_modules — it is only
+	// skipped when a .gitignore (or config `ignores`) says so, exactly like
+	// any other directory.
 	dir := setupGitignoreFixture(t, map[string]string{
 		".gitignore":                  "dist/\n",
-		"node_modules/pkg/.gitignore": "# should not be read\n",
+		"node_modules/pkg/.gitignore": "should-be-read\n",
 		"src/a.ts":                    "x",
 	})
 	globs := readGitignoreGlobsForTest(dir, osvfs.FS(), nil)
 
-	// Only root .gitignore should be read
-	assert.Equal(t, len(globs), 1)
-	assert.Equal(t, globs[0], "**/dist/**/*")
+	found := false
+	for _, g := range globs {
+		if strings.Contains(g, "should-be-read") {
+			found = true
+		}
+	}
+	assert.Assert(t, found, "node_modules/pkg/.gitignore should be read absent a default exclusion, got: %v", globs)
+}
+
+func TestReadGitignoreAsGlobs_NodeModulesExcludedWhenGitignored(t *testing.T) {
+	// The common real-world case: node_modules/ is itself listed in
+	// .gitignore, so it is pruned like any other gitignored directory.
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                  "node_modules/\ndist/\n",
+		"node_modules/pkg/.gitignore": "should-not-be-read\n",
+		"src/a.ts":                    "x",
+	})
+	globs := readGitignoreGlobsForTest(dir, osvfs.FS(), nil)
+
+	for _, g := range globs {
+		if strings.Contains(g, "should-not-be-read") {
+			t.Errorf("node_modules should be pruned once gitignored, but its nested .gitignore was read: %s", g)
+		}
+	}
 }
 
 // --- Scope isolation tests ---
