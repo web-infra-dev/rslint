@@ -496,19 +496,49 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 	return nil
 }
 
+// GetForwardRefOrMemoCallbackCall returns the CallExpression when `fn` is the
+// immediate argument of a call whose callee is `<name>` or `React.<name>`.
+// Parenthesized callback expressions are transparent: `memo((() => null))` is
+// the same callback shape as `memo(() => null)`.
+func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
+	if fn == nil {
+		return nil
+	}
+	child := fn
+	p := fn.Parent
+	for p != nil && p.Kind == ast.KindParenthesizedExpression {
+		child = p
+		p = p.Parent
+	}
+	if p == nil || p.Kind != ast.KindCallExpression {
+		return nil
+	}
+	call := p.AsCallExpression()
+	if call.Arguments == nil {
+		return nil
+	}
+	isArg := false
+	for _, arg := range call.Arguments.Nodes {
+		if arg == child {
+			isArg = true
+			break
+		}
+	}
+	if !isArg {
+		return nil
+	}
+	callee := ast.SkipParentheses(call.Expression)
+	if !IsReactCalleeNamed(callee, name) {
+		return nil
+	}
+	return p
+}
+
 // IsForwardRefOrMemoCallback reports whether `fn` is the immediate
 // argument of a CallExpression whose callee is `<name>` or
 // `React.<name>`.
 func IsForwardRefOrMemoCallback(fn *ast.Node, name string) bool {
-	if fn == nil || fn.Parent == nil {
-		return false
-	}
-	p := fn.Parent
-	if p.Kind != ast.KindCallExpression {
-		return false
-	}
-	callee := ast.SkipParentheses(p.AsCallExpression().Expression)
-	return IsReactCalleeNamed(callee, name)
+	return GetForwardRefOrMemoCallbackCall(fn, name) != nil
 }
 
 // IsClassMember reports whether `fn` is a member of a class — either
