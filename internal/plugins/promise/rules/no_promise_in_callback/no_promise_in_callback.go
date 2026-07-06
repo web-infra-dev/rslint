@@ -34,7 +34,33 @@ func messageAvoidPromiseInCallback() rule.RuleMessage {
 
 func isReturnExpression(node *ast.Node) bool {
 	current := ast.WalkUpParenthesizedExpressions(node.Parent)
-	return current != nil && current.Kind == ast.KindReturnStatement
+	return current != nil && current.Kind == ast.KindReturnStatement && !hasOptionalChain(node)
+}
+
+func hasOptionalChain(node *ast.Node) bool {
+	node = ast.SkipOuterExpressions(node, skipTransparent)
+	if node == nil {
+		return false
+	}
+	if ast.IsOptionalChain(node) {
+		return true
+	}
+	switch node.Kind {
+	case ast.KindCallExpression:
+		call := node.AsCallExpression()
+		return call != nil && hasOptionalChain(call.Expression)
+	case ast.KindPropertyAccessExpression:
+		access := node.AsPropertyAccessExpression()
+		return access != nil && hasOptionalChain(access.Expression)
+	case ast.KindElementAccessExpression:
+		access := node.AsElementAccessExpression()
+		return access != nil && hasOptionalChain(access.Expression)
+	case ast.KindNonNullExpression:
+		expression := node.AsNonNullExpression()
+		return expression != nil && hasOptionalChain(expression.Expression)
+	default:
+		return false
+	}
 }
 
 func isPromiseCallback(node *ast.Node) bool {
@@ -51,6 +77,9 @@ func firstParameterName(node *ast.Node) string {
 	}
 	param := node.Parameters()[0]
 	if param == nil || !ast.IsParameterDeclaration(param) {
+		return ""
+	}
+	if param.Parent != nil && ast.IsParameterPropertyDeclaration(param, param.Parent) {
 		return ""
 	}
 	decl := param.AsParameterDeclaration()
