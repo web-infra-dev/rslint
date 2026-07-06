@@ -16,7 +16,7 @@ export {
   jsxA11yPlugin,
 } from './config/presets/index.js';
 
-// The ESLint v10-aligned programmatic Node.js API (issue #1106). This `Rslint`
+// The ESLint v10-aligned programmatic JavaScript API (issue #1106). This `Rslint`
 // class and the `runCLI` wrapper are the only linting surfaces exported from
 // the package root; alongside them the root exports just the config-authoring
 // helpers (`defineConfig` / `globalIgnores`) and the plugin presets. The

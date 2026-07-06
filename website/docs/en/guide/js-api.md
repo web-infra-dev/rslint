@@ -1,6 +1,6 @@
-# Node.js API
+# JavaScript API
 
-The Node.js API lets you run rslint programmatically — lint files or in-memory source from a script, an editor integration, or a build tool. Its surface is aligned with [ESLint](https://eslint.org/docs/latest/integrate/nodejs-api)'s v10 API shape, so most ESLint API code ports over with minimal changes.
+The JavaScript API lets you run rslint programmatically — lint files or in-memory source from a JavaScript runtime script, an editor integration, or a build tool. It is designed for JavaScript runtime hosts such as Node.js, Bun, or Deno when they can load npm packages and provide the Node-compatible filesystem and process APIs that `@rslint/core` uses. Its surface is aligned with [ESLint](https://eslint.org/docs/latest/integrate/nodejs-api)'s v10 programmatic API shape, so most ESLint API code ports over with minimal changes.
 
 All config resolution (override config, config-file selection, discovery, normalization) happens in JavaScript; rslint's engine receives only the final resolved config object and never reads config from disk.
 
@@ -9,7 +9,7 @@ All config resolution (override config, config-file selection, discovery, normal
 ```ts
 import { Rslint } from '@rslint/core';
 
-const rslint = new Rslint({ cwd: process.cwd() });
+const rslint = new Rslint();
 const results = await rslint.lintFiles(['src/**/*.ts']);
 
 for (const result of results) {
@@ -49,7 +49,7 @@ By default `lintText` still reads the config and tsconfig from disk. To lint wit
 
 ```ts
 const rslint = new Rslint({
-  cwd: '/', // virtual root: doesn't touch process.cwd() or disk
+  cwd: '/', // virtual root: doesn't touch the host cwd or disk
   overrideConfigFile: true, // use only overrideConfig — skip config discovery
   overrideConfig: [
     {
@@ -136,7 +136,7 @@ await using rslint = new Rslint();
 await rslint.lintFiles(['src/**/*.ts']);
 ```
 
-Native `await using` needs a runtime with explicit resource management support, which Node 22 lacks (a bare `.mjs` throws a SyntaxError). Compile with a `using`-aware toolchain such as TypeScript 5.2+, or use the `try` / `finally` form above, which runs everywhere.
+Native `await using` needs a runtime with explicit resource management support, which Node.js 22 lacks (a bare `.mjs` throws a SyntaxError). Compile with a `using`-aware toolchain such as TypeScript 5.2+, or use the `try` / `finally` form above, which does not rely on native `using` syntax.
 
 ## Result shape
 
@@ -169,10 +169,10 @@ Each `LintMessage`:
 
 `new Rslint(options)` accepts:
 
-| Option               | Type                                               | Default         | Description                                                                                                                            |
-| -------------------- | -------------------------------------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `cwd`                | `string`                                           | `process.cwd()` | Base directory for config discovery and relative path resolution                                                                       |
-| `overrideConfig`     | `RslintConfigEntry \| RslintConfigEntry[] \| null` | —               | Extra config appended after the resolved/discovered config (ESLint's `overrideConfig`)                                                 |
-| `overrideConfigFile` | `string \| true \| null`                           | `null`          | `string`: use this config file (no discovery); `true`: use only `overrideConfig` (no file, no discovery); `null`/absent: auto-discover |
-| `fix`                | `boolean`                                          | `false`         | Apply rule auto-fixes; results carry `output`                                                                                          |
-| `virtualFiles`       | `Record<string, string>`                           | —               | In-memory file overlay (path → content) for fully in-memory linting                                                                    |
+| Option               | Type                                               | Default     | Description                                                                                                                            |
+| -------------------- | -------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `cwd`                | `string`                                           | current cwd | Base directory for config discovery and relative path resolution                                                                       |
+| `overrideConfig`     | `RslintConfigEntry \| RslintConfigEntry[] \| null` | —           | Extra config appended after the resolved/discovered config (ESLint's `overrideConfig`)                                                 |
+| `overrideConfigFile` | `string \| true \| null`                           | `null`      | `string`: use this config file (no discovery); `true`: use only `overrideConfig` (no file, no discovery); `null`/absent: auto-discover |
+| `fix`                | `boolean`                                          | `false`     | Apply rule auto-fixes; results carry `output`                                                                                          |
+| `virtualFiles`       | `Record<string, string>`                           | —           | In-memory file overlay (path → content) for fully in-memory linting                                                                    |

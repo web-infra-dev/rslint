@@ -31,8 +31,8 @@
   },
   {
     "type": "file",
-    "name": "node-api",
-    "label": "Node.js API"
+    "name": "js-api",
+    "label": "JavaScript API"
   },
   {
     "type": "file",

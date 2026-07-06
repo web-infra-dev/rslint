@@ -7,7 +7,7 @@ import { loadConfigFile, normalizeConfig } from '@rslint/core/config-loader';
 //
 // Each rule-tester loads `rslint.config.mjs`, optionally merges in per-test
 // `settings`, and hands the resolved config object straight to `lint()`. The
-// Node API takes a config object (Go never reads config from disk), so there
+// JavaScript API takes a config object (Go never reads config from disk), so there
 // is no temp file to write or clean up.
 //
 // The base config is cached by `baseConfigPath` so each .mjs is parsed exactly
@@ -42,7 +42,7 @@ export async function buildConfigForSettings(
       ...(settings ?? {}),
     },
   }));
-  // Hand the resolved config object straight to the Node API (no temp file).
+  // Hand the resolved config object straight to the JavaScript API (no temp file).
   // rslint resolves each entry's relative `tsconfig.*.json` against
   // configDirectory — the base config file's directory.
   return { config: merged, configDirectory: path.dirname(baseConfigPath) };
