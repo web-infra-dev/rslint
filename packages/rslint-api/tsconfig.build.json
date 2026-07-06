@@ -23,7 +23,11 @@
 
   "include": [
     "src/**/*.ts",
-    "../../typescript-go/_packages/native-preview/src/**/*.ts"
+    "../../typescript-go/_packages/native-preview/src/api/node/**/*.ts",
+    "../../typescript-go/_packages/native-preview/src/api/timing.ts",
+    "../../typescript-go/_packages/native-preview/src/ast/**/*.ts",
+    "../../typescript-go/_packages/native-preview/src/enums/**/*.enum.ts",
+    "../../typescript-go/_packages/native-preview/src/internal/utils.ts"
   ],
   "references": []
 }

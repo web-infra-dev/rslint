@@ -139,9 +139,11 @@ type extra_Checker struct {
   compareSymbolChains func([]*ast.Symbol, []*ast.Symbol) int
   TypeCount uint32
   SymbolCount uint32
+  SignatureCount uint32
   TotalInstantiationCount uint32
   instantiationCount uint32
   instantiationDepth uint32
+  conditionalConstraintDepth uint32
   inlineLevel int
   serializationLevel int
   currentNode *ast.Node
@@ -874,6 +876,7 @@ type SerializedTypeEntry = checker.SerializedTypeEntry
 type SharedFlow = checker.SharedFlow
 type Signature = checker.Signature
 type extra_Signature struct {
+  id checker.SignatureId
   flags checker.SignatureFlags
   minArgumentCount int32
   resolvedMinArgumentCount int32
@@ -915,6 +918,7 @@ const SignatureFlagsIsSignatureCandidateForOverloadFailure = checker.SignatureFl
 const SignatureFlagsIsUntypedSignatureInJSFile = checker.SignatureFlagsIsUntypedSignatureInJSFile
 const SignatureFlagsNone = checker.SignatureFlagsNone
 const SignatureFlagsPropagatingFlags = checker.SignatureFlagsPropagatingFlags
+type SignatureId = checker.SignatureId
 var SignatureKeyBase = checker.SignatureKeyBase
 var SignatureKeyCanonical = checker.SignatureKeyCanonical
 var SignatureKeyErased = checker.SignatureKeyErased

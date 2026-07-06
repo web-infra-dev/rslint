@@ -154,30 +154,45 @@ func (s *Server) reloadConfig() error {
 	return nil
 }
 
-func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
-	// params is raw JSON from the custom notification
+type configUpdateParams struct {
+	Configs []struct {
+		ConfigDirectory string              `json:"configDirectory"`
+		Entries         config.RslintConfig `json:"entries"`
+	} `json:"configs"`
+	// EslintPlugins carries the {prefix, ruleNames} metadata for every
+	// ESLint plugin mounted across all configs, aggregated by the VS Code
+	// extension (same shape the CLI sends as initPayload.EslintPlugins).
+	// The live plugin objects stay in Node (the worker re-imports the
+	// config); Go only needs the names to register placeholder rules that
+	// make `<prefix>/<rule>` resolvable and route to the worker.
+	EslintPlugins []config.EslintPluginEntry `json:"eslintPlugins,omitempty"`
+}
+
+func parseConfigUpdateParams(params any) (configUpdateParams, error) {
+	if payload, ok := params.(configUpdateParams); ok {
+		return payload, nil
+	}
+
+	var payload configUpdateParams
 	data, err := stdjson.Marshal(params)
 	if err != nil {
-		return fmt.Errorf("failed to marshal config update params: %w", err)
-	}
-
-	var payload struct {
-		Configs []struct {
-			ConfigDirectory string              `json:"configDirectory"`
-			Entries         config.RslintConfig `json:"entries"`
-		} `json:"configs"`
-		// EslintPlugins carries the {prefix, ruleNames} metadata for every
-		// ESLint plugin mounted across all configs, aggregated by the VS Code
-		// extension (same shape the CLI sends as initPayload.EslintPlugins).
-		// The live plugin objects stay in Node (the worker re-imports the
-		// config); Go only needs the names to register placeholder rules that
-		// make `<prefix>/<rule>` resolvable and route to the worker.
-		EslintPlugins []config.EslintPluginEntry `json:"eslintPlugins,omitempty"`
+		return payload, fmt.Errorf("failed to marshal config update params: %w", err)
 	}
 	if err := stdjson.Unmarshal(data, &payload); err != nil {
-		return fmt.Errorf("failed to parse config update: %w", err)
+		return payload, fmt.Errorf("failed to parse config update: %w", err)
 	}
+	return payload, nil
+}
 
+func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
+	payload, err := parseConfigUpdateParams(params)
+	if err != nil {
+		return err
+	}
+	return s.applyConfigUpdate(ctx, payload)
+}
+
+func (s *Server) applyConfigUpdate(ctx context.Context, payload configUpdateParams) error {
 	// Distinguish nil (malformed/missing "configs" field) from an explicitly
 	// empty array (all JS configs were deleted — legitimate clear signal).
 	// Go JSON: {"configs":[]} → non-nil empty slice; null/{}/missing → nil.
