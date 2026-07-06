@@ -56,7 +56,7 @@ const Playground: React.FC = () => {
         fileContents['/tsconfig.json'] = JSON.stringify(tsConfig);
       }
 
-      // The Node.js API takes the config object directly (Go no longer reads
+      // The JavaScript API takes the config object directly (Go no longer reads
       // /rslint.json from the VFS). configDirectory is the memfs root where
       // tsconfig.json lives, so the config's relative `project` resolves.
       // rules (with their options) travel inside the config entries; there is
