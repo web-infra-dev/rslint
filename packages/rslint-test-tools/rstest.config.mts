@@ -210,6 +210,7 @@ export default defineConfig({
     // eslint-plugin-react-hooks
     './tests/eslint-plugin-react-hooks/rules/rules-of-hooks.test.ts',
     './tests/eslint-plugin-react-hooks/rules/exhaustive-deps.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/component-hook-factories.test.ts',
 
     // eslint-plugin-jsx-a11y
     './tests/eslint-plugin-jsx-a11y/rules/alt-text.test.ts',

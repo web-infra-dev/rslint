@@ -729,8 +729,7 @@ func reportNameForPath(ctx *rule.RuleContext, node *ast.Node, specifiers []speci
 
 func isRestrictedPattern(importSource string, group *restrictedPatternGroup) bool {
 	if group.regexMatcher != nil {
-		matched, _ := group.regexMatcher.MatchString(importSource)
-		return matched
+		return utils.Regexp2MatchString(group.regexMatcher, importSource)
 	}
 	if group.matcher != nil {
 		return group.matcher.ignores(importSource)
@@ -772,7 +771,7 @@ func reportPathForPatterns(
 
 		// Check restricted import names (by name list or regex pattern)
 		if (len(group.importNames) > 0 && slices.Contains(group.importNames, e.name)) ||
-			(group.importNamePattern != nil && regexp2Match(group.importNamePattern, e.name)) {
+			(group.importNamePattern != nil && utils.Regexp2MatchString(group.importNamePattern, e.name)) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"patternAndImportName", "patternAndImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted from being used by a pattern.", e.name, importSource))
@@ -783,7 +782,7 @@ func reportPathForPatterns(
 				"allowedImportName", "allowedImportNameWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only %s %s allowed.",
 					e.name, importSource, formatEnglishList(group.allowImportNames), isOrAre(group.allowImportNames)))
-		} else if group.allowImportNamePattern != nil && !regexp2Match(group.allowImportNamePattern, e.name) {
+		} else if group.allowImportNamePattern != nil && !utils.Regexp2MatchString(group.allowImportNamePattern, e.name) {
 			reportSpecifiersForPattern(ctx, node, e.specifiers, group, e.name, importSource,
 				"allowedImportNamePattern", "allowedImportNamePatternWithCustomMessage",
 				fmt.Sprintf("'%s' import from '%s' is restricted because only imports that match the pattern '%s' are allowed from '%s'.",
@@ -957,12 +956,6 @@ func formatEnglishList(names []string) string {
 // jsRegexString formats a regex pattern in JavaScript RegExp.toString() notation: /pattern/u.
 func jsRegexString(re *regexp2.Regexp) string {
 	return "/" + re.String() + "/u"
-}
-
-// regexp2Match wraps regexp2.MatchString, discarding the error (timeout).
-func regexp2Match(re *regexp2.Regexp, s string) bool {
-	matched, _ := re.MatchString(s)
-	return matched
 }
 
 func isOrAre(names []string) string {
