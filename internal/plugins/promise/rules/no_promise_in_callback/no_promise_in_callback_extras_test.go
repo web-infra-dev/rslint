@@ -61,6 +61,9 @@ func TestNoPromiseInCallbackExtras(t *testing.T) {
 			{Code: `class X { onError(reason) { audit().catch(log) } }`},
 			// A getter takes no parameters, so it is never an err/error callback.
 			{Code: `class X { get value() { return p.then(a) } }`},
+
+			// ---- TypeScript ESTree parity: TSParameterProperty is not a plain param ----
+			{Code: `class X { constructor(public err: unknown) { Promise.resolve(err) } }`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Branch lock-in: err/error as first parameter are callbacks ----
@@ -114,6 +117,14 @@ func TestNoPromiseInCallbackExtras(t *testing.T) {
 			// ---- Dimension 4: optional chain promise-like call ----
 			{
 				Code:   `a(function(err) { doThing()?.then(a) })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
+			},
+			{
+				Code:   `a(function(err) { return doThing()?.then(a) })`,
+				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
+			},
+			{
+				Code:   `a(function(err) { return Promise?.resolve(err) })`,
 				Errors: []rule_tester.InvalidTestCaseError{{MessageId: "avoidPromiseInCallback", Message: avoidPromiseInCallbackMessage, Line: 1}},
 			},
 

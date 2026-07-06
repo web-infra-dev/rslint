@@ -37,6 +37,9 @@ ruleTester.run('no-promise-in-callback', {} as never, {
     // (which take no params) are never err/error callbacks
     { code: 'const o = { onError(e) { Promise.resolve(e) } }' },
     { code: 'class X { get value() { return p.then(a) } }' },
+    {
+      code: 'class X { constructor(public err: unknown) { Promise.resolve(err) } }',
+    },
 
     {
       code: `
@@ -95,6 +98,14 @@ ruleTester.run('no-promise-in-callback', {} as never, {
     },
     {
       code: 'let x = (err) => doThingWith(err).then(a)',
+      errors: [{ message: errorMessage }],
+    },
+    {
+      code: 'a(function(err) { return doThing()?.then(a) })',
+      errors: [{ message: errorMessage }],
+    },
+    {
+      code: 'a(function(err) { return Promise?.resolve(err) })',
       errors: [{ message: errorMessage }],
     },
 
