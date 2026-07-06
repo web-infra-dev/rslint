@@ -9,16 +9,29 @@
 // (and third) copy of every predicate.
 //
 // Naming convention follows the rest of the codebase: predicates
-// start with `Is*`, getters with `Get*`. The package never imports
-// `internal/utils/` — the rules consume `internal/utils/` separately
-// and pass values through.
+// start with `Is*`, getters with `Get*`. General AST helpers stay in
+// `internal/utils`; this package composes them where they already exist.
 package react_hooksutil
 
 import (
 	"regexp"
+	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+type CompilerReactFunctionType string
+
+const (
+	CompilerReactFunctionComponent CompilerReactFunctionType = "Component"
+	CompilerReactFunctionHook      CompilerReactFunctionType = "Hook"
+)
+
+type CompilerFunctionOptions struct {
+	HookPattern *regexp2.Regexp
+}
 
 // hookNameTailRegex matches the suffix part of a hook identifier:
 // after the leading `use`, the next character must be uppercase Latin
@@ -39,6 +52,13 @@ var effectNameRegex = regexp.MustCompile(`Effect($|[^a-z])`)
 // `useFoo` / `use1` (`use` followed by uppercase letter or digit).
 func IsHookName(s string) bool {
 	return s == "use" || hookNameTailRegex.MatchString(s)
+}
+
+// IsCompilerHookName reports whether `s` follows the React Compiler
+// hook-like naming convention. Unlike rules-of-hooks, the compiler lint
+// predicates do not treat the bare `use` identifier as a custom hook name.
+func IsCompilerHookName(s string) bool {
+	return hookNameTailRegex.MatchString(s)
 }
 
 // IsComponentNameStr reports whether `s` looks like a React component
@@ -136,6 +156,200 @@ func IsHookCallee(node *ast.Node) bool {
 	return false
 }
 
+// IsCompilerHookCallee is the React Compiler variant of IsHookCallee:
+// it accepts `useFoo` / `Namespace.useFoo`, but not the bare `use`.
+func IsCompilerHookCallee(node *ast.Node, hookPattern *regexp2.Regexp) bool {
+	if node == nil {
+		return false
+	}
+	isHookName := func(name string) bool {
+		if hookPattern != nil {
+			return utils.Regexp2MatchString(hookPattern, name)
+		}
+		return IsCompilerHookName(name)
+	}
+	n := ast.SkipParentheses(node)
+	switch n.Kind {
+	case ast.KindIdentifier:
+		return isHookName(n.AsIdentifier().Text)
+	case ast.KindPropertyAccessExpression:
+		pae := n.AsPropertyAccessExpression()
+		prop := pae.Name()
+		if prop == nil || prop.Kind != ast.KindIdentifier || !isHookName(prop.AsIdentifier().Text) {
+			return false
+		}
+		obj := ast.SkipParentheses(pae.Expression)
+		return obj != nil && obj.Kind == ast.KindIdentifier && IsComponentNameStr(obj.AsIdentifier().Text)
+	}
+	return false
+}
+
+// IsCompilerFunctionKind reports whether `node` is one of the function
+// syntaxes that React Compiler's Factories diagnostic traverses:
+// FunctionDeclaration, FunctionExpression, or ArrowFunctionExpression.
+func IsCompilerFunctionKind(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
+}
+
+// GetCompilerReactFunctionType mirrors the React Compiler classifier used by
+// the Factories diagnostic: a PascalCase function is a component only when it
+// directly creates JSX or calls a hook, has component-like parameters, and does
+// not return obviously non-ReactNode values; a hook-like function must directly
+// create JSX or call a hook; memo/forwardRef callbacks are components.
+func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) CompilerReactFunctionType {
+	name := GetFunctionName(fn)
+	if name != nil && name.Kind == ast.KindIdentifier && IsComponentNameStr(name.AsIdentifier().Text) {
+		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) &&
+			IsValidCompilerComponentParams(fn) &&
+			!ReturnsCompilerNonNode(fn) {
+			return CompilerReactFunctionComponent
+		}
+		return ""
+	}
+	if name != nil && IsCompilerHookCallee(name, opts.HookPattern) {
+		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+			return CompilerReactFunctionHook
+		}
+		return ""
+	}
+	if ast.IsFunctionExpressionOrArrowFunction(fn) {
+		if IsForwardRefOrMemoCallback(fn, "forwardRef") || IsForwardRefOrMemoCallback(fn, "memo") {
+			if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+				return CompilerReactFunctionComponent
+			}
+		}
+	}
+	return ""
+}
+
+// CallsHooksOrCreatesJsx reports whether `fn` directly creates JSX or directly
+// calls a compiler hook. Nested function bodies are skipped, matching React
+// Compiler's traversal boundary.
+func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
+	found := false
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil || found {
+			return
+		}
+		if node != fn && IsCompilerFunctionKind(node) {
+			return
+		}
+		if ast.IsJsxElement(node) || ast.IsJsxSelfClosingElement(node) || ast.IsJsxFragment(node) {
+			found = true
+			return
+		}
+		if ast.IsCallExpression(node) {
+			if IsCompilerHookCallee(node.AsCallExpression().Expression, hookPattern) {
+				found = true
+				return
+			}
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return found
+		})
+	}
+	walk(fn)
+	return found
+}
+
+// IsValidCompilerComponentParams mirrors React Compiler's
+// isValidComponentParams helper.
+func IsValidCompilerComponentParams(fn *ast.Node) bool {
+	params := fn.Parameters()
+	if len(params) == 0 {
+		return true
+	}
+	if len(params) > 2 || !isValidCompilerPropsAnnotation(params[0]) {
+		return false
+	}
+	if len(params) == 1 {
+		return !utils.IsRestParameterDeclaration(params[0])
+	}
+	secondName := params[1].AsParameterDeclaration().Name()
+	if secondName == nil || secondName.Kind != ast.KindIdentifier {
+		return false
+	}
+	name := secondName.AsIdentifier().Text
+	return strings.Contains(name, "ref") || strings.Contains(name, "Ref")
+}
+
+func isValidCompilerPropsAnnotation(param *ast.Node) bool {
+	if param == nil || !ast.IsParameterDeclaration(param) {
+		return false
+	}
+	typ := ast.GetTypeAnnotationNode(param)
+	if typ == nil {
+		return true
+	}
+	switch typ.Kind {
+	case ast.KindArrayType, ast.KindBigIntKeyword, ast.KindBooleanKeyword,
+		ast.KindConstructorType, ast.KindFunctionType, ast.KindLiteralType,
+		ast.KindNeverKeyword, ast.KindNumberKeyword, ast.KindStringKeyword,
+		ast.KindSymbolKeyword, ast.KindTupleType:
+		return false
+	}
+	return true
+}
+
+// ReturnsCompilerNonNode mirrors React Compiler's returnsNonNode helper.
+func ReturnsCompilerNonNode(fn *ast.Node) bool {
+	returnsNonNode := false
+	if ast.IsArrowFunction(fn) {
+		body := fn.AsArrowFunction().Body
+		if body != nil && body.Kind != ast.KindBlock {
+			returnsNonNode = IsCompilerNonNode(body)
+		}
+	}
+
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil {
+			return
+		}
+		if node != fn && IsCompilerFunctionKind(node) {
+			return
+		}
+		if isCompilerObjectMethod(node) {
+			return
+		}
+		if node.Kind == ast.KindReturnStatement {
+			returnsNonNode = IsCompilerNonNode(node.AsReturnStatement().Expression)
+			return
+		}
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(fn)
+	return returnsNonNode
+}
+
+func isCompilerObjectMethod(node *ast.Node) bool {
+	return node != nil && ast.IsObjectLiteralMethod(node)
+}
+
+// IsCompilerNonNode mirrors React Compiler's isNonNode helper for returns
+// whose value is definitely not a React node.
+func IsCompilerNonNode(node *ast.Node) bool {
+	if node == nil {
+		return true
+	}
+	n := ast.SkipParentheses(node)
+	if ast.IsObjectLiteralExpression(n) ||
+		ast.IsFunctionExpressionOrArrowFunction(n) ||
+		ast.IsClassExpression(n) ||
+		ast.IsNewExpression(n) {
+		return true
+	}
+	return ast.IsBigIntLiteral(n)
+}
+
 // IsFunctionLikeContainer reports whether `node` is one of the
 // function-like kinds the upstream rules treat as a "code path"
 // boundary.
@@ -227,7 +441,7 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 		}
 		// fall through to anonymous handling
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		if fn.Parent != nil && fn.Parent.Kind == ast.KindObjectLiteralExpression {
+		if fn.Parent != nil && ast.IsObjectLiteralExpression(fn.Parent) {
 			return fn.Name()
 		}
 		return nil
@@ -308,11 +522,11 @@ func IsClassMember(fn *ast.Node) bool {
 	p := fn.Parent
 	switch fn.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return p.Kind == ast.KindClassDeclaration || p.Kind == ast.KindClassExpression
+		return ast.IsClassLike(p)
 	case ast.KindArrowFunction, ast.KindFunctionExpression:
 		if p.Kind == ast.KindPropertyDeclaration {
 			gp := p.Parent
-			if gp != nil && (gp.Kind == ast.KindClassDeclaration || gp.Kind == ast.KindClassExpression) {
+			if gp != nil && ast.IsClassLike(gp) {
 				return true
 			}
 		}

@@ -14,8 +14,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-const jsRegexOpts = regexp2.ECMAScript | regexp2.Unicode
-
 type matcherEntry struct {
 	re *regexp2.Regexp
 	// customText non-empty ⇒ use mustMatchCustom / mustNotMatchCustom
@@ -71,19 +69,11 @@ func boolFromMap(m map[string]interface{}, key string, def bool) bool {
 }
 
 func compileRE2(pat string) (*regexp2.Regexp, error) {
-	re, err := regexp2.Compile(pat, jsRegexOpts)
+	re, err := utils.CompileRegexp2(pat, utils.JSUnicodeRegexOptions)
 	if err != nil {
 		return nil, err
 	}
 	return re, nil
-}
-
-func matchRE2(re *regexp2.Regexp, s string) bool {
-	if re == nil {
-		return false
-	}
-	m, err := re.FindStringMatch(s)
-	return err == nil && m != nil
 }
 
 func compileMatcherPatterns(raw interface{}, optionPath string) (matchersByFn, []invalidPattern) {
@@ -514,13 +504,13 @@ var ValidTitleRule = rule.Rule{
 
 				fnKey := trimFXPrefix(jestFn.Name)
 
-				if me := matcherFor(fnKey, co.mustNotMatch); matchRE2(me.re, title) {
+				if me := matcherFor(fnKey, co.mustNotMatch); utils.Regexp2MatchString(me.re, title) {
 					buildMustNotReport(ctx, arg, unprefixedName, me)
 					return
 				}
 
 				me := matcherFor(fnKey, co.mustMatch)
-				if me.re != nil && !matchRE2(me.re, title) {
+				if me.re != nil && !utils.Regexp2MatchString(me.re, title) {
 					buildMustMatchReport(ctx, arg, unprefixedName, me)
 				}
 			},
