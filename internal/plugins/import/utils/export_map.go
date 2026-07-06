@@ -185,6 +185,8 @@ func exportAssignmentHasDefault(ctx rule.RuleContext, sourceFile *ast.SourceFile
 }
 
 // The tsgo shim exposes CompilerOptions fields but not GetESModuleInterop.
+//
+//nolint:staticcheck // esModuleInterop still needs to be inspected for import/export compatibility.
 func compilerOptionsESModuleInterop(ctx rule.RuleContext) bool {
 	if ctx.Program == nil || ctx.Program.Options() == nil {
 		return false
