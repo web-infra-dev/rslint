@@ -76,17 +76,29 @@ export default [{ files: ['**/*.ts'], rules: {} }] satisfies Bad;
 	})
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	programs, exitCode := createProgramsForConfig(
+	parseCache := utils.NewParseCache()
+	cfg := rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}}}
+	programs, hasTsConfig, exitCode := createProgramsForConfig(
 		dir,
-		rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}}},
+		cfg,
 		true,
 		fs,
 		nil,
-		utils.NewParseCache(),
+		parseCache,
 	)
 	if exitCode != 0 {
 		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
 	}
+	if hasTsConfig {
+		t.Fatalf("expected no tsconfig to be found")
+	}
+	if len(programs) != 0 {
+		t.Fatalf("expected no programs before gap fallback, got %d", len(programs))
+	}
+
+	programs, _, _, _, _ = buildProgramsWithGapFallback(
+		programs, nil, cfg, dir, fs, nil, nil, parseCache, true, hasTsConfig, nil,
+	)
 	if len(programs) != 1 {
 		t.Fatalf("expected one synthesized fallback program, got %d", len(programs))
 	}
@@ -125,7 +137,7 @@ export const value: Bad | null = null;
 	})
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	programs, exitCode := createProgramsForConfig(
+	programs, hasTsConfig, exitCode := createProgramsForConfig(
 		dir,
 		rslintconfig.RslintConfig{{
 			Files: []string{"**/*.ts"},
@@ -142,6 +154,9 @@ export const value: Bad | null = null;
 	)
 	if exitCode != 0 {
 		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
+	}
+	if !hasTsConfig {
+		t.Fatalf("expected tsconfig to be found")
 	}
 	if len(programs) != 1 {
 		t.Fatalf("expected one tsconfig-backed program, got %d", len(programs))
@@ -191,7 +206,7 @@ export const value: Bad | null = null;
 			},
 		},
 	}}
-	programs, exitCode := createProgramsForConfig(
+	programs, hasTsConfig, exitCode := createProgramsForConfig(
 		dir,
 		cfg,
 		true,
@@ -202,6 +217,9 @@ export const value: Bad | null = null;
 	if exitCode != 0 {
 		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
 	}
+	if !hasTsConfig {
+		t.Fatalf("expected tsconfig to be found")
+	}
 	if len(programs) != 1 {
 		t.Fatalf("expected one tsconfig-backed program before gap fallback, got %d", len(programs))
 	}
@@ -209,7 +227,7 @@ export const value: Bad | null = null;
 		t.Fatalf("expected tsconfig-backed program to participate in type-check, got %v", skip)
 	}
 
-	programs, typeInfoFiles, gapFiles := buildProgramsWithGapFallback(
+	programs, typeInfoFiles, gapFiles, _, _ := buildProgramsWithGapFallback(
 		programs,
 		nil,
 		cfg,
@@ -219,6 +237,8 @@ export const value: Bad | null = null;
 		nil,
 		parseCache,
 		true,
+		hasTsConfig,
+		nil,
 	)
 	if len(programs) != 2 {
 		t.Fatalf("expected the gap fallback program to be appended, got %d programs", len(programs))

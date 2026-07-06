@@ -154,8 +154,9 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// (the JS side resolves any multi-config merge into one entry list).
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	programs, typeInfoFiles, _ := buildProgramsWithGapFallback(
+	programs, typeInfoFiles, _, rslintConfig, _ := buildProgramsWithGapFallback(
 		programs, nil, rslintConfig, configDirectory, fs, allowedFiles, nil, parseCache, false,
+		len(tsConfigs) > 0, nil,
 	)
 
 	// Collect diagnostics and source files

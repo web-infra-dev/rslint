@@ -14,44 +14,204 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// defaultExcludeDirs is a set of directory names always excluded from walking.
-var defaultExcludeDirs = func() map[string]struct{} {
-	m := make(map[string]struct{}, len(utils.DefaultExcludeDirNames))
-	for _, name := range utils.DefaultExcludeDirNames {
-		m[name] = struct{}{}
-	}
-	return m
-}()
+// sourceFileExtensions are the extensions walkDir treats as lintable source
+// files. Mirrors the extension list historically used for the no-tsconfig
+// directory scan (cmd/rslint/programs.go).
+var sourceFileExtensions = []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
 
-// DiscoverGapFiles scans the filesystem for "gap files" — files that match a config
-// entry's `files` pattern but are not in any tsconfig Program. These files get a
-// fallback Program (AST-only, no type info) and only run non-type-aware rules.
+func hasSourceExtension(name string) bool {
+	for _, ext := range sourceFileExtensions {
+		if strings.HasSuffix(name, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// walkJob is one unit of work for walkDir's worker pool: a directory to read,
+// plus the gitignore-derived ignore chain inherited from ancestors (grows as
+// nested .gitignore files are found) and the combined ignores/negation-reach
+// ready for use (chain ++ staticIgnores, cached — see walkDir's doc comment
+// on why gitignore patterns must stay ordered before staticIgnores).
+type walkJob struct {
+	path    string
+	chain   []IgnorePattern
+	ignores []IgnorePattern
+	neg     negReach
+}
+
+// walkDir does a single top-down traversal of cwd, returning:
+//   - every file not excluded by gitignoreSeed, any .gitignore found during
+//     the walk, or staticIgnores (no extension filtering here —
+//     DiscoverGapFiles applies that itself, only for the no-`files`-field
+//     case; when a config entry sets `files`, the pattern itself is the only
+//     filter, matching pre-existing behavior for e.g. `files: ["**/*"]`).
+//     ".git" is the only hard-coded directory skip; everything else,
+//     including node_modules, is controlled by ignore patterns the caller
+//     folds into staticIgnores (see utils.DefaultIgnoreDirGlobs).
+//   - every .gitignore-derived glob pattern discovered during the walk
+//     (flat, in top-down discovery order), for callers that need to fold them
+//     into a config's global ignores for consumers outside this walk (e.g.
+//     GetConfigForFile on a file that is already in a tsconfig Program).
+//     Patterns already present in gitignoreSeed are NOT re-returned.
+//
+// gitignoreSeed and staticIgnores are kept as two separate inputs — rather
+// than one flat pre-merged list — because they must stay in a fixed relative
+// order that a single "seed, then append newly found .gitignore" list can't
+// guarantee: gitignore-derived patterns (ancestor + seed + anything found
+// during the walk) must ALWAYS be evaluated before staticIgnores (the user's
+// own config `ignores`, e.g. `!dist/keep.ts`), so a user's `!` can override a
+// gitignore rule regardless of whether that rule came from an ancestor
+// .gitignore (known upfront) or one discovered mid-walk. Every job carries
+// `chain` (the gitignore patterns accumulated root-to-here) separately from
+// the cached `ignores = chain ++ staticIgnores`; only chain growth (a new
+// .gitignore found in that directory) triggers recomputing `ignores`/`neg`.
+//
+// A .gitignore found in a directory applies to that directory and everything
+// beneath it: its rules are appended after the inherited chain (so a nested
+// `!` can override an ancestor .gitignore's rule — sequential evaluation,
+// later wins) and threaded down to child jobs. Directories without their own
+// .gitignore just pass their inherited chain/ignores/negReach to children
+// unchanged (no recomputation).
+//
+// Symlinked subdirectories are skipped (vfsAdapter with followSymlinks=false),
+// matching ESLint v10's flat-config walker semantics.
+func walkDir(
+	cwd string,
+	fsys vfs.FS,
+	gitignoreSeed []IgnorePattern,
+	staticIgnores []IgnorePattern,
+	singleThreaded bool,
+) (files []string, gitignoreGlobs []string) {
+	normalizedCwd := normalizeGlobPath(cwd)
+	fsAdapter := &vfsAdapter{vfs: fsys, root: normalizedCwd}
+
+	var filesMu, globsMu sync.Mutex
+
+	workers := runtime.GOMAXPROCS(0)
+	if workers < 2 {
+		workers = 2
+	}
+	if singleThreaded {
+		workers = 1
+	}
+
+	combine := func(chain []IgnorePattern) ([]IgnorePattern, negReach) {
+		combined := make([]IgnorePattern, 0, len(chain)+len(staticIgnores))
+		combined = append(combined, chain...)
+		combined = append(combined, staticIgnores...)
+		return combined, buildNegReach(combined)
+	}
+
+	work := func(job walkJob) []walkJob {
+		f, err := fsAdapter.Open(job.path)
+		if err != nil {
+			return nil
+		}
+		rdf, ok := f.(fs.ReadDirFile)
+		if !ok {
+			f.Close()
+			return nil
+		}
+		entries, _ := rdf.ReadDir(-1)
+		f.Close()
+
+		chain := job.chain
+		ignores := job.ignores
+		neg := job.neg
+
+		for _, e := range entries {
+			if e.IsDir() || e.Name() != ".gitignore" {
+				continue
+			}
+			dirAbsPath := normalizedCwd
+			if job.path != "." {
+				dirAbsPath = normalizedCwd + "/" + job.path
+			}
+			content, ok := fsys.ReadFile(dirAbsPath + "/.gitignore")
+			if !ok {
+				break
+			}
+			relDir := ""
+			if job.path != "." {
+				relDir = job.path
+			}
+			localGlobs := convertGitignoreToGlobs(content, relDir)
+			if len(localGlobs) == 0 {
+				break
+			}
+			globsMu.Lock()
+			gitignoreGlobs = append(gitignoreGlobs, localGlobs...)
+			globsMu.Unlock()
+
+			newChain := make([]IgnorePattern, len(chain), len(chain)+len(localGlobs))
+			copy(newChain, chain)
+			chain = append(newChain, ParseIgnorePatterns(localGlobs)...)
+			ignores, neg = combine(chain)
+			break
+		}
+
+		var childJobs []walkJob
+		for _, e := range entries {
+			name := e.Name()
+			if e.IsDir() {
+				if name == ".git" {
+					continue
+				}
+				childPath := path.Join(job.path, name)
+				if canPruneDir(childPath, ignores, neg) {
+					continue
+				}
+				childJobs = append(childJobs, walkJob{path: childPath, chain: chain, ignores: ignores, neg: neg})
+				continue
+			}
+			walkPath := path.Join(job.path, name)
+			fullPath := tspath.NormalizePath(path.Join(normalizedCwd, walkPath))
+			if isFileIgnored(fullPath, ignores, cwd) {
+				continue
+			}
+			filesMu.Lock()
+			files = append(files, fullPath)
+			filesMu.Unlock()
+		}
+		return childJobs
+	}
+
+	rootIgnores, rootNeg := combine(gitignoreSeed)
+	pool := newWalkPool[walkJob](workers)
+	pool.submitMany([]walkJob{{path: ".", chain: gitignoreSeed, ignores: rootIgnores, neg: rootNeg}})
+	pool.run(work)
+
+	sort.Strings(files)
+	return files, gitignoreGlobs
+}
+
+// DiscoverGapFiles discovers files that should get a fallback (AST-only, no
+// type info) Program: they are not already covered by any tsconfig-backed
+// Program, but the linter would still assign them rules.
+//
+// Two scenarios trigger this:
+//   - hasTsConfig is false: there is no tsconfig at all for configDir (a pure
+//     JS/TS project). Every ts/js file under configDir not already in
+//     programFiles is a gap file — a whole-directory fallback Program takes
+//     the place of the old ad-hoc "no tsconfig" directory scan.
+//   - a config entry sets `files`: files matching those patterns but absent
+//     from every tsconfig Program are gaps, even when a tsconfig exists.
+//
+// When hasTsConfig is true and no entry sets `files`, the tsconfig's own
+// `include`/`exclude` resolution is authoritative and this function is a
+// no-op (nil, nil) — legacy behavior.
 //
 // Files pass through these filters:
-//  1. Match at least one config entry's `files` pattern
-//  2. Not in global ignores (directory-level and file-level)
+//  1. Match at least one config entry's `files` pattern (skipped when no
+//     entry sets `files` — legacy semantics: applies to everything)
+//  2. Not in global ignores or any .gitignore (enforced inside walkDir)
 //  3. Not already in programFiles (existing tsconfig Programs)
 //  4. Pass GetConfigForFile (would actually receive lint rules)
 //
-// Walking model:
-//   - A bounded worker pool (see walkPool) traverses the directory tree.
-//     Total live goroutines at any moment is at most `workers`.
-//   - Default workers = max(2, GOMAXPROCS); singleThreaded forces workers=1
-//     for fully serial traversal (a knob users rely on for debugging,
-//     reproducibility, and constrained environments).
-//   - The vfsAdapter is constructed with followSymlinks=false, so symlinked
-//     subdirectories are skipped entirely. This matches ESLint v10's
-//     flat-config file walker, which uses @humanfs/node and recurses only
-//     when Dirent.isDirectory() is true (Node returns false for symlinks).
-//     It also avoids the otherwise scheduling-dependent "first writer wins"
-//     non-determinism a parallel walker would introduce.
-//
-// When allowFiles/allowDirs are provided (CLI args), only files within scope.
-//
-// Returns:
-//   - nil: no config entry has a `files` field → caller uses legacy tsconfig-only behavior
-//   - []: `files` present but no gaps found
-//   - [...]: gap files to create a fallback Program for (sorted lexically)
+// Returns the gap files (sorted, deduplicated) and every .gitignore-derived
+// glob pattern relevant to configDir (ancestor + discovered during the walk),
+// for the caller to fold into the config's global ignores.
 func DiscoverGapFiles(
 	config RslintConfig,
 	configDir string,
@@ -60,9 +220,9 @@ func DiscoverGapFiles(
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
-) []string {
-	// 1. Collect global ignore patterns and files patterns from config entries.
-	globalIgnores := ExtractConfigIgnores(config)
+	hasTsConfig bool,
+) (gapFiles []string, gitignoreGlobs []string) {
+	configIgnores := ExtractConfigIgnores(config)
 
 	var allFilesPatterns []string
 	hasFilesField := false
@@ -73,15 +233,14 @@ func DiscoverGapFiles(
 		}
 	}
 
-	// No entry has files → backward compat, signal caller to skip new logic.
-	if !hasFilesField {
-		return nil
+	// tsconfig found and no entry restricts scope via `files` → legacy
+	// behavior, tsconfig `include`/`exclude` is authoritative.
+	if hasTsConfig && !hasFilesField {
+		return nil, nil
 	}
 
-	// Deduplicate patterns.
 	allFilesPatterns = deduplicate(allFilesPatterns)
 
-	// Build allowFiles set for fast lookup.
 	var allowFileSet map[string]struct{}
 	if allowFiles != nil {
 		allowFileSet = make(map[string]struct{}, len(allowFiles))
@@ -90,97 +249,109 @@ func DiscoverGapFiles(
 		}
 	}
 
-	// 2. Prepend default directory ignores so they are always active
-	// regardless of user config.
-	globalIgnores = append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), globalIgnores...)
+	// staticIgnores (default dir excludes + the user's own config `ignores`)
+	// must always be evaluated AFTER gitignore-derived patterns, so a user's
+	// `!` can override a gitignore rule regardless of where that rule came
+	// from. See walkDir's doc comment for why these stay as two separate
+	// lists instead of one pre-merged seed.
+	staticIgnores := append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), configIgnores...)
 
-	// Use non-nil empty slice to distinguish "files field present, no gaps"
-	// from "no files field" (nil).
-	gapFiles := []string{}
+	normalizedConfigDirForGitignore := normalizeGlobPath(configDir)
+	ancestorGlobs := collectAncestorGitignoreGlobs(normalizedConfigDirForGitignore, fsys)
+	gitignoreSeed := ParseIgnorePatterns(ancestorGlobs)
+
+	result := []string{}
 
 	// Fast path: when only specific files are provided (e.g., lint-staged),
-	// check each file directly instead of walking the entire filesystem.
+	// check each file directly instead of walking the entire filesystem. This
+	// path skips walkDir entirely, so it wouldn't otherwise see any
+	// .gitignore at all — read configDir's own .gitignore directly (one
+	// extra file read, not a tree walk) so the common case (a single
+	// top-level .gitignore) still works. Nested .gitignore files in
+	// subdirectories under configDir are NOT discovered by this path — that
+	// would require a walk, defeating the point of the fast path.
 	if allowFileSet != nil && allowDirs == nil {
-		for f := range allowFileSet {
-			if _, exists := programFiles[f]; exists {
-				continue
+		ownGlobs, _ := fsys.ReadFile(normalizedConfigDirForGitignore + "/.gitignore")
+		fastGitignore := gitignoreSeed
+		rootGlobs := ancestorGlobs
+		if ownGlobs != "" {
+			converted := convertGitignoreToGlobs(ownGlobs, "")
+			if len(converted) > 0 {
+				fastGitignore = append(append([]IgnorePattern{}, gitignoreSeed...), ParseIgnorePatterns(converted)...)
+				rootGlobs = append(append([]string{}, ancestorGlobs...), converted...)
 			}
-			if isFileIgnored(f, globalIgnores, configDir) {
+		}
+		fastIgnores := append(append([]IgnorePattern{}, fastGitignore...), staticIgnores...)
+		for f := range allowFileSet {
+			// See the same check in the walk path below for why this only
+			// applies when hasTsConfig is true.
+			if hasTsConfig {
+				if _, exists := programFiles[f]; exists {
+					continue
+				}
+			}
+			if isFileIgnored(f, fastIgnores, configDir) {
 				continue
 			}
 			if config.GetConfigForFile(f, configDir) == nil {
 				continue
 			}
-			gapFiles = append(gapFiles, f)
+			result = append(result, f)
 		}
-		gapFiles = deduplicate(gapFiles)
-		// Map iteration order is non-deterministic; sort to match the walker
-		// path and keep output stable across runs.
-		sort.Strings(gapFiles)
-		return gapFiles
+		result = deduplicate(result)
+		sort.Strings(result)
+		return result, rootGlobs
 	}
 
-	// 3. Walk the tree with a bounded worker pool. Goroutine count is capped
-	// at `workers`; symlinks are skipped (see vfsAdapter doc) so the result
-	// set is deterministic regardless of scheduling.
-	normalizedConfigDir := normalizeGlobPath(configDir)
-	fsAdapter := &vfsAdapter{vfs: fsys, root: normalizedConfigDir}
+	walked, discoveredGlobs := walkDir(configDir, fsys, gitignoreSeed, staticIgnores, singleThreaded)
 
-	// Normalize patterns relative to configDir for matching.
+	normalizedConfigDir := normalizeGlobPath(configDir)
 	relativePatterns := make([]string, len(allFilesPatterns))
 	for i, pattern := range allFilesPatterns {
 		normalizedPattern := normalizeGlobPath(tspath.ResolvePath(configDir, pattern))
 		relativePatterns[i] = strings.TrimPrefix(normalizedPattern, normalizedConfigDir+"/")
 	}
 
-	var (
-		gapMu     sync.Mutex
-		seen      sync.Map // map[string]struct{} — file dedupe
-		dirIgnore sync.Map // map[string]bool — pattern check cache, write-once per path
-	)
-
-	// Precompute negation reaches once. canPruneDir uses them to prune gitignore
-	// file-level directories (e.g. target/ → **/target/**/*) without ever
-	// skipping a directory a `!` pattern could re-include.
-	neg := buildNegReach(globalIgnores)
-
-	// Defer the parallelism limit to GOMAXPROCS (Go's standard knob; aligned
-	// with container CGroup CPU limits). Lower bound of 2 keeps the walker
-	// useful on single-core CI runners. singleThreaded overrides to 1 for
-	// fully serial traversal — a knob users depend on for reproducibility,
-	// debugging, and constrained environments.
-	workers := runtime.GOMAXPROCS(0)
-	if workers < 2 {
-		workers = 2
-	}
-	if singleThreaded {
-		workers = 1
-	}
-
-	processFile := func(walkPath string) {
-		// 1. pattern match
-		matched := false
-		for _, pattern := range relativePatterns {
-			if ok, _ := doublestar.Match(pattern, walkPath); ok {
-				matched = true
-				break
+	for _, fullPath := range walked {
+		// 1. pattern match (skipped when no entry sets `files`: legacy
+		// semantics treat that as "applies to everything" — but only to
+		// ts/js source files, matching the old no-tsconfig directory scan
+		// this case replaces; a `files` pattern like "**/*" is itself the
+		// only filter when one is present, so e.g. .md/.json files stay
+		// discoverable there).
+		if hasFilesField {
+			relPath := strings.TrimPrefix(fullPath, normalizedConfigDir+"/")
+			matched := false
+			for _, pattern := range relativePatterns {
+				if ok, _ := doublestar.Match(pattern, relPath); ok {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		} else if !hasSourceExtension(fullPath) {
+			continue
+		}
+		// 2. already in tsconfig Programs. Only applies when THIS configDir
+		// has its own tsconfig: programFiles is a cross-config set, and an
+		// ancestor config's broader tsconfig `include` can already cover a
+		// file that structurally belongs to a nested config with no
+		// tsconfig of its own (e.g. a monorepo root tsconfig with
+		// `include: ["**/*.ts"]` sweeping up every package). Excluding it
+		// here would mean it never gets the nested config's own rules at
+		// all. Instead, when hasTsConfig is false, always treat it as a gap
+		// file for this config — the existing nearest-config ownership
+		// resolution (buildFileOwnerMap/buildFileFilters) is what decides
+		// which program's rules actually apply per file, exactly as it did
+		// for the old no-tsconfig whole-directory scan Program.
+		if hasTsConfig {
+			if _, exists := programFiles[fullPath]; exists {
+				continue
 			}
 		}
-		if !matched {
-			return
-		}
-
-		fullPath := tspath.NormalizePath(path.Join(normalizedConfigDir, walkPath))
-
-		// 2. already in tsconfig Programs
-		if _, exists := programFiles[fullPath]; exists {
-			return
-		}
-		// 3. file-level global ignores
-		if isFileIgnored(fullPath, globalIgnores, configDir) {
-			return
-		}
-		// 4. CLI scope
+		// 3. CLI scope
 		if allowFileSet != nil || allowDirs != nil {
 			inScope := false
 			if allowFileSet != nil {
@@ -197,82 +368,34 @@ func DiscoverGapFiles(
 				}
 			}
 			if !inScope {
-				return
+				continue
 			}
 		}
-		// 5. final config check
+		// 4. final config check
 		if config.GetConfigForFile(fullPath, configDir) == nil {
-			return
+			continue
 		}
-		// 6. dedupe + append
-		if _, loaded := seen.LoadOrStore(fullPath, struct{}{}); loaded {
-			return
-		}
-		gapMu.Lock()
-		gapFiles = append(gapFiles, fullPath)
-		gapMu.Unlock()
+		result = append(result, fullPath)
 	}
 
-	work := func(walkPath string) []string {
-		f, err := fsAdapter.Open(walkPath)
-		if err != nil {
-			return nil
-		}
-		rdf, ok := f.(fs.ReadDirFile)
-		if !ok {
-			f.Close()
-			return nil
-		}
-		entries, _ := rdf.ReadDir(-1)
-		f.Close()
+	result = deduplicate(result)
+	sort.Strings(result)
 
-		var childDirs []string
-		for _, e := range entries {
-			name := e.Name()
-			if e.IsDir() {
-				if _, excluded := defaultExcludeDirs[name]; excluded {
-					continue
-				}
-				childPath := path.Join(walkPath, name)
-				if cached, ok := dirIgnore.Load(childPath); ok {
-					blocked, _ := cached.(bool) // dirIgnore only stores bool (set by Store below)
-					if blocked {
-						continue
-					}
-				} else {
-					// canPruneDir unifies both directory-prune cases: absolute
-					// blocks (dir/**, bare names) and negation-aware file-level
-					// gitignore covers (dir/**/*). Sound — prunes only when every
-					// descendant file would be ignored by isFileIgnored.
-					blocked := canPruneDir(childPath, globalIgnores, neg)
-					dirIgnore.Store(childPath, blocked)
-					if blocked {
-						continue
-					}
-				}
-				childDirs = append(childDirs, childPath)
-			} else {
-				processFile(path.Join(walkPath, name))
-			}
-		}
-		return childDirs
-	}
+	allGlobs := make([]string, 0, len(ancestorGlobs)+len(discoveredGlobs))
+	allGlobs = append(allGlobs, ancestorGlobs...)
+	allGlobs = append(allGlobs, discoveredGlobs...)
 
-	pool := newWalkPool(workers)
-	pool.submitMany([]string{"."})
-	pool.run(work)
-
-	sort.Strings(gapFiles)
-	return gapFiles
+	return result, allGlobs
 }
 
 // DiscoverGapFilesMultiConfig runs DiscoverGapFiles for each config in a
-// monorepo config map and returns the union of all gap files.
+// monorepo config map and returns the union of all gap files, plus the
+// .gitignore-derived globs discovered per configDir (kept separate per dir —
+// a child config's own .gitignore must not leak into its siblings or parent).
 //
-// Configs are processed serially. Each DiscoverGapFiles invocation already
-// uses an internal worker pool, so the total live goroutine count is bounded
-// by the worker pool size, not by `len(configMap) × workers`. Cross-config
-// parallelism can be added later if benchmarks justify it.
+// hasTsConfigByDir carries, per configDir, whether a tsconfig was found for
+// that config (see DiscoverGapFiles). A missing entry defaults to false
+// (walks that configDir), which is the safe default.
 func DiscoverGapFilesMultiConfig(
 	configMap map[string]RslintConfig,
 	fsys vfs.FS,
@@ -280,33 +403,44 @@ func DiscoverGapFilesMultiConfig(
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
-) []string {
+	hasTsConfigByDir map[string]bool,
+) (gapFiles []string, gitignoreGlobsByDir map[string][]string) {
 	if len(configMap) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	seen := make(map[string]struct{})
 	var allGapFiles []string
+	globsByDir := make(map[string][]string, len(configMap))
 	for configDir, cfg := range configMap {
-		gapFiles := DiscoverGapFiles(cfg, configDir, fsys, programFiles, allowFiles, allowDirs, singleThreaded)
-		for _, f := range gapFiles {
+		dirGapFiles, dirGlobs := DiscoverGapFiles(
+			cfg, configDir, fsys, programFiles, allowFiles, allowDirs, singleThreaded, hasTsConfigByDir[configDir],
+		)
+		for _, f := range dirGapFiles {
 			if _, exists := seen[f]; !exists {
 				seen[f] = struct{}{}
 				allGapFiles = append(allGapFiles, f)
 			}
 		}
+		if len(dirGlobs) > 0 {
+			globsByDir[configDir] = dirGlobs
+		}
 	}
 
-	if len(allGapFiles) == 0 {
-		return nil
+	if len(allGapFiles) > 0 {
+		sort.Strings(allGapFiles)
+	} else {
+		allGapFiles = nil
 	}
-	sort.Strings(allGapFiles)
-	return allGapFiles
+	if len(globsByDir) == 0 {
+		globsByDir = nil
+	}
+	return allGapFiles, globsByDir
 }
 
 // walkPool is a fixed-size worker pool with an unbounded internal LIFO queue,
-// used by DiscoverGapFiles to walk directory trees with a bounded number of
-// live goroutines. Properties:
+// used by walkDir to walk directory trees with a bounded number of live
+// goroutines. Properties:
 //
 //   - At most `workers` goroutines exist concurrently.
 //   - submitMany never blocks (queue grows as needed; total memory ~ peak
@@ -316,84 +450,86 @@ func DiscoverGapFilesMultiConfig(
 //     idle and the queue is empty.
 //
 // workers=1 degenerates to an effectively serial DFS-style traversal (LIFO
-// pops the most recently submitted dir); the only goroutine is the worker
+// pops the most recently submitted item); the only goroutine is the worker
 // itself. This is what --singleThreaded relies on.
-type walkPool struct {
+type walkPool[T any] struct {
 	mu      sync.Mutex
 	cond    *sync.Cond
-	queue   []string
+	queue   []T
 	idle    int
 	workers int
 	done    bool
 }
 
-func newWalkPool(workers int) *walkPool {
+func newWalkPool[T any](workers int) *walkPool[T] {
 	if workers < 1 {
 		workers = 1
 	}
-	p := &walkPool{workers: workers}
+	p := &walkPool[T]{workers: workers}
 	p.cond = sync.NewCond(&p.mu)
 	return p
 }
 
-// submitMany appends dirs to the queue and wakes idle workers. Safe to call
+// submitMany appends items to the queue and wakes idle workers. Safe to call
 // from any goroutine.
-func (p *walkPool) submitMany(dirs []string) {
-	if len(dirs) == 0 {
+func (p *walkPool[T]) submitMany(items []T) {
+	if len(items) == 0 {
 		return
 	}
 	p.mu.Lock()
-	p.queue = append(p.queue, dirs...)
+	p.queue = append(p.queue, items...)
 	p.mu.Unlock()
-	if len(dirs) == 1 {
+	if len(items) == 1 {
 		p.cond.Signal()
 	} else {
 		p.cond.Broadcast()
 	}
 }
 
-// take pops a job from the queue, blocking if empty. Returns ("", false)
+// take pops a job from the queue, blocking if empty. Returns (zero, false)
 // only when the queue is empty AND every worker is simultaneously idle —
 // which means no more work will ever appear.
-func (p *walkPool) take() (string, bool) {
+func (p *walkPool[T]) take() (T, bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	for {
 		if len(p.queue) > 0 {
 			n := len(p.queue) - 1
-			dir := p.queue[n]
+			item := p.queue[n]
 			p.queue = p.queue[:n]
-			return dir, true
+			return item, true
 		}
 		p.idle++
 		if p.idle == p.workers {
 			p.done = true
 			p.cond.Broadcast()
-			return "", false
+			var zero T
+			return zero, false
 		}
 		p.cond.Wait()
 		if p.done {
-			return "", false
+			var zero T
+			return zero, false
 		}
 		p.idle--
 	}
 }
 
-// run drives the worker pool. Each worker pulls jobs and calls work(dir),
-// which returns the child directories to enqueue. Returns when all reachable
-// work is processed.
+// run drives the worker pool. Each worker pulls jobs and calls work(item),
+// which returns the child jobs to enqueue. Returns when all reachable work
+// is processed.
 //
 // When workers == 1, runs the loop on the calling goroutine directly — no
 // goroutines are spawned at all. This is what --singleThreaded relies on:
 // callers can rely on the Go side spawning no extra goroutines.
-func (p *walkPool) run(work func(string) []string) {
+func (p *walkPool[T]) run(work func(T) []T) {
 	if p.workers == 1 {
 		for {
-			dir, ok := p.take()
+			item, ok := p.take()
 			if !ok {
 				return
 			}
-			p.submitMany(work(dir))
+			p.submitMany(work(item))
 		}
 	}
 	var wg sync.WaitGroup
@@ -402,11 +538,11 @@ func (p *walkPool) run(work func(string) []string) {
 		go func() {
 			defer wg.Done()
 			for {
-				dir, ok := p.take()
+				item, ok := p.take()
 				if !ok {
 					return
 				}
-				p.submitMany(work(dir))
+				p.submitMany(work(item))
 			}
 		}()
 	}

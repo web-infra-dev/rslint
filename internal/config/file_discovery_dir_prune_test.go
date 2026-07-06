@@ -41,7 +41,7 @@ func TestDiscoverGapFiles_PrunesGitignoreFileLevelDir(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 
 	// target/ must NOT be entered.
 	for _, dir := range spy.snapshotAccessedDirs() {
@@ -68,7 +68,7 @@ func TestDiscoverGapFiles_NegationReincludeFullPath(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 	dirs := spy.snapshotAccessedDirs()
 
 	// Top-level target NOT entered; the re-included sub/path/target IS entered.
@@ -99,7 +99,7 @@ func TestDiscoverGapFiles_NegationReincludeChildNotOverPruned(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 
 	// Must reach target/keep.
 	assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "target/keep"), "target/keep must be walked")
@@ -124,7 +124,7 @@ func TestDiscoverGapFiles_UnrootedNegationConservative(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 
 	assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "build"), "build must be walked (unrooted negation)")
 
@@ -147,7 +147,7 @@ func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {
 			{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 		}
 		spy := &spyFS{FS: osvfs.FS()}
-		gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+		gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 		for _, d := range spy.snapshotAccessedDirs() {
 			if strings.Contains(d, "dist") {
 				t.Errorf("dir-level dist must be absolutely pruned, entered: %s", d)
@@ -168,7 +168,7 @@ func TestDiscoverGapFiles_DirLevelVsFileLevel(t *testing.T) {
 			{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 		}
 		spy := &spyFS{FS: osvfs.FS()}
-		gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+		gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 		assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "dist"), "file-level dist must be walked for negation")
 		gapSet := toSet(gapFiles)
 		assert.Assert(t, gapSet[paths["dist/keep.ts"]], "file-level ! re-includes keep.ts")
@@ -190,20 +190,22 @@ func TestDiscoverGapFiles_GitignoreTargetPrunedE2E(t *testing.T) {
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ExtractConfigIgnores(config))
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, gitignoreGlobs := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false, true)
 
 	// The actual optimization: target/ must NOT be entered.
 	assert.Assert(t, !dirAccessed(spy.snapshotAccessedDirs(), "target"), "target should be pruned via gitignore")
 	// gap-file set unchanged.
 	assert.Equal(t, len(gapFiles), 1, "got %v", gapFiles)
 	assert.Assert(t, toSet(gapFiles)[tspath.NormalizePath(dir+"/src/index.ts")])
-	// Linter consistency: target files return nil.
+
+	// Linter consistency: once the discovered .gitignore globs are folded into
+	// the config's global ignores (as buildProgramsWithGapFallback does),
+	// target files return nil.
+	if len(gitignoreGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitignoreGlobs}}, config...)
+	}
 	assert.Assert(t, config.GetConfigForFile(tspath.NormalizePath(dir+"/target/a.ts"), dir) == nil)
 }
 
@@ -223,18 +225,18 @@ func TestDiscoverGapFiles_NestedGitignoreNegationE2E(t *testing.T) {
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
-	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), ExtractConfigIgnores(config))
-	if len(gitGlobs) > 0 {
-		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
-	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, gitignoreGlobs := DiscoverGapFiles(config, dir, spy, map[string]struct{}{}, nil, nil, false, true)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/a.ts")])
 	// Re-included nested build must be walked + discovered.
 	assert.Assert(t, dirAccessed(spy.snapshotAccessedDirs(), "build"), "sub/build must be walked")
+
+	if len(gitignoreGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitignoreGlobs}}, config...)
+	}
 	if !gapSet[tspath.NormalizePath(dir+"/sub/build/keep.ts")] {
 		// Consistency cross-check: linter must agree it is lintable.
 		mc := config.GetConfigForFile(tspath.NormalizePath(dir+"/sub/build/keep.ts"), dir)
@@ -319,7 +321,7 @@ func TestDiscoverGapFiles_PruningPreservesGapFiles(t *testing.T) {
 			}
 			sort.Strings(oracle)
 
-			got := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+			got, _ := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false, true)
 			sort.Strings(got)
 
 			assert.DeepEqual(t, got, oracle)
@@ -345,7 +347,7 @@ func TestDiscoverGapFiles_PerEntryNegationDoesNotResurrect(t *testing.T) {
 	}
 
 	spy := &spyFS{FS: osvfs.FS()}
-	gapFiles := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false)
+	gapFiles, _ := DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, false, true)
 	gapSet := toSet(gapFiles)
 
 	assert.Assert(t, gapSet[paths["src/a.ts"]])
@@ -369,8 +371,8 @@ func TestDiscoverGapFiles_PruneSingleThreadedEquivalence(t *testing.T) {
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
 
-	par := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
-	seq := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, true)
+	par, _ := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false, true)
+	seq, _ := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, true, true)
 	sort.Strings(par)
 	sort.Strings(seq)
 	assert.DeepEqual(t, par, seq)

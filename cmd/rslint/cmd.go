@@ -33,7 +33,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -743,25 +742,38 @@ func collectAllowFileWarnings(
 
 	var out []allowFileWarning
 	for _, f := range allowFiles {
-		if _, inProgram := programFiles[f]; !inProgram {
-			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotInProgram})
-			continue
-		}
-		// File is in a Program — check if config would assign rules
-		var merged *rslintconfig.MergedConfig
+		var cfgDir string
+		var cfg rslintconfig.RslintConfig
 		if configMap != nil {
 			dir := tspath.GetDirectoryPath(f)
 			cached, ok := dirConfigCache[dir]
 			if !ok {
-				cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
-				cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
+				d, c := rslintconfig.FindNearestConfig(f, configMap)
+				cached = &cachedConfig{cfgDir: d, cfg: c}
 				dirConfigCache[dir] = cached
 			}
-			if cached.cfg != nil {
-				merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
-			}
+			cfgDir, cfg = cached.cfgDir, cached.cfg
 		} else {
-			merged = rslintConfig.GetConfigForFile(f, currentDirectory)
+			cfgDir, cfg = currentDirectory, rslintConfig
+		}
+
+		// Check ignore status first, independent of program membership: a
+		// gitignored/config-ignored file never enters a Program (correctly —
+		// see DiscoverGapFiles/the no-tsconfig fallback), so "not in program"
+		// would otherwise misreport it as merely absent rather than ignored.
+		if cfg != nil && cfg.IsFileIgnored(f, cfgDir) {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
+			continue
+		}
+		if _, inProgram := programFiles[f]; !inProgram {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotInProgram})
+			continue
+		}
+		// File is in a Program and not globally ignored — check if any entry's
+		// `files` pattern actually assigns it rules.
+		var merged *rslintconfig.MergedConfig
+		if cfg != nil {
+			merged = cfg.GetConfigForFile(f, cfgDir)
 		}
 		if merged == nil {
 			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
@@ -1011,6 +1023,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// programConfigDirs tracks which configDir each program belongs to (parallel to programs).
 	// Used for ownership-based file deduplication in multi-config mode.
 	var programConfigDirs []string
+	// hasTsConfig / hasTsConfigByDir record whether ResolveTsConfigPaths found a
+	// tsconfig for the (single) config / each configDir in multi-config mode.
+	// Fed to buildProgramsWithGapFallback, which uses it to decide whether gap-file
+	// discovery is a no-op (tsconfig found, no `files` field) or must walk the
+	// directory (no tsconfig, or a `files` field restricts scope).
+	var hasTsConfig bool
+	var hasTsConfigByDir map[string]bool
 
 	if configStdin {
 		// Read config JSON from stdin (sent by JS config loader).
@@ -1037,119 +1056,47 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			configMap = payload.ConfigMap
 			originalConfigDir = payload.OriginalConfigDir
 
-			// Inject .gitignore patterns as global ignores for each config.
-			// Each config independently reads its own .gitignore tree:
-			// ReadGitignoreAsGlobs walks UP (ancestor inheritance) and DOWN
-			// (nested .gitignore) from each configDir. Sibling configs are
-			// fully isolated — they never share gitignore patterns.
-			//
-			// Config ignores are passed so that directories which are
-			// directory-level blocked (e.g. **/tests/**) are pruned during
-			// the .gitignore scan. This is safe because isDirAbsolutelyBlocked is
-			// the same predicate used by the linter — blocked dirs' files
-			// are never linted, so their .gitignore patterns are irrelevant.
-			//
-			// Concurrency:
-			//   - When singleThreaded is set, both stages run sequentially in
-			//     the main goroutine (no goroutines spawned at all).
-			//   - Otherwise, gitignore reads run in parallel across configs
-			//     (independent FS reads via cachedvfs, which is concurrent-
-			//     safe). createProgramsForConfig still runs serially in the
-			//     main goroutine — typescript-go's API is invoked one config
-			//     at a time. The two stages overlap: gitignore goroutines
-			//     run alongside the createPrograms loop.
-			//
-			// configMap is NOT mutated by gitignore goroutines; results are
-			// collected via channel and merged in the main goroutine after
-			// the createPrograms loop, so the createPrograms loop sees the
-			// pre-augmentation entries (createProgramsForConfig only reads
-			// languageOptions.parserOptions.project — Ignores entries are
-			// no-ops for it; verified in LoadTsConfigsFromRslintConfig).
-			// Read each config's gitignore on the shared WorkGroup (honoring
-			// --singleThreaded). In the parallel path these overlap with the
-			// serial createProgramsForConfig loop below; that is safe because
-			// createProgramsForConfig only reads parserOptions.project, never
-			// Ignores, so observing the pre-augmentation configMap is fine.
-			// Results are merged after the loop — DiscoverGapFiles needs them.
-			type giResult struct {
-				configDir string
-				globs     []string
-			}
-			var (
-				giResults []giResult
-				giMu      sync.Mutex
-			)
-			giWG := core.NewWorkGroup(singleThreaded)
-			for configDir, entries := range configMap {
-				configIgnores := rslintconfig.ExtractConfigIgnores(entries)
-				giWG.Queue(func() {
-					if globs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs, configIgnores); len(globs) > 0 {
-						giMu.Lock()
-						giResults = append(giResults, giResult{configDir, globs})
-						giMu.Unlock()
-					}
-				})
-			}
-
+			// .gitignore reading is no longer a separate pass here: each
+			// configDir's .gitignore tree is read inline by the walk inside
+			// DiscoverGapFiles (via buildProgramsWithGapFallback), which runs
+			// after programs are built. hasTsConfigByDir records, per
+			// configDir, whether a tsconfig was found — that's what lets
+			// DiscoverGapFiles decide whether it needs to walk at all.
 			seenTsConfigs := make(map[string]struct{})
+			hasTsConfigByDir = make(map[string]bool, len(configMap))
 
 			for configDir, entries := range configMap {
-				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs, parseCache)
+				progs, dirHasTsConfig, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs, parseCache)
 				if exitCode != 0 {
 					return exitCode
 				}
+				hasTsConfigByDir[configDir] = dirHasTsConfig
 				for range progs {
 					programConfigDirs = append(programConfigDirs, configDir)
 				}
 				programs = append(programs, progs...)
-			}
-
-			// Join the gitignore reads and merge into configMap. Must complete
-			// before DiscoverGapFiles, which relies on the augmented configMap.
-			giWG.RunAndWait()
-			for _, r := range giResults {
-				configMap[r.configDir] = append(
-					rslintconfig.RslintConfig{{Ignores: r.globs}},
-					configMap[r.configDir]...,
-				)
 			}
 		} else {
 			// Legacy single-config format
 			rslintConfig = payload.SingleConfig
 			currentDirectory = payload.SingleConfigDir
 
-			// Inject .gitignore patterns as global ignores. Run gitignore
-			// reading in parallel with createProgramsForConfig — they're
-			// independent (createProgramsForConfig only reads
-			// languageOptions.parserOptions.project, not Ignores).
-			var (
-				progs    []*compiler.Program
-				exitCode int
-			)
-			rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
-				rslintConfig, currentDirectory, fs, singleThreaded, nil, parseCache,
-			)
+			progs, dirHasTsConfig, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 			if exitCode != 0 {
 				return exitCode
 			}
+			hasTsConfig = dirHasTsConfig
 			programs = append(programs, progs...)
 		}
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
 		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
-		// Inject .gitignore patterns as global ignores. Run gitignore reading
-		// in parallel with createProgramsForConfig (see comment above).
-		var (
-			progs    []*compiler.Program
-			exitCode int
-		)
-		rslintConfig, progs, exitCode = parallelGitignoreAndPrograms(
-			rslintConfig, currentDirectory, fs, singleThreaded, nil, parseCache,
-		)
+		progs, dirHasTsConfig, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 		if exitCode != 0 {
 			return exitCode
 		}
+		hasTsConfig = dirHasTsConfig
 		programs = append(programs, progs...)
 	}
 
@@ -1197,8 +1144,11 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// resolve gap files, the fallback Program, and the type-info set (the
 	// type-aware gate's only input) identically. cwd == currentDirectory here
 	// (see above), so passing currentDirectory preserves prior behavior.
-	programs, typeInfoFiles, capturedGapFiles := buildProgramsWithGapFallback(
+	var capturedGapFiles []string
+	var typeInfoFiles map[string]struct{}
+	programs, typeInfoFiles, capturedGapFiles, rslintConfig, configMap = buildProgramsWithGapFallback(
 		programs, configMap, rslintConfig, currentDirectory, fs, allowFiles, allowDirs, parseCache, singleThreaded,
+		hasTsConfig, hasTsConfigByDir,
 	)
 
 	// Initial build (including the gap fallback) is complete: evict cache
@@ -1216,14 +1166,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		if configMap != nil {
 			seen := make(map[string]struct{})
 			for configDir, entries := range configMap {
-				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen, parseCache)
+				progs, _, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen, parseCache)
 				if exitCode != 0 {
 					return nil, fmt.Errorf("failed to create programs for %s", configDir)
 				}
 				baseProgs = append(baseProgs, progs...)
 			}
 		} else {
-			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
+			progs, _, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 			if exitCode != 0 {
 				return nil, errors.New("failed to create programs")
 			}

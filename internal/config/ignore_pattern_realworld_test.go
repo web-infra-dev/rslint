@@ -267,7 +267,7 @@ func TestRealWorld_DiscoverGapFiles_MatchesLinterOracle(t *testing.T) {
 	}
 	sort.Strings(oracle)
 
-	got := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	got, _ := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false, true)
 	sort.Strings(got)
 
 	// Walker must equal the linter oracle exactly (no over-prune, no over-include).

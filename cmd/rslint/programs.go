@@ -9,74 +9,17 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/vfsmatch"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// parallelGitignoreAndPrograms runs ReadGitignoreAsGlobs and createProgramsForConfig
-// for a single rslint config (single-config and legacy JSON paths).
-//
-// When singleThreaded is true, both run sequentially in the calling goroutine
-// — honoring the user's --singleThreaded flag (no concurrency at all).
-// Otherwise the two are dispatched as parallel goroutines: they have no data
-// dependency, since createProgramsForConfig only reads
-// entry.LanguageOptions.ParserOptions.Project (see
-// LoadTsConfigsFromRslintConfig), never entry.Ignores. Calling it before vs.
-// after gitignore globs are prepended is equivalent for TS Program creation.
-//
-// The returned config is the gitignore-augmented config (gitignore globs
-// prepended when non-empty), suitable for downstream DiscoverGapFiles /
-// GetConfigForFile.
-//
-// Returns: (augmentedConfig, programs, exitCode). On non-zero exitCode,
-// augmentedConfig and programs may be nil/partial — caller should propagate
-// exitCode without using them.
-func parallelGitignoreAndPrograms(
-	rslintConfig rslintconfig.RslintConfig,
-	configDir string,
-	fsys vfs.FS,
-	singleThreaded bool,
-	seenTsConfigs map[string]struct{},
-	parseCache *utils.ParseCache,
-) (rslintconfig.RslintConfig, []*compiler.Program, int) {
-	configIgnores := rslintconfig.ExtractConfigIgnores(rslintConfig)
-
-	var (
-		gitGlobs []string
-		progs    []*compiler.Program
-		exitCode int
-	)
-	// gitignore reading and program creation are independent
-	// (createProgramsForConfig only reads parserOptions.project, never Ignores),
-	// so run them on the shared WorkGroup — which honors --singleThreaded the
-	// same way the lint and type-check phases do.
-	wg := core.NewWorkGroup(singleThreaded)
-	wg.Queue(func() {
-		gitGlobs = rslintconfig.ReadGitignoreAsGlobs(configDir, fsys, configIgnores)
-	})
-	wg.Queue(func() {
-		progs, exitCode = createProgramsForConfig(configDir, rslintConfig, singleThreaded, fsys, seenTsConfigs, parseCache)
-	})
-	wg.RunAndWait()
-
-	if exitCode != 0 {
-		return rslintConfig, nil, exitCode
-	}
-	if len(gitGlobs) > 0 {
-		rslintConfig = append(
-			rslintconfig.RslintConfig{{Ignores: gitGlobs}},
-			rslintConfig...,
-		)
-	}
-	return rslintConfig, progs, 0
-}
-
 // createProgramsForConfig creates TypeScript programs for a single config entry.
-// It handles tsconfig extraction, auto-detection, deduplication, and the no-tsconfig fallback.
+// It handles tsconfig extraction, auto-detection, and deduplication.
 // seenTsConfigs is used for cross-config tsconfig deduplication (pass nil to skip).
-// Returns the created programs or an error exit code (> 0).
+// Returns the created programs, whether a tsconfig was found for this config
+// (see DiscoverGapFiles — this gates whether gap-file discovery is a no-op),
+// and an error exit code (> 0).
 func createProgramsForConfig(
 	configDir string,
 	entries rslintconfig.RslintConfig,
@@ -84,68 +27,55 @@ func createProgramsForConfig(
 	fsys vfs.FS,
 	seenTsConfigs map[string]struct{},
 	parseCache *utils.ParseCache,
-) ([]*compiler.Program, int) {
+) ([]*compiler.Program, bool, int) {
 	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, configDir, fsys)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		return nil, 1
+		return nil, false, 1
+	}
+
+	if len(tsConfigs) == 0 {
+		// No tsconfig for this config directory: buildProgramsWithGapFallback's
+		// DiscoverGapFiles call (with hasTsConfig=false) is responsible for
+		// walking configDir and building the fallback Program — there is no
+		// separate "no tsconfig" scan here anymore.
+		return nil, false, 0
 	}
 
 	var programs []*compiler.Program
 	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 
-	if len(tsConfigs) > 0 {
-		for _, tc := range tsConfigs {
-			// Cross-config deduplication
-			if seenTsConfigs != nil {
-				normalized := tspath.NormalizePath(tc)
-				if _, exists := seenTsConfigs[normalized]; exists {
-					continue
-				}
-				seenTsConfigs[normalized] = struct{}{}
+	for _, tc := range tsConfigs {
+		// Cross-config deduplication
+		if seenTsConfigs != nil {
+			normalized := tspath.NormalizePath(tc)
+			if _, exists := seenTsConfigs[normalized]; exists {
+				continue
 			}
+			seenTsConfigs[normalized] = struct{}{}
+		}
 
-			program, err := utils.CreateProgram(singleThreaded, fsys, configDir, tc, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, tspath.ComparePathsOptions{
-					CurrentDirectory:          configDir,
-					UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-				}) {
-					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-				}
-				return nil, 1
+		program, err := utils.CreateProgram(singleThreaded, fsys, configDir, tc, host)
+		if err != nil {
+			w := bufio.NewWriter(os.Stderr)
+			if !reportSyntacticErrors(err, w, tspath.ComparePathsOptions{
+				CurrentDirectory:          configDir,
+				UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
+			}) {
+				fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
 			}
-			programs = append(programs, program)
+			return nil, true, 1
 		}
-	} else {
-		// No tsconfig fallback: scan directory for pure JS projects
-		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
-		excludes := utils.DefaultExcludeDirNames
-		includes := []string{"**/*"}
-		rootFiles := vfsmatch.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, vfsmatch.UnlimitedDepth)
-		if len(rootFiles) > 0 {
-			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, tspath.ComparePathsOptions{
-					CurrentDirectory:          configDir,
-					UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-				}) {
-					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
-				}
-				return nil, 1
-			}
-			programs = append(programs, program)
-		}
+		programs = append(programs, program)
 	}
 
-	return programs, 0
+	return programs, true, 0
 }
 
 // createFallbackProgram creates a Program for "gap" files — files matched by
-// config `files` patterns but not included in any tsconfig. Uses minimal
-// compiler options sufficient for AST parsing (no type checking).
+// config `files` patterns but not included in any tsconfig, or every source
+// file in a project with no tsconfig at all. Uses minimal compiler options
+// sufficient for AST parsing (no type checking).
 func createFallbackProgram(
 	gapFiles []string,
 	singleThreaded bool,
@@ -171,14 +101,16 @@ func createFallbackProgram(
 
 // buildProgramsWithGapFallback discovers "gap" files — files matched by config
 // `files` patterns (or explicitly requested and matched by config) but absent
-// from every tsconfig Program — and appends one AST-only fallback Program for
-// them. It returns the (possibly extended) program slice, the type-info file
-// set, and the gap files retained for --fix rebuilds.
+// from every tsconfig Program, or every source file in a tsconfig-less
+// project — and appends one AST-only fallback Program for them. It returns
+// the (possibly extended) program slice, the type-info file set, the gap
+// files retained for --fix rebuilds, and the rslintConfig/configMap updated
+// with any .gitignore-derived global ignores discovered while walking.
 //
-// The appended fallback Program (like the no-tsconfig directory-scan Program)
-// carries synthesized CompilerOptions with no ConfigFilePath, which is how
-// buildTypeCheckSkipMask later recognizes and excludes it from the CLI
-// --type-check phase — no index needs to be threaded out of here.
+// The appended fallback Program carries synthesized CompilerOptions with no
+// ConfigFilePath, which is how buildTypeCheckSkipMask later recognizes and
+// excludes it from the CLI --type-check phase — no index needs to be
+// threaded out of here.
 //
 // The type-info set is captured from the tsconfig Programs BEFORE the fallback
 // is appended, so fallback files are deliberately absent from it. That absence
@@ -191,7 +123,16 @@ func createFallbackProgram(
 //
 // configMap is non-nil only in the multi-config (stdin) path; the --api and
 // single-config paths pass nil and resolve against rslintConfig +
-// currentDirectory.
+// currentDirectory. hasTsConfig / hasTsConfigByDir mirror that split: exactly
+// one of them is consulted, matching which of rslintConfig/configMap is live.
+//
+// Callers MUST use the returned rslintConfig/configMap (not their pre-call
+// values) for anything downstream — buildFileFilters, RunLinter, and any
+// --fix rebuild — so that files excluded by a discovered .gitignore rule
+// (even ones already inside a tsconfig Program) are correctly filtered out
+// of lint results. The .gitignore-derived entry is prepended (not appended)
+// to preserve existing negation precedence: gitignore rules first, user
+// config `ignores` after, so a user's `!` can override a gitignore rule.
 func buildProgramsWithGapFallback(
 	programs []*compiler.Program,
 	configMap map[string]rslintconfig.RslintConfig,
@@ -202,17 +143,51 @@ func buildProgramsWithGapFallback(
 	allowDirs []string,
 	parseCache *utils.ParseCache,
 	singleThreaded bool,
-) ([]*compiler.Program, map[string]struct{}, []string) {
-	var typeInfoFiles map[string]struct{}
-	var capturedGapFiles []string
-
+	hasTsConfig bool,
+	hasTsConfigByDir map[string]bool,
+) (
+	resultPrograms []*compiler.Program,
+	typeInfoFiles map[string]struct{},
+	capturedGapFiles []string,
+	updatedRslintConfig rslintconfig.RslintConfig,
+	updatedConfigMap map[string]rslintconfig.RslintConfig,
+) {
 	programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
 
 	var gapFiles []string
 	if configMap != nil {
-		gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded)
+		var gitignoreGlobsByDir map[string][]string
+		gapFiles, gitignoreGlobsByDir = rslintconfig.DiscoverGapFilesMultiConfig(
+			configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded, hasTsConfigByDir,
+		)
+		if len(gitignoreGlobsByDir) > 0 {
+			updatedConfigMap = make(map[string]rslintconfig.RslintConfig, len(configMap))
+			for dir, cfg := range configMap {
+				updatedConfigMap[dir] = cfg
+			}
+			for dir, globs := range gitignoreGlobsByDir {
+				updatedConfigMap[dir] = append(
+					rslintconfig.RslintConfig{{Ignores: globs}},
+					updatedConfigMap[dir]...,
+				)
+			}
+		} else {
+			updatedConfigMap = configMap
+		}
+		updatedRslintConfig = rslintConfig
 	} else {
-		gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded)
+		var gitignoreGlobs []string
+		gapFiles, gitignoreGlobs = rslintconfig.DiscoverGapFiles(
+			rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded, hasTsConfig,
+		)
+		if len(gitignoreGlobs) > 0 {
+			updatedRslintConfig = append(
+				rslintconfig.RslintConfig{{Ignores: gitignoreGlobs}},
+				rslintConfig...,
+			)
+		} else {
+			updatedRslintConfig = rslintConfig
+		}
 	}
 
 	// Explicit file args bypass config `files` patterns (ESLint behavior):
@@ -233,13 +208,13 @@ func buildProgramsWithGapFallback(
 			}
 			// Check if config would assign any rules to this file.
 			var merged *rslintconfig.MergedConfig
-			if configMap != nil {
-				cfgDir, cfg := rslintconfig.FindNearestConfig(nf, configMap)
+			if updatedConfigMap != nil {
+				cfgDir, cfg := rslintconfig.FindNearestConfig(nf, updatedConfigMap)
 				if cfg != nil {
 					merged = cfg.GetConfigForFile(nf, cfgDir)
 				}
 			} else {
-				merged = rslintConfig.GetConfigForFile(nf, currentDirectory)
+				merged = updatedRslintConfig.GetConfigForFile(nf, currentDirectory)
 			}
 			if merged != nil {
 				gapFiles = append(gapFiles, nf)
@@ -261,7 +236,7 @@ func buildProgramsWithGapFallback(
 		}
 	}
 
-	return programs, typeInfoFiles, capturedGapFiles
+	return programs, typeInfoFiles, capturedGapFiles, updatedRslintConfig, updatedConfigMap
 }
 
 // buildFileOwnerMap determines which config directory "owns" each file across
@@ -362,22 +337,16 @@ func toFileFilters(in []func(string) bool) []linter.FileFilter {
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which
 // programs must be excluded from the type-check phase. A program is skipped
 // when it was NOT built from a real tsconfig on disk — i.e. its CompilerOptions
-// carry no ConfigFilePath. That covers both synthetic-options program kinds:
-//
-//   - the no-tsconfig directory-scan Program (createProgramsForConfig's else
-//     branch), built with default options for a config directory that has no
-//     tsconfig; and
-//   - the gap-file fallback Program (createFallbackProgram).
-//
-// Their options are synthesized, not the user's tsconfig, so semantic
-// diagnostics there are unreliable and must not be surfaced. Concretely, the
-// scan program sets neither Target nor Lib, so its default lib can lack modern
-// globals like Symbol.asyncDispose and emit spurious diagnostics against
-// typings pulled in from node_modules. This mirrors the type-checking boundary:
-// only Programs backed by parserOptions.project or the auto-detected
-// tsconfig.json participate in program-level --type-check diagnostics. Programs
-// built via utils.CreateProgram -> GetParsedCommandLineOfConfigFile carry a
-// non-empty ConfigFilePath.
+// carry no ConfigFilePath. That is the gap-file fallback Program
+// (createFallbackProgram): its options are synthesized, not the user's
+// tsconfig, so semantic diagnostics there are unreliable and must not be
+// surfaced. Concretely, it sets neither Target nor Lib beyond ESNext defaults,
+// so it can lack modern globals or emit spurious diagnostics against typings
+// pulled in from node_modules. This mirrors the type-checking boundary: only
+// Programs backed by parserOptions.project or the auto-detected tsconfig.json
+// participate in program-level --type-check diagnostics. Programs built via
+// utils.CreateProgram -> GetParsedCommandLineOfConfigFile carry a non-empty
+// ConfigFilePath.
 //
 // Returns nil when every program is tsconfig-backed, so callers don't allocate
 // an all-false slice. Deriving from the programs keeps the CLI initial build
