@@ -14,6 +14,10 @@ import {
 import { resolveRslintBinary } from '../internal/resolve-binary.js';
 
 export type RunCLIOptions = {
+  /**
+   * The command-line arguments to parse, matching the shape of Node.js `process.argv`
+   * @default process.argv
+   */
   argv?: string[];
 };
 
