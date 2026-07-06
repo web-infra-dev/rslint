@@ -153,6 +153,218 @@ func TestHasExport(t *testing.T) {
 	}
 }
 
+func TestGetExportMap(t *testing.T) {
+	t.Parallel()
+
+	t.Run("direct exports and export-all namespace alias", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./named-exports")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		for _, name := range []string{"a", "b", "d", "ExportedClass"} {
+			if !exportMap.Has(name) {
+				t.Fatalf("expected export %q to exist", name)
+			}
+		}
+		deep := exportMap.Get("deep")
+		if deep == nil {
+			t.Fatal("expected export-all namespace alias to expose deep")
+		}
+		if deep.Namespace != nil {
+			t.Fatal("expected export-all namespace alias not to carry namespace metadata")
+		}
+	})
+
+	t.Run("star export excludes default", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./re-export")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		if !exportMap.Has("baz") {
+			t.Fatal("expected star export to include baz")
+		}
+		if exportMap.Has("default") {
+			t.Fatal("expected star export not to include default")
+		}
+	})
+
+	t.Run("nested export-all namespace aliases expose names without namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./deep-namespace-chain/entry")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		b := exportMap.Get("b")
+		if b == nil {
+			t.Fatal("expected b namespace export alias")
+		}
+		if b.Namespace != nil {
+			t.Fatal("expected export-all namespace alias not to carry namespace metadata")
+		}
+	})
+
+	t.Run("unresolved star export keeps map open", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./unresolved-star-export")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		if !exportMap.Has("anything") {
+			t.Fatal("expected unresolved star export to make unknown names valid")
+		}
+		if exportMap.Get("anything") != nil {
+			t.Fatal("expected unknown export to have no namespace metadata")
+		}
+	})
+
+	t.Run("ambient namespace declaration exposes name without namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./typescript-ambient-namespace")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		ambient := exportMap.Get("ambient")
+		if ambient == nil {
+			t.Fatal("expected ambient namespace export")
+		}
+		if ambient.Namespace != nil {
+			t.Fatal("expected ambient namespace declaration not to carry namespace metadata")
+		}
+	})
+
+	t.Run("string literal default export name", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-export-string")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		if !exportMap.Has("default") {
+			t.Fatal("expected string-literal default export to be visible")
+		}
+	})
+
+	t.Run("string literal namespace export name exposes default without namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-export-namespace-string")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		def := exportMap.Get("default")
+		if def == nil {
+			t.Fatal("expected string-literal namespace default to be visible")
+		}
+		if def.Namespace != nil {
+			t.Fatal("expected string-literal namespace default not to carry namespace metadata")
+		}
+	})
+
+	t.Run("default export of namespace import carries namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-from-namespace-import")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		def := exportMap.Get("default")
+		if def == nil || def.Namespace == nil || !def.Namespace.Has("a") {
+			t.Fatal("expected default export of namespace import to expose a")
+		}
+	})
+
+	t.Run("declaration default export of namespace import carries namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-from-namespace-import-declaration")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		def := exportMap.Get("default")
+		if def == nil || def.Namespace == nil || !def.Namespace.Has("a") {
+			t.Fatal("expected declaration default export of namespace import to expose a")
+		}
+	})
+
+	t.Run("default export of default import does not carry namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./default-chain-from-namespace-import")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		def := exportMap.Get("default")
+		if def == nil {
+			t.Fatal("expected default export to be visible")
+		}
+		if def.Namespace != nil {
+			t.Fatal("expected default-import re-export not to carry namespace metadata")
+		}
+	})
+
+	t.Run("local export of namespace import carries namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./namespace-import-local-reexport")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		forwarded := exportMap.Get("forwarded")
+		if forwarded == nil || forwarded.Namespace == nil || !forwarded.Namespace.Has("a") {
+			t.Fatal("expected local namespace import re-export to expose a")
+		}
+	})
+
+	t.Run("source re-export preserves remote namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./namespace-import-source-reexport")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		forwarded := exportMap.Get("forwardedAgain")
+		if forwarded == nil || forwarded.Namespace == nil || !forwarded.Namespace.Has("a") {
+			t.Fatal("expected source re-export to preserve namespace metadata")
+		}
+	})
+
+	t.Run("local export of namespace-valued named import does not carry namespace metadata", func(t *testing.T) {
+		t.Parallel()
+
+		ctx, specifier := contextForImport(t, "./namespace-import-local-reexport-chain")
+		exportMap, ok := import_utils.GetExportMap(ctx, specifier)
+		if !ok {
+			t.Fatal("GetExportMap returned no map")
+		}
+		forwarded := exportMap.Get("forwardedLocal")
+		if forwarded == nil {
+			t.Fatal("expected local re-export to be visible")
+		}
+		if forwarded.Namespace != nil {
+			t.Fatal("expected named-import re-export not to carry namespace metadata")
+		}
+	})
+}
+
 func TestHasDefaultExportRespectsESModuleInterop(t *testing.T) {
 	t.Parallel()
 

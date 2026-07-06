@@ -128,6 +128,7 @@ export default defineConfig({
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/default.test.ts',
     './tests/eslint-plugin-import/rules/first.test.ts',
+    './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
