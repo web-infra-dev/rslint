@@ -12,7 +12,7 @@ export function parseArgs(argv: string[]) {
     strict: false,
     tokens: true,
     options: {
-      config: { type: 'string' },
+      config: { type: 'string', short: 'c' },
       init: { type: 'boolean' },
       // Detected so the JS host can size the ESLint-plugin worker pool to a
       // single worker. NOT skipped below, so it still forwards to Go in
