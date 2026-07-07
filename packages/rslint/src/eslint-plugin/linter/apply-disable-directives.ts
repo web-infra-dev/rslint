@@ -142,10 +142,7 @@ function collectDirectives(
     // `global`, `globals`, `exported` — none of those affect
     // diagnostic suppression, so we skip silently.
     let kind:
-      | 'block-disable'
-      | 'block-enable'
-      | 'line-disable'
-      | 'line-next-disable';
+      'block-disable' | 'block-enable' | 'line-disable' | 'line-next-disable';
     switch (parsed.label) {
       case 'eslint-disable':
       case 'rslint-disable':

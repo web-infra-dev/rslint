@@ -118,13 +118,13 @@ describe('WorkerPool respawn rejection drains pendingQueue', () => {
     //    in well under the cap.
     const TIMEOUT_MS = 3000;
     type Outcome =
-      | { tag: 'sibling'; parseError: string | undefined }
-      | { tag: 'timeout' };
+      { tag: 'sibling'; parseError: string | undefined } | { tag: 'timeout' };
 
     const outcome: Outcome = await Promise.race([
-      siblingPromise.then(
-        (r): Outcome => ({ tag: 'sibling', parseError: r[0].parseError }),
-      ),
+      siblingPromise.then((r): Outcome => ({
+        tag: 'sibling',
+        parseError: r[0].parseError,
+      })),
       new Promise<Outcome>((r) =>
         setTimeout(() => r({ tag: 'timeout' }), TIMEOUT_MS),
       ),
@@ -1922,13 +1922,13 @@ describe('drainQueueIfAllSlotsDegraded does not fire during mid-respawn', () => 
     // Wait for sibling outcome.
     const TIMEOUT_MS = 8000;
     type Outcome =
-      | { tag: 'sibling'; parseError: string | undefined }
-      | { tag: 'timeout' };
+      { tag: 'sibling'; parseError: string | undefined } | { tag: 'timeout' };
 
     const outcome: Outcome = await Promise.race([
-      sibling.then(
-        (r): Outcome => ({ tag: 'sibling', parseError: r[0].parseError }),
-      ),
+      sibling.then((r): Outcome => ({
+        tag: 'sibling',
+        parseError: r[0].parseError,
+      })),
       new Promise<Outcome>((r) =>
         setTimeout(() => r({ tag: 'timeout' }), TIMEOUT_MS),
       ),

@@ -145,8 +145,7 @@ describe('oxc-parser native TSEnumDeclaration shape', () => {
     const enumDecl = program.body.find(
       (n) => n.type === 'TSEnumDeclaration',
     ) as unknown as
-      | { body: { type: string; members: ESTreeNode[] } }
-      | undefined;
+      { body: { type: string; members: ESTreeNode[] } } | undefined;
     expect(enumDecl).toBeDefined();
 
     const body = enumDecl!.body;

@@ -16,10 +16,7 @@
  * variations; we read defensively.
  */
 export type RuleSchema =
-  | readonly RuleSchemaEntry[]
-  | RuleSchemaEntry
-  | undefined
-  | null;
+  readonly RuleSchemaEntry[] | RuleSchemaEntry | undefined | null;
 
 export interface RuleSchemaEntry {
   type?: string;

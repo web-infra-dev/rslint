@@ -278,8 +278,7 @@ export function getScopeForNode(
     curr = curr.parent
   ) {
     const scope = sm.acquire(curr, inner) as
-      | { type?: string; childScopes?: unknown[] }
-      | undefined;
+      { type?: string; childScopes?: unknown[] } | undefined;
     if (scope) {
       if (scope.type === 'function-expression-name') {
         return (scope.childScopes ?? [])[0] ?? scope;

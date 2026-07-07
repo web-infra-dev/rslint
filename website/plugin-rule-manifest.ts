@@ -28,8 +28,7 @@ function resolvePresetConfig(
   presetName: string,
 ): RslintConfigEntry | undefined {
   const mod = (rslintCore as Record<string, unknown>)[importName] as
-    | { configs?: Record<string, RslintConfigEntry> }
-    | undefined;
+    { configs?: Record<string, RslintConfigEntry> } | undefined;
   const prefix = `${importName}.configs.`;
   if (!presetName.startsWith(prefix)) return undefined;
   const configKey = presetName.slice(prefix.length);
