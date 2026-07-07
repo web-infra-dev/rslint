@@ -45,36 +45,6 @@ function Button({ color, children }) {
 }
 ```
 
-## Options
-
-```json
-{
-  "react-hooks/component-hook-factories": [
-    "error",
-    {
-      "environment": {
-        "hookPattern": "^signal[A-Z]"
-      }
-    }
-  ]
-}
-```
-
-- `environment.hookPattern`: A JavaScript regular expression pattern for
-  custom Hook names. Function names that match this pattern are treated as
-  Hooks when the rule classifies nested factories. When omitted or invalid,
-  the rule falls back to React's default Hook naming convention.
-
-Examples of **incorrect** code for this rule with `{ "environment": { "hookPattern": "^signal[A-Z]" } }`:
-
-```javascript
-function createSignalHook(source) {
-  return function signalValue() {
-    return signalRead(source);
-  };
-}
-```
-
 ## Original Documentation
 
 - [react.dev — component-hook-factories](https://react.dev/reference/eslint-plugin-react-hooks/lints/component-hook-factories)

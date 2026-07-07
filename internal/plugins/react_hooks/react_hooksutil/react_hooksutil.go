@@ -17,7 +17,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -28,10 +27,6 @@ const (
 	CompilerReactFunctionComponent CompilerReactFunctionType = "Component"
 	CompilerReactFunctionHook      CompilerReactFunctionType = "Hook"
 )
-
-type CompilerFunctionOptions struct {
-	HookPattern *regexp2.Regexp
-}
 
 // hookNameTailRegex matches the suffix part of a hook identifier:
 // after the leading `use`, the next character must be uppercase Latin
@@ -158,24 +153,18 @@ func IsHookCallee(node *ast.Node) bool {
 
 // IsCompilerHookCallee is the React Compiler variant of IsHookCallee:
 // it accepts `useFoo` / `Namespace.useFoo`, but not the bare `use`.
-func IsCompilerHookCallee(node *ast.Node, hookPattern *regexp2.Regexp) bool {
+func IsCompilerHookCallee(node *ast.Node) bool {
 	if node == nil {
 		return false
-	}
-	isHookName := func(name string) bool {
-		if hookPattern != nil {
-			return utils.Regexp2MatchString(hookPattern, name)
-		}
-		return IsCompilerHookName(name)
 	}
 	n := ast.SkipParentheses(node)
 	switch n.Kind {
 	case ast.KindIdentifier:
-		return isHookName(n.AsIdentifier().Text)
+		return IsCompilerHookName(n.AsIdentifier().Text)
 	case ast.KindPropertyAccessExpression:
 		pae := n.AsPropertyAccessExpression()
 		prop := pae.Name()
-		if prop == nil || prop.Kind != ast.KindIdentifier || !isHookName(prop.AsIdentifier().Text) {
+		if prop == nil || prop.Kind != ast.KindIdentifier || !IsCompilerHookName(prop.AsIdentifier().Text) {
 			return false
 		}
 		obj := ast.SkipParentheses(pae.Expression)
@@ -199,25 +188,25 @@ func IsCompilerFunctionKind(node *ast.Node) bool {
 // directly creates JSX or calls a hook, has component-like parameters, and does
 // not return obviously non-ReactNode values; a hook-like function must directly
 // create JSX or call a hook; memo/forwardRef callbacks are components.
-func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) CompilerReactFunctionType {
+func GetCompilerReactFunctionType(fn *ast.Node) CompilerReactFunctionType {
 	name := GetFunctionName(fn)
 	if name != nil && name.Kind == ast.KindIdentifier && IsComponentNameStr(name.AsIdentifier().Text) {
-		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) &&
+		if CallsHooksOrCreatesJsx(fn) &&
 			IsValidCompilerComponentParams(fn) &&
 			!ReturnsCompilerNonNode(fn) {
 			return CompilerReactFunctionComponent
 		}
 		return ""
 	}
-	if name != nil && IsCompilerHookCallee(name, opts.HookPattern) {
-		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+	if name != nil && IsCompilerHookCallee(name) {
+		if CallsHooksOrCreatesJsx(fn) {
 			return CompilerReactFunctionHook
 		}
 		return ""
 	}
 	if ast.IsFunctionExpressionOrArrowFunction(fn) {
 		if IsForwardRefOrMemoCallback(fn, "forwardRef") || IsForwardRefOrMemoCallback(fn, "memo") {
-			if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+			if CallsHooksOrCreatesJsx(fn) {
 				return CompilerReactFunctionComponent
 			}
 		}
@@ -228,7 +217,7 @@ func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) Co
 // CallsHooksOrCreatesJsx reports whether `fn` directly creates JSX or directly
 // calls a compiler hook. Nested function bodies are skipped, matching React
 // Compiler's traversal boundary.
-func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
+func CallsHooksOrCreatesJsx(fn *ast.Node) bool {
 	found := false
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
@@ -243,7 +232,7 @@ func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
 			return
 		}
 		if ast.IsCallExpression(node) {
-			if IsCompilerHookCallee(node.AsCallExpression().Expression, hookPattern) {
+			if IsCompilerHookCallee(node.AsCallExpression().Expression) {
 				found = true
 				return
 			}
