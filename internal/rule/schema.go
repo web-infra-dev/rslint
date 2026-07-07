@@ -20,8 +20,10 @@ type CompiledSchema struct {
 // invalid). See the <rule-name>.schema.json convention.
 //
 // rslint only supports Draft 4 — the draft under which a plain array `items`
-// means positional/tuple validation — so authored schema.json files must not
-// declare a newer `$schema`.
+// means positional/tuple validation — so this is a convention for our own
+// authored schema.json files, not a constraint CompileSchema enforces: an
+// explicit `$schema` declaring a newer draft would compile fine, just under
+// that draft's (different) `items` semantics.
 //
 // Each call compiles against its own private jsonschema.Compiler, so a
 // `$ref` in one rule's schema can never resolve into another rule's `$defs`
