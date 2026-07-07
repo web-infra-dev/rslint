@@ -1,0 +1,546 @@
+[
+  {
+    "name": "object_property_defaults_fill_missing_keys",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "strict": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "strict": false
+      }
+    ],
+    "output": [
+      {
+        "strict": false,
+        "allow": []
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "object_property_defaults_fill_all_when_empty",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            },
+            "strict": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "allow": [],
+        "strict": true
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "no_options_provided_first_tuple_item_filled_from_default",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": []
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [],
+    "output": [
+      {
+        "allow": []
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "multiple_trailing_tuple_items_filled_from_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string",
+          "default": "a"
+        },
+        {
+          "type": "number",
+          "default": 1
+        },
+        {
+          "type": "boolean",
+          "default": true
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 3
+    },
+    "input": ["given"],
+    "output": ["given", 1, true],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "later_tuple_item_default_fills_creating_gap",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number",
+          "default": 42
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 2
+    },
+    "input": [],
+    "output": [null, 42],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "type",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/type",
+        "params": {
+          "type": "string"
+        },
+        "message": "should be string",
+        "schema": "string",
+        "parentSchema": {
+          "type": "string"
+        }
+      }
+    ]
+  },
+  {
+    "name": "nested_object_in_object_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "outer": {
+              "type": "object",
+              "properties": {
+                "inner": {
+                  "type": "string",
+                  "default": "fallback"
+                }
+              },
+              "additionalProperties": false,
+              "default": {}
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "outer": {
+          "inner": "fallback"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "nested_object_in_tuple_item_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "level": {
+              "type": "string",
+              "default": "warn"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 1,
+      "maxItems": 2
+    },
+    "input": ["first", {}],
+    "output": [
+      "first",
+      {
+        "level": "warn"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "existing_property_is_not_overwritten",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": ["x"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": ["y"]
+      }
+    ],
+    "output": [
+      {
+        "allow": ["y"]
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "explicit_null_is_not_overwritten_by_default",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": ["array", "null"],
+              "default": ["x"]
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": null
+      }
+    ],
+    "output": [
+      {
+        "allow": null
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "oneOf_default_not_applied_inside_composite_rule",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "a"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "b"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [{}],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "oneOf",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/oneOf",
+        "params": {
+          "passingSchemas": [0, 1]
+        },
+        "message": "should match exactly one schema in oneOf",
+        "schema": [
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "default": "a"
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "const": "b"
+              }
+            },
+            "additionalProperties": false
+          }
+        ],
+        "parentSchema": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "a"
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "mode": {
+                  "const": "b"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "data": {}
+      }
+    ]
+  },
+  {
+    "name": "list_style_items_default_not_applied_per_element",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "default": "x"
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [["a"]],
+    "output": [["a"]],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "no_defaults_needed_output_unchanged",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "output": [
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "empty_options_array_with_no_items_schema_stays_empty",
+    "schema": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "input": [],
+    "output": [],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "defaults_still_applied_when_result_is_invalid",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "unknown": true
+      }
+    ],
+    "output": [
+      {
+        "unknown": true,
+        "allow": []
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "additionalProperties",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/additionalProperties",
+        "params": {
+          "additionalProperty": "unknown"
+        },
+        "message": "should NOT have additional properties",
+        "schema": false,
+        "parentSchema": {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "default": []
+            }
+          },
+          "additionalProperties": false
+        },
+        "data": {
+          "unknown": true,
+          "allow": []
+        }
+      }
+    ]
+  },
+  {
+    "name": "numeric_default_type",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "max": {
+              "type": "number",
+              "default": 3.5
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [{}],
+    "output": [
+      {
+        "max": 3.5
+      }
+    ],
+    "valid": true,
+    "errors": null
+  }
+]
