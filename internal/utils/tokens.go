@@ -5,6 +5,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
@@ -13,6 +14,11 @@ type SourceToken struct {
 	Kind       ast.Kind
 	Start, End int
 	Text       string
+}
+
+// Range returns the token's source span.
+func (t SourceToken) Range() core.TextRange {
+	return core.NewTextRange(t.Start, t.End)
 }
 
 // TokensOfNode returns all parser tokens contained in node, in source order.
