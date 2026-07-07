@@ -204,7 +204,7 @@ func (state *globalsState) activeFunctionKind(fn *ast.Node) activeFunctionKind {
 }
 
 func isCompilerRenderFunction(fn *ast.Node) bool {
-	return react_hooksutil.GetCompilerReactFunctionType(fn, react_hooksutil.CompilerFunctionOptions{}) != ""
+	return react_hooksutil.GetCompilerReactFunctionType(fn) != ""
 }
 
 func isNonRenderCallback(fn *ast.Node) bool {

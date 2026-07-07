@@ -123,18 +123,14 @@ function makeComputedHook() {
   };
 }
 		`, Tsx: true},
-		// ---- Branch lock-in: malformed hookPattern is ignored like upstream option parsing ----
-		{
-			Code: `
+		// ---- Upstream parity: non-use factory names are not custom Hooks. ----
+		{Code: `
 function createSignalHook(source) {
   return function signalValue() {
     return signalRead(source);
   };
 }
-			`,
-			Tsx:     true,
-			Options: map[string]interface{}{"environment": map[string]interface{}{"hookPattern": "["}},
-		},
+		`, Tsx: true},
 		// ---- Dimension 4: class declarations/expressions are skipped by the React Compiler traversal ----
 		{Code: `
 class Holder {
@@ -365,32 +361,6 @@ function createWrapped(kind) {
 				{MessageId: "componentHookFactory"},
 				{MessageId: "componentHookFactory"},
 			},
-		},
-		// ---- Dimension 4: custom hookPattern option ----
-		{
-			Code: `
-function createSignalHook(source) {
-  return function signalValue() {
-    return signalRead(source);
-  };
-}
-			`,
-			Tsx:     true,
-			Options: map[string]interface{}{"environment": map[string]interface{}{"hookPattern": "(?=signal)signal[A-Z]"}},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "componentHookFactory"}},
-		},
-		// ---- Branch lock-in: array-wrapped hookPattern option matches context.options shape ----
-		{
-			Code: `
-function createTrackedHook(source) {
-  return function trackValue() {
-    return trackRead(source);
-  };
-}
-			`,
-			Tsx:     true,
-			Options: []interface{}{map[string]interface{}{"environment": map[string]interface{}{"hookPattern": "^track[A-Z]"}}},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "componentHookFactory"}},
 		},
 		// ---- Real-user: library helper that returns an endpoint hook ----
 		{
