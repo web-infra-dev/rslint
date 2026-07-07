@@ -617,7 +617,7 @@ Usage:
 
 Options:
   --init                Initialize a default config in the current directory.
-  --config PATH         Which rslint config file to use.
+  -c, --config PATH     Which rslint config file to use.
   --format FORMAT       Output format: default | jsonline | github | gitlab
   --fix                 Automatically fix problems
   --type-check          Enable TypeScript type checking
@@ -832,6 +832,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 
 	fs.StringVar(&args.Format, "format", "default", "output format")
 	fs.StringVar(&args.Config, "config", "", "which rslint config to use")
+	fs.StringVar(&args.Config, "c", "", "which rslint config to use")
 	fs.BoolVar(&args.ConfigStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	fs.BoolVar(&args.Init, "init", false, "initialize a default config in the current directory")
 	fs.BoolVar(&args.Fix, "fix", false, "automatically fix problems")

@@ -243,6 +243,15 @@ describe('parseArgs positionals', () => {
     expect(result.positionals).toEqual(['src/a.ts']);
   });
 
+  test('-c is parsed as --config and excluded from rest', () => {
+    const result = parseArgs(['-c', 'custom.js', 'src/a.ts']);
+    expect(result.config).toBe('custom.js');
+    expect(result.rest).not.toContain('-c');
+    expect(result.rest).not.toContain('custom.js');
+    expect(result.rest).toContain('src/a.ts');
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
   test('--start-time is excluded from rest', () => {
     const result = parseArgs(['--start-time', '1234567890', 'src/a.ts']);
     expect(result.rest).not.toContain('--start-time');
