@@ -380,7 +380,8 @@ func jestEmptyFunctionName(kind jestUtils.JestFnType) string {
 // ValidTitleRule enforces ESLint jest/valid-title.
 var ValidTitleRule = rule.Rule{
 	Name: "jest/valid-title",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		co := parseCompiledOptions(options)
 		if len(co.invalidPatterns) > 0 {
 			for _, bad := range co.invalidPatterns {

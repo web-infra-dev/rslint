@@ -28,7 +28,7 @@ var disambiguationExtensions = []string{tspath.ExtensionCts, tspath.ExtensionMts
 
 var NoUnnecessaryTypeConstraintRule = rule.CreateRule(rule.Rule{
 	Name: "no-unnecessary-type-constraint",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		needsDisambiguation := tspath.FileExtensionIsOneOf(ctx.SourceFile.FileName(), disambiguationExtensions)
 		text := ctx.SourceFile.Text()
 

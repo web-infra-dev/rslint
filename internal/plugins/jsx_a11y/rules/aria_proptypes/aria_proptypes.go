@@ -212,7 +212,7 @@ func permittedValuesContainsString(values []any, candidate string) bool {
 
 var AriaProptypesRule = rule.Rule{
 	Name: "jsx-a11y/aria-proptypes",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				rawName := reactutil.GetJsxPropName(attr)

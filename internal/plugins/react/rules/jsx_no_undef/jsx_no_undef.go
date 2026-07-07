@@ -11,7 +11,7 @@ import (
 
 var JsxNoUndefRule = rule.Rule{
 	Name: "react/jsx-no-undef",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		check := func(element *ast.Node) {
 			tagName := reactutil.GetJsxTagName(element)
 			if tagName == nil {

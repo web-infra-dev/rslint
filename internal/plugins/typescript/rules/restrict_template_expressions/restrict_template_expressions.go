@@ -24,7 +24,8 @@ var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	options := rule.UnwrapOptions(_options)
 	opts := RestrictTemplateExpressionsOptions{
 		AllowNumber:  false,
 		AllowBoolean: false,

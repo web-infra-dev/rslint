@@ -13,7 +13,8 @@ type Options struct {
 
 var NoVarRequiresRule = rule.CreateRule(rule.Rule{
 	Name: "no-var-requires",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := &Options{}
 		if options != nil {
 			if optMap, ok := options.(map[string]interface{}); ok {

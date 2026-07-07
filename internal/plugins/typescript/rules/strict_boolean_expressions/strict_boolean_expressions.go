@@ -28,27 +28,27 @@ import (
 // number / nullable-object default to `true`, everything else defaults to
 // `false`.
 type Options struct {
-	AllowAny                                                 *bool `json:"allowAny"`
-	AllowNullableBoolean                                     *bool `json:"allowNullableBoolean"`
-	AllowNullableEnum                                        *bool `json:"allowNullableEnum"`
-	AllowNullableNumber                                      *bool `json:"allowNullableNumber"`
-	AllowNullableObject                                      *bool `json:"allowNullableObject"`
-	AllowNullableString                                      *bool `json:"allowNullableString"`
-	AllowNumber                                              *bool `json:"allowNumber"`
-	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing   *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"`
-	AllowString                                              *bool `json:"allowString"`
+	AllowAny                                               *bool `json:"allowAny"`
+	AllowNullableBoolean                                   *bool `json:"allowNullableBoolean"`
+	AllowNullableEnum                                      *bool `json:"allowNullableEnum"`
+	AllowNullableNumber                                    *bool `json:"allowNullableNumber"`
+	AllowNullableObject                                    *bool `json:"allowNullableObject"`
+	AllowNullableString                                    *bool `json:"allowNullableString"`
+	AllowNumber                                            *bool `json:"allowNumber"`
+	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing"`
+	AllowString                                            *bool `json:"allowString"`
 }
 
 type resolvedOptions struct {
-	allowAny                                                 bool
-	allowNullableBoolean                                     bool
-	allowNullableEnum                                        bool
-	allowNullableNumber                                      bool
-	allowNullableObject                                      bool
-	allowNullableString                                      bool
-	allowNumber                                              bool
-	allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing   bool
-	allowString                                              bool
+	allowAny                                               bool
+	allowNullableBoolean                                   bool
+	allowNullableEnum                                      bool
+	allowNullableNumber                                    bool
+	allowNullableObject                                    bool
+	allowNullableString                                    bool
+	allowNumber                                            bool
+	allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing bool
+	allowString                                            bool
 }
 
 func parseOptions(options any) resolvedOptions {
@@ -129,10 +129,10 @@ const (
 
 type variantSet map[variantType]struct{}
 
-func newVariantSet() variantSet                  { return variantSet{} }
-func (s variantSet) add(v variantType)           { s[v] = struct{}{} }
-func (s variantSet) has(v variantType) bool      { _, ok := s[v]; return ok }
-func (s variantSet) size() int                   { return len(s) }
+func newVariantSet() variantSet             { return variantSet{} }
+func (s variantSet) add(v variantType)      { s[v] = struct{}{} }
+func (s variantSet) has(v variantType) bool { _, ok := s[v]; return ok }
+func (s variantSet) size() int              { return len(s) }
 
 // ----- Messages ---------------------------------------------------------
 
@@ -279,7 +279,8 @@ func sugDefaultZero() rule.RuleMessage {
 var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 	Name:             "strict-boolean-expressions",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, optionsRaw any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _optionsRaw []any) rule.RuleListeners {
+		optionsRaw := rule.UnwrapOptions(_optionsRaw)
 		opts := parseOptions(optionsRaw)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile

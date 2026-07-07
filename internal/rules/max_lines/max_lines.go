@@ -16,7 +16,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-lines
 var MaxLinesRule = rule.Rule{
 	Name: "max-lines",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		// The linter never fires a KindSourceFile listener, so run eagerly.
 		checkMaxLines(ctx, options)
 		return rule.RuleListeners{}
@@ -60,7 +61,6 @@ func parseOptions(opts any) maxLinesOptions {
 	}
 	return result
 }
-
 
 func checkMaxLines(ctx rule.RuleContext, options any) {
 	opts := parseOptions(options)

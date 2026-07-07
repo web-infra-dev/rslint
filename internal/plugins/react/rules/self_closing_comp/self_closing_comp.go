@@ -12,7 +12,8 @@ import (
 
 var SelfClosingCompRule = rule.Rule{
 	Name: "react/self-closing-comp",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		checkComponent := true
 		checkHTML := true
 

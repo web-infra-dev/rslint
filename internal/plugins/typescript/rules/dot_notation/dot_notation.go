@@ -164,7 +164,8 @@ func literalKey(n *ast.Node) (string, bool) {
 var DotNotationRule = rule.CreateRule(rule.Rule{
 	Name:             "dot-notation",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		// ECMAScript + Unicode flags mirror ESLint's `new RegExp(pattern, 'u')`
 		// so user patterns using lookaround, backreferences, or `\p{...}` work

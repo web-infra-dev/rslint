@@ -52,7 +52,7 @@ func errorMessage(invalidProp string) string {
 
 var AriaUnsupportedElementsRule = rule.Rule{
 	Name: "jsx-a11y/aria-unsupported-elements",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			nodeType := jsxa11yutil.GetElementType(node, ctx.Settings)
 			if _, reserved := reservedElements[nodeType]; !reserved {

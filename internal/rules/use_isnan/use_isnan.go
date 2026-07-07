@@ -11,7 +11,9 @@ import (
 // unwrapToValue strips parentheses (any depth), resolves at most one level
 // of comma expression (taking the last element), then strips parentheses again.
 // This matches ESLint's isNaNIdentifier which does:
-//   node.type === "SequenceExpression" ? node.expressions.at(-1) : node
+//
+//	node.type === "SequenceExpression" ? node.expressions.at(-1) : node
+//
 // In ESTree parentheses are not AST nodes, but in tsgo they are, so we must
 // strip them before and after the comma resolution.
 func unwrapToValue(node *ast.Node) *ast.Node {
@@ -86,7 +88,8 @@ func parseOptions(opts any) useIsNaNOptions {
 // UseIsNaNRule requires calls to isNaN() when checking for NaN
 var UseIsNaNRule = rule.Rule{
 	Name: "use-isnan",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// Comparison operators to check

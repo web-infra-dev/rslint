@@ -119,7 +119,7 @@ func parseOptions(options any) Options {
 	return opts
 }
 
-// nullishCheckOperator: '!', '!=', '!==', '', '==', '==='
+// nullishCheckOperator: '!', '!=', '!==', ”, '==', '==='
 type nullishCheckOperator string
 
 const (
@@ -1035,7 +1035,8 @@ func getTypeFlags(t *checker.Type) checker.TypeFlags {
 var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-nullish-coalescing",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		compilerOptions := ctx.Program.Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.StrictNullChecks)

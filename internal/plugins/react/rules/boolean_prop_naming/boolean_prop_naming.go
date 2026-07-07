@@ -97,7 +97,8 @@ func renderTemplate(tmpl string, data map[string]string) string {
 // single-level lookup for unresolvable references).
 const resolveDepth = 8
 
-func runRule(ctx rule.RuleContext, input any) rule.RuleListeners {
+func runRule(ctx rule.RuleContext, _input []any) rule.RuleListeners {
+	input := rule.UnwrapOptions(_input)
 	opts := parseOptions(input)
 	// Upstream: `const rule = config.rule ? new RegExp(config.rule) : null;`
 	// followed by `if (!rule) return;` in every listener.

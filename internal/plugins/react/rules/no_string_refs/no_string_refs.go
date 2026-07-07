@@ -9,7 +9,8 @@ import (
 
 var NoStringRefsRule = rule.Rule{
 	Name: "react/no-string-refs",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		detectTemplateLiterals := false
 		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
 			if v, ok := optsMap["noTemplateLiterals"].(bool); ok {

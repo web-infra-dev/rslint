@@ -122,7 +122,8 @@ func (o *NoMisusedPromisesOptions) UnmarshalJSON(data []byte) error {
 var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-promises",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts, ok := options.(NoMisusedPromisesOptions)
 		if !ok {
 			opts = NoMisusedPromisesOptions{}

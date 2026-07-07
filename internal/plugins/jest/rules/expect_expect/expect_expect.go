@@ -179,7 +179,8 @@ func checkCallExpressionUsed(
 
 var ExpectExpectRule = rule.Rule{
 	Name: "jest/expect-expect",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		assertNames, additionalTestBlocks := parseOptions(options)
 		compiled := compileAssertPatterns(assertNames)
 		var unchecked []*ast.Node

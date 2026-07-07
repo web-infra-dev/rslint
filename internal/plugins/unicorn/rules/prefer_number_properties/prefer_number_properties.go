@@ -44,7 +44,8 @@ var globalObjectNames = map[string]struct{}{
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-number-properties.md
 var PreferNumberPropertiesRule = rule.Rule{
 	Name: "unicorn/prefer-number-properties",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		report := func(ref globalReference) {

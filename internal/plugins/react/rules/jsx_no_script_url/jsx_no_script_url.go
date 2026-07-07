@@ -22,7 +22,8 @@ const noScriptURLMessage = "A future version of React will block javascript: URL
 
 var JsxNoScriptUrlRule = rule.Rule{
 	Name: "react/jsx-no-script-url",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		config := parseConfig(options, ctx.Settings)
 
 		return rule.RuleListeners{

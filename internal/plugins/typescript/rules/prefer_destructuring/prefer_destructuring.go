@@ -127,7 +127,8 @@ const precedenceOfAssignmentExpr = 1
 var PreferDestructuringRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-destructuring",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

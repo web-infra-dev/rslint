@@ -35,7 +35,7 @@ type sourceItem struct {
 
 var NoUnusedPrivateClassMembersRule = rule.Rule{
 	Name: "no-unused-private-class-members",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var stack []*classMembers
 		var sourceItems []sourceItem
 

@@ -28,7 +28,8 @@ func parseOptions(opts any) options {
 var NoUndefRule = rule.Rule{
 	Name:             "no-undef",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for

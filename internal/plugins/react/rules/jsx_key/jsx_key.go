@@ -33,7 +33,8 @@ func parseOptions(raw any) options {
 
 var JsxKeyRule = rule.Rule{
 	Name: "react/jsx-key",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		reactPragma := reactutil.GetReactPragma(ctx.Settings)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)

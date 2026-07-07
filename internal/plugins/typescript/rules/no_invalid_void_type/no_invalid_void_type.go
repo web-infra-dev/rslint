@@ -248,7 +248,8 @@ func hasOverloadSignatures(ctx rule.RuleContext, node *ast.Node) bool {
 
 var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
 	Name: "no-invalid-void-type",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := NoInvalidVoidTypeOptions{
 			AllowInGenericTypeArguments: true,
 			AllowAsThisParameter:        false,

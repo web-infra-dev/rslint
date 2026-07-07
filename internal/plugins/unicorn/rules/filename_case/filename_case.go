@@ -154,14 +154,14 @@ func nodeExtname(basename string) string {
 // splitWords reproduces change-case@5.4's `split()`. The exact upstream regex
 // pipeline is:
 //
-//   1. /([\p{Ll}\d])(\p{Lu})/gu       → insert delimiter before an uppercase
-//                                       that follows a lowercase or digit.
-//   2. /(\p{Lu})([\p{Lu}][\p{Ll}])/gu → insert delimiter between two
-//                                       uppercases when the second is the
-//                                       start of a TitleCase word
-//                                       (e.g. `XMLHttp` → `XML Http`).
-//   3. /[^\p{L}\d]+/giu               → collapse non-alphanumeric runs into
-//                                       the same delimiter.
+//  1. /([\p{Ll}\d])(\p{Lu})/gu       → insert delimiter before an uppercase
+//     that follows a lowercase or digit.
+//  2. /(\p{Lu})([\p{Lu}][\p{Ll}])/gu → insert delimiter between two
+//     uppercases when the second is the
+//     start of a TitleCase word
+//     (e.g. `XMLHttp` → `XML Http`).
+//  3. /[^\p{L}\d]+/giu               → collapse non-alphanumeric runs into
+//     the same delimiter.
 //
 // Then trim leading/trailing delimiters and split. We use rune `0` as the
 // internal delimiter (matching the upstream's `\0`).
@@ -448,7 +448,8 @@ var FilenameCaseRule = rule.Rule{
 	// return an empty listener map. (The linter's visitor walks SourceFile
 	// children but never the SourceFile node itself, so a
 	// `ast.KindSourceFile` listener would silently never fire.)
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}

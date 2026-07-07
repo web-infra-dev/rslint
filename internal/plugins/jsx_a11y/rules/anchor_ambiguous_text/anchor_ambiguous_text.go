@@ -111,7 +111,7 @@ func standardizeSpaceAndCase(input string) string {
 //     enter the same resolution order, so a self-closing `<img alt="x"/>`
 //     contributes its alt text in step 2.
 //   - Everything else (JsxExpression, JsxFragment, …) → empty string. This
-//     mirrors upstream's switch which falls to `default: return ''`.
+//     mirrors upstream's switch which falls to `default: return ”`.
 //
 // The leaf-empty-string contributions are intentionally preserved (rather
 // than skipped): they introduce the spaces that — combined with the
@@ -264,7 +264,8 @@ func parseOptions(raw any) options {
 
 var AnchorAmbiguousTextRule = rule.Rule{
 	Name: "jsx-a11y/anchor-ambiguous-text",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// Pre-build the lookup set so each check is O(1) on the wordlist.

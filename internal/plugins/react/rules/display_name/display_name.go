@@ -88,14 +88,14 @@ type contextEntry struct {
 // A single walker fully owns the components / context maps and the helper
 // closures that mutate them; the rule's `Run` constructs one per file.
 type nodeWalker struct {
-	ctx                  rule.RuleContext
-	opts                 Options
-	pragma               string
-	createClass          string
-	wrappers             []reactutil.ComponentWrapperEntry
-	tc                   *checker.Checker
-	checkContextObjects  bool
-	nestedMemoSupported  bool
+	ctx                 rule.RuleContext
+	opts                Options
+	pragma              string
+	createClass         string
+	wrappers            []reactutil.ComponentWrapperEntry
+	tc                  *checker.Checker
+	checkContextObjects bool
+	nestedMemoSupported bool
 
 	// Component registry. `byNode` is the source-of-truth for has-displayName
 	// state; `order` preserves discovery order for deterministic reporting.
@@ -1322,7 +1322,8 @@ func (w *nodeWalker) isNestedMemo(node *ast.Node) bool {
 // registration.
 var DisplayNameRule = rule.Rule{
 	Name: "react/display-name",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

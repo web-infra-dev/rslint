@@ -959,7 +959,8 @@ func getClassMembers(node *ast.Node) []*ast.Node {
 
 var MemberOrderingRule = rule.CreateRule(rule.Rule{
 	Name: "member-ordering",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		getConfig := func(nodeKind ast.Kind) *parsedConfig {

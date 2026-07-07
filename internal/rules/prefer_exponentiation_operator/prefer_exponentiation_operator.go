@@ -438,7 +438,7 @@ func buildFix(sf *ast.SourceFile, node *ast.Node) *rule.RuleFix {
 // https://eslint.org/docs/latest/rules/prefer-exponentiation-operator
 var PreferExponentiationOperatorRule = rule.Rule{
 	Name: "prefer-exponentiation-operator",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if !isMathPowCall(node) {

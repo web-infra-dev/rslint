@@ -57,7 +57,7 @@ func errorMessage(name string) string {
 
 var AriaPropsRule = rule.Rule{
 	Name: "jsx-a11y/aria-props",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				name := reactutil.GetJsxPropName(attr)

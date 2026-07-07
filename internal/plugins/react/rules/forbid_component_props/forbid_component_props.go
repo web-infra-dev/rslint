@@ -284,7 +284,8 @@ func getTagShape(tagName *ast.Node) (tagShape, bool) {
 
 var ForbidComponentPropsRule = rule.Rule{
 	Name: "react/forbid-component-props",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		cfg := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(node *ast.Node) {

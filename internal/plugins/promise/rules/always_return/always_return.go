@@ -74,8 +74,6 @@ func isFunctionWithBlockStatement(node *ast.Node) bool {
 	}
 }
 
-
-
 func isLastCallback(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
@@ -188,7 +186,8 @@ func rootObjectName(node *ast.Node) string {
 
 var AlwaysReturnRule = rule.Rule{
 	Name: "promise/always-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {

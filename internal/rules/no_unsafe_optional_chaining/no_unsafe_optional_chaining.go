@@ -9,7 +9,8 @@ import (
 // https://eslint.org/docs/latest/rules/no-unsafe-optional-chaining
 var NoUnsafeOptionalChainingRule = rule.Rule{
 	Name: "no-unsafe-optional-chaining",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		unsafeOptionalChainMsg := rule.RuleMessage{

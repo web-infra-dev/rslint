@@ -39,7 +39,8 @@ var JsxIndentPropsRule = BuildRule("react/jsx-indent-props")
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,
-		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+			options := rule.UnwrapOptions(_options)
 			indentType, indentSize, indentChar, indentIsFirst, ignoreTernaryOperator := parseOptions(options)
 
 			text := ctx.SourceFile.Text()

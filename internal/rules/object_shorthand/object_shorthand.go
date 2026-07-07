@@ -353,7 +353,8 @@ func declarationListDeclaresBlockScopedArguments(node *ast.Node) bool {
 
 var ObjectShorthandRule = rule.Rule{
 	Name: "object-shorthand",
-	Run: func(ctx rule.RuleContext, optionsAny any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _optionsAny []any) rule.RuleListeners {
+		optionsAny := rule.UnwrapOptions(_optionsAny)
 		opts := parseOptions(optionsAny)
 		sourceText := ctx.SourceFile.Text()
 
@@ -839,10 +840,10 @@ var ObjectShorthandRule = rule.Rule{
 		// -------- Listeners --------
 
 		listeners := rule.RuleListeners{
-			ast.KindFunctionDeclaration:                    func(n *ast.Node) { enterScope() },
+			ast.KindFunctionDeclaration:                      func(n *ast.Node) { enterScope() },
 			rule.ListenerOnExit(ast.KindFunctionDeclaration): func(n *ast.Node) { exitScope() },
-			ast.KindFunctionExpression:                     func(n *ast.Node) { enterScope() },
-			rule.ListenerOnExit(ast.KindFunctionExpression): func(n *ast.Node) { exitScope() },
+			ast.KindFunctionExpression:                       func(n *ast.Node) { enterScope() },
+			rule.ListenerOnExit(ast.KindFunctionExpression):  func(n *ast.Node) { exitScope() },
 			ast.KindMethodDeclaration: func(n *ast.Node) {
 				enterScope()
 				// Also run the property-level check (only when inside an

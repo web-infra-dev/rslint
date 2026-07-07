@@ -9,7 +9,7 @@ import (
 var PreferForOfRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-for-of",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindForStatement: func(node *ast.Node) {
 				forStmt := node.AsForStatement()
@@ -292,10 +292,10 @@ func isValidIndexUsage(ctx rule.RuleContext, id *ast.Node, arrayText string) boo
 // isAssignee checks if a node is used as an assignment target.
 // This matches the upstream typescript-eslint isAssignee utility.
 // NOTE: This is similar to utils.IsWriteReference but NOT identical:
-// - IsWriteReference doesn't handle DeleteExpression or SatisfiesExpression
-// - IsWriteReference is designed for identifiers; isAssignee targets member expressions
-// - delete semantically removes a property (not a "write"), so adding it to
-//   IsWriteReference would change its contract for other rules.
+//   - IsWriteReference doesn't handle DeleteExpression or SatisfiesExpression
+//   - IsWriteReference is designed for identifiers; isAssignee targets member expressions
+//   - delete semantically removes a property (not a "write"), so adding it to
+//     IsWriteReference would change its contract for other rules.
 func isAssignee(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false

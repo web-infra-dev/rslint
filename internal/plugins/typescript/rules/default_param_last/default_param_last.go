@@ -11,7 +11,7 @@ var DefaultParamLastRule = rule.CreateRule(rule.Rule{
 	Run:  run,
 })
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	// Helper function to check if a parameter is optional
 	isOptionalParam := func(node *ast.Node) bool {
 		if node == nil {

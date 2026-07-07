@@ -97,7 +97,8 @@ func parseEntities(options any) []entity {
 
 var NoUnescapedEntitiesRule = rule.Rule{
 	Name: "react/no-unescaped-entities",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		entities := parseEntities(options)
 		if len(entities) == 0 {
 			return rule.RuleListeners{}

@@ -286,7 +286,8 @@ func checkFunction(fn *ast.Node, opts Options, ctx rule.RuleContext) {
 
 var NoParamReassignRule = rule.Rule{
 	Name: "no-param-reassign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		handler := func(node *ast.Node) {
 			checkFunction(node, opts, ctx)

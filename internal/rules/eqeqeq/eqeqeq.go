@@ -155,7 +155,8 @@ func parseOptions(opts any) eqeqeqOptions {
 // https://eslint.org/docs/latest/rules/eqeqeq
 var EqeqeqRule = rule.Rule{
 	Name: "eqeqeq",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

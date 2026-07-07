@@ -126,7 +126,8 @@ func analyzeEquals(s *scanner.Scanner, nameEnd int) (equalsInfo, bool) {
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,
-		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+			options := rule.UnwrapOptions(_options)
 			config := parseOption(options)
 			sf := ctx.SourceFile
 			if sf == nil {

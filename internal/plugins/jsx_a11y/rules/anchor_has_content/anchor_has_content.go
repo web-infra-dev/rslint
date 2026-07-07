@@ -37,7 +37,8 @@ func parseOptions(raw any) options {
 
 var AnchorHasContentRule = rule.Rule{
 	Name: "jsx-a11y/anchor-has-content",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// Mirrors upstream `typeCheck = ['a'].concat(componentOptions)`.

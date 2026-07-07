@@ -188,7 +188,8 @@ func isFunction(node *ast.Node) bool {
 
 var ClassLiteralPropertyStyleRule = rule.CreateRule(rule.Rule{
 	Name: "class-literal-property-style",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		style := "fields" // default option
 
 		// Parse options - handle both string and array formats

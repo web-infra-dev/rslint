@@ -82,6 +82,24 @@ func NormalizeOptions(raw any) []any {
 	return []any{raw}
 }
 
+// UnwrapOptions is NormalizeOptions' inverse: it collapses a rule's options
+// array (Run's []any parameter — ESLint's context.options, the config array
+// after the severity level) back to the single bare value most existing rule
+// implementations parse. Empty → nil; a single element → that element;
+// otherwise the slice itself. This is the compatibility shim old
+// `parseOptions(options any)` bodies call so they don't need to change beyond
+// their Run signature.
+func UnwrapOptions(options []any) any {
+	switch len(options) {
+	case 0:
+		return nil
+	case 1:
+		return options[0]
+	default:
+		return options
+	}
+}
+
 const (
 	lastTokenKind                        ast.Kind = 1000
 	lastOnExitTokenKind                  ast.Kind = 2000
@@ -113,13 +131,19 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	Run                func(ctx RuleContext, options any) RuleListeners
+	// Schema is the rule's options JSON Schema (see CompileSchema and the
+	// <rule-name>.schema.json convention): a tuple describing the
+	// ESLint-style options array. Nil means the rule opts out of schema
+	// validation/defaulting — its options pass through to Run unchecked.
+	Schema []byte
+	Run    func(ctx RuleContext, options []any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
+		Schema:           r.Schema,
 		Run:              r.Run,
 	}
 }

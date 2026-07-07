@@ -319,7 +319,8 @@ func isClassMember(node *ast.Node) bool {
 
 var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 	Name: "explicit-member-accessibility",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		sf := ctx.SourceFile
 
@@ -462,10 +463,10 @@ var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			ast.KindMethodDeclaration: checkMethod,
-			ast.KindConstructor:       checkMethod,
-			ast.KindGetAccessor:       checkMethod,
-			ast.KindSetAccessor:       checkMethod,
+			ast.KindMethodDeclaration:   checkMethod,
+			ast.KindConstructor:         checkMethod,
+			ast.KindGetAccessor:         checkMethod,
+			ast.KindSetAccessor:         checkMethod,
 			ast.KindPropertyDeclaration: checkProperty,
 			ast.KindParameter:           checkParameterProperty,
 		}

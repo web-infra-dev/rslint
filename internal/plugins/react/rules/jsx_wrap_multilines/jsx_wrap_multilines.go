@@ -23,7 +23,8 @@ var defaultOptions = map[string]string{
 // JsxWrapMultilinesRule enforces parentheses around multiline JSX.
 var JsxWrapMultilinesRule = rule.Rule{
 	Name: "react/jsx-wrap-multilines",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		// Build effective options from defaults
 		opts := make(map[string]string)
 		for k, v := range defaultOptions {

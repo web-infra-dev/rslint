@@ -107,7 +107,8 @@ func isAllowedPromiseTermination(expression *ast.Node, opts Options) bool {
 
 var CatchOrReturnRule = rule.Rule{
 	Name: "promise/catch-or-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {

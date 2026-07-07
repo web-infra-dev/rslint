@@ -8,7 +8,7 @@ import (
 // https://eslint.org/docs/latest/rules/prefer-rest-params
 var PreferRestParamsRule = rule.Rule{
 	Name: "prefer-rest-params",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				if node.Text() != "arguments" {

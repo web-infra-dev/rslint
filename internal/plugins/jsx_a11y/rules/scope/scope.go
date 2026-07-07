@@ -45,7 +45,7 @@ const errorMessage = "The scope prop can only be used on <th> elements."
 
 var ScopeRule = rule.Rule{
 	Name: "jsx-a11y/scope",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxAttribute: func(attr *ast.Node) {
 				// Upstream: `if (name && name.toUpperCase() !== 'SCOPE') return;`

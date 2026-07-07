@@ -14,7 +14,8 @@ var globalObjects = []string{"window", "global", "globalThis"}
 // https://eslint.org/docs/latest/rules/no-eval
 var NoEvalRule = rule.Rule{
 	Name: "no-eval",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		allowIndirect := false
 		optsMap := utils.GetOptionsMap(options)
 		if optsMap != nil {

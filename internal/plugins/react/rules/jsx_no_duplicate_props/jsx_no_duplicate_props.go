@@ -11,7 +11,8 @@ import (
 
 var JsxNoDuplicatePropsRule = rule.Rule{
 	Name: "react/jsx-no-duplicate-props",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		ignoreCase := false
 		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
 			if v, ok := optsMap["ignoreCase"].(bool); ok {

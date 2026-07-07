@@ -25,7 +25,7 @@ import (
 // the dominant case (label clashing with a sibling declaration).
 var NoLabelVarRule = rule.Rule{
 	Name: "no-label-var",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		report := func(node *ast.Node) {
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          "identifierClashWithLabel",

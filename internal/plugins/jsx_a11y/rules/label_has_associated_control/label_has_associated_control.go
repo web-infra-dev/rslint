@@ -157,7 +157,8 @@ func parseOptions(raw any) options {
 // `jsx-a11y/` prefix is part of the registered key.
 var LabelHasAssociatedControlRule = rule.Rule{
 	Name: "jsx-a11y/label-has-associated-control",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// `labelComponentNames = ['label'].concat(labelComponents)` upstream.

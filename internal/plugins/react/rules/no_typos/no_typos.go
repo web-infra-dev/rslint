@@ -65,7 +65,7 @@ var NoTyposRule = rule.Rule{
 	Run:  runRule,
 }
 
-func runRule(ctx rule.RuleContext, options any) rule.RuleListeners {
+func runRule(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	pragma := reactutil.GetReactPragma(ctx.Settings)
 	createClass := reactutil.GetReactCreateClass(ctx.Settings)
 

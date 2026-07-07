@@ -117,7 +117,8 @@ func getConditionalTypeName(node *ast.Node) string {
 // NoCondAssignRule disallows assignment operators in conditional expressions
 var NoCondAssignRule = rule.Rule{
 	Name: "no-cond-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		// Parse options - default is "except-parens"
 		mode := "except-parens"
 		if options != nil {

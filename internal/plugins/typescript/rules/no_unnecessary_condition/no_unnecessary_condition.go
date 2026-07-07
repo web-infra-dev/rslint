@@ -324,7 +324,8 @@ func buildTypeGuardAlreadyIsTypeMessage(typeGuardOrAssertionFunction string) rul
 var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-condition",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		tc := ctx.TypeChecker
 

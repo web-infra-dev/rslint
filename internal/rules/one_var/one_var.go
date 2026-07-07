@@ -315,25 +315,25 @@ func isInStatementListPosition(parent *ast.Node) bool {
 //
 // Fields:
 //   - hasExportWrapper:  in ESLint, the VariableDeclaration is wrapped by
-//                        ExportNamedDeclaration. Affects: report column,
-//                        autofix join, sibling lookup for `consecutive`.
-//                        In tsgo, this is encoded as `export` on the
-//                        VariableStatement.Modifiers list.
+//     ExportNamedDeclaration. Affects: report column,
+//     autofix join, sibling lookup for `consecutive`.
+//     In tsgo, this is encoded as `export` on the
+//     VariableStatement.Modifiers list.
 //   - hasOtherModifier:  any non-export modifier (`declare` etc.). ESLint
-//                        keeps these inside VariableDeclaration; we keep them
-//                        in the report range and disable autofix to avoid
-//                        producing syntactically dubious output.
+//     keeps these inside VariableDeclaration; we keep them
+//     in the report range and disable autofix to avoid
+//     producing syntactically dubious output.
 //   - reportStart:       first byte of the (would-be ESLint) VariableDeclaration.
-//                        For `export const x` this is the `const` keyword; for
-//                        `declare const x` this is the `declare` keyword; for
-//                        `export declare const x` this is the `declare` keyword.
-//                        For for-init forms, the VariableDeclarationList itself.
+//     For `export const x` this is the `const` keyword; for
+//     `declare const x` this is the `declare` keyword; for
+//     `export declare const x` this is the `declare` keyword.
+//     For for-init forms, the VariableDeclarationList itself.
 //   - reportEnd:         last byte of the VariableDeclaration. Includes the
-//                        trailing `;` for top-level forms; matches the
-//                        VariableDeclarationList's end for for-init.
+//     trailing `;` for top-level forms; matches the
+//     VariableDeclarationList's end for for-init.
 //   - keywordRange:      range of the kind keyword (`var`/`let`/`const`/
-//                        `using` or `await` for `await using`). Used for
-//                        autofix to remove the keyword on the merged side.
+//     `using` or `await` for `await using`). Used for
+//     autofix to remove the keyword on the merged side.
 type eslintVarDeclView struct {
 	hasExportWrapper bool
 	hasOtherModifier bool
@@ -624,7 +624,8 @@ func hasOnlyOneStatement(scope *funcScope, opts typeOpts, decls []*ast.Node, sep
 
 var OneVarRule = rule.Rule{
 	Name: "one-var",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 		funcStack := []*funcScope{{}}
 		blockStack := []*blockScope{{}}

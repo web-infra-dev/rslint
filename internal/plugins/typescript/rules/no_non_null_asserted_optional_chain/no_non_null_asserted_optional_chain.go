@@ -22,7 +22,7 @@ func isPartOfOptionalChain(node *ast.Node) bool {
 
 var NoNonNullAssertedOptionalChainRule = rule.CreateRule(rule.Rule{
 	Name: "no-non-null-asserted-optional-chain",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noNonNullOptionalChain",
 			Description: "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",

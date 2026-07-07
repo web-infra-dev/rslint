@@ -133,7 +133,8 @@ func unwrapParenthesized(node *ast.Node) *ast.Node {
 
 var NoTypeAliasRule = rule.CreateRule(rule.Rule{
 	Name: "no-type-alias",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		isSupportedComposition := func(isTopLevel bool, composition compositionType, allowed optionValue) bool {

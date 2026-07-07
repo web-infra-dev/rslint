@@ -1989,7 +1989,8 @@ func isIdentifierTaggedTemplateTag(node *ast.Node) bool {
 var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 	Name:             "no-deprecated",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}

@@ -47,7 +47,8 @@ type runCaches struct {
 // Diagnostics intentionally mirror upstream wording for switchover parity.
 var ExhaustiveDepsRule = rule.Rule{
 	Name: "react-hooks/exhaustive-deps",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.UnwrapOptions(_options)
 		opts := parseOptions(options, ctx.Settings)
 		sf := ctx.SourceFile
 		tc := ctx.TypeChecker

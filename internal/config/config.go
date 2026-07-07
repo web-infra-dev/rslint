@@ -463,15 +463,6 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 				if rc := parseArrayRuleConfig(v); rc != nil {
 					merged.Rules[ruleName] = rc
 				}
-			case map[string]interface{}:
-				ruleConfig := &RuleConfig{}
-				if level, ok := v["level"].(string); ok {
-					ruleConfig.Level = level
-				}
-				if options, ok := v["options"].(map[string]interface{}); ok {
-					ruleConfig.Options = options
-				}
-				merged.Rules[ruleName] = ruleConfig
 			}
 		}
 

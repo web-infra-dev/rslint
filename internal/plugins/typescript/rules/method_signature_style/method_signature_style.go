@@ -54,7 +54,8 @@ func containsThisType(node *ast.Node) bool {
 	return found
 }
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	options := rule.UnwrapOptions(_options)
 	opt := mode(utils.GetOptionsString(options))
 	if opt == "" {
 		opt = modeProperty

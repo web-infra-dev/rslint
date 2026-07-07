@@ -96,7 +96,8 @@ func firstCommaToken(node *ast.Node) *ast.Node {
 // https://eslint.org/docs/latest/rules/no-sequences
 var NoSequencesRule = rule.Rule{
 	Name: "no-sequences",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

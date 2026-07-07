@@ -683,7 +683,7 @@ func matchVarDeclBinding(vd *ast.Node, name string) *ast.Node {
 //     (`for (let x = …; …; …)`, `for (let x of …)`, `for (let x in …)`),
 //     the loop statement itself is the scope — `let` / `const` introduced
 //     in for-init are scoped to the entire ForStatement (init + condition
-//     + incrementor + body), not the enclosing Block. Returning the outer
+//   - incrementor + body), not the enclosing Block. Returning the outer
 //     Block would let us see same-name writes that don't refer to this
 //     binding and miss reassignments in the loop body.
 //   - Otherwise, the nearest enclosing Block / SourceFile / ModuleBlock /
@@ -1008,7 +1008,8 @@ func checkDescendant(ctx rule.RuleContext, baseDepth, maxDepth int, children []*
 
 var JsxMaxDepthRule = rule.Rule{
 	Name: "react/jsx-max-depth",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.UnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		handleJSX := func(node *ast.Node) {
