@@ -216,6 +216,7 @@ export default defineConfig({
     './tests/eslint-plugin-react-hooks/rules/component-hook-factories.test.ts',
     './tests/eslint-plugin-react-hooks/rules/error-boundaries.test.ts',
     './tests/eslint-plugin-react-hooks/rules/globals.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/immutability.test.ts',
 
     // eslint-plugin-jsx-a11y
     './tests/eslint-plugin-jsx-a11y/rules/alt-text.test.ts',

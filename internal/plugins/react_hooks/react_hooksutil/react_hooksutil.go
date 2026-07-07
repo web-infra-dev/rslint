@@ -183,6 +183,31 @@ func IsCompilerFunctionKind(node *ast.Node) bool {
 	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
 }
 
+// AccessChainRootIdentifier returns the identifier at the root of an access
+// chain like `value.x.y` or `(value as T)["x"]`.
+func AccessChainRootIdentifier(node *ast.Node) *ast.Node {
+	node = utils.SkipAssertionsAndParens(node)
+	for node != nil && ast.IsAccessExpression(node) {
+		node = utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	}
+	if node != nil && node.Kind == ast.KindIdentifier {
+		return node
+	}
+	return nil
+}
+
+// ContainsNode reports whether `descendant` is inside `ancestor` in the same
+// source file.
+func ContainsNode(ancestor, descendant *ast.Node) bool {
+	if ancestor == nil || descendant == nil {
+		return false
+	}
+	if descendant.Pos() < ancestor.Pos() || descendant.End() > ancestor.End() {
+		return false
+	}
+	return ast.GetSourceFileOfNode(ancestor) == ast.GetSourceFileOfNode(descendant)
+}
+
 // GetCompilerReactFunctionType mirrors the React Compiler classifier used by
 // the Factories diagnostic: a PascalCase function is a component only when it
 // directly creates JSX or calls a hook, has component-like parameters, and does

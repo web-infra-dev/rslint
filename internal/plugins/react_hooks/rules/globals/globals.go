@@ -239,7 +239,8 @@ func (state *globalsState) isObjectHelperCalled(fn *ast.Node, parentFn *ast.Node
 			return false
 		}
 		call := node.AsCallExpression()
-		if memberExpressionRootIdentifier(call.Expression) == name {
+		root := react_hooksutil.AccessChainRootIdentifier(call.Expression)
+		if root != nil && root.AsIdentifier().Text == name {
 			found = true
 			return true
 		}
@@ -277,21 +278,6 @@ func objectLiteralRootBindingName(fn *ast.Node) string {
 		default:
 			return ""
 		}
-	}
-	return ""
-}
-
-func memberExpressionRootIdentifier(node *ast.Node) string {
-	node = ast.SkipParentheses(node)
-	if node == nil || !ast.IsAccessExpression(node) {
-		return ""
-	}
-	for node != nil && ast.IsAccessExpression(node) {
-		node = utils.AccessExpressionObject(node)
-		node = ast.SkipParentheses(node)
-	}
-	if node != nil && node.Kind == ast.KindIdentifier {
-		return node.AsIdentifier().Text
 	}
 	return ""
 }
