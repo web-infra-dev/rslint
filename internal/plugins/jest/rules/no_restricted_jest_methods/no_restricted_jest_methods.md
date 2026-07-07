@@ -15,9 +15,8 @@ Examples of **incorrect** code for this rule with the following configuration:
   "jest/no-restricted-jest-methods": [
     "error",
     {
-      "fn": null,
-      "mock": "Do not use mocks",
-      "advanceTimersByTime": null
+      "advanceTimersByTime": null,
+      "spyOn": "Don't use spies"
     }
   ]
 }
