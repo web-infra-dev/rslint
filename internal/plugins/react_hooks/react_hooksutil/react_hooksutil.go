@@ -17,7 +17,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -28,10 +27,6 @@ const (
 	CompilerReactFunctionComponent CompilerReactFunctionType = "Component"
 	CompilerReactFunctionHook      CompilerReactFunctionType = "Hook"
 )
-
-type CompilerFunctionOptions struct {
-	HookPattern *regexp2.Regexp
-}
 
 // hookNameTailRegex matches the suffix part of a hook identifier:
 // after the leading `use`, the next character must be uppercase Latin
@@ -158,24 +153,18 @@ func IsHookCallee(node *ast.Node) bool {
 
 // IsCompilerHookCallee is the React Compiler variant of IsHookCallee:
 // it accepts `useFoo` / `Namespace.useFoo`, but not the bare `use`.
-func IsCompilerHookCallee(node *ast.Node, hookPattern *regexp2.Regexp) bool {
+func IsCompilerHookCallee(node *ast.Node) bool {
 	if node == nil {
 		return false
-	}
-	isHookName := func(name string) bool {
-		if hookPattern != nil {
-			return utils.Regexp2MatchString(hookPattern, name)
-		}
-		return IsCompilerHookName(name)
 	}
 	n := ast.SkipParentheses(node)
 	switch n.Kind {
 	case ast.KindIdentifier:
-		return isHookName(n.AsIdentifier().Text)
+		return IsCompilerHookName(n.AsIdentifier().Text)
 	case ast.KindPropertyAccessExpression:
 		pae := n.AsPropertyAccessExpression()
 		prop := pae.Name()
-		if prop == nil || prop.Kind != ast.KindIdentifier || !isHookName(prop.AsIdentifier().Text) {
+		if prop == nil || prop.Kind != ast.KindIdentifier || !IsCompilerHookName(prop.AsIdentifier().Text) {
 			return false
 		}
 		obj := ast.SkipParentheses(pae.Expression)
@@ -194,30 +183,55 @@ func IsCompilerFunctionKind(node *ast.Node) bool {
 	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
 }
 
+// AccessChainRootIdentifier returns the identifier at the root of an access
+// chain like `value.x.y` or `(value as T)["x"]`.
+func AccessChainRootIdentifier(node *ast.Node) *ast.Node {
+	node = utils.SkipAssertionsAndParens(node)
+	for node != nil && ast.IsAccessExpression(node) {
+		node = utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	}
+	if node != nil && node.Kind == ast.KindIdentifier {
+		return node
+	}
+	return nil
+}
+
+// ContainsNode reports whether `descendant` is inside `ancestor` in the same
+// source file.
+func ContainsNode(ancestor, descendant *ast.Node) bool {
+	if ancestor == nil || descendant == nil {
+		return false
+	}
+	if descendant.Pos() < ancestor.Pos() || descendant.End() > ancestor.End() {
+		return false
+	}
+	return ast.GetSourceFileOfNode(ancestor) == ast.GetSourceFileOfNode(descendant)
+}
+
 // GetCompilerReactFunctionType mirrors the React Compiler classifier used by
 // the Factories diagnostic: a PascalCase function is a component only when it
 // directly creates JSX or calls a hook, has component-like parameters, and does
 // not return obviously non-ReactNode values; a hook-like function must directly
 // create JSX or call a hook; memo/forwardRef callbacks are components.
-func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) CompilerReactFunctionType {
+func GetCompilerReactFunctionType(fn *ast.Node) CompilerReactFunctionType {
 	name := GetFunctionName(fn)
 	if name != nil && name.Kind == ast.KindIdentifier && IsComponentNameStr(name.AsIdentifier().Text) {
-		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) &&
+		if CallsHooksOrCreatesJsx(fn) &&
 			IsValidCompilerComponentParams(fn) &&
 			!ReturnsCompilerNonNode(fn) {
 			return CompilerReactFunctionComponent
 		}
 		return ""
 	}
-	if name != nil && IsCompilerHookCallee(name, opts.HookPattern) {
-		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+	if name != nil && IsCompilerHookCallee(name) {
+		if CallsHooksOrCreatesJsx(fn) {
 			return CompilerReactFunctionHook
 		}
 		return ""
 	}
 	if ast.IsFunctionExpressionOrArrowFunction(fn) {
 		if IsForwardRefOrMemoCallback(fn, "forwardRef") || IsForwardRefOrMemoCallback(fn, "memo") {
-			if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+			if CallsHooksOrCreatesJsx(fn) {
 				return CompilerReactFunctionComponent
 			}
 		}
@@ -228,7 +242,7 @@ func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) Co
 // CallsHooksOrCreatesJsx reports whether `fn` directly creates JSX or directly
 // calls a compiler hook. Nested function bodies are skipped, matching React
 // Compiler's traversal boundary.
-func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
+func CallsHooksOrCreatesJsx(fn *ast.Node) bool {
 	found := false
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
@@ -243,7 +257,7 @@ func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
 			return
 		}
 		if ast.IsCallExpression(node) {
-			if IsCompilerHookCallee(node.AsCallExpression().Expression, hookPattern) {
+			if IsCompilerHookCallee(node.AsCallExpression().Expression) {
 				found = true
 				return
 			}
@@ -350,19 +364,10 @@ func IsCompilerNonNode(node *ast.Node) bool {
 	return ast.IsBigIntLiteral(n)
 }
 
-// IsFunctionLikeContainer reports whether `node` is one of the
-// function-like kinds the upstream rules treat as a "code path"
-// boundary.
+// IsFunctionLikeContainer keeps the react-hooks shared API while delegating to
+// the repository-wide function-scope boundary helper.
 func IsFunctionLikeContainer(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return true
-	}
-	return false
+	return utils.IsFunctionLikeContainer(node)
 }
 
 // FindEnclosingFunction walks up from `node` and returns the nearest
@@ -496,19 +501,55 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 	return nil
 }
 
+// GetReactCallbackCall returns the CallExpression when `fn` is the immediate
+// argument of a call whose callee is `<name>` or `React.<name>`.
+// Parenthesized callback expressions are transparent: `memo((() => null))` is
+// the same callback shape as `memo(() => null)`.
+func GetReactCallbackCall(fn *ast.Node, name string) *ast.Node {
+	if fn == nil {
+		return nil
+	}
+	child := fn
+	p := fn.Parent
+	for p != nil && p.Kind == ast.KindParenthesizedExpression {
+		child = p
+		p = p.Parent
+	}
+	if p == nil || p.Kind != ast.KindCallExpression {
+		return nil
+	}
+	call := p.AsCallExpression()
+	if call.Arguments == nil {
+		return nil
+	}
+	isArg := false
+	for _, arg := range call.Arguments.Nodes {
+		if arg == child {
+			isArg = true
+			break
+		}
+	}
+	if !isArg {
+		return nil
+	}
+	callee := ast.SkipParentheses(call.Expression)
+	if !IsReactCalleeNamed(callee, name) {
+		return nil
+	}
+	return p
+}
+
+// GetForwardRefOrMemoCallbackCall is kept for existing callers that only check
+// React's `memo` / `forwardRef` callback shapes.
+func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
+	return GetReactCallbackCall(fn, name)
+}
+
 // IsForwardRefOrMemoCallback reports whether `fn` is the immediate
 // argument of a CallExpression whose callee is `<name>` or
 // `React.<name>`.
 func IsForwardRefOrMemoCallback(fn *ast.Node, name string) bool {
-	if fn == nil || fn.Parent == nil {
-		return false
-	}
-	p := fn.Parent
-	if p.Kind != ast.KindCallExpression {
-		return false
-	}
-	callee := ast.SkipParentheses(p.AsCallExpression().Expression)
-	return IsReactCalleeNamed(callee, name)
+	return GetForwardRefOrMemoCallbackCall(fn, name) != nil
 }
 
 // IsClassMember reports whether `fn` is a member of a class — either

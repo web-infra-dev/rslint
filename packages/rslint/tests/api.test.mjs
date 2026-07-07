@@ -3,7 +3,7 @@ import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 import { RemoteSourceFile } from '@rslint/api';
 
-// rslint's Node API takes a config OBJECT (Go never reads config from disk, and
+// rslint's JavaScript API takes a config OBJECT (Go never reads config from disk, and
 // there is no separate ruleOptions surface). A single-rule config keeps each
 // test scoped to the rule under test.
 const cfg = (project, rule) => [

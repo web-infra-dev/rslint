@@ -8,19 +8,19 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                 | Description                                                                                    |
-| -------------------- | ---------------------------------------------------------------------------------------------- |
-| `--init`             | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
-| `--config <path>`    | Specify which config file to use                                                               |
-| `--fix`              | Automatically fix problems                                                                     |
-| `--type-check`       | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
-| `--format <format>`  | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
-| `--quiet`            | Report errors only, suppress warnings                                                          |
-| `--max-warnings <n>` | Exit with error if warning count exceeds this number                                           |
-| `--rule <rule>`      | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
-| `--no-color`         | Disable colored output ([details](/guide/environment-variables))                               |
-| `--force-color`      | Force colored output ([details](/guide/environment-variables))                                 |
-| `--help`, `-h`       | Show help information                                                                          |
+| Flag                  | Description                                                                                    |
+| --------------------- | ---------------------------------------------------------------------------------------------- |
+| `--init`              | Generate a default config file, or migrate an existing JSON config to JS/TS                    |
+| `-c, --config <path>` | Specify which config file to use                                                               |
+| `--fix`               | Automatically fix problems                                                                     |
+| `--type-check`        | Enable TypeScript semantic type checking ([details](/guide/type-checking))                     |
+| `--format <format>`   | Output format: `default`, `jsonline`, `github`, or `gitlab` ([details](/guide/output-formats)) |
+| `--quiet`             | Report errors only, suppress warnings                                                          |
+| `--max-warnings <n>`  | Exit with error if warning count exceeds this number                                           |
+| `--rule <rule>`       | Override a rule's severity or options (repeatable, see [details](#rule-overrides))             |
+| `--no-color`          | Disable colored output ([details](/guide/environment-variables))                               |
+| `--force-color`       | Force colored output ([details](/guide/environment-variables))                                 |
+| `--help`, `-h`        | Show help information                                                                          |
 
 ## File and Directory Arguments
 
@@ -59,10 +59,11 @@ rslint packages/foo/
 rslint packages/foo/src/a.ts packages/bar/src/b.ts
 ```
 
-Use `--config` to override automatic config discovery:
+Use `--config` or `-c` to override automatic config discovery:
 
 ```bash
 rslint --config custom.config.ts src/
+rslint -c custom.config.ts src/
 ```
 
 ## Rule Overrides

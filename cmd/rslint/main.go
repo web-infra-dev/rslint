@@ -22,7 +22,7 @@ func runMain() int {
 			// run in LSP mode for Language Server
 			return runLSP(args[1:])
 		case "--api":
-			// run in API mode for JS API
+			// run in API mode for JavaScript API
 			return runAPI()
 		}
 	}

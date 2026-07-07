@@ -600,3 +600,7 @@ ruleopts
 anyfunc
 errrr
 supa
+Ändra
+Värde
+Dmts
+Dcts

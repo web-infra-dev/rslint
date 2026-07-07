@@ -45,7 +45,7 @@ async function buildConfigForSettings(
       ...(settings ?? {}),
     },
   }));
-  // Hand the resolved config object straight to the Node API (no temp file).
+  // Hand the resolved config object straight to the JavaScript API (no temp file).
   // rslint resolves each entry's relative `tsconfig.*.json` against
   // configDirectory — the base config file's directory.
   return { config: merged, configDirectory: path.dirname(baseConfigPath) };
