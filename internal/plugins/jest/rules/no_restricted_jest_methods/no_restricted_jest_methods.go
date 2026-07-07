@@ -2,7 +2,6 @@ package no_restricted_jest_methods
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -69,14 +68,6 @@ func parseOptions(options any) map[string]restrictedMethod {
 	return restricted
 }
 
-func restrictedRange(entries []jestUtils.ParsedJestFnMemberEntry) (core.TextRange, bool) {
-	if len(entries) == 0 || entries[0].Node == nil || entries[len(entries)-1].Node == nil {
-		return core.TextRange{}, false
-	}
-
-	return core.NewTextRange(entries[0].Node.Pos(), entries[len(entries)-1].Node.End()), true
-}
-
 func isNestedJestFnCall(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
@@ -112,7 +103,7 @@ var NoRestrictedJestMethodsRule = rule.Rule{
 					return
 				}
 
-				reportRange, ok := restrictedRange(jestFnCall.MemberEntries)
+				reportRange, ok := jestUtils.JestFnMemberEntriesRange(jestFnCall.MemberEntries)
 				if !ok {
 					return
 				}

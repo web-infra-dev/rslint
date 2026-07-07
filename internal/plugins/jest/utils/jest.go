@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -143,6 +144,16 @@ func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
 	}
 
 	return strings.Join(parts, ".")
+}
+
+// JestFnMemberEntriesRange returns the source range spanning the first through
+// last member entry nodes in a parsed jest/expect call chain.
+func JestFnMemberEntriesRange(entries []ParsedJestFnMemberEntry) (core.TextRange, bool) {
+	if len(entries) == 0 || entries[0].Node == nil || entries[len(entries)-1].Node == nil {
+		return core.TextRange{}, false
+	}
+
+	return core.NewTextRange(entries[0].Node.Pos(), entries[len(entries)-1].Node.End()), true
 }
 
 func getPropertyName(node *ast.Node) string {
