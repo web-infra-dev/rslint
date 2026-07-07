@@ -130,6 +130,7 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
+    './tests/eslint-plugin-import/rules/no-cycle.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
