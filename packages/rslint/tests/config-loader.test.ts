@@ -251,6 +251,7 @@ describe('normalizeConfig — community plugins (object-form)', () => {
     'eslint-plugin-import',
     'eslint-plugin-jest',
     'eslint-plugin-jsx-a11y',
+    'eslint-plugin-n',
     'eslint-plugin-promise',
     'eslint-plugin-react-hooks',
     'eslint-plugin-unicorn',
@@ -271,7 +272,7 @@ describe('normalizeConfig — community plugins (object-form)', () => {
   test('accepts an eslint-plugin-* key that is NOT a native decl-name', () => {
     // `eslint-plugin-react` has no Go DeclName alias (react is declared bare),
     // so reserving it would wrongly false-reject a legitimate community mount.
-    // The asymmetry must be exact: only the 6 aliased names are reserved.
+    // The asymmetry must be exact: only the aliased names are reserved.
     const [entry] = normalizeConfig([
       {
         files: ['**/*.ts'],
