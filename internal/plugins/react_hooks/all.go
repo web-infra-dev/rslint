@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/error_boundaries"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/exhaustive_deps"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/globals"
+	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/immutability"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/rules_of_hooks"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -16,5 +17,6 @@ func GetAllRules() []rule.Rule {
 		component_hook_factories.ComponentHookFactoriesRule,
 		error_boundaries.ErrorBoundariesRule,
 		globals.GlobalsRule,
+		immutability.ImmutabilityRule,
 	}
 }
