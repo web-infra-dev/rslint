@@ -65,7 +65,9 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "allow": [],
@@ -125,8 +127,14 @@
       "minItems": 0,
       "maxItems": 3
     },
-    "input": ["given"],
-    "output": ["given", 1, true],
+    "input": [
+      "given"
+    ],
+    "output": [
+      "given",
+      1,
+      true
+    ],
     "valid": true,
     "errors": null
   },
@@ -147,7 +155,10 @@
       "maxItems": 2
     },
     "input": [],
-    "output": [null, 42],
+    "output": [
+      null,
+      42
+    ],
     "valid": false,
     "errors": [
       {
@@ -191,7 +202,9 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "outer": {
@@ -224,7 +237,10 @@
       "minItems": 1,
       "maxItems": 2
     },
-    "input": ["first", {}],
+    "input": [
+      "first",
+      {}
+    ],
     "output": [
       "first",
       {
@@ -244,7 +260,9 @@
           "properties": {
             "allow": {
               "type": "array",
-              "default": ["x"]
+              "default": [
+                "x"
+              ]
             }
           },
           "additionalProperties": false
@@ -255,12 +273,16 @@
     },
     "input": [
       {
-        "allow": ["y"]
+        "allow": [
+          "y"
+        ]
       }
     ],
     "output": [
       {
-        "allow": ["y"]
+        "allow": [
+          "y"
+        ]
       }
     ],
     "valid": true,
@@ -275,8 +297,13 @@
           "type": "object",
           "properties": {
             "allow": {
-              "type": ["array", "null"],
-              "default": ["x"]
+              "type": [
+                "array",
+                "null"
+              ],
+              "default": [
+                "x"
+              ]
             }
           },
           "additionalProperties": false
@@ -330,8 +357,12 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
-    "output": [{}],
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
+    ],
     "valid": false,
     "errors": [
       {
@@ -339,7 +370,10 @@
         "dataPath": "[0]",
         "schemaPath": "#/items/0/oneOf",
         "params": {
-          "passingSchemas": [0, 1]
+          "passingSchemas": [
+            0,
+            1
+          ]
         },
         "message": "should match exactly one schema in oneOf",
         "schema": [
@@ -406,8 +440,16 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [["a"]],
-    "output": [["a"]],
+    "input": [
+      [
+        "a"
+      ]
+    ],
+    "output": [
+      [
+        "a"
+      ]
+    ],
     "valid": true,
     "errors": null
   },
@@ -435,12 +477,18 @@
     },
     "input": [
       {
-        "allow": ["warn", "error"]
+        "allow": [
+          "warn",
+          "error"
+        ]
       }
     ],
     "output": [
       {
-        "allow": ["warn", "error"]
+        "allow": [
+          "warn",
+          "error"
+        ]
       }
     ],
     "valid": true,
@@ -534,11 +582,318 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "max": 3.5
       }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_property_absent_ref_targets_own_default_not_pulled_through",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/inner"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_tuple_item_absent_ref_targets_own_default_not_pulled_through",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "$ref": "#/definitions/inner"
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [],
+    "output": [],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_tuple_item_present_as_empty_object_fills_nested_default_through_ref",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "$ref": "#/definitions/inner"
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {
+        "a": 1
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_property_present_as_empty_object_fills_nested_default_through_ref",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "inner": {
+          "type": "object",
+          "properties": {
+            "a": {
+              "type": "number",
+              "default": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/inner"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "foo": {}
+      }
+    ],
+    "output": [
+      {
+        "foo": {
+          "a": 1
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_multi_hop_chain_fills_nested_default_through_ref",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "a": {
+          "$ref": "#/definitions/b"
+        },
+        "b": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "string",
+              "default": "hi"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/a"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "foo": {}
+      }
+    ],
+    "output": [
+      {
+        "foo": {
+          "x": "hi"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_property_present_ref_target_is_array_with_tuple_default",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "innerArr": {
+          "type": "array",
+          "items": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number",
+              "default": 42
+            }
+          ],
+          "minItems": 0,
+          "maxItems": 2
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/innerArr"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "foo": []
+      }
+    ],
+    "output": [
+      {
+        "foo": [
+          null,
+          42
+        ]
+      }
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "type",
+        "dataPath": "[0].foo[0]",
+        "schemaPath": "#/definitions/innerArr/items/0/type",
+        "params": {
+          "type": "string"
+        },
+        "message": "should be string",
+        "schema": "string",
+        "parentSchema": {
+          "type": "string"
+        }
+      }
+    ]
+  },
+  {
+    "name": "ref_to_oneOf_default_still_not_applied",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "directiveConfig": {
+          "oneOf": [
+            {
+              "type": "boolean",
+              "default": true
+            },
+            {
+              "type": "string",
+              "enum": [
+                "allow-with-description"
+              ]
+            }
+          ]
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "ts-check": {
+              "$ref": "#/definitions/directiveConfig"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
     ],
     "valid": true,
     "errors": null

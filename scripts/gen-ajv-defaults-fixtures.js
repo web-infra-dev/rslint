@@ -276,6 +276,174 @@ const cases = [
     },
     input: [{}],
   },
+  // The following $ref cases pin down a subtle ajv behavior: whether a
+  // property/item's default propagates through a bare `{"$ref": ...}`
+  // schema depends entirely on whether that property/item is *already
+  // present*, never on whether it's absent — because ajv compiles $ref as a
+  // call into the referenced schema's own compiled validator, and
+  // object/array mutation-by-reference is what makes a nested default land
+  // in the parent's data. A `$ref` target's own top-level default can never
+  // fill an *absent* parent slot, because that decision is made by the
+  // parent's own codegen looking at the literal (undereferenced) schema
+  // text, which never contains `default` when it's just `{"$ref": ...}`.
+  {
+    name: 'ref_property_absent_ref_targets_own_default_not_pulled_through',
+    schema: {
+      type: 'array',
+      definitions: {
+        inner: {
+          type: 'object',
+          default: {},
+          properties: { a: { type: 'number', default: 1 } },
+          additionalProperties: false,
+        },
+      },
+      items: [
+        {
+          type: 'object',
+          properties: { foo: { $ref: '#/definitions/inner' } },
+          additionalProperties: false,
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
+  {
+    name: 'ref_tuple_item_absent_ref_targets_own_default_not_pulled_through',
+    schema: {
+      type: 'array',
+      definitions: {
+        inner: {
+          type: 'object',
+          default: {},
+          properties: { a: { type: 'number', default: 1 } },
+          additionalProperties: false,
+        },
+      },
+      items: [{ $ref: '#/definitions/inner' }],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [],
+  },
+  {
+    name: 'ref_tuple_item_present_as_empty_object_fills_nested_default_through_ref',
+    schema: {
+      type: 'array',
+      definitions: {
+        inner: {
+          type: 'object',
+          properties: { a: { type: 'number', default: 1 } },
+          additionalProperties: false,
+        },
+      },
+      items: [{ $ref: '#/definitions/inner' }],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
+  {
+    name: 'ref_property_present_as_empty_object_fills_nested_default_through_ref',
+    schema: {
+      type: 'array',
+      definitions: {
+        inner: {
+          type: 'object',
+          properties: { a: { type: 'number', default: 1 } },
+          additionalProperties: false,
+        },
+      },
+      items: [
+        {
+          type: 'object',
+          properties: { foo: { $ref: '#/definitions/inner' } },
+          additionalProperties: false,
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{ foo: {} }],
+  },
+  {
+    name: 'ref_multi_hop_chain_fills_nested_default_through_ref',
+    schema: {
+      type: 'array',
+      definitions: {
+        a: { $ref: '#/definitions/b' },
+        b: {
+          type: 'object',
+          properties: { x: { type: 'string', default: 'hi' } },
+          additionalProperties: false,
+        },
+      },
+      items: [
+        {
+          type: 'object',
+          properties: { foo: { $ref: '#/definitions/a' } },
+          additionalProperties: false,
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{ foo: {} }],
+  },
+  {
+    name: 'ref_property_present_ref_target_is_array_with_tuple_default',
+    schema: {
+      type: 'array',
+      definitions: {
+        innerArr: {
+          type: 'array',
+          items: [{ type: 'string' }, { type: 'number', default: 42 }],
+          minItems: 0,
+          maxItems: 2,
+        },
+      },
+      items: [
+        {
+          type: 'object',
+          properties: { foo: { $ref: '#/definitions/innerArr' } },
+          additionalProperties: false,
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{ foo: [] }],
+  },
+  {
+    // A default nested inside oneOf stays excluded even when reached via a
+    // property that's a bare $ref to that oneOf (ban-ts-comment's own
+    // ts-check/ts-expect-error/... pattern): the oneOf itself has no
+    // Properties/Items for applyDefaults to walk into, ref-resolved or not.
+    name: 'ref_to_oneOf_default_still_not_applied',
+    schema: {
+      type: 'array',
+      definitions: {
+        directiveConfig: {
+          oneOf: [
+            { type: 'boolean', default: true },
+            { type: 'string', enum: ['allow-with-description'] },
+          ],
+        },
+      },
+      items: [
+        {
+          type: 'object',
+          properties: { 'ts-check': { $ref: '#/definitions/directiveConfig' } },
+          additionalProperties: false,
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
 ];
 
 function run() {

@@ -73,10 +73,11 @@ var EmptyArraySchema = MustCompileSchema([]byte(`{"type": "array", "maxItems": 0
 // with defaults applied, along with any validation error.
 //
 // Defaults are applied the way ajv's `useDefaults` option does: only plain
-// object `properties` and tuple-style array `items` are filled in. Defaults
-// are not applied through `$ref` or inside `allOf`/`anyOf`/`oneOf`/`not`,
-// since which branch applies (or whether the ref should be followed) is
-// ambiguous.
+// object `properties` and tuple-style array `items` are filled in, including
+// through a `$ref` once the property/item it's attached to is already
+// present — see [applyDefaults]. Defaults are never applied inside
+// `allOf`/`anyOf`/`oneOf`/`not`, since which branch applies (if any) is
+// genuinely ambiguous.
 func (s *CompiledSchema) Validate(options any) (any, error) {
 	options = applyDefaults(s.schema, options)
 	if err := s.schema.Validate(options); err != nil {
@@ -97,10 +98,26 @@ func (s *CompiledSchema) Validate(options any) (any, error) {
 // item's default can be inserted even while an earlier, default-less item is
 // still missing — matching ajv, this leaves a hole (nil) at that earlier
 // position rather than refusing to fill the later one.
+//
+// A property/item schema that is itself a bare `$ref` never contributes a
+// default to fill an absent slot: ajv decides whether to create a missing
+// key/index purely from a literal `default` written on that exact schema
+// node, never by dereferencing (confirmed against ajv@6: a $ref target's own
+// top-level `default` is not pulled through into the parent when the parent
+// slot is absent, even across a multi-hop $ref chain). But once a slot is
+// already present — either originally, or because it was just filled from a
+// literal default at this level — recursing into it uses [resolveRef] to
+// follow the schema's own `$ref` chain first. This matches ajv compiling
+// `$ref` as a call into the referenced schema's own compiled validator:
+// since objects/arrays are mutated by reference, that nested call's own
+// useDefaults processing lands directly in the shared data being validated
+// here. Defaults are still never pulled through `allOf`/`anyOf`/`oneOf`/`not`
+// — a $ref chain has exactly one target, unlike those, so there's no
+// ambiguity about which schema's defaults apply.
 func applyDefaults(s *jsonschema.Schema, v any) any {
 	switch val := v.(type) {
 	case map[string]any:
-		for key, prop := range s.Properties {
+		for key, prop := range resolveRef(s).Properties {
 			if _, ok := val[key]; !ok {
 				if prop.Default == nil {
 					continue
@@ -111,7 +128,7 @@ func applyDefaults(s *jsonschema.Schema, v any) any {
 		}
 		return val
 	case []any:
-		items, ok := s.Items.([]*jsonschema.Schema)
+		items, ok := resolveRef(s).Items.([]*jsonschema.Schema)
 		if !ok {
 			return val
 		}
@@ -136,6 +153,30 @@ func applyDefaults(s *jsonschema.Schema, v any) any {
 	default:
 		return v
 	}
+}
+
+// resolveRef follows s's `$ref` chain, if any, to the schema whose own
+// `Properties`/`Items` [applyDefaults] should walk — mirroring how ajv
+// compiles a bare `{"$ref": ...}` schema into a call to the referenced
+// schema's own compiled validator rather than inlining it. A `$ref` chain
+// has exactly one target at each hop, so this is unconditional (unlike
+// allOf/anyOf/oneOf/not, which [applyDefaults] deliberately never resolves).
+//
+// Cycle-guarded for a self-referential chain of pure-$ref wrapper schemas
+// that never bottoms out in a concrete Properties/Items schema (e.g. two
+// schemas that only $ref each other); a normal recursive schema (say, a
+// tree node whose child items $ref back to the node's own object schema)
+// terminates in one hop once it reaches that concrete schema, so this never
+// affects it. It does not need to guard against recursing forever through
+// applyDefaults itself, since that recursion walks v (finite JSON data),
+// not s.
+func resolveRef(s *jsonschema.Schema) *jsonschema.Schema {
+	seen := map[*jsonschema.Schema]bool{}
+	for s.Ref != nil && !seen[s] {
+		seen[s] = true
+		s = s.Ref
+	}
+	return s
 }
 
 // normalizeNumbers mutates v in place, converting any json.Number leaves to
