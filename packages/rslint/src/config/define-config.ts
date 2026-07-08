@@ -84,7 +84,9 @@ export type RuleEntry =
 export type RulesRecord = Record<string, RuleEntry>;
 
 /**
- * TypeScript parser options. `project` may be a single tsconfig path or a list.
+ * Parser-specific extras, nested under `parserOptions` per ESLint v10's
+ * flat-config layout (`ecmaVersion`/`sourceType` moved to the top level of
+ * `languageOptions`; only `ecmaFeatures` and TS-project settings remain here).
  */
 export interface ParserOptions {
   /**
@@ -103,12 +105,66 @@ export interface ParserOptions {
    * project: ['./tsconfig.*.json']
    */
   project?: string | string[];
+  /**
+   * Grammar toggles forwarded to both the native parser and the scope
+   * analyzer.
+   */
+  ecmaFeatures?: {
+    /**
+     * Parse `.js`/`.ts` files as `.jsx`/`.tsx` (JSX inside a non-`x`
+     * extension). `.jsx`/`.tsx` files don't need this — it's inferred from
+     * the extension already.
+     */
+    jsx?: boolean;
+    /**
+     * Allow a top-level `return`. Node CommonJS scripts are implicitly
+     * wrapped in a function at runtime (`(function (exports, require,
+     * module, __filename, __dirname) { ... })`), so top-level `return` /
+     * `arguments` / `this` are valid there; sets are inferred automatically
+     * for `sourceType: 'commonjs'`.
+     */
+    globalReturn?: boolean;
+    /**
+     * Treat the source as if it begins with `'use strict'`. ESLint v10
+     * default is `false`. Modules are always strict regardless of this
+     * setting.
+     */
+    impliedStrict?: boolean;
+  };
 }
 
 /**
  * Language-specific configuration.
  */
 export interface LanguageOptions {
+  /**
+   * The type of JavaScript source code. `'module'` allows `import`/`export`
+   * and is always strict mode; `'script'` is a plain non-module file;
+   * `'commonjs'` additionally implies a Node-style function wrapper (see
+   * `parserOptions.ecmaFeatures.globalReturn`).
+   *
+   * @default 'module' for .js/.mjs/.ts/.tsx; 'commonjs' for .cjs/.cts
+   */
+  sourceType?: 'module' | 'script' | 'commonjs';
+  /**
+   * Additional identifiers to treat as globals, beyond the ECMAScript
+   * built-ins (`Array`, `Promise`, `globalThis`, ...) rslint always seeds.
+   * `'readonly'` / `'writable'` control whether `no-const-assign`-style
+   * write-checks flag reassignment; `'off'` un-declares a global that a
+   * broader config entry added.
+   *
+   * Only rules that do scope analysis honour this (community plugin rules
+   * run through rslint's ESLint-compat runtime, and any rslint-native rule
+   * that walks scope). It is NOT consulted by rslint's own `no-undef`,
+   * `no-shadow`, or `no-redeclare` — those are typed-linting rules that ask
+   * the TypeScript checker whether a name resolves (so add an ambient
+   * `.d.ts` — or `@types/*` — declaration instead if those rules flag a
+   * global as undefined).
+   *
+   * @example
+   * globals: { describe: 'readonly', it: 'readonly' }
+   */
+  globals?: Record<string, 'readonly' | 'writable' | 'off'>;
   parserOptions?: ParserOptions;
 }
 
