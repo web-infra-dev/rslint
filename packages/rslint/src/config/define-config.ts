@@ -131,6 +131,23 @@ export interface ParserOptions {
      */
     impliedStrict?: boolean;
   };
+  /**
+   * The identifier that's used for JSX element creation, so unused-import/
+   * unused-variable checks recognize the pragma as "used" instead of
+   * flagging it (e.g. `import { h } from 'preact'` with `jsxPragma: 'h'`).
+   * Only relevant when the classic (non-automatic) JSX runtime is in play.
+   *
+   * @default 'React'
+   */
+  jsxPragma?: string | null;
+  /**
+   * The identifier used for JSX fragment elements (`<>...</>`), analogous to
+   * `jsxPragma` — set this when a custom pragma also provides its own
+   * fragment component (e.g. Preact's `Fragment`).
+   *
+   * @default null
+   */
+  jsxFragmentName?: string | null;
 }
 
 /**
