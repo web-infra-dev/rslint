@@ -1,6 +1,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -66,6 +67,33 @@ func TestParseConfigPayload_MultiConfig(t *testing.T) {
 	}
 }
 
+func TestParseConfigPayload_MultiConfigTargetFiles(t *testing.T) {
+	data := []byte(`{
+		"configs": [
+			{
+				"configDirectory": "/project/packages/foo",
+				"entries": [{"rules": {"no-console": "error"}}],
+				"targetFiles": ["/project/packages/foo/src/a.ts", "src/b.ts"]
+			}
+		]
+	}`)
+
+	result, err := parseConfigPayload(data)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	targets := result.ConfigTargetFiles["/project/packages/foo"]
+	if len(targets) != 2 {
+		t.Fatalf("Expected 2 target files, got %v", targets)
+	}
+	if targets[0] != "/project/packages/foo/src/a.ts" {
+		t.Errorf("Expected absolute target to be normalized, got %q", targets[0])
+	}
+	if targets[1] != "/project/packages/foo/src/b.ts" {
+		t.Errorf("Expected relative target to resolve from config dir, got %q", targets[1])
+	}
+}
+
 func TestParseConfigPayload_SingleConfig(t *testing.T) {
 	data := []byte(`{
 		"configDirectory": "/project/packages/foo",
@@ -87,6 +115,40 @@ func TestParseConfigPayload_SingleConfig(t *testing.T) {
 	}
 	if result.SingleConfig == nil {
 		t.Fatal("Expected non-nil singleConfig")
+	}
+}
+
+func TestParseConfigPayload_RejectsEmptyFilesArray(t *testing.T) {
+	cases := []struct {
+		name string
+		data []byte
+	}{
+		{
+			name: "multi config",
+			data: []byte(`{
+				"configs": [
+					{"configDirectory": "/project", "entries": [{"files": [], "rules": {"no-console": "error"}}]}
+				]
+			}`),
+		},
+		{
+			name: "legacy single config",
+			data: []byte(`{
+				"configDirectory": "/project",
+				"entries": [{"files": [], "rules": {"no-console": "error"}}]
+			}`),
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := parseConfigPayload(tt.data)
+			if err == nil {
+				t.Fatal("expected parseConfigPayload to reject empty files array")
+			}
+			if !strings.Contains(err.Error(), `key "files": expected value to be a non-empty array`) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 

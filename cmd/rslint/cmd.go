@@ -677,7 +677,7 @@ func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
 type allowFileWarningKind int
 
 const (
-	allowFileNotInProgram allowFileWarningKind = iota
+	allowFileNotFound allowFileWarningKind = iota
 	allowFileIgnored
 )
 
@@ -696,8 +696,8 @@ type allowFileWarning struct {
 func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions) string {
 	rel := tspath.ConvertToRelativePath(w.Path, opts)
 	switch w.Kind {
-	case allowFileNotInProgram:
-		return fmt.Sprintf("warning: %s was not found in the project, skipping", rel)
+	case allowFileNotFound:
+		return fmt.Sprintf("warning: %s was not found, skipping", rel)
 	case allowFileIgnored:
 		return fmt.Sprintf("warning: %s is ignored because of a matching ignore pattern", rel)
 	}
@@ -705,10 +705,10 @@ func formatAllowFileWarning(w allowFileWarning, opts tspath.ComparePathsOptions)
 }
 
 // collectAllowFileWarnings explains, for each CLI-specified file in
-// allowFiles, why it won't be visited by Phase 1 (lint). A file lands in
-// the result if it is outside every Program, or if it is in some Program
-// but the nearest config's `ignores` patterns exclude it. Returns nil for
-// empty allowFiles.
+// allowFiles, why it won't be visited by Phase 1 (lint). Program membership
+// is deliberately not consulted: lint targets are resolved before type-info
+// binding, so a file outside every tsconfig can still be linted via fallback.
+// Returns nil for empty allowFiles.
 //
 // This is a Phase-1 concern only. In --type-check-only mode the lint phase
 // is skipped, so callers MUST gate emission on `!typeCheckOnly` — otherwise
@@ -726,12 +726,6 @@ func collectAllowFileWarnings(
 	if len(allowFiles) == 0 {
 		return nil
 	}
-	programFiles := make(map[string]struct{})
-	for _, prog := range programs {
-		for _, sf := range prog.GetSourceFiles() {
-			programFiles[sf.FileName()] = struct{}{}
-		}
-	}
 
 	// Cache FindNearestConfig results by directory to avoid redundant lookups
 	// when many files are in the same directory (e.g., lint-staged).
@@ -743,28 +737,30 @@ func collectAllowFileWarnings(
 
 	var out []allowFileWarning
 	for _, f := range allowFiles {
-		if _, inProgram := programFiles[f]; !inProgram {
-			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotInProgram})
-			continue
-		}
-		// File is in a Program — check if config would assign rules
-		var merged *rslintconfig.MergedConfig
+		var cfgDir string
+		var cfg rslintconfig.RslintConfig
 		if configMap != nil {
 			dir := tspath.GetDirectoryPath(f)
 			cached, ok := dirConfigCache[dir]
 			if !ok {
-				cfgDir, cfg := rslintconfig.FindNearestConfig(f, configMap)
-				cached = &cachedConfig{cfgDir: cfgDir, cfg: cfg}
+				foundDir, foundCfg := rslintconfig.FindNearestConfig(f, configMap)
+				cached = &cachedConfig{cfgDir: foundDir, cfg: foundCfg}
 				dirConfigCache[dir] = cached
 			}
-			if cached.cfg != nil {
-				merged = cached.cfg.GetConfigForFile(f, cached.cfgDir)
-			}
+			cfgDir = cached.cfgDir
+			cfg = cached.cfg
 		} else {
-			merged = rslintConfig.GetConfigForFile(f, currentDirectory)
+			cfgDir = currentDirectory
+			cfg = rslintConfig
 		}
-		if merged == nil {
+		if cfg != nil && cfg.IsFileIgnored(f, cfgDir) {
 			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
+			continue
+		}
+
+		if _, err := os.Stat(f); err != nil {
+			out = append(out, allowFileWarning{Path: f, Kind: allowFileNotFound})
+			continue
 		}
 	}
 	return out
@@ -804,6 +800,17 @@ func validateTypeCheckOnlyFlags(typeCheckOnly, fix bool, ruleFlags []string) (in
 		return 2, "error: --rule cannot be combined with --type-check-only (no lint rules run)"
 	}
 	return 0, ""
+}
+
+func cloneConfigMap(configMap map[string]rslintconfig.RslintConfig) map[string]rslintconfig.RslintConfig {
+	if configMap == nil {
+		return nil
+	}
+	cloned := make(map[string]rslintconfig.RslintConfig, len(configMap))
+	for dir, cfg := range configMap {
+		cloned[dir] = slices.Clone(cfg)
+	}
+	return cloned
 }
 
 // resolveStartTime returns the start time for timing output.
@@ -898,9 +905,9 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 	return args, help, 0
 }
 
-// executeLintPipeline runs the full lint flow (config load → program build
-// → gap-file fallback → lint → optional --fix loop → report) and returns
-// the process exit code. Shared by the IPC entry (runCLI) and the wasm
+// executeLintPipeline runs the full lint flow (config load → program build →
+// lint target plan/fallback binding → lint → optional --fix loop → report) and
+// returns the process exit code. Shared by the IPC entry (runCLI) and the wasm
 // native fallback.
 func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.EslintPluginDispatcher) int {
 	// Unpack into locals so the pipeline body below stays verbatim — only the
@@ -975,6 +982,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return 1
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
+	workingDirectory := currentDirectory
 
 	if init {
 		if err := rslintconfig.InitDefaultConfig(currentDirectory); err != nil {
@@ -1007,10 +1015,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// round-trips raw (byte-matching the worker's plugin map key). nil outside
 	// multi-config mode (single-config / JSON configs never mount plugins).
 	var originalConfigDir map[string]string
+	var configTargetFiles map[string][]string
 
 	programs := []*compiler.Program{}
 	// programConfigDirs tracks which configDir each program belongs to (parallel to programs).
-	// Used for ownership-based file deduplication in multi-config mode.
+	// Used when binding duplicate selected targets to the Program associated
+	// with the nearest config in multi-config mode.
 	var programConfigDirs []string
 
 	if configStdin {
@@ -1037,6 +1047,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// Multi-config format
 			configMap = payload.ConfigMap
 			originalConfigDir = payload.OriginalConfigDir
+			configTargetFiles = payload.ConfigTargetFiles
 
 			// Inject .gitignore patterns as global ignores for each config.
 			// Each config independently reads its own .gitignore tree:
@@ -1071,7 +1082,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// serial createProgramsForConfig loop below; that is safe because
 			// createProgramsForConfig only reads parserOptions.project, never
 			// Ignores, so observing the pre-augmentation configMap is fine.
-			// Results are merged after the loop — DiscoverGapFiles needs them.
+			// Results are merged after the loop — target discovery needs them.
 			type giResult struct {
 				configDir string
 				globs     []string
@@ -1106,7 +1117,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 
 			// Join the gitignore reads and merge into configMap. Must complete
-			// before DiscoverGapFiles, which relies on the augmented configMap.
+			// before target discovery, which relies on the augmented configMap.
 			giWG.RunAndWait()
 			for _, r := range giResults {
 				configMap[r.configDir] = append(
@@ -1138,6 +1149,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
 		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+		if config != "" {
+			// Explicit --config follows flat-config invocation semantics: file,
+			// ignore, project, and implicit no-args target scope are rooted at
+			// the cwd where rslint was invoked, not the config file's directory.
+			currentDirectory = workingDirectory
+		}
 
 		// Inject .gitignore patterns as global ignores. Run gitignore reading
 		// in parallel with createProgramsForConfig (see comment above).
@@ -1154,7 +1171,13 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		programs = append(programs, progs...)
 	}
 
-	// Apply --rule CLI overrides by appending a synthetic ConfigEntry (no files = matches all).
+	targetConfigMap := cloneConfigMap(configMap)
+	targetRslintConfig := slices.Clone(rslintConfig)
+
+	// Apply --rule CLI overrides by appending a synthetic ConfigEntry. Target
+	// discovery below intentionally uses the pre-override config snapshots
+	// above, so --rule overlays already-selected lint targets without widening
+	// discovery by itself.
 	if len(ruleFlags) > 0 {
 		cliEntry, err := rslintconfig.BuildCLIRuleEntry(ruleFlags)
 		if err != nil {
@@ -1175,58 +1198,58 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Use CWD for display paths (not any config directory).
 	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
 	// so it already holds the normalized CWD.
-	cwd := currentDirectory
+	cwd := workingDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          cwd,
 		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
 	}
 
-	// No args → implicit CWD scoping (same as `rslint .`).
-	// Only applies to multi-config stdin path. In this mode, configs may include
-	// parent or nested configs, so Programs may contain files outside CWD.
-	// Without scoping, all those files would be linted unexpectedly.
-	if len(allowFiles) == 0 && len(allowDirs) == 0 && configStdin && configMap != nil {
+	// No args → implicit CWD scoping (same as `rslint .`), matching ESLint.
+	// This keeps an explicit --config outside the current directory from
+	// widening the scanned root to the config file's directory.
+	if len(allowFiles) == 0 && len(allowDirs) == 0 {
 		allowDirs = []string{cwd}
 	}
 
-	// --- Gap file discovery and fallback Program ---
-	// Discover files that match config `files` patterns but are not in any
-	// tsconfig Program. These "gap" files get a fallback Program (AST-only,
-	// no type info) and only run non-type-aware rules. Shared verbatim with
-	// the --api path (HandleLint) via buildProgramsWithGapFallback, so both
-	// resolve gap files, the fallback Program, and the type-info set (the
-	// type-aware gate's only input) identically. cwd == currentDirectory here
-	// (see above), so passing currentDirectory preserves prior behavior.
-	programs, typeInfoFiles, capturedGapFiles := buildProgramsWithGapFallback(
-		programs, configMap, rslintConfig, currentDirectory, fs, allowFiles, allowDirs, parseCache, singleThreaded,
+	// --- Lint target discovery and fallback Program binding ---
+	// Resolve the exact lint target set independently from Program membership,
+	// then bind selected files to existing Programs or an AST-only fallback
+	// Program. Shared with the --api path via buildProgramsWithLintTargets, so
+	// target discovery, fallback creation, and type-aware gating stay aligned.
+	programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+		programs, targetConfigMap, targetRslintConfig, currentDirectory, programConfigDirs, configTargetFiles, fs, allowFiles, allowDirs, parseCache, singleThreaded,
 	)
 
-	// Initial build (including the gap fallback) is complete: evict cache
+	// Initial build (including any fallback) is complete: evict cache
 	// entries for files that ended up in no program — build-time dedup
 	// losers, parsed-then-dropped duplicates. Deletion-only, see
 	// ParseCache.RetainOnly (I7).
 	parseCache.RetainOnly(programs)
 
 	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
-	// The gap-file fallback is appended last, but callers no longer need its
+	// The fallback is appended last, but callers no longer need its
 	// index: buildTypeCheckSkipMask reads each program's ConfigFilePath to decide
 	// what to exclude from type-check.
-	createPrograms := func() ([]*compiler.Program, error) {
+	createPrograms := func() ([]*compiler.Program, []string, error) {
 		var baseProgs []*compiler.Program
+		var baseProgramConfigDirs []string
 		if configMap != nil {
 			seen := make(map[string]struct{})
 			for configDir, entries := range configMap {
 				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen, parseCache)
 				if exitCode != 0 {
-					return nil, fmt.Errorf("failed to create programs for %s", configDir)
+					return nil, nil, fmt.Errorf("failed to create programs for %s", configDir)
+				}
+				for range progs {
+					baseProgramConfigDirs = append(baseProgramConfigDirs, configDir)
 				}
 				baseProgs = append(baseProgs, progs...)
 			}
 		} else {
 			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil, parseCache)
 			if exitCode != 0 {
-				return nil, errors.New("failed to create programs")
+				return nil, nil, errors.New("failed to create programs")
 			}
 			baseProgs = append(baseProgs, progs...)
 		}
@@ -1239,7 +1262,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			}
 		}
 
-		return baseProgs, nil
+		return baseProgs, baseProgramConfigDirs, nil
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -1272,9 +1295,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, filePath, currentDirectory, enforcePlugins, typeInfoFiles)
 	}
 
-	// Build per-program file filters combining:
-	//   - multi-config ownership deduplication (ESLint v10 aligned)
-	//   - config `ignores` exclusion (applies to rules and counts)
+	// Build per-program file filters for global ignores. Target ownership and
+	// deduplication were already resolved in targetsByProgram.
 	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
 
 	// Programs not backed by a real tsconfig (the gap-file fallback AND the
@@ -1297,6 +1319,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 		PerProgramFilter:      toFileFilters(fileFilters),
+		TargetFiles:           targetsByProgram,
 		GetRulesForFile:       rulesForFile,
 		TypeInfoFiles:         typeInfoFiles,
 		TypeCheck:             typeCheck,
@@ -1369,7 +1392,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
 		// Skip if nothing was fixed in the first pass (no need to re-lint).
 		for pass := 1; pass < maxFixPasses && fixedCount > 0; pass++ {
-			newPrograms, err := createPrograms()
+			newPrograms, newProgramConfigDirs, err := createPrograms()
 			if err != nil || len(newPrograms) == 0 {
 				break
 			}
@@ -1383,8 +1406,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint: collect remaining diagnostics.
-			// Rebuild file filters for the new programs (ownership + ignores).
-			fixFileFilters := buildFileFilters(newPrograms, configMap, programConfigDirs, rslintConfig, currentDirectory)
+			// Rebuild global-ignore filters for the new programs.
+			fixFileFilters := buildFileFilters(newPrograms, configMap, newProgramConfigDirs, rslintConfig, currentDirectory)
+			fixTargetsByProgram := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fs)
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			var passDiags []rule.RuleDiagnostic
 			fixRunOpts := linter.RunLinterOptions{
@@ -1392,6 +1416,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				SingleThreaded:        singleThreaded,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 				PerProgramFilter:      toFileFilters(fixFileFilters),
+				TargetFiles:           fixTargetsByProgram,
 				GetRulesForFile:       getRulesForFile,
 				TypeInfoFiles:         typeInfoFiles,
 				TypeCheck:             typeCheck,

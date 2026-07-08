@@ -21,12 +21,12 @@
         },
         "files": {
           "type": "array",
-          "description": "Additional files to include beyond those specified in tsconfig.json",
+          "description": "Non-empty glob patterns selecting files this config entry applies to. Omit to use rslint's default lintable extensions.",
+          "minItems": 1,
           "items": {
             "type": "string",
             "description": "File pattern (glob) to include"
-          },
-          "default": []
+          }
         },
         "ignores": {
           "type": "array",
@@ -306,7 +306,6 @@
     [
       {
         "language": "javascript",
-        "files": [],
         "ignores": ["node_modules/**", "dist/**", "*.test.ts"],
         "languageOptions": {
           "parserOptions": {

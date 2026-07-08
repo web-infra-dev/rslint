@@ -9,6 +9,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -209,11 +210,13 @@ export const value: Bad | null = null;
 		t.Fatalf("expected tsconfig-backed program to participate in type-check, got %v", skip)
 	}
 
-	programs, typeInfoFiles, gapFiles := buildProgramsWithGapFallback(
+	programs, typeInfoFiles, gapFiles, _, _ := buildProgramsWithLintTargets(
 		programs,
 		nil,
 		cfg,
 		dir,
+		nil,
+		nil,
 		fs,
 		nil,
 		nil,
@@ -240,5 +243,63 @@ export const value: Bad | null = null;
 
 	if diags := collectProgramTypeDiagnostics(t, programs, skip, typeInfoFiles); containsTSDiagnostic(diags, "TS2304") {
 		t.Fatalf("did not expect declaration diagnostics from a gap fallback program: %+v", diags)
+	}
+}
+
+func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
+	dir := t.TempDir()
+	writeProgramTestFiles(t, dir, map[string]string{
+		"main.ts":       "import { value } from './lib';\nconsole.log(value);\n",
+		"lib.ts":        "export const value = 1;\n",
+		"tsconfig.json": `{"files": ["main.ts"], "compilerOptions": {"module": "ESNext"}}`,
+	})
+
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	parseCache := utils.NewParseCache()
+	cfg := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{
+			ParserOptions: &rslintconfig.ParserOptions{
+				Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+			},
+		},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
+	}}
+	programs, exitCode := createProgramsForConfig(dir, cfg, true, fs, nil, parseCache)
+	if exitCode != 0 {
+		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
+	}
+	if len(programs) != 1 {
+		t.Fatalf("expected one tsconfig-backed program, got %d", len(programs))
+	}
+
+	libPath := tspath.NormalizePath(filepath.Join(dir, "lib.ts"))
+	programs, typeInfoFiles, gapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+		programs,
+		nil,
+		cfg,
+		dir,
+		nil,
+		nil,
+		fs,
+		[]string{libPath},
+		nil,
+		parseCache,
+		true,
+	)
+	if len(programs) != 1 {
+		t.Fatalf("imported non-root target should reuse existing Program, got %d programs", len(programs))
+	}
+	if len(gapFiles) != 0 {
+		t.Fatalf("imported non-root target should not become a gap file, got %v", gapFiles)
+	}
+	if typeInfoFiles != nil {
+		t.Fatalf("no fallback appended, so typeInfoFiles should stay nil, got %v", typeInfoFiles)
+	}
+	if len(targetFiles) != 1 || targetFiles[0] != libPath {
+		t.Fatalf("expected lib.ts as the only target, got %v", targetFiles)
+	}
+	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 || targetsByProgram[0][0] != libPath {
+		t.Fatalf("expected lib.ts bound to the tsconfig Program, got %v", targetsByProgram)
 	}
 }

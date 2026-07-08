@@ -185,6 +185,11 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 		log.Printf("[rslint] Config update has no configs field; keeping existing JS configs intact")
 		return nil
 	}
+	for _, cfg := range payload.Configs {
+		if err := config.ValidateConfig(cfg.Entries); err != nil {
+			return fmt.Errorf("invalid config for %q: %w", cfg.ConfigDirectory, err)
+		}
+	}
 
 	// Replace all JS configs with the new set (may be empty when all deleted).
 	// Keys are URI strings (e.g. "file:///project") sent from VS Code,

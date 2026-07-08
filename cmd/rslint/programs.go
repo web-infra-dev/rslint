@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"sort"
 
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -27,7 +28,7 @@ import (
 // after gitignore globs are prepended is equivalent for TS Program creation.
 //
 // The returned config is the gitignore-augmented config (gitignore globs
-// prepended when non-empty), suitable for downstream DiscoverGapFiles /
+// prepended when non-empty), suitable for downstream target discovery /
 // GetConfigForFile.
 //
 // Returns: (augmentedConfig, programs, exitCode). On non-zero exitCode,
@@ -120,7 +121,7 @@ func createProgramsForConfig(
 		}
 	} else {
 		// No tsconfig fallback: scan directory for pure JS projects
-		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
+		sourceExts := rslintconfig.DefaultLintFileExtensions
 		excludes := utils.DefaultExcludeDirNames
 		includes := []string{"**/*"}
 		rootFiles := vfsmatch.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, vfsmatch.UnlimitedDepth)
@@ -143,9 +144,9 @@ func createProgramsForConfig(
 	return programs, 0
 }
 
-// createFallbackProgram creates a Program for "gap" files — files matched by
-// config `files` patterns but not included in any tsconfig. Uses minimal
-// compiler options sufficient for AST parsing (no type checking).
+// createFallbackProgram creates a Program for selected lint targets not
+// included in any existing Program. It uses minimal compiler options sufficient
+// for AST parsing (no type checking).
 func createFallbackProgram(
 	gapFiles []string,
 	singleThreaded bool,
@@ -169,11 +170,9 @@ func createFallbackProgram(
 	return program, 0
 }
 
-// buildProgramsWithGapFallback discovers "gap" files — files matched by config
-// `files` patterns (or explicitly requested and matched by config) but absent
-// from every tsconfig Program — and appends one AST-only fallback Program for
-// them. It returns the (possibly extended) program slice, the type-info file
-// set, and the gap files retained for --fix rebuilds.
+// buildProgramsWithLintTargets resolves the exact lint target set, appends an
+// AST-only fallback Program for selected files absent from every existing
+// Program, and returns the per-program target plan consumed by RunLinter.
 //
 // The appended fallback Program (like the no-tsconfig directory-scan Program)
 // carries synthesized CompilerOptions with no ConfigFilePath, which is how
@@ -186,108 +185,168 @@ func createFallbackProgram(
 // rules off files with no type information — the only guard against a
 // type-aware rule dereferencing a nil TypeChecker (which crashes the whole
 // process). Both the CLI (executeLintPipeline) and the --api path (HandleLint)
-// call this, so their gap / fallback / gate behavior is identical by
-// construction rather than by two parallel implementations kept in sync.
+// call this, so target discovery, fallback binding, and type-aware gating are
+// identical by construction rather than by two parallel implementations kept
+// in sync.
 //
 // configMap is non-nil only in the multi-config (stdin) path; the --api and
 // single-config paths pass nil and resolve against rslintConfig +
 // currentDirectory.
-func buildProgramsWithGapFallback(
+func buildProgramsWithLintTargets(
 	programs []*compiler.Program,
 	configMap map[string]rslintconfig.RslintConfig,
 	rslintConfig rslintconfig.RslintConfig,
 	currentDirectory string,
+	programConfigDirs []string,
+	configTargetFiles map[string][]string,
 	fs vfs.FS,
 	allowFiles []string,
 	allowDirs []string,
 	parseCache *utils.ParseCache,
 	singleThreaded bool,
-) ([]*compiler.Program, map[string]struct{}, []string) {
+) ([]*compiler.Program, map[string]struct{}, []string, []string, [][]string) {
 	var typeInfoFiles map[string]struct{}
 	var capturedGapFiles []string
 
 	programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
 
-	var gapFiles []string
+	var targetFiles []string
 	if configMap != nil {
-		gapFiles = rslintconfig.DiscoverGapFilesMultiConfig(configMap, fs, programFiles, allowFiles, allowDirs, singleThreaded)
+		targetFiles = discoverLintFilesMultiConfig(configMap, configTargetFiles, fs, allowFiles, allowDirs, singleThreaded)
 	} else {
-		gapFiles = rslintconfig.DiscoverGapFiles(rslintConfig, currentDirectory, fs, programFiles, allowFiles, allowDirs, singleThreaded)
+		targetFiles = rslintconfig.DiscoverLintFiles(rslintConfig, currentDirectory, fs, allowFiles, allowDirs, singleThreaded)
 	}
 
-	// Explicit file args bypass config `files` patterns (ESLint behavior):
-	// if a file is explicitly requested, lint it even if no config entry has a
-	// matching `files` pattern — as long as the config would assign it rules.
-	if gapFiles != nil && len(allowFiles) > 0 {
-		gapSet := make(map[string]struct{}, len(gapFiles))
-		for _, f := range gapFiles {
-			gapSet[f] = struct{}{}
-		}
-		for _, f := range allowFiles {
-			nf := tspath.NormalizePath(f)
-			if _, inProgram := programFiles[nf]; inProgram {
-				continue
-			}
-			if _, alreadyGap := gapSet[nf]; alreadyGap {
-				continue
-			}
-			// Check if config would assign any rules to this file.
-			var merged *rslintconfig.MergedConfig
-			if configMap != nil {
-				cfgDir, cfg := rslintconfig.FindNearestConfig(nf, configMap)
-				if cfg != nil {
-					merged = cfg.GetConfigForFile(nf, cfgDir)
-				}
-			} else {
-				merged = rslintConfig.GetConfigForFile(nf, currentDirectory)
-			}
-			if merged != nil {
-				gapFiles = append(gapFiles, nf)
-			}
+	gapFiles := make([]string, 0, len(targetFiles))
+	for _, target := range targetFiles {
+		if _, inProgram := programFiles[target]; !inProgram {
+			gapFiles = append(gapFiles, target)
 		}
 	}
 
-	if gapFiles != nil {
+	if len(gapFiles) > 0 {
 		// Build type-info set from existing (tsconfig) Programs BEFORE
 		// appending the fallback, so fallback files are NOT in this set.
 		typeInfoFiles = utils.CollectProgramFiles(programs, fs, singleThreaded)
 		capturedGapFiles = gapFiles
 
-		if len(gapFiles) > 0 {
-			fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache)
-			if fallback != nil {
-				programs = append(programs, fallback)
-			}
+		fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache)
+		if fallback != nil {
+			programs = append(programs, fallback)
 		}
 	}
 
-	return programs, typeInfoFiles, capturedGapFiles
+	targetsByProgram := assignLintTargetsToPrograms(programs, configMap, programConfigDirs, targetFiles, fs)
+
+	return programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram
 }
 
-// buildFileOwnerMap determines which config directory "owns" each file across
-// all programs. Ownership is based on nearest config lookup (deepest matching
-// configDirectory), aligning with ESLint v10's per-file config resolution.
-// This ensures each file is linted exactly once by the program belonging to
-// its nearest config.
-func buildFileOwnerMap(programs []*compiler.Program, configMap map[string]rslintconfig.RslintConfig) map[string]string {
-	fileOwner := make(map[string]string)
-	for _, prog := range programs {
+func discoverLintFilesMultiConfig(
+	configMap map[string]rslintconfig.RslintConfig,
+	configTargetFiles map[string][]string,
+	fs vfs.FS,
+	allowFiles []string,
+	allowDirs []string,
+	singleThreaded bool,
+) []string {
+	if len(configTargetFiles) == 0 {
+		return rslintconfig.DiscoverLintFilesMultiConfig(configMap, fs, allowFiles, allowDirs, singleThreaded)
+	}
+
+	seen := make(map[string]struct{})
+	var allTargets []string
+	for configDir, cfg := range configMap {
+		configAllowFiles := allowFiles
+		configAllowDirs := allowDirs
+		if targetFiles, scoped := configTargetFiles[configDir]; scoped {
+			configAllowFiles = targetFiles
+			configAllowDirs = nil
+		}
+
+		targets := rslintconfig.DiscoverLintFiles(cfg, configDir, fs, configAllowFiles, configAllowDirs, singleThreaded)
+		for _, f := range targets {
+			ownerDir, _ := rslintconfig.FindNearestConfig(f, configMap)
+			if ownerDir != configDir {
+				continue
+			}
+			if _, exists := seen[f]; !exists {
+				seen[f] = struct{}{}
+				allTargets = append(allTargets, f)
+			}
+		}
+	}
+	sort.Strings(allTargets)
+	return allTargets
+}
+
+type programFileCandidate struct {
+	programIndex int
+	fileName     string
+}
+
+// assignLintTargetsToPrograms binds resolved lint targets to exactly one
+// Program. It accepts imported non-root SourceFiles; ownership/dedup is driven
+// by the target plan, not by CommandLine().FileNames().
+func assignLintTargetsToPrograms(
+	programs []*compiler.Program,
+	configMap map[string]rslintconfig.RslintConfig,
+	programConfigDirs []string,
+	targetFiles []string,
+	fs vfs.FS,
+) [][]string {
+	targetsByProgram := make([][]string, len(programs))
+	if len(programs) == 0 || len(targetFiles) == 0 {
+		return targetsByProgram
+	}
+
+	byPath := make(map[string][]programFileCandidate)
+	for i, prog := range programs {
 		for _, sf := range prog.GetSourceFiles() {
-			fn := sf.FileName()
-			if _, ok := fileOwner[fn]; !ok {
-				nearestDir, _ := rslintconfig.FindNearestConfig(fn, configMap)
-				fileOwner[fn] = nearestDir
+			name := sf.FileName()
+			candidate := programFileCandidate{programIndex: i, fileName: name}
+			byPath[name] = append(byPath[name], candidate)
+			if fs != nil {
+				if real := fs.Realpath(name); real != "" && real != name {
+					byPath[real] = append(byPath[real], candidate)
+				}
 			}
 		}
 	}
-	return fileOwner
+
+	seenProgramFile := make([]map[string]struct{}, len(programs))
+	for _, target := range targetFiles {
+		candidates := byPath[target]
+		if len(candidates) == 0 {
+			continue
+		}
+		chosen := candidates[0]
+		if configMap != nil && len(programConfigDirs) > 0 {
+			ownerDir, _ := rslintconfig.FindNearestConfig(target, configMap)
+			for _, candidate := range candidates {
+				if candidate.programIndex < len(programConfigDirs) && programConfigDirs[candidate.programIndex] == ownerDir {
+					chosen = candidate
+					break
+				}
+			}
+		}
+		if seenProgramFile[chosen.programIndex] == nil {
+			seenProgramFile[chosen.programIndex] = make(map[string]struct{})
+		}
+		if _, seen := seenProgramFile[chosen.programIndex][chosen.fileName]; seen {
+			continue
+		}
+		seenProgramFile[chosen.programIndex][chosen.fileName] = struct{}{}
+		targetsByProgram[chosen.programIndex] = append(targetsByProgram[chosen.programIndex], chosen.fileName)
+	}
+	for i := range targetsByProgram {
+		sort.Strings(targetsByProgram[i])
+	}
+	return targetsByProgram
 }
 
-// buildFileFilters returns per-program file filters combining two concerns:
-//   - multi-config ownership: a file is linted by the program belonging to its
-//     nearest config (only active when len(configMap) > 1)
-//   - config `ignores`: files matching the user's ignore patterns are excluded
-//     from lint rules and the linted-file count
+// buildFileFilters returns per-program file filters for config `ignores`.
+// Target ownership/deduplication is handled by DiscoverLintFilesMultiConfig and
+// assignLintTargetsToPrograms before RunLinter receives TargetFiles.
 //
 // These filters are consumed by RunLinter only in Phase 1 (lint). Phase 2
 // (type-check) does NOT consult them — type-check mirrors `tsgo --noEmit`
@@ -307,25 +366,9 @@ func buildFileFilters(
 	singleConfig rslintconfig.RslintConfig,
 	singleConfigDir string,
 ) []func(string) bool {
-	var fileOwner map[string]string
-	if len(configMap) > 1 {
-		fileOwner = buildFileOwnerMap(programs, configMap)
-	}
-
 	filters := make([]func(string) bool, len(programs))
 	for i := range programs {
-		var ownerDir string
-		if fileOwner != nil && i < len(programConfigDirs) {
-			ownerDir = programConfigDirs[i]
-		}
 		filters[i] = func(fileName string) bool {
-			// Ownership check: only when we have multiple configs AND this
-			// program is anchored to a configDir (gap fallback has "").
-			if fileOwner != nil && ownerDir != "" {
-				if owner, ok := fileOwner[fileName]; ok && owner != ownerDir {
-					return false
-				}
-			}
 			// Ignore check: resolve the config that governs this file and
 			// consult its global `ignores` patterns.
 			var cfg rslintconfig.RslintConfig

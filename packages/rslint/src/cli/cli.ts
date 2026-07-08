@@ -9,6 +9,8 @@ import { parseArgs, classifyArgs, isJSConfigFile } from '../utils/args.js';
 import {
   discoverConfigs,
   filterConfigsByParentIgnores,
+  findJSConfigUp,
+  isConfigDirIgnoredByParentIgnores,
   type ConfigEntry,
 } from '../utils/config-discovery.js';
 import { resolveRslintBinary } from '../internal/resolve-binary.js';
@@ -23,8 +25,8 @@ export type RunCLIOptions = {
 
 /**
  * Load multiple JS/TS configs and run them through the Go binary over IPC.
- * Tolerates individual config load failures — skips broken configs with a
- * warning and continues with the remaining configs.
+ * Any discovered config load/validation failure is fatal, matching ESLint's
+ * config validation behavior.
  */
 async function runWithJSConfigs(
   binPath: string,
@@ -32,25 +34,41 @@ async function runWithJSConfigs(
   goArgs: string[],
   cwd: string,
   singleThreaded: boolean,
+  protectedConfigFiles = new Map<string, string[]>(),
 ): Promise<number> {
   const configEntries: ConfigEntry[] = [];
   const dirToPath = new Map<string, string>();
-  const isSingleConfig = configs.size === 1;
+  const scopedTargetFilesByDir = new Map<string, string[]>();
+  const protectedConfigDirs = new Set(
+    [...protectedConfigFiles.keys()].map((configPath) =>
+      path.dirname(configPath),
+    ),
+  );
 
   for (const [configPath, configDir] of configs) {
+    const ignoredByParent = isConfigDirIgnoredByParentIgnores(
+      configDir,
+      configEntries,
+    );
+    if (!protectedConfigFiles.has(configPath) && ignoredByParent) {
+      continue;
+    }
+    if (ignoredByParent) {
+      const protectedFiles = protectedConfigFiles.get(configPath);
+      if (protectedFiles) {
+        scopedTargetFilesByDir.set(configDir, protectedFiles);
+      }
+    }
+
     let rawConfig: unknown;
     try {
       rawConfig = await loadConfigFile(configPath);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (isSingleConfig) {
-        process.stderr.write(
-          `Error: failed to load config ${configPath}: ${msg}\n`,
-        );
-        return 1;
-      }
-      process.stderr.write(`Warning: skipping config ${configPath}: ${msg}\n`);
-      continue;
+      process.stderr.write(
+        `Error: failed to load config ${configPath}: ${msg}\n`,
+      );
+      return 1;
     }
 
     let entries: ConfigEntry['entries'];
@@ -58,14 +76,8 @@ async function runWithJSConfigs(
       entries = normalizeConfig(rawConfig);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (isSingleConfig) {
-        process.stderr.write(
-          `Error: invalid config in ${configPath}: ${msg}\n`,
-        );
-        return 1;
-      }
-      process.stderr.write(`Warning: skipping config ${configPath}: ${msg}\n`);
-      continue;
+      process.stderr.write(`Error: invalid config in ${configPath}: ${msg}\n`);
+      return 1;
     }
 
     configEntries.push({ configDirectory: configDir, entries });
@@ -76,27 +88,25 @@ async function runWithJSConfigs(
   // of the browser/wasm bundle, loaded only on the real CLI path.
   const { runEngine } = await import('./engine.js');
 
-  // All configs failed to load — fall back to Go loading JSON config from disk
-  // (init with no configs → Go's ConfigStdin=false branch).
-  if (configEntries.length === 0) {
-    return runEngine({ binPath, goArgs, configs: [], cwd });
-  }
-
   // Filter out nested configs whose directory is covered by a parent config's
   // global ignores (ESLint v10 alignment). Then hand the configs to Go in the
   // IPC `init` payload (no more `--config-stdin` stdin pipe).
-  const filteredEntries = filterConfigsByParentIgnores(configEntries);
-  const { eslintPluginEntries, pluginConfigs } = collectPluginMeta(
-    filteredEntries.map((ce) => ({
-      configPath: dirToPath.get(ce.configDirectory) ?? '',
-      configDirectory: ce.configDirectory,
-      entries: ce.entries,
-    })),
+  const filteredEntries = filterConfigsByParentIgnores(
+    configEntries,
+    protectedConfigDirs,
   );
+  const wireConfigEntries = filteredEntries.map((ce) => ({
+    configPath: dirToPath.get(ce.configDirectory) ?? '',
+    configDirectory: ce.configDirectory,
+    entries: ce.entries,
+    targetFiles: scopedTargetFilesByDir.get(ce.configDirectory),
+  }));
+  const { eslintPluginEntries, pluginConfigs } =
+    collectPluginMeta(wireConfigEntries);
   return runEngine({
     binPath,
     goArgs,
-    configs: filteredEntries,
+    configs: wireConfigEntries,
     cwd,
     eslintPluginEntries,
     pluginConfigs,
@@ -137,6 +147,20 @@ export async function run(
 
   // Discover JS/TS configs
   const configs = await discoverConfigs(files, dirs, cwd, args.config);
+  const protectedConfigFiles = new Map<string, string[]>();
+  if (!args.config) {
+    for (const file of files) {
+      const nearestConfig = findJSConfigUp(path.dirname(file));
+      if (nearestConfig) {
+        const protectedFiles = protectedConfigFiles.get(nearestConfig);
+        if (protectedFiles) {
+          protectedFiles.push(file);
+        } else {
+          protectedConfigFiles.set(nearestConfig, [file]);
+        }
+      }
+    }
+  }
 
   // Check if any discovered config is a JS/TS config.
   // NOTE: If any JS config is found (even in subdirectories), the entire flow
@@ -157,6 +181,7 @@ export async function run(
       goArgs,
       cwd,
       args.singleThreaded,
+      protectedConfigFiles,
     );
   }
 

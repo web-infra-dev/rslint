@@ -224,7 +224,7 @@ describe('CLI File Arguments', () => {
     }
   });
 
-  test('should warn per-file when specified file is not in the project', async () => {
+  test('should warn per-file when specified file is missing', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
@@ -236,13 +236,13 @@ describe('CLI File Arguments', () => {
       // Should warn about the file not found and exit with 0
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toContain('nonexistent.ts');
-      expect(result.stderr).toContain('not found in the project');
+      expect(result.stderr).toContain('was not found');
     } finally {
       await cleanupTempDir(tempDir);
     }
   });
 
-  test('should warn per-file when multiple specified files are all not in the project', async () => {
+  test('should warn per-file when multiple specified files are missing', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
@@ -263,7 +263,7 @@ describe('CLI File Arguments', () => {
     }
   });
 
-  test('should warn for non-project file while linting project files', async () => {
+  test('should warn for missing file while linting existing files', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
@@ -274,15 +274,15 @@ describe('CLI File Arguments', () => {
       const result = await runRslint(['clean.ts', 'nonexistent.ts'], tempDir);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain('linted 1 file');
-      // Should still warn about the non-project file
+      // Should still warn about the missing file
       expect(result.stderr).toContain('nonexistent.ts');
-      expect(result.stderr).toContain('not found in the project');
+      expect(result.stderr).toContain('was not found');
     } finally {
       await cleanupTempDir(tempDir);
     }
   });
 
-  test('should exit 0 with --max-warnings 0 when files are not in project', async () => {
+  test('should exit 0 with --max-warnings 0 when files are missing', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
@@ -297,7 +297,7 @@ describe('CLI File Arguments', () => {
       // Warning goes to stderr, not counted as lint warning, so exit 0
       expect(result.exitCode).toBe(0);
       expect(result.stderr).toContain('nonexistent.ts');
-      expect(result.stderr).toContain('not found in the project');
+      expect(result.stderr).toContain('was not found');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -432,7 +432,7 @@ describe('CLI File Arguments', () => {
       expect(result.stdout).toContain('linted 1 file');
       // Should warn about the nonexistent file
       expect(result.stderr).toContain('nonexistent.ts');
-      expect(result.stderr).toContain('not found in the project');
+      expect(result.stderr).toContain('was not found');
     } finally {
       await cleanupTempDir(tempDir);
     }

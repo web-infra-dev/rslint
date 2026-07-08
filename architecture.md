@@ -415,14 +415,14 @@ JSON config files (`rslint.json`, `rslint.jsonc`) are deprecated and will be rem
 
 Each entry in the config array supports:
 
-| Field             | Type                | Description                                           |
-| ----------------- | ------------------- | ----------------------------------------------------- |
-| `files`           | `string[]`          | Glob patterns this entry applies to                   |
-| `ignores`         | `string[]`          | Glob patterns excluded by this entry                  |
-| `languageOptions` | `object`            | Parser options such as `project` and `projectService` |
-| `rules`           | `Record<string, …>` | Rule level or `[level, options]`                      |
-| `plugins`         | `string[]`          | Plugin declarations used for plugin gating            |
-| `settings`        | `Record<string, …>` | Shared settings available in `RuleContext`            |
+| Field             | Type                | Description                                                                                     |
+| ----------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
+| `files`           | `string[]`          | Non-empty glob patterns this entry applies to; omit to use rslint's default lintable extensions |
+| `ignores`         | `string[]`          | Glob patterns excluded by this entry                                                            |
+| `languageOptions` | `object`            | Parser options such as `project` and `projectService`                                           |
+| `rules`           | `Record<string, …>` | Rule level or `[level, options]`                                                                |
+| `plugins`         | `string[]`          | Plugin declarations used for plugin gating                                                      |
+| `settings`        | `Record<string, …>` | Shared settings available in `RuleContext`                                                      |
 
 ### Configuration Loading
 
@@ -434,7 +434,7 @@ The loading flow differs by config type:
 2. each config is loaded and normalized on the Node side
 3. the Node wrapper sends a stdin payload to the Go binary via `--config-stdin`
 4. Go parses either a multi-config payload or a legacy single-config payload
-5. nearest-config lookup is used later to decide file ownership and rule selection
+5. nearest-config lookup is used later to decide target ownership and rule selection
 
 **JSON config**:
 
@@ -447,7 +447,7 @@ The loading flow differs by config type:
 Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 
 1. global-ignore-only entries apply first
-2. `files` patterns decide which entries match
+2. `files` patterns decide which entries match; an explicit `files: []` is invalid
 3. `ignores` can remove files from an otherwise matching entry
 4. later rule values override earlier rule values
 5. later settings override earlier settings by key
@@ -459,8 +459,9 @@ Additional current behaviors:
 
 - `.gitignore` is injected into CLI configs as a global-ignore entry
 - plugin rules are gated by declared plugins for JS/TS configs
-- files passed explicitly on the CLI can still be linted even if they do not match a config `files` pattern, if merged config still assigns them rules
-- files outside all tsconfig-backed Programs can become gap files and receive an AST-only fallback Program
+- lint target selection is independent from TypeScript `Program` membership: CLI/API targets are filtered by `files`, global ignores, and `.gitignore`; omitted `files` entries contribute rslint's default lintable extensions (`.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, `.cts`)
+- files passed explicitly on the CLI/API can still appear as 0-rule lint results even if they do not match any config `files` pattern
+- selected files outside all tsconfig-backed Programs become gap files and receive an AST-only fallback Program
 
 ### Inline Directives
 
@@ -492,14 +493,15 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--lsp`: starts the LSP server
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
-4. **Program Creation**: Go builds one or more tsconfig-backed Programs, plus optional no-tsconfig or gap-file fallback Programs
-5. **Ownership Filtering**: multi-config mode computes nearest-config ownership so files are linted once
-6. **Rule Resolution**: `getRulesForFile` resolves enabled rules per file
-7. **Rule Execution**: `RunLinter()` schedules per-Program work; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a second program-level pass runs after Phase 1 and aggregates `tsc --noEmit`-aligned diagnostics through the internal `collectNoEmitDiagnostics()` helper
-8. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
-9. **Fix Passes**: when enabled, fixes are applied and Programs can be rebuilt for another pass
-10. **Output Formatting**: default, JSON line, and GitHub workflow formats are supported
-11. **Exit Code**: depends on diagnostics, warnings, and fix outcomes
+4. **Program Creation**: Go builds one or more tsconfig-backed Programs, plus optional no-tsconfig Programs for projects without tsconfig coverage
+5. **Lint Target Selection**: Go resolves the lint target set from CLI/API targets, config `files`, default lintable extensions, global ignores, and `.gitignore`
+6. **Program Binding**: selected files are bound to existing Programs when possible; selected files outside every Program are parsed through an AST-only fallback Program
+7. **Rule Resolution**: `getRulesForFile` resolves enabled rules per selected file, filtering type-aware rules off no-type-info gap files
+8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a second program-level pass runs after Phase 1 and aggregates `tsc --noEmit`-aligned diagnostics through the internal `collectNoEmitDiagnostics()` helper
+9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
+10. **Fix Passes**: when enabled, fixes are applied and Programs can be rebuilt for another pass without changing the original target set
+11. **Output Formatting**: default, JSON line, and GitHub workflow formats are supported
+12. **Exit Code**: depends on diagnostics, warnings, and fix outcomes
 
 ### Concurrency Model
 
@@ -520,8 +522,8 @@ which is the user-facing escape hatch for serial / reproducible execution.
      (typescript-go's API is invoked one config at a time).
    - `--singleThreaded` runs both stages sequentially — no goroutines spawned.
 
-3. **Gap-file directory walker** (`internal/config/file_discovery.go`)
-   - `DiscoverGapFiles` uses a fixed-size worker pool (`walkPool`) that walks
+3. **Lint-target directory walker** (`internal/config/file_discovery.go`)
+   - `DiscoverLintFiles` uses a fixed-size worker pool (`walkPool`) that walks
      the directory tree. Live goroutine count is capped at `workers`, not the
      number of directories.
    - Default `workers = max(2, GOMAXPROCS)`; `--singleThreaded` forces
@@ -535,14 +537,14 @@ true})` reports the dirent type without following symlinks, so
      scheduling-dependent non-determinism that a parallel walker would
      otherwise introduce.
 
-4. **Multi-config gap discovery** (`DiscoverGapFilesMultiConfig`)
-   - Iterates `configMap` serially, calling `DiscoverGapFiles` once per config.
+4. **Multi-config target discovery** (`DiscoverLintFilesMultiConfig`)
+   - Iterates `configMap` serially, calling `DiscoverLintFiles` once per config.
    - Each call is itself bounded by its own worker pool, so total live
      goroutines remain bounded by `workers`, not `len(configMap) × workers`.
 
 Other invariants:
 
-- File-ownership filtering avoids duplicate work in multi-config mode.
+- Target discovery and Program binding deduplicate selected files across configs before `RunLinter` runs.
 - LSP uses a different orchestration model and keeps session access on its
   main dispatch loop.
 
@@ -555,8 +557,8 @@ Other invariants:
 | Linter work group              | Collapsed to serial via `core.NewWorkGroup(true)`.            |
 | gitignore ‖ Program creation   | Both stages run sequentially in the main goroutine.           |
 | Multi-config gitignore fan-out | Replaced by a sequential for-loop.                            |
-| Gap-file walker workers        | Forced to 1 (single goroutine, no concurrency).               |
-| Multi-config gap discovery     | Already serial across configs; inner walker also forced to 1. |
+| Lint-target walker workers     | Forced to 1 (single goroutine, no concurrency).               |
+| Multi-config target discovery  | Already serial across configs; inner walker also forced to 1. |
 
 End result: with `--singleThreaded`, the Go side spawns no goroutines beyond
 those typescript-go itself creates for syntactic / semantic work.
@@ -568,7 +570,7 @@ those typescript-go itself creates for syntactic / semantic work.
 - **Direct ts-go Data Model**: rslint operates on ts-go `Program`, AST, and `TypeChecker` objects directly instead of converting through a second AST representation
 - **Program-Level Parallelism**: `RunLinter` queues work per `Program` through `core.NewWorkGroup`; `--singleThreaded` forces the same flow to run serially
 - **Single-Walk Rule Dispatch**: each file is traversed once, with rules registering listeners up front and sharing the same AST walk
-- **Early Filtering**: skip paths, allowFiles/allowDirs, nearest-config ownership filters, and gap-file type filtering reduce work before listeners run
+- **Early Filtering**: exact lint target plans, skip paths, global-ignore filters, and gap-file type filtering reduce work before listeners run
 
 ### Performance Optimizations
 

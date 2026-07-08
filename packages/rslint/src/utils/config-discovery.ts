@@ -122,7 +122,8 @@ export async function discoverConfigs(
   }
 
   // Scan for nested configs within the target scope (no-args and dir-args).
-  // Broken configs are tolerated by runWithJSConfigs (skipped with warning).
+  // runWithJSConfigs loads parents first, skips configs hidden by parent
+  // global ignores, and treats every remaining broken config as fatal.
   // Serial await (not Promise.all over scanDirs): a single async glob already
   // saturates the libuv thread pool, so parallelizing across scanDirs adds no
   // speed — it only creates I/O contention when scanDirs overlap (e.g. `.` plus
@@ -133,7 +134,42 @@ export async function discoverConfigs(
     }
   }
 
-  return configs;
+  return sortConfigsParentFirst(configs);
+}
+
+function sortConfigsParentFirst(
+  configs: Map<string, string>,
+): Map<string, string> {
+  return new Map(
+    [...configs.entries()]
+      .map(([configPath, configDirectory], index) => ({
+        configPath,
+        configDirectory,
+        index,
+      }))
+      .sort((a, b) => {
+        if (a.configDirectory === b.configDirectory) {
+          return a.index - b.index;
+        }
+
+        const aToB = path.relative(a.configDirectory, b.configDirectory);
+        if (aToB && !aToB.startsWith('..') && !path.isAbsolute(aToB)) {
+          return -1;
+        }
+
+        const bToA = path.relative(b.configDirectory, a.configDirectory);
+        if (bToA && !bToA.startsWith('..') && !path.isAbsolute(bToA)) {
+          return 1;
+        }
+
+        const aDepth = a.configDirectory.split(path.sep).length;
+        const bDepth = b.configDirectory.split(path.sep).length;
+        if (aDepth !== bDepth) return aDepth - bDepth;
+
+        return a.index - b.index;
+      })
+      .map(({ configPath, configDirectory }) => [configPath, configDirectory]),
+  );
 }
 
 /**
@@ -247,6 +283,42 @@ export interface ConfigEntry {
   entries: RslintConfigEntry[];
 }
 
+function resolveConfigDirectory(configDirectory: string): string {
+  let dir = configDirectory.replace(/[/\\]+$/, '');
+  try {
+    dir = fs.realpathSync(dir);
+  } catch {
+    // Keep the original (stripped) path if realpath fails.
+  }
+  return dir;
+}
+
+export function isConfigDirIgnoredByParentIgnores(
+  configDirectory: string,
+  parentConfigs: ConfigEntry[],
+): boolean {
+  const configDir = resolveConfigDirectory(configDirectory);
+
+  for (const parent of parentConfigs) {
+    const parentDir = resolveConfigDirectory(parent.configDirectory);
+    if (
+      !configDir.startsWith(parentDir + path.sep) &&
+      configDir !== parentDir
+    ) {
+      continue;
+    }
+
+    const globalIgnores = getGlobalIgnores(parent.entries);
+    if (globalIgnores.length === 0) continue;
+
+    if (isDirIgnoredByPatterns(configDir, globalIgnores, parentDir)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Filter out nested configs whose directory is covered by an ancestor config's
  * global ignores. Aligns with ESLint v10 behavior: when traversing directories,
@@ -259,52 +331,24 @@ export interface ConfigEntry {
  */
 export function filterConfigsByParentIgnores(
   configEntries: ConfigEntry[],
+  protectedConfigDirectories = new Set<string>(),
 ): ConfigEntry[] {
   if (configEntries.length <= 1) return configEntries;
-
-  // Resolve symlinks and normalize trailing slashes for reliable ancestor checks.
-  const resolvedDirs = new Map<ConfigEntry, string>();
-  for (const entry of configEntries) {
-    let dir = entry.configDirectory.replace(/[/\\]+$/, '');
-    try {
-      dir = fs.realpathSync(dir);
-    } catch {
-      // Keep the original (stripped) path if realpath fails
-    }
-    resolvedDirs.set(entry, dir);
-  }
 
   // Sort by directory depth (shallowest first) so parents are processed first
   const sorted = [...configEntries].sort(
     (a, b) =>
-      (resolvedDirs.get(a)?.length ?? 0) - (resolvedDirs.get(b)?.length ?? 0),
+      resolveConfigDirectory(a.configDirectory).length -
+      resolveConfigDirectory(b.configDirectory).length,
   );
 
   const result: ConfigEntry[] = [];
 
   for (const config of sorted) {
-    let ignored = false;
-    const configDir = resolvedDirs.get(config)!;
-
-    for (const parent of result) {
-      const parentDir = resolvedDirs.get(parent)!;
-      if (
-        !configDir.startsWith(parentDir + path.sep) &&
-        configDir !== parentDir
-      ) {
-        continue;
-      }
-
-      const globalIgnores = getGlobalIgnores(parent.entries);
-      if (globalIgnores.length === 0) continue;
-
-      if (isDirIgnoredByPatterns(configDir, globalIgnores, parentDir)) {
-        ignored = true;
-        break;
-      }
-    }
-
-    if (!ignored) {
+    if (
+      protectedConfigDirectories.has(config.configDirectory) ||
+      !isConfigDirIgnoredByParentIgnores(config.configDirectory, result)
+    ) {
       result.push(config);
     }
   }

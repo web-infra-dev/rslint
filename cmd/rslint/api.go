@@ -112,12 +112,24 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		if err := json.Unmarshal(req.Config, &rslintConfig); err != nil {
 			return nil, fmt.Errorf("invalid config: %w", err)
 		}
+		if err := rslintconfig.ValidateConfig(rslintConfig); err != nil {
+			return nil, fmt.Errorf("invalid config: %w", err)
+		}
 	}
 	configDirectory := req.ConfigDirectory
 	if configDirectory == "" {
 		configDirectory = currentDirectory
 	}
 	configDirectory = tspath.NormalizePath(configDirectory)
+	var gitignoreGlobs []string
+	if len(allowedFiles) > 0 {
+		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobsForFiles(configDirectory, fs, allowedFiles)
+	} else {
+		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobs(configDirectory, fs, rslintconfig.ExtractConfigIgnores(rslintConfig))
+	}
+	if len(gitignoreGlobs) > 0 {
+		rslintConfig = append(rslintconfig.RslintConfig{{Ignores: gitignoreGlobs}}, rslintConfig...)
+	}
 	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(rslintConfig, configDirectory, fs)
 	if err != nil {
 		return nil, fmt.Errorf("error resolving tsconfig: %w", err)
@@ -146,16 +158,16 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs = append(programs, program)
 	}
 
-	// Discover "gap" files — requested/matched files absent from every tsconfig
-	// Program (the typical lintText/lintFiles in-memory file) — and append an
-	// AST-only fallback Program for them, plus the type-info set that gates
-	// type-aware rules off no-type-info files. Identical to the CLI via the
-	// shared helper. configMap is nil: the --api path is always single-config
-	// (the JS side resolves any multi-config merge into one entry list).
+	// Resolve the exact lint target set, bind targets to existing Programs, and
+	// append an AST-only fallback Program for selected files absent from every
+	// Program (the typical lintText/lintFiles in-memory file). Identical to the
+	// CLI via the shared helper. configMap is nil: the --api path is always
+	// single-config (the JS side resolves any multi-config merge into one entry
+	// list).
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	programs, typeInfoFiles, _ := buildProgramsWithGapFallback(
-		programs, nil, rslintConfig, configDirectory, fs, allowedFiles, nil, parseCache, false,
+	programs, typeInfoFiles, _, _, targetsByProgram := buildProgramsWithLintTargets(
+		programs, nil, rslintConfig, configDirectory, nil, nil, fs, allowedFiles, nil, parseCache, false,
 	)
 
 	// Collect diagnostics and source files
@@ -272,13 +284,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 	}
 
-	// Exclude config-ignored files from the lint scope (and therefore from
-	// FileCount and the LintedFiles list built below), matching the CLI
-	// (cmd.go). Without this an ignored file the caller passed would still be
-	// linted — its rules are gated off so it produces no diagnostics, but it
-	// would inflate the count and seed a phantom empty result on the JS side.
-	// --api takes one resolved config (single-config mode), so configMap /
-	// programConfigDirs are nil.
+	// Exclude global ignores from the lint scope (and therefore from FileCount
+	// and the LintedFiles list built below), matching the CLI (cmd.go).
+	// Entry-level ignores are not global target exclusions: an explicit file
+	// excluded by the only matching entry is still a lint result, but runs zero
+	// rules through GetActiveRulesForFile. --api takes one resolved config
+	// (single-config mode), so configMap / programConfigDirs are nil.
 	fileFilters := buildFileFilters(programs, nil, nil, rslintConfig, configDirectory)
 
 	// Run linter
@@ -287,6 +298,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		SingleThreaded:   false, // Don't use single-threaded mode for IPC
 		Scope:            linter.FileScope{Files: allowedFiles},
 		PerProgramFilter: toFileFilters(fileFilters),
+		TargetFiles:      targetsByProgram,
 		// Defense-in-depth alongside the GetRulesForFile gate: RunLinter passes
 		// a nil TypeChecker to rules running on files outside this set (gap /
 		// fallback files), so a non-type-aware rule with optional TypeChecker

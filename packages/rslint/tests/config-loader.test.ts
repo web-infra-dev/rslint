@@ -150,9 +150,33 @@ describe('normalizeConfig', () => {
     );
   });
 
+  test('throws when files is an empty array', () => {
+    expect(() => normalizeConfig([{ files: [], rules: {} }])).toThrow(
+      '"files" must be a non-empty array',
+    );
+  });
+
+  test('throws when files is null', () => {
+    expect(() => normalizeConfig([{ files: null, rules: {} }])).toThrow(
+      '"files" must be an array',
+    );
+  });
+
+  test('throws when files contains non-string values', () => {
+    expect(() => normalizeConfig([{ files: [123], rules: {} }])).toThrow(
+      '"files" must contain only strings',
+    );
+  });
+
   test('throws when ignores is a string instead of array', () => {
     expect(() => normalizeConfig([{ ignores: 'dist/**', rules: {} }])).toThrow(
       '"ignores" must be an array',
+    );
+  });
+
+  test('throws when ignores contains non-string values', () => {
+    expect(() => normalizeConfig([{ ignores: [null], rules: {} }])).toThrow(
+      '"ignores" must contain only strings',
     );
   });
 
@@ -160,7 +184,18 @@ describe('normalizeConfig', () => {
     const result = normalizeConfig([{ rules: { 'no-console': 'error' } }]);
     expect(result).toHaveLength(1);
     expect(result[0].files).toBeUndefined();
+    expect(Object.hasOwn(result[0], 'files')).toBe(false);
     expect(result[0].ignores).toBeUndefined();
+    expect(Object.hasOwn(result[0], 'ignores')).toBe(false);
+  });
+
+  test('allows files set to undefined', () => {
+    const result = normalizeConfig([
+      { files: undefined, rules: { 'no-console': 'error' } },
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].files).toBeUndefined();
+    expect(Object.hasOwn(result[0], 'files')).toBe(false);
   });
 });
 

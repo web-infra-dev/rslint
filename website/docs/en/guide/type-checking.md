@@ -159,7 +159,7 @@ rslint --type-check-only .
 | `--type-check`      |     ✓      |        ✓         |                      no                      |
 | `--type-check-only` |     ✗      |        ✓         |                     yes                      |
 
-<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found in the project, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, when in fact Phase 2 is independent of CLI scope and rslint ignores (see [What gets type-checked](#what-gets-type-checked)).
+<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, when in fact Phase 2 is independent of CLI scope and rslint ignores (see [What gets type-checked](#what-gets-type-checked)).
 
 ## Flag matrix
 

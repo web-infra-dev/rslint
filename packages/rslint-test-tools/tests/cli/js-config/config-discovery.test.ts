@@ -148,7 +148,7 @@ describe('CLI config discovery (upward traversal)', () => {
     }
   });
 
-  test('broken sub-package config should be skipped in multi-config', async () => {
+  test('broken sub-package config should be fatal when discovered', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.js': jsConfig(),
@@ -162,9 +162,45 @@ describe('CLI config discovery (upward traversal)', () => {
     });
     try {
       const result = await runRslint(['--format', 'jsonline'], tempDir);
-      // Should still lint root.ts with root config, skipping broken package
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stderr).toContain('failed to load config');
+      expect(result.stderr).toContain('packages/broken/rslint.config.js');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('broken sub-package config hidden by parent global ignores should be skipped', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'rslint.config.js': `export default [
+        { ignores: ['packages/broken/**'] },
+        ${JSON.stringify({
+          files: ['**/*.ts'],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ['./tsconfig.json'],
+            },
+          },
+          rules: { '@typescript-eslint/no-unsafe-member-access': 'error' },
+          plugins: ['@typescript-eslint'],
+        })}
+      ];`,
+      // This config has invalid syntax but should never be loaded because the
+      // parent global ignore blocks traversal into packages/broken.
+      'packages/broken/rslint.config.js':
+        'export default [INVALID SYNTAX HERE;',
+      'packages/broken/tsconfig.json': TS_CONFIG,
+      'packages/broken/src/a.ts': 'let a: any = 10;\na.b = 20;\n',
+      'root.ts': 'let b: any = 10;\nb.c = 20;\n',
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('root.ts');
-      expect(result.stderr).toContain('Warning: skipping config');
+      expect(result.stderr).not.toContain('failed to load config');
+      expect(result.stderr).not.toContain('packages/broken/rslint.config.js');
     } finally {
       await cleanupTempDir(tempDir);
     }

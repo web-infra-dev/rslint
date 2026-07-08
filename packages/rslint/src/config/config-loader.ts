@@ -90,14 +90,41 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       return true;
     })
     .map((entry: Record<string, unknown>, index: number) => {
-      if (entry.files != null && !Array.isArray(entry.files)) {
+      const hasFiles = Object.prototype.hasOwnProperty.call(entry, 'files');
+      if (
+        hasFiles &&
+        entry.files !== undefined &&
+        !Array.isArray(entry.files)
+      ) {
         throw new Error(
           `[rslint] Config entry at index ${index}: "files" must be an array, got ${typeof entry.files}`,
+        );
+      }
+      if (hasFiles && Array.isArray(entry.files) && entry.files.length === 0) {
+        throw new Error(
+          `[rslint] Config entry at index ${index}: "files" must be a non-empty array`,
+        );
+      }
+      if (
+        hasFiles &&
+        Array.isArray(entry.files) &&
+        entry.files.some((pattern) => typeof pattern !== 'string')
+      ) {
+        throw new Error(
+          `[rslint] Config entry at index ${index}: "files" must contain only strings`,
         );
       }
       if (entry.ignores != null && !Array.isArray(entry.ignores)) {
         throw new Error(
           `[rslint] Config entry at index ${index}: "ignores" must be an array, got ${typeof entry.ignores}`,
+        );
+      }
+      if (
+        Array.isArray(entry.ignores) &&
+        entry.ignores.some((pattern) => typeof pattern !== 'string')
+      ) {
+        throw new Error(
+          `[rslint] Config entry at index ${index}: "ignores" must contain only strings`,
         );
       }
 
@@ -142,12 +169,14 @@ export function normalizeConfig(config: unknown): Record<string, unknown>[] {
       const plugins = [...new Set([...stringPlugins, ...pluginPrefixes])];
 
       return {
-        files: entry.files,
-        ignores: entry.ignores,
-        languageOptions: entry.languageOptions,
-        rules: entry.rules,
+        ...(entry.files !== undefined ? { files: entry.files } : {}),
+        ...(entry.ignores !== undefined ? { ignores: entry.ignores } : {}),
+        ...(entry.languageOptions !== undefined
+          ? { languageOptions: entry.languageOptions }
+          : {}),
+        ...(entry.rules !== undefined ? { rules: entry.rules } : {}),
         plugins,
-        settings: entry.settings,
+        ...(entry.settings !== undefined ? { settings: entry.settings } : {}),
         ...(pluginPrefixes.length > 0
           ? { eslintPlugins: eslintPluginMeta }
           : {}),

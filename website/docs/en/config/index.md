@@ -100,9 +100,24 @@ For available presets, rule severity, and plugin configuration, see [Rules & Pre
 
 - **Type:** `string[]`
 
-Glob patterns specifying which files this config entry applies to. If omitted, the entry applies to all files matched by other entries.
+Glob patterns specifying which files this config entry applies to. If omitted, the entry applies to rslint's default lintable file set.
 
-The `files` field determines the **lint scope** — only files matching at least one entry's `files` pattern will be linted. This is independent of tsconfig's `include`: a file in tsconfig but not matching any `files` pattern will not be linted, while a file matching `files` but not in any tsconfig will still be linted with syntax-only rules (type-aware rules require tsconfig coverage).
+If `files` is present, it must contain at least one pattern. Use an omitted `files` field for shared/default entries; `files: []` is invalid.
+
+Lint targets are selected from the CLI/API target range, then filtered by `files`, global ignores, and `.gitignore`. Explicit file arguments are the exception: an explicit file can still appear as a lint result even when it does not match any `files` pattern, but no rules run for it unless `GetConfigForFile` finds a matching entry. Global ignores and `.gitignore` still remove explicit files from the result set.
+
+Each non-global entry that omits `files` contributes this default set:
+
+- `.js`
+- `.mjs`
+- `.cjs`
+- `.jsx`
+- `.ts`
+- `.tsx`
+- `.mts`
+- `.cts`
+
+This is independent of tsconfig's `include`: a file in tsconfig but not selected by rslint's lint scope will not be linted, while a selected file that is not in any tsconfig will still be linted with syntax-only rules (type-aware rules require tsconfig coverage).
 
 ```ts
 {
@@ -217,7 +232,7 @@ When multiple config entries match a file, they are merged in array order:
 6. **Settings** — shallow merge
 7. **Language options** — deep merge at field level
 
-If no entry matches a file, it is not linted.
+If no entry matches a file, no rules run for it. Explicit file arguments may still be reported as 0-rule results unless global ignores or `.gitignore` exclude them.
 
 ## JSON Configuration (Deprecated)
 

@@ -195,7 +195,7 @@ describe('Files-driven lint: gap file auto-degrade', () => {
     }
   });
 
-  test('JSON config without files field should use legacy behavior (tsconfig-driven)', async () => {
+  test('JSON config without files field should scan default lintable extensions', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': JSON.stringify({
         compilerOptions: { target: 'ES2020', module: 'ESNext', strict: true },
@@ -212,13 +212,16 @@ describe('Files-driven lint: gap file auto-degrade', () => {
           },
           rules: {
             '@typescript-eslint/no-unsafe-member-access': 'error',
+            'no-debugger': 'error',
           },
           plugins: ['@typescript-eslint'],
         },
       ]),
       'src/index.ts': `let a: any = 1;\na.b = 2;\n`,
-      // This file is NOT in tsconfig include — should NOT be linted in legacy mode
-      'scripts/build.ts': `let x: any = 1;\nx.y = 2;\n`,
+      // This file is NOT in tsconfig include. It should still be linted by
+      // syntax-only rules because omitted files selects rslint's default
+      // lintable extensions, but type-aware rules should be gated off.
+      'scripts/build.ts': `debugger;\nlet x: any = 1;\nx.y = 2;\n`,
     });
     try {
       const result = await runRslint(['--format', 'jsonline'], tempDir);
@@ -235,11 +238,14 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       );
       expect(srcDiags.length).toBeGreaterThan(0);
 
-      // scripts/build.ts should NOT be linted (legacy mode: tsconfig-driven)
       const scriptDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('scripts/build.ts'),
       );
-      expect(scriptDiags.length).toBe(0);
+      const scriptRules = scriptDiags.map((d: any) => d.ruleName);
+      expect(scriptRules).toContain('no-debugger');
+      expect(scriptRules).not.toContain(
+        '@typescript-eslint/no-unsafe-member-access',
+      );
     } finally {
       await cleanupTempDir(tempDir);
     }

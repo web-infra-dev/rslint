@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -917,6 +918,33 @@ func TestHandleConfigUpdate_ReplacesOldConfigs(t *testing.T) {
 	}
 	if _, ok := s.jsConfigs["file:///new-project"]; !ok {
 		t.Error("new config should exist")
+	}
+}
+
+func TestHandleConfigUpdate_RejectsEmptyFilesArray(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+	s.jsConfigs["file:///old-project"] = config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
+
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///new-project",
+				"entries":         []any{map[string]any{"files": []any{}, "rules": map[string]any{"no-debugger": "error"}}},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected handleConfigUpdate to reject empty files array")
+	}
+	if !strings.Contains(err.Error(), `key "files": expected value to be a non-empty array`) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, ok := s.jsConfigs["file:///old-project"]; !ok {
+		t.Fatal("old config should be preserved after invalid update")
+	}
+	if _, ok := s.jsConfigs["file:///new-project"]; ok {
+		t.Fatal("invalid new config should not be installed")
 	}
 }
 

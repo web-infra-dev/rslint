@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 
@@ -30,10 +31,45 @@ type ConfigEntry struct {
 	Rules           Rules            `json:"rules"`
 	Plugins         []string         `json:"plugins,omitempty"`
 	Settings        Settings         `json:"settings,omitempty"`
+
+	filesPresent bool
 }
 
 // Settings represents shared settings accessible to rules
 type Settings map[string]interface{}
+
+// UnmarshalJSON records whether the `files` key was present so validation can
+// distinguish an omitted field from an explicit null/empty array.
+func (entry *ConfigEntry) UnmarshalJSON(data []byte) error {
+	type configEntryAlias ConfigEntry
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	var decoded configEntryAlias
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+
+	*entry = ConfigEntry(decoded)
+	if _, ok := raw["files"]; ok {
+		entry.filesPresent = true
+	}
+	return nil
+}
+
+// ValidateConfig checks config invariants that depend on preserving the
+// distinction between an omitted field and an explicitly-authored empty value.
+func ValidateConfig(config RslintConfig) error {
+	for index, entry := range config {
+		if (entry.filesPresent || entry.Files != nil) && len(entry.Files) == 0 {
+			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
+		}
+	}
+	return nil
+}
 
 // LanguageOptions contains language-specific configuration options.
 type LanguageOptions struct {
@@ -480,7 +516,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 // isGlobalIgnoreEntry returns true if the entry is a global ignore entry
 // (has only ignores, no other fields).
 func isGlobalIgnoreEntry(entry ConfigEntry) bool {
-	return len(entry.Files) == 0 &&
+	return entry.Files == nil &&
 		len(entry.Rules) == 0 &&
 		len(entry.Plugins) == 0 &&
 		entry.Settings == nil &&

@@ -8,11 +8,37 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+// DefaultLintFileExtensions are the file extensions rslint discovers when a
+// config entry omits `files`. This intentionally extends ESLint's default
+// .js/.mjs/.cjs set with JSX and TypeScript-family files.
+var DefaultLintFileExtensions = []string{".js", ".mjs", ".cjs", ".jsx", ".ts", ".tsx", ".mts", ".cts"}
+
+var defaultLintFileExtensionSet = func() map[string]struct{} {
+	m := make(map[string]struct{}, len(DefaultLintFileExtensions))
+	for _, ext := range DefaultLintFileExtensions {
+		m[ext] = struct{}{}
+	}
+	return m
+}()
+
+func defaultLintFilePatterns() []string {
+	patterns := make([]string, 0, len(DefaultLintFileExtensions))
+	for _, ext := range DefaultLintFileExtensions {
+		patterns = append(patterns, "**/*"+ext)
+	}
+	return patterns
+}
+
+// IsSupportedLintFile reports whether rslint can parse and lint this path.
+func IsSupportedLintFile(filePath string) bool {
+	_, ok := defaultLintFileExtensionSet[strings.ToLower(path.Ext(filePath))]
+	return ok
+}
 
 // defaultExcludeDirs is a set of directory names always excluded from walking.
 var defaultExcludeDirs = func() map[string]struct{} {
@@ -23,65 +49,34 @@ var defaultExcludeDirs = func() map[string]struct{} {
 	return m
 }()
 
-// DiscoverGapFiles scans the filesystem for "gap files" — files that match a config
-// entry's `files` pattern but are not in any tsconfig Program. These files get a
-// fallback Program (AST-only, no type info) and only run non-type-aware rules.
+// DiscoverLintFiles resolves the lint target set for one config directory.
+// Target selection is independent from TypeScript Program membership:
 //
-// Files pass through these filters:
-//  1. Match at least one config entry's `files` pattern
-//  2. Not in global ignores (directory-level and file-level)
-//  3. Not already in programFiles (existing tsconfig Programs)
-//  4. Pass GetConfigForFile (would actually receive lint rules)
+//   - CLI/API files and directories first constrain the search space.
+//   - Non-global config entries then contribute `files` patterns; an omitted
+//     files field contributes rslint's default lintable extensions.
+//   - Global ignores, including injected .gitignore entries, remove files.
+//   - Entry-level ignores are honored through GetConfigForFile for discovered
+//     files. Explicit file targets bypass `files` and entry-level ignores for
+//     target selection, but still use GetConfigForFile later for rule selection
+//     and can therefore be counted as 0-rule lint results.
+//   - Explicit file targets are retained even when they do not match any
+//     config entry's files patterns, matching ESLint's empty-result behavior.
 //
-// Walking model:
-//   - A bounded worker pool (see walkPool) traverses the directory tree.
-//     Total live goroutines at any moment is at most `workers`.
-//   - Default workers = max(2, GOMAXPROCS); singleThreaded forces workers=1
-//     for fully serial traversal (a knob users rely on for debugging,
-//     reproducibility, and constrained environments).
-//   - The vfsAdapter is constructed with followSymlinks=false, so symlinked
-//     subdirectories are skipped entirely. This matches ESLint v10's
-//     flat-config file walker, which uses @humanfs/node and recurses only
-//     when Dirent.isDirectory() is true (Node returns false for symlinks).
-//     It also avoids the otherwise scheduling-dependent "first writer wins"
-//     non-determinism a parallel walker would introduce.
-//
-// When allowFiles/allowDirs are provided (CLI args), only files within scope.
-//
-// Returns:
-//   - nil: no config entry has a `files` field → caller uses legacy tsconfig-only behavior
-//   - []: `files` present but no gaps found
-//   - [...]: gap files to create a fallback Program for (sorted lexically)
-func DiscoverGapFiles(
+// Returned paths are absolute, normalized, deduplicated, and sorted.
+func DiscoverLintFiles(
 	config RslintConfig,
 	configDir string,
 	fsys vfs.FS,
-	programFiles map[string]struct{},
 	allowFiles []string,
 	allowDirs []string,
 	singleThreaded bool,
 ) []string {
-	// 1. Collect global ignore patterns and files patterns from config entries.
 	globalIgnores := ExtractConfigIgnores(config)
+	globalIgnores = append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), globalIgnores...)
 
-	var allFilesPatterns []string
-	hasFilesField := false
-	for _, entry := range config {
-		if len(entry.Files) > 0 {
-			hasFilesField = true
-			allFilesPatterns = append(allFilesPatterns, entry.Files...)
-		}
-	}
+	filesPatterns := collectLintFilePatterns(config)
 
-	// No entry has files → backward compat, signal caller to skip new logic.
-	if !hasFilesField {
-		return nil
-	}
-
-	// Deduplicate patterns.
-	allFilesPatterns = deduplicate(allFilesPatterns)
-
-	// Build allowFiles set for fast lookup.
 	var allowFileSet map[string]struct{}
 	if allowFiles != nil {
 		allowFileSet = make(map[string]struct{}, len(allowFiles))
@@ -90,65 +85,68 @@ func DiscoverGapFiles(
 		}
 	}
 
-	// 2. Prepend default directory ignores so they are always active
-	// regardless of user config.
-	globalIgnores = append(ParseIgnorePatterns(utils.DefaultIgnoreDirGlobs()), globalIgnores...)
-
-	// Use non-nil empty slice to distinguish "files field present, no gaps"
-	// from "no files field" (nil).
-	gapFiles := []string{}
-
-	// Fast path: when only specific files are provided (e.g., lint-staged),
-	// check each file directly instead of walking the entire filesystem.
-	if allowFileSet != nil && allowDirs == nil {
-		for f := range allowFileSet {
-			if _, exists := programFiles[f]; exists {
-				continue
-			}
-			if isFileIgnored(f, globalIgnores, configDir) {
-				continue
-			}
-			if config.GetConfigForFile(f, configDir) == nil {
-				continue
-			}
-			gapFiles = append(gapFiles, f)
+	targetFiles := []string{}
+	seenTargets := make(map[string]struct{})
+	addTarget := func(filePath string) {
+		if _, seen := seenTargets[filePath]; seen {
+			return
 		}
-		gapFiles = deduplicate(gapFiles)
-		// Map iteration order is non-deterministic; sort to match the walker
-		// path and keep output stable across runs.
-		sort.Strings(gapFiles)
-		return gapFiles
+		seenTargets[filePath] = struct{}{}
+		targetFiles = append(targetFiles, filePath)
+	}
+	isGloballyIgnored := func(filePath string) bool {
+		return isDirBlockedByIgnores(filePath, globalIgnores, configDir) ||
+			isFileIgnored(filePath, globalIgnores, configDir)
 	}
 
-	// 3. Walk the tree with a bounded worker pool. Goroutine count is capped
-	// at `workers`; symlinks are skipped (see vfsAdapter doc) so the result
-	// set is deterministic regardless of scheduling.
+	includeExplicitFile := func(filePath string) bool {
+		if !IsSupportedLintFile(filePath) {
+			return false
+		}
+		if fsys != nil && !fsys.FileExists(filePath) {
+			return false
+		}
+		return !isGloballyIgnored(filePath)
+	}
+
+	includeDiscoveredFile := func(filePath string) bool {
+		if !IsSupportedLintFile(filePath) {
+			return false
+		}
+		if len(filesPatterns) == 0 || !isFileMatched(filePath, filesPatterns, configDir) {
+			return false
+		}
+		if isGloballyIgnored(filePath) {
+			return false
+		}
+		return config.GetConfigForFile(filePath, configDir) != nil
+	}
+
+	addExplicitTargets := func() {
+		for f := range allowFileSet {
+			if includeExplicitFile(f) {
+				addTarget(f)
+			}
+		}
+	}
+
+	// Fast path for explicit file-only invocations, e.g. lint-staged.
+	if allowFileSet != nil && allowDirs == nil {
+		addExplicitTargets()
+		sort.Strings(targetFiles)
+		return targetFiles
+	}
+
 	normalizedConfigDir := normalizeGlobPath(configDir)
 	fsAdapter := &vfsAdapter{vfs: fsys, root: normalizedConfigDir}
 
-	// Normalize patterns relative to configDir for matching.
-	relativePatterns := make([]string, len(allFilesPatterns))
-	for i, pattern := range allFilesPatterns {
-		normalizedPattern := normalizeGlobPath(tspath.ResolvePath(configDir, pattern))
-		relativePatterns[i] = strings.TrimPrefix(normalizedPattern, normalizedConfigDir+"/")
-	}
-
 	var (
-		gapMu     sync.Mutex
-		seen      sync.Map // map[string]struct{} — file dedupe
-		dirIgnore sync.Map // map[string]bool — pattern check cache, write-once per path
+		targetMu  sync.Mutex
+		dirIgnore sync.Map // map[string]bool — pattern check cache
 	)
 
-	// Precompute negation reaches once. canPruneDir uses them to prune gitignore
-	// file-level directories (e.g. target/ → **/target/**/*) without ever
-	// skipping a directory a `!` pattern could re-include.
 	neg := buildNegReach(globalIgnores)
 
-	// Defer the parallelism limit to GOMAXPROCS (Go's standard knob; aligned
-	// with container CGroup CPU limits). Lower bound of 2 keeps the walker
-	// useful on single-core CI runners. singleThreaded overrides to 1 for
-	// fully serial traversal — a knob users depend on for reproducibility,
-	// debugging, and constrained environments.
 	workers := runtime.GOMAXPROCS(0)
 	if workers < 2 {
 		workers = 2
@@ -158,29 +156,8 @@ func DiscoverGapFiles(
 	}
 
 	processFile := func(walkPath string) {
-		// 1. pattern match
-		matched := false
-		for _, pattern := range relativePatterns {
-			if ok, _ := doublestar.Match(pattern, walkPath); ok {
-				matched = true
-				break
-			}
-		}
-		if !matched {
-			return
-		}
-
 		fullPath := tspath.NormalizePath(path.Join(normalizedConfigDir, walkPath))
 
-		// 2. already in tsconfig Programs
-		if _, exists := programFiles[fullPath]; exists {
-			return
-		}
-		// 3. file-level global ignores
-		if isFileIgnored(fullPath, globalIgnores, configDir) {
-			return
-		}
-		// 4. CLI scope
 		if allowFileSet != nil || allowDirs != nil {
 			inScope := false
 			if allowFileSet != nil {
@@ -200,17 +177,14 @@ func DiscoverGapFiles(
 				return
 			}
 		}
-		// 5. final config check
-		if config.GetConfigForFile(fullPath, configDir) == nil {
+
+		if !includeDiscoveredFile(fullPath) {
 			return
 		}
-		// 6. dedupe + append
-		if _, loaded := seen.LoadOrStore(fullPath, struct{}{}); loaded {
-			return
-		}
-		gapMu.Lock()
-		gapFiles = append(gapFiles, fullPath)
-		gapMu.Unlock()
+
+		targetMu.Lock()
+		addTarget(fullPath)
+		targetMu.Unlock()
 	}
 
 	work := func(walkPath string) []string {
@@ -235,15 +209,11 @@ func DiscoverGapFiles(
 				}
 				childPath := path.Join(walkPath, name)
 				if cached, ok := dirIgnore.Load(childPath); ok {
-					blocked, _ := cached.(bool) // dirIgnore only stores bool (set by Store below)
+					blocked, _ := cached.(bool)
 					if blocked {
 						continue
 					}
 				} else {
-					// canPruneDir unifies both directory-prune cases: absolute
-					// blocks (dir/**, bare names) and negation-aware file-level
-					// gitignore covers (dir/**/*). Sound — prunes only when every
-					// descendant file would be ignored by isFileIgnored.
 					blocked := canPruneDir(childPath, globalIgnores, neg)
 					dirIgnore.Store(childPath, blocked)
 					if blocked {
@@ -262,7 +232,107 @@ func DiscoverGapFiles(
 	pool.submitMany([]string{"."})
 	pool.run(work)
 
-	sort.Strings(gapFiles)
+	if allowFileSet != nil {
+		addExplicitTargets()
+	}
+
+	sort.Strings(targetFiles)
+	return targetFiles
+}
+
+func collectLintFilePatterns(config RslintConfig) []string {
+	var patterns []string
+	for _, entry := range config {
+		if isGlobalIgnoreEntry(entry) {
+			continue
+		}
+		if len(entry.Files) > 0 {
+			patterns = append(patterns, entry.Files...)
+		} else {
+			patterns = append(patterns, defaultLintFilePatterns()...)
+		}
+	}
+	return deduplicate(patterns)
+}
+
+// DiscoverLintFilesMultiConfig resolves lint targets across a config map.
+func DiscoverLintFilesMultiConfig(
+	configMap map[string]RslintConfig,
+	fsys vfs.FS,
+	allowFiles []string,
+	allowDirs []string,
+	singleThreaded bool,
+) []string {
+	if len(configMap) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{})
+	var allTargets []string
+	for configDir, cfg := range configMap {
+		targets := DiscoverLintFiles(cfg, configDir, fsys, allowFiles, allowDirs, singleThreaded)
+		for _, f := range targets {
+			ownerDir, _ := FindNearestConfig(f, configMap)
+			if ownerDir != configDir {
+				continue
+			}
+			if _, exists := seen[f]; !exists {
+				seen[f] = struct{}{}
+				allTargets = append(allTargets, f)
+			}
+		}
+	}
+	sort.Strings(allTargets)
+	return allTargets
+}
+
+// DiscoverGapFiles returns resolved lint targets that are absent from existing
+// Programs. The filesystem walk and config/default-files matching are owned by
+// DiscoverLintFiles; this helper only subtracts programFiles for callers that
+// need an AST-only fallback Program.
+//
+// Files pass through these filters in DiscoverLintFiles:
+//  1. Inside CLI/API file or directory scope
+//  2. Selected by config `files` patterns or default lintable extensions;
+//     explicit file targets may pass this step to produce an empty result
+//  3. Not in global ignores or .gitignore-injected ignores
+//  4. Not already in programFiles
+//
+// Walking model:
+//   - A bounded worker pool (see walkPool) traverses the directory tree.
+//     Total live goroutines at any moment is at most `workers`.
+//   - Default workers = max(2, GOMAXPROCS); singleThreaded forces workers=1
+//     for fully serial traversal (a knob users rely on for debugging,
+//     reproducibility, and constrained environments).
+//   - The vfsAdapter is constructed with followSymlinks=false, so symlinked
+//     subdirectories are skipped entirely. This matches ESLint v10's
+//     flat-config file walker, which uses @humanfs/node and recurses only
+//     when Dirent.isDirectory() is true (Node returns false for symlinks).
+//     It also avoids the otherwise scheduling-dependent "first writer wins"
+//     non-determinism a parallel walker would introduce.
+//
+// When allowFiles/allowDirs are provided (CLI args), only files within scope.
+//
+// Returns:
+//   - []: no gaps found
+//   - [...]: gap files to create a fallback Program for (sorted lexically)
+func DiscoverGapFiles(
+	config RslintConfig,
+	configDir string,
+	fsys vfs.FS,
+	programFiles map[string]struct{},
+	allowFiles []string,
+	allowDirs []string,
+	singleThreaded bool,
+) []string {
+	gapFiles := []string{}
+	targetFiles := DiscoverLintFiles(config, configDir, fsys, allowFiles, allowDirs, singleThreaded)
+	for _, fullPath := range targetFiles {
+		if _, exists := programFiles[fullPath]; exists {
+			continue
+		}
+		gapFiles = append(gapFiles, fullPath)
+	}
 	return gapFiles
 }
 
@@ -290,6 +360,10 @@ func DiscoverGapFilesMultiConfig(
 	for configDir, cfg := range configMap {
 		gapFiles := DiscoverGapFiles(cfg, configDir, fsys, programFiles, allowFiles, allowDirs, singleThreaded)
 		for _, f := range gapFiles {
+			ownerDir, _ := FindNearestConfig(f, configMap)
+			if ownerDir != configDir {
+				continue
+			}
 			if _, exists := seen[f]; !exists {
 				seen[f] = struct{}{}
 				allGapFiles = append(allGapFiles, f)
@@ -297,9 +371,6 @@ func DiscoverGapFilesMultiConfig(
 		}
 	}
 
-	if len(allGapFiles) == 0 {
-		return nil
-	}
 	sort.Strings(allGapFiles)
 	return allGapFiles
 }

@@ -170,67 +170,76 @@ export class Rslint {
     });
     const files = matched.map((f) => path.normalize(f));
     if (files.length === 0) return [];
-    const { config, configDirectory } = await this.#resolveConfig(this.#cwd);
-    const response = await this.#service.lint({
-      config,
-      configDirectory,
-      workingDirectory: this.#cwd,
-      files,
-      // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
-      fileContents: this.#resolveOverlay(),
-      fix: this.#fix,
-    });
-    // Read source for each file that produced a diagnostic so mergeFixes can
-    // gap-fill multi-edit fixes (parity with lintText, which has the source
-    // in-hand). Only diagnosed files are read; a lint with no findings reads
-    // nothing.
-    const contents: Record<string, string> = {};
-    // Disk files whose bytes start with a UTF-8 BOM. Go reads them through a
-    // decoder that strips the BOM, so its fix offsets AND Output are
-    // BOM-stripped. We strip the BOM from the source fed to mergeFixes so the
-    // gap-fill slices line up with those offsets — and `fix.range` therefore
-    // stays BOM-stripped, matching ESLint v10 and the message line/column —
-    // then re-prepend the BOM to Output (in toLintResults) so outputFixes writes
-    // back the real file. (lintText is unaffected: its overlay keeps the BOM and
-    // Go's offsets already include it, so no adjustment is needed there.)
-    const bomFiles = new Set<string>();
-    for (const d of response.diagnostics ?? []) {
-      const abs = path.isAbsolute(d.filePath)
-        ? path.normalize(d.filePath)
-        : path.resolve(configDirectory, d.filePath);
-      if (!(abs in contents)) {
-        try {
-          const raw = await readFile(abs, 'utf8');
-          if (raw.charCodeAt(0) === 0xfeff) {
-            bomFiles.add(abs);
-            contents[abs] = raw.slice(1); // BOM-stripped, matching Go's offsets
-          } else {
-            contents[abs] = raw;
-          }
-        } catch {
-          // Unreadable (e.g. virtual/deleted) — mergeFixes degrades to first edit.
-        }
+
+    const groups = new Map<
+      string,
+      {
+        config: Record<string, unknown>[];
+        configDirectory: string;
+        files: string[];
       }
+    >();
+    const configCache = new Map<
+      string,
+      Promise<{ config: Record<string, unknown>[]; configDirectory: string }>
+    >();
+
+    for (const file of [...files].sort()) {
+      const fromDir = path.dirname(file);
+      let resolved = configCache.get(fromDir);
+      if (!resolved) {
+        resolved = this.#resolveConfig(fromDir);
+        configCache.set(fromDir, resolved);
+      }
+      const { config, configDirectory } = await resolved;
+      let group = groups.get(configDirectory);
+      if (!group) {
+        group = { config, configDirectory, files: [] };
+        groups.set(configDirectory, group);
+      }
+      group.files.push(file);
     }
-    // Seed results from the files Go actually linted (config `ignores` already
-    // excluded, paths program-canonical) rather than the glob matches: an
-    // ignored match produces no phantom empty result, and a symlinked glob path
-    // can't duplicate a result whose diagnostic is keyed to the program path.
-    // Fall back to the glob matches if an older binary omits lintedFiles.
-    const linted = response.lintedFiles
-      ? response.lintedFiles.map((f) =>
-          path.isAbsolute(f)
-            ? path.normalize(f)
-            : path.resolve(configDirectory, f),
-        )
-      : files;
-    return this.#toLintResults(
-      response,
-      configDirectory,
-      linted,
-      contents,
-      bomFiles,
-    );
+
+    const results: LintResult[] = [];
+    for (const group of [...groups.values()].sort((a, b) =>
+      a.configDirectory.localeCompare(b.configDirectory),
+    )) {
+      const response = await this.#service.lint({
+        config: group.config,
+        configDirectory: group.configDirectory,
+        workingDirectory: this.#cwd,
+        files: group.files,
+        // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
+        fileContents: this.#resolveOverlay(),
+        fix: this.#fix,
+      });
+      const { contents, bomFiles } = await this.#readDiagnosticContents(
+        response,
+        group.configDirectory,
+      );
+      // Seed results from the files Go actually linted (config `ignores`
+      // already excluded, paths program-canonical) rather than the glob matches:
+      // an ignored match produces no phantom empty result, and a symlinked glob
+      // path can't duplicate a result whose diagnostic is keyed to the program
+      // path. Fall back to the glob matches if an older binary omits lintedFiles.
+      const linted = response.lintedFiles
+        ? response.lintedFiles.map((f) =>
+            path.isAbsolute(f)
+              ? path.normalize(f)
+              : path.resolve(group.configDirectory, f),
+          )
+        : group.files;
+      results.push(
+        ...this.#toLintResults(
+          response,
+          group.configDirectory,
+          linted,
+          contents,
+          bomFiles,
+        ),
+      );
+    }
+    return results.sort((a, b) => a.filePath.localeCompare(b.filePath));
   }
 
   /**
@@ -283,14 +292,12 @@ export class Rslint {
     } else if (typeof this.#overrideConfigFile === 'string') {
       const configPath = path.resolve(this.#cwd, this.#overrideConfigFile);
       base = normalizeConfig(await loadConfigFile(configPath));
-      configDirectory = path.dirname(configPath);
+      // Explicit overrideConfigFile follows CLI --config semantics: files,
+      // ignores, and parserOptions.project resolve from invocation cwd.
+      configDirectory = this.#cwd;
     } else {
-      // null / absent: auto-discover the nearest config from fromDir upward.
-      const configPath = findJSConfigUp(fromDir);
-      if (configPath) {
-        base = normalizeConfig(await loadConfigFile(configPath));
-        configDirectory = path.dirname(configPath);
-      }
+      ({ config: base, configDirectory } =
+        await this.#resolveAutoConfig(fromDir));
     }
 
     if (this.#overrideConfig != null) {
@@ -301,6 +308,60 @@ export class Rslint {
     }
 
     return { config: base, configDirectory };
+  }
+
+  async #resolveAutoConfig(fromDir: string): Promise<{
+    config: Record<string, unknown>[];
+    configDirectory: string;
+  }> {
+    const nearestConfig = findJSConfigUp(fromDir);
+    if (!nearestConfig) {
+      return { config: [], configDirectory: this.#cwd };
+    }
+
+    return {
+      config: normalizeConfig(await loadConfigFile(nearestConfig)),
+      configDirectory: path.dirname(nearestConfig),
+    };
+  }
+
+  async #readDiagnosticContents(
+    response: LintResponse,
+    configDirectory: string,
+  ): Promise<{ contents: Record<string, string>; bomFiles: Set<string> }> {
+    // Read source for each file that produced a diagnostic so mergeFixes can
+    // gap-fill multi-edit fixes (parity with lintText, which has the source
+    // in-hand). Only diagnosed files are read; a lint with no findings reads
+    // nothing.
+    const contents: Record<string, string> = {};
+    // Disk files whose bytes start with a UTF-8 BOM. Go reads them through a
+    // decoder that strips the BOM, so its fix offsets AND Output are
+    // BOM-stripped. We strip the BOM from the source fed to mergeFixes so the
+    // gap-fill slices line up with those offsets — and `fix.range` therefore
+    // stays BOM-stripped, matching ESLint v10 and the message line/column —
+    // then re-prepend the BOM to Output (in toLintResults) so outputFixes writes
+    // back the real file. (lintText is unaffected: its overlay keeps the BOM and
+    // Go's offsets already include it, so no adjustment is needed there.)
+    const bomFiles = new Set<string>();
+    for (const d of response.diagnostics ?? []) {
+      const abs = path.isAbsolute(d.filePath)
+        ? path.normalize(d.filePath)
+        : path.resolve(configDirectory, d.filePath);
+      if (!(abs in contents)) {
+        try {
+          const raw = await readFile(abs, 'utf8');
+          if (raw.charCodeAt(0) === 0xfeff) {
+            bomFiles.add(abs);
+            contents[abs] = raw.slice(1); // BOM-stripped, matching Go's offsets
+          } else {
+            contents[abs] = raw;
+          }
+        } catch {
+          // Unreadable (e.g. virtual/deleted) — mergeFixes degrades to first edit.
+        }
+      }
+    }
+    return { contents, bomFiles };
   }
 
   #toLintResults(

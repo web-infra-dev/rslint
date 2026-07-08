@@ -161,6 +161,31 @@ describe('discoverConfigs', () => {
     }
   });
 
+  test('discovered configs are returned parent-first', async () => {
+    const tmp = createTempDir();
+    try {
+      fs.mkdirSync(path.join(tmp, 'packages', 'app'), { recursive: true });
+      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
+      fs.writeFileSync(
+        path.join(tmp, 'packages', 'rslint.config.js'),
+        'export default []',
+      );
+      fs.writeFileSync(
+        path.join(tmp, 'packages', 'app', 'rslint.config.js'),
+        'export default []',
+      );
+
+      const result = await discoverConfigs([], [], tmp, null);
+      expect([...result.values()]).toEqual([
+        tmp,
+        path.join(tmp, 'packages'),
+        path.join(tmp, 'packages', 'app'),
+      ]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
   test('dir arg discovers nested configs within scope', async () => {
     const tmp = createTempDir();
     try {

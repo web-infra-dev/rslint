@@ -54,6 +54,9 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 	if err := utils.ParseJSONC([]byte(data), &config); err != nil {
 		return nil, "", fmt.Errorf("error parsing rslint config file %q: %w", configFileName, err)
 	}
+	if err := ValidateConfig(config); err != nil {
+		return nil, "", fmt.Errorf("invalid rslint config file %q: %w", configFileName, err)
+	}
 
 	// Normalize JSON config: inject core rules and plugin rules into each entry's Rules map.
 	// User-specified rules take precedence (they are applied after the defaults).

@@ -134,20 +134,24 @@ func TestDiscoverGapFiles_GetConfigForFilePreFilter(t *testing.T) {
 	assert.Equal(t, len(gapFiles), 0)
 }
 
-func TestDiscoverGapFiles_NoFilesField_ReturnsNil(t *testing.T) {
-	configDir, _ := setupDiscoveryFixture(t, []string{
+func TestDiscoverGapFiles_NoFilesField_UsesDefaultExtensions(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
+		"src/b.jsx",
+		"src/c.cjs",
+		"src/d.cts",
+		"src/styles.css",
 	})
 
-	// JSON-style config: no files field
 	config := RslintConfig{
 		{Rules: Rules{"test-rule": "error"}},
 	}
 
 	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
-	// Should return nil (backward compat signal)
-	assert.Assert(t, gapFiles == nil, "should return nil when no entry has files field")
+	expected := []string{paths["src/a.ts"], paths["src/b.jsx"], paths["src/c.cjs"], paths["src/d.cts"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, gapFiles, expected)
 }
 
 func TestDiscoverGapFiles_AllowDirsScope(t *testing.T) {
@@ -245,14 +249,42 @@ func TestDiscoverGapFiles_AllowFilesScope(t *testing.T) {
 	assert.Equal(t, gapFiles[0], paths["scripts/b.ts"])
 }
 
-func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
-	configDir, _ := setupDiscoveryFixture(t, []string{
+func TestDiscoverLintFiles_ExplicitFileBypassesFilesWithDirScope(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"explicit.js",
 		"src/a.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	srcDir := tspath.NormalizePath(filepath.Join(configDir, "src"))
+	targets := DiscoverLintFiles(
+		config,
+		configDir,
+		osvfs.FS(),
+		[]string{paths["explicit.js"]},
+		[]string{srcDir},
+		false,
+	)
+
+	expected := []string{paths["explicit.js"], paths["src/a.ts"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, targets, expected)
+}
+
+func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"src/a.ts",
+		"src/b.jsx",
+		"src/c.cjs",
 		"src/readme.md",
 		"src/data.json",
 	})
 
-	// files: ['**/*'] matches all files — no extension filtering
+	// files: ['**/*'] matches the whole tree, but rslint still only lints
+	// extensions it can parse.
 	config := RslintConfig{
 		{Files: []string{"**/*"}, Rules: Rules{"test-rule": "error"}},
 	}
@@ -262,8 +294,9 @@ func TestDiscoverGapFiles_AllExtensionsDiscoveredByPattern(t *testing.T) {
 	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
-	// All files matching the pattern should be discovered (no extension filter)
-	assert.Equal(t, len(gapFiles), 3)
+	expected := []string{paths["src/a.ts"], paths["src/b.jsx"], paths["src/c.cjs"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, gapFiles, expected)
 }
 
 func TestDiscoverGapFilesMultiConfig(t *testing.T) {
@@ -300,20 +333,50 @@ func TestDiscoverGapFilesMultiConfig(t *testing.T) {
 	assert.Assert(t, hasB, "should find b.tsx")
 }
 
-func TestDiscoverGapFiles_EmptyFilesArray(t *testing.T) {
-	configDir, _ := setupDiscoveryFixture(t, []string{
-		"src/a.ts",
+func TestDiscoverLintFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
+	rootDir, rootPaths := setupDiscoveryFixture(t, []string{
+		"root.ts",
+		"pkg/child.ts",
 	})
+	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
 
-	// Entry with files: [] (empty array, not absent)
-	config := RslintConfig{
-		{Files: []string{}, Rules: Rules{"test-rule": "error"}},
+	configMap := map[string]RslintConfig{
+		rootDir: {
+			{Files: []string{"**/*.ts"}, Rules: Rules{"root-rule": "error"}},
+		},
+		childDir: {
+			{Files: []string{"**/*.jsx"}, Rules: Rules{"child-rule": "error"}},
+		},
 	}
 
-	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
+	targets := DiscoverLintFilesMultiConfig(configMap, osvfs.FS(), nil, []string{rootDir}, false)
 
-	// Empty files array has no patterns to match → same as no files field → nil (legacy mode)
-	assert.Assert(t, gapFiles == nil, "should return nil for empty files array")
+	expected := []string{rootPaths["root.ts"]}
+	assert.DeepEqual(t, targets, expected)
+}
+
+func TestDiscoverGapFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
+	rootDir, rootPaths := setupDiscoveryFixture(t, []string{
+		"root.ts",
+		"pkg/child.ts",
+		"pkg/child.jsx",
+	})
+	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
+
+	configMap := map[string]RslintConfig{
+		rootDir: {
+			{Files: []string{"**/*.ts"}, Rules: Rules{"root-rule": "error"}},
+		},
+		childDir: {
+			{Files: []string{"**/*.jsx"}, Rules: Rules{"child-rule": "error"}},
+		},
+	}
+
+	gapFiles := DiscoverGapFilesMultiConfig(configMap, osvfs.FS(), map[string]struct{}{}, nil, []string{rootDir}, false)
+
+	expected := []string{rootPaths["pkg/child.jsx"], rootPaths["root.ts"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, gapFiles, expected)
 }
 
 func TestDiscoverGapFiles_FilesButNoRules(t *testing.T) {

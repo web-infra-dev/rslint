@@ -231,6 +231,354 @@ func TestHandleLint_ExplicitFilesRestrictsScope(t *testing.T) {
 	}
 }
 
+func TestHandleLint_ExplicitFileOutsideFilesIsCountedWithNoRules(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "explicit.js")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	config := json.RawMessage(`[{
+		"files": ["**/*.ts"],
+		"rules": { "no-debugger": "error" }
+	}]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 1 {
+		t.Fatalf("explicit files-scope miss should still count as one lint result, got %d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 1 || response.LintedFiles[0] != "explicit.js" {
+		t.Fatalf("expected explicit.js in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics because no rules match the file, got %+v", response.Diagnostics)
+	}
+	if response.RuleCount != 0 {
+		t.Fatalf("expected no executed rules, got %d", response.RuleCount)
+	}
+}
+
+func TestHandleLint_ExplicitFileEntryIgnoredIsCountedWithNoRules(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored.js")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	config := json.RawMessage(`[{
+		"files": ["**/*.js"],
+		"ignores": ["ignored.js"],
+		"rules": { "no-debugger": "error" }
+	}]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 1 {
+		t.Fatalf("entry-level ignores should not remove an explicit file from the result set, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 1 || response.LintedFiles[0] != "ignored.js" {
+		t.Fatalf("expected ignored.js in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics because entry-level ignores leave no matching rules, got %+v", response.Diagnostics)
+	}
+	if response.RuleCount != 0 {
+		t.Fatalf("expected no executed rules, got %d", response.RuleCount)
+	}
+}
+
+func TestHandleLint_ExplicitFileGloballyIgnoredIsSkipped(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored.js")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	config := json.RawMessage(`[
+		{ "ignores": ["ignored.js"] },
+		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+	]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 {
+		t.Fatalf("globally ignored explicit files should be skipped, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 0 {
+		t.Fatalf("globally ignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for globally ignored file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_ExplicitFileGitignoredIsSkipped(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored.js")
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("ignored.js\n"), 0o644); err != nil {
+		t.Fatalf("write .gitignore: %v", err)
+	}
+	config := json.RawMessage(`[
+		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+	]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 {
+		t.Fatalf("gitignored explicit files should be skipped, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 0 {
+		t.Fatalf("gitignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for gitignored file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_GitignoredParentBlocksNestedNegation(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "ignored", "src", "file.js")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("ignored/\n"), 0o644); err != nil {
+		t.Fatalf("write root .gitignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "ignored", ".gitignore"), []byte("!src/file.js\n"), 0o644); err != nil {
+		t.Fatalf("write nested .gitignore: %v", err)
+	}
+	config := json.RawMessage(`[
+		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+	]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 {
+		t.Fatalf("parent-gitignored explicit file should stay skipped despite nested negation, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 0 {
+		t.Fatalf("parent-gitignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for parent-gitignored file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_AncestorGitignoredConfigRootBlocksOwnNegation(t *testing.T) {
+	dir := t.TempDir()
+	appDir := filepath.Join(dir, "packages", "app")
+	target := filepath.Join(appDir, "src", "file.js")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("packages/\n"), 0o644); err != nil {
+		t.Fatalf("write root .gitignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(appDir, ".gitignore"), []byte("!src/file.js\n"), 0o644); err != nil {
+		t.Fatalf("write app .gitignore: %v", err)
+	}
+	config := json.RawMessage(`[
+		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+	]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  appDir,
+		WorkingDirectory: appDir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 {
+		t.Fatalf("ancestor-gitignored config root should stay skipped despite own negation, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 0 {
+		t.Fatalf("ancestor-gitignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for ancestor-gitignored file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_AncestorGitignoredIntermediateBlocksNegation(t *testing.T) {
+	dir := t.TempDir()
+	appDir := filepath.Join(dir, "packages", "app")
+	target := filepath.Join(appDir, "src", "file.js")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("packages/\n"), 0o644); err != nil {
+		t.Fatalf("write root .gitignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "packages", ".gitignore"), []byte("!app/src/file.js\n"), 0o644); err != nil {
+		t.Fatalf("write packages .gitignore: %v", err)
+	}
+	config := json.RawMessage(`[
+		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+	]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  appDir,
+		WorkingDirectory: appDir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 {
+		t.Fatalf("ancestor-gitignored intermediate dir should stay skipped despite its negation, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 0 {
+		t.Fatalf("ancestor-gitignored file must not be in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for ancestor-gitignored file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_AncestorChildWildcardReadsIntermediateGitignore(t *testing.T) {
+	dir := t.TempDir()
+	appDir := filepath.Join(dir, "packages", "app")
+	target := filepath.Join(appDir, "src", "generated", "file.js")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("debugger;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("packages/*\n!packages/app/\n"), 0o644); err != nil {
+		t.Fatalf("write root .gitignore: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "packages", ".gitignore"), []byte("app/src/generated/\n"), 0o644); err != nil {
+		t.Fatalf("write packages .gitignore: %v", err)
+	}
+	config := json.RawMessage(`[
+		{ "files": ["**/*.js"], "rules": { "no-debugger": "error" } }
+	]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  appDir,
+		WorkingDirectory: appDir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 0 {
+		t.Fatalf("intermediate .gitignore should skip generated explicit file, got FileCount=%d", response.FileCount)
+	}
+	if len(response.LintedFiles) != 0 {
+		t.Fatalf("gitignored generated file must not be in LintedFiles, got %v", response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no diagnostics for gitignored generated file, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_NoFilesEntryScansDefaultExtensions(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"a.jsx":      "debugger;\n",
+		"b.cjs":      "debugger;\n",
+		"c.cts":      "debugger;\n",
+		"styles.css": "debugger;\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	config := json.RawMessage(`[{
+		"rules": { "no-debugger": "error" }
+	}]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+
+	expectedFiles := []string{"a.jsx", "b.cjs", "c.cts"}
+	if strings.Join(response.LintedFiles, ",") != strings.Join(expectedFiles, ",") {
+		t.Fatalf("expected default lint files %v, got %v", expectedFiles, response.LintedFiles)
+	}
+	if response.FileCount != len(expectedFiles) {
+		t.Fatalf("expected FileCount=%d, got %d", len(expectedFiles), response.FileCount)
+	}
+	if len(response.Diagnostics) != len(expectedFiles) {
+		t.Fatalf("expected one no-debugger diagnostic per default file, got %d: %+v", len(response.Diagnostics), response.Diagnostics)
+	}
+	for _, diagnostic := range response.Diagnostics {
+		if diagnostic.FilePath == "styles.css" {
+			t.Fatalf("unsupported css file must not be linted, diagnostics=%+v", response.Diagnostics)
+		}
+	}
+}
+
 func TestHandleLint_NoConfigEnablesNoRules(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
@@ -262,9 +610,9 @@ func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve fixtures dir: %v", err)
 	}
-	// Non-empty `files` activates gap discovery; the tsconfig only covers
-	// src/, so a file at the fixtures root is a gap file. array-type is a
-	// non-type-aware (syntactic) rule, so it must still run on the fallback.
+	// The tsconfig only covers src/, so a selected file at the fixtures root is
+	// bound to the AST-only fallback. array-type is a non-type-aware
+	// (syntactic) rule, so it must still run there.
 	config := json.RawMessage(`[{
 		"files": ["**/*.ts"],
 		"languageOptions": { "parserOptions": { "project": ["./tsconfig.json"] } },
@@ -366,6 +714,26 @@ func TestHandleLint_MalformedConfigReturnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected an error for a malformed (non-array) config")
+	}
+}
+
+func TestHandleLint_RejectsEmptyFilesArrayConfig(t *testing.T) {
+	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
+	if err != nil {
+		t.Fatalf("resolve fixtures dir: %v", err)
+	}
+
+	handler := &IPCHandler{}
+	_, err = handler.HandleLint(api.LintRequest{
+		Config:           json.RawMessage(`[{"files":[],"rules":{"no-console":"error"}}]`),
+		ConfigDirectory:  fixturesDir,
+		WorkingDirectory: fixturesDir,
+	})
+	if err == nil {
+		t.Fatal("expected an error for empty files array")
+	}
+	if !strings.Contains(err.Error(), `key "files": expected value to be a non-empty array`) {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

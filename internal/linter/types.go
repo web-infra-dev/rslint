@@ -80,7 +80,7 @@ type LintResult struct {
 //     (substring match against utils.ExcludePaths). Pass an explicit empty
 //     slice to disable the default.
 //   - PerProgramFilter=nil                → no per-program ad-hoc filter
-//     (multi-config ownership / config `ignores`). Entries within the slice
+//     (for example config global ignores). Entries within the slice
 //     may be nil individually.
 //   - GetRulesForFile=nil                 → no lint rules executed
 //   - TypeInfoFiles=nil                   → no gap-file distinction
@@ -105,6 +105,12 @@ type RunLinterOptions struct {
 	Scope            FileScope
 	ExcludePaths     []string
 	PerProgramFilter []FileFilter
+	// TargetFiles, when non-nil, enables an exact per-Program lint target plan.
+	// Entries are parallel to Programs; a missing, nil, or empty entry means
+	// that Program has no lint-rule targets. CLI/API use this after resolving
+	// lint targets from config `files`/ignores independently from TypeScript
+	// Program membership. nil preserves the legacy Program scan.
+	TargetFiles [][]string
 
 	GetRulesForFile RuleHandler
 	TypeInfoFiles   map[string]struct{}
