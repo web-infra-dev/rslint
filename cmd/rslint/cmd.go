@@ -1233,7 +1233,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 		// Rebuild fallback Program for gap files (content may have changed after fixes).
 		if len(capturedGapFiles) > 0 {
-			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs, parseCache)
+			jsxFactory, jsxFragmentFactory := resolveGapJsxPragma(configMap, rslintConfig)
+			fallback, _ := createFallbackProgram(capturedGapFiles, singleThreaded, cwd, fs, parseCache, jsxFactory, jsxFragmentFactory)
 			if fallback != nil {
 				baseProgs = append(baseProgs, fallback)
 			}

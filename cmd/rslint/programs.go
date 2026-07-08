@@ -125,7 +125,12 @@ func createProgramsForConfig(
 		includes := []string{"**/*"}
 		rootFiles := vfsmatch.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, vfsmatch.UnlimitedDepth)
 		if len(rootFiles) > 0 {
-			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
+			jsxFactory, jsxFragmentFactory := rslintconfig.ResolveJsxPragmaOptions(entries)
+			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{
+				AllowJs:            core.TSTrue,
+				JsxFactory:         jsxFactory,
+				JsxFragmentFactory: jsxFragmentFactory,
+			}, rootFiles, host)
 			if err != nil {
 				w := bufio.NewWriter(os.Stderr)
 				if !reportSyntacticErrors(err, w, tspath.ComparePathsOptions{
@@ -146,19 +151,27 @@ func createProgramsForConfig(
 // createFallbackProgram creates a Program for "gap" files — files matched by
 // config `files` patterns but not included in any tsconfig. Uses minimal
 // compiler options sufficient for AST parsing (no type checking).
+// jsxFactory / jsxFragmentFactory come from the owning config's
+// languageOptions.parserOptions.jsxPragma / jsxFragmentName (see
+// rslintconfig.ResolveJsxPragmaOptions); empty strings leave TypeScript's
+// own "React" / "Fragment" defaults in place.
 func createFallbackProgram(
 	gapFiles []string,
 	singleThreaded bool,
 	configDir string,
 	fsys vfs.FS,
 	parseCache *utils.ParseCache,
+	jsxFactory string,
+	jsxFragmentFactory string,
 ) (*compiler.Program, int) {
 	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
-		Target:  core.ScriptTargetESNext,
-		Module:  core.ModuleKindESNext,
-		Jsx:     core.JsxEmitPreserve,
-		AllowJs: core.TSTrue,
+		Target:             core.ScriptTargetESNext,
+		Module:             core.ModuleKindESNext,
+		Jsx:                core.JsxEmitPreserve,
+		AllowJs:            core.TSTrue,
+		JsxFactory:         jsxFactory,
+		JsxFragmentFactory: jsxFragmentFactory,
 	}, gapFiles, host)
 	if err != nil {
 		// Non-fatal: gap files failing to parse should not block the entire run.
@@ -254,7 +267,8 @@ func buildProgramsWithGapFallback(
 		capturedGapFiles = gapFiles
 
 		if len(gapFiles) > 0 {
-			fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache)
+			jsxFactory, jsxFragmentFactory := resolveGapJsxPragma(configMap, rslintConfig)
+			fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache, jsxFactory, jsxFragmentFactory)
 			if fallback != nil {
 				programs = append(programs, fallback)
 			}
@@ -262,6 +276,29 @@ func buildProgramsWithGapFallback(
 	}
 
 	return programs, typeInfoFiles, capturedGapFiles
+}
+
+// resolveGapJsxPragma resolves the jsxPragma / jsxFragmentName to seed the
+// gap-file fallback Program's CompilerOptions with. In multi-config mode
+// (configMap non-nil) the gap-file batch can span multiple config
+// directories, so this unions across all of them — a best-effort default for
+// the (rare) case where directories disagree, matching the same
+// single-Program-for-many-files tradeoff the fallback Program already makes.
+// Single-config mode resolves directly against rslintConfig.
+func resolveGapJsxPragma(configMap map[string]rslintconfig.RslintConfig, rslintConfig rslintconfig.RslintConfig) (jsxFactory, jsxFragmentFactory string) {
+	if configMap != nil {
+		for _, entries := range configMap {
+			f, ff := rslintconfig.ResolveJsxPragmaOptions(entries)
+			if f != "" {
+				jsxFactory = f
+			}
+			if ff != "" {
+				jsxFragmentFactory = ff
+			}
+		}
+		return jsxFactory, jsxFragmentFactory
+	}
+	return rslintconfig.ResolveJsxPragmaOptions(rslintConfig)
 }
 
 // buildFileOwnerMap determines which config directory "owns" each file across

@@ -91,6 +91,16 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 type ParserOptions struct {
 	ProjectService *bool        `json:"projectService,omitempty"`
 	Project        ProjectPaths `json:"project,omitempty"`
+	// JsxPragma / JsxFragmentName mirror @typescript-eslint/parser's
+	// `parserOptions.jsxPragma` / `parserOptions.jsxFragmentName` — the
+	// identifier implicitly referenced by JSX elements / fragments (Preact's
+	// `h`/`Fragment`, a custom factory, ...). Consumed by
+	// ResolveJsxPragmaOptions to seed CompilerOptions.JsxFactory /
+	// JsxFragmentFactory for Programs synthesized without a tsconfig (see
+	// cmd/rslint/programs.go), so the Go-native `no-unused-vars` implicit-
+	// usage check (markJsxFactoryUsed) doesn't hard-code "React".
+	JsxPragma       *string `json:"jsxPragma,omitempty"`
+	JsxFragmentName *string `json:"jsxFragmentName,omitempty"`
 }
 
 // BoolPtr returns a pointer to the given bool value.
@@ -563,25 +573,78 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			if len(override.ParserOptions.Project) > 0 {
 				po.Project = override.ParserOptions.Project
 			}
+			if override.ParserOptions.JsxPragma != nil {
+				po.JsxPragma = override.ParserOptions.JsxPragma
+			}
+			if override.ParserOptions.JsxFragmentName != nil {
+				po.JsxFragmentName = override.ParserOptions.JsxFragmentName
+			}
 			merged.ParserOptions = &po
 		}
 	}
-	// Shallow-merge the raw languageOptions map (override wins per key). This is
-	// intentionally shallow, NOT ESLint's recursive flat-config deepMerge of
-	// nested parserOptions/globals — matching that merge fidelity is a separate
-	// concern from wiring eslintPlugins and is out of scope here. merged is a
-	// shallow copy of base, so build a fresh map rather than mutating base.Raw.
+	// Deep-merge the raw languageOptions map (override wins per key; nested
+	// objects like `parserOptions` are merged key-by-key rather than replaced
+	// wholesale). Without this, overriding only `parserOptions.jsxPragma` in a
+	// later entry silently dropped an earlier entry's `parserOptions.project`
+	// (and any other nested parserOptions/globals) because the whole
+	// `parserOptions` object was swapped out — see
+	// https://github.com/web-infra-dev/rslint/issues/1230. merged is a shallow
+	// copy of base, so build a fresh map rather than mutating base.Raw.
 	if len(override.Raw) > 0 {
-		mergedRaw := make(map[string]any, len(base.Raw)+len(override.Raw))
-		for k, v := range base.Raw {
-			mergedRaw[k] = v
-		}
-		for k, v := range override.Raw {
-			mergedRaw[k] = v
-		}
-		merged.Raw = mergedRaw
+		merged.Raw = deepMergeRawMaps(base.Raw, override.Raw)
 	}
 	return &merged
+}
+
+// deepMergeRawMaps recursively merges override into base (override wins on
+// conflicting scalar/array keys); when both sides have a `map[string]any`
+// at the same key, they are merged recursively instead of override
+// replacing the whole nested object. Matches ESLint flat-config's
+// languageOptions merge semantics closely enough for parserOptions/globals
+// nesting without pulling in a general-purpose deep-merge dependency.
+func deepMergeRawMaps(base, override map[string]any) map[string]any {
+	merged := make(map[string]any, len(base)+len(override))
+	for k, v := range base {
+		merged[k] = v
+	}
+	for k, v := range override {
+		if baseVal, ok := merged[k]; ok {
+			if baseMap, ok := baseVal.(map[string]any); ok {
+				if overrideMap, ok := v.(map[string]any); ok {
+					merged[k] = deepMergeRawMaps(baseMap, overrideMap)
+					continue
+				}
+			}
+		}
+		merged[k] = v
+	}
+	return merged
+}
+
+// ResolveJsxPragmaOptions scans entries for a `languageOptions.parserOptions`
+// jsxPragma / jsxFragmentName, in entry order, later entries overriding
+// earlier ones (matching GetConfigForFile's merge order). It exists for the
+// Programs that synthesize CompilerOptions for a batch of files instead of
+// resolving a single file's merged config — the no-tsconfig directory scan
+// and the gap-file fallback Program (cmd/rslint/programs.go) — so their
+// JsxFactory / JsxFragmentFactory aren't hard-coded to TypeScript's "React"
+// default when the user only configured Preact/Vue-style pragmas via rslint
+// config rather than tsconfig.json. See
+// https://github.com/web-infra-dev/rslint/issues/1230.
+func ResolveJsxPragmaOptions(entries RslintConfig) (jsxFactory, jsxFragmentFactory string) {
+	for _, entry := range entries {
+		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
+			continue
+		}
+		po := entry.LanguageOptions.ParserOptions
+		if po.JsxPragma != nil && *po.JsxPragma != "" {
+			jsxFactory = *po.JsxPragma
+		}
+		if po.JsxFragmentName != nil && *po.JsxFragmentName != "" {
+			jsxFragmentFactory = *po.JsxFragmentName
+		}
+	}
+	return jsxFactory, jsxFragmentFactory
 }
 
 // RulePluginPrefix extracts the plugin prefix from a rule name.

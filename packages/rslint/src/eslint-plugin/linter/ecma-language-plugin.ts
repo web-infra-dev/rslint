@@ -134,6 +134,16 @@ export interface LintFileRequest {
         globalReturn?: boolean;
         impliedStrict?: boolean;
       };
+      /**
+       * `@typescript-eslint/parser`-compatible top-level `parserOptions`
+       * knobs (siblings of `ecmaFeatures`, NOT nested under it). Consumed
+       * by the scope-manager factory below so `<Pragma />` / `<>...</>`
+       * resolve to the configured identifier instead of hard-coded
+       * `React` / `Fragment` — see
+       * https://github.com/web-infra-dev/rslint/issues/1230.
+       */
+      jsxPragma?: string | null;
+      jsxFragmentName?: string | null;
     };
   };
   /** Merged flat-config `settings` for plugin consumption (e.g. `react.version`). */
@@ -267,7 +277,8 @@ export function lintFile(
   // ESLint v10: sourceType / ecmaVersion / globals are top-level fields
   // of `languageOptions`. No legacy positions are accepted.
   const globals = req.languageOptions?.globals;
-  const ecmaFeatures = req.languageOptions?.parserOptions?.ecmaFeatures;
+  const parserOptions = req.languageOptions?.parserOptions;
+  const ecmaFeatures = parserOptions?.ecmaFeatures;
   const scopeManagerFactory = (() => {
     const inner = makeScopeManagerFactory(ast, {
       filePath: req.filePath,
@@ -281,6 +292,16 @@ export function lintFile(
       // are filled in by `scope-factory` to match ESLint v10.
       impliedStrict: ecmaFeatures?.impliedStrict,
       globalReturn: ecmaFeatures?.globalReturn,
+      // `jsxPragma` / `jsxFragmentName` are top-level `parserOptions` keys
+      // (siblings of `ecmaFeatures`), NOT nested under it — reading them
+      // off `ecmaFeatures` (the pre-fix code didn't forward them at all)
+      // silently fell back to `scope-factory`'s 'React'/'Fragment'
+      // defaults for every Preact/Vue/custom-pragma config. `?? undefined`
+      // normalizes an explicit `null` (parserOptions.jsxPragma=null is
+      // typescript-eslint's "disable pragma tracking") to "use the
+      // scope-factory default" — rslint doesn't yet expose that opt-out.
+      jsxPragma: parserOptions?.jsxPragma ?? undefined,
+      jsxFragmentName: parserOptions?.jsxFragmentName ?? undefined,
     });
     return () => {
       const sm = inner();

@@ -272,6 +272,62 @@ func TestMergeLanguageOptions(t *testing.T) {
 			t.Error("Expected ProjectService to be preserved from base")
 		}
 	})
+
+	t.Run("jsxPragma/jsxFragmentName override wins, unset fields preserve base", func(t *testing.T) {
+		base := &LanguageOptions{
+			ParserOptions: &ParserOptions{
+				Project: ProjectPaths{"./tsconfig.json"},
+			},
+		}
+		pragma := "h"
+		override := &LanguageOptions{
+			ParserOptions: &ParserOptions{
+				JsxPragma: &pragma,
+			},
+		}
+		result := mergeLanguageOptions(base, override)
+
+		if result.ParserOptions.JsxPragma == nil || *result.ParserOptions.JsxPragma != "h" {
+			t.Error("Expected JsxPragma to be set from override")
+		}
+		if len(result.ParserOptions.Project) != 1 || result.ParserOptions.Project[0] != "./tsconfig.json" {
+			t.Error("Expected Project to be preserved from base")
+		}
+	})
+
+	// Regression test for https://github.com/web-infra-dev/rslint/issues/1230:
+	// a later entry overriding only parserOptions.jsxPragma must not discard
+	// an earlier entry's parserOptions.project — the Raw map merge used to be
+	// a one-level shallow overwrite, so setting ANY key under `parserOptions`
+	// replaced the whole nested object.
+	t.Run("raw parserOptions deep merge preserves sibling keys", func(t *testing.T) {
+		base := &LanguageOptions{
+			Raw: map[string]any{
+				"parserOptions": map[string]any{
+					"project": "./tsconfig.json",
+				},
+			},
+		}
+		override := &LanguageOptions{
+			Raw: map[string]any{
+				"parserOptions": map[string]any{
+					"jsxPragma": "h",
+				},
+			},
+		}
+		result := mergeLanguageOptions(base, override)
+
+		po, ok := result.Raw["parserOptions"].(map[string]any)
+		if !ok {
+			t.Fatal("Expected parserOptions to be a map in the merged Raw config")
+		}
+		if po["project"] != "./tsconfig.json" {
+			t.Errorf("Expected base's parserOptions.project to survive the merge, got %v", po["project"])
+		}
+		if po["jsxPragma"] != "h" {
+			t.Errorf("Expected override's parserOptions.jsxPragma to be applied, got %v", po["jsxPragma"])
+		}
+	})
 }
 
 func TestIsGlobalIgnoreEntry(t *testing.T) {
@@ -815,4 +871,63 @@ func TestGetConfigForFile_WindowsPaths(t *testing.T) {
 			}
 		})
 	}
+}
+
+func strPtr(s string) *string { return &s }
+
+func TestResolveJsxPragmaOptions(t *testing.T) {
+	t.Run("no entries set jsxPragma", func(t *testing.T) {
+		entries := RslintConfig{
+			{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{}}},
+		}
+		factory, fragment := ResolveJsxPragmaOptions(entries)
+		if factory != "" || fragment != "" {
+			t.Errorf("expected empty defaults, got factory=%q fragment=%q", factory, fragment)
+		}
+	})
+
+	t.Run("single entry sets both", func(t *testing.T) {
+		entries := RslintConfig{
+			{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+				JsxPragma:       strPtr("h"),
+				JsxFragmentName: strPtr("Fragment"),
+			}}},
+		}
+		factory, fragment := ResolveJsxPragmaOptions(entries)
+		if factory != "h" {
+			t.Errorf("expected factory=%q, got %q", "h", factory)
+		}
+		if fragment != "Fragment" {
+			t.Errorf("expected fragment=%q, got %q", "Fragment", fragment)
+		}
+	})
+
+	t.Run("later entry overrides earlier entry", func(t *testing.T) {
+		entries := RslintConfig{
+			{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+				JsxPragma: strPtr("React"),
+			}}},
+			{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+				JsxPragma: strPtr("h"),
+			}}},
+		}
+		factory, _ := ResolveJsxPragmaOptions(entries)
+		if factory != "h" {
+			t.Errorf("expected the later entry's factory=%q to win, got %q", "h", factory)
+		}
+	})
+
+	t.Run("nil LanguageOptions/ParserOptions are skipped", func(t *testing.T) {
+		entries := RslintConfig{
+			{},
+			{LanguageOptions: &LanguageOptions{}},
+			{LanguageOptions: &LanguageOptions{ParserOptions: &ParserOptions{
+				JsxPragma: strPtr("h"),
+			}}},
+		}
+		factory, _ := ResolveJsxPragmaOptions(entries)
+		if factory != "h" {
+			t.Errorf("expected factory=%q, got %q", "h", factory)
+		}
+	})
 }

@@ -87,6 +87,9 @@ export interface LanguageOptions {
       globalReturn?: boolean;
       impliedStrict?: boolean;
     };
+    /** Top-level parserOptions keys (siblings of `ecmaFeatures`); see ecma-language-plugin.ts's LintFileRequest. */
+    jsxPragma?: string | null;
+    jsxFragmentName?: string | null;
   };
 }
 

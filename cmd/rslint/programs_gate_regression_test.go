@@ -86,7 +86,7 @@ func runBypassedGateScenario() {
 	fs = utils.NewOverlayVFS(fs, map[string]string{gapFile: "let a: any = 10;\na.b = 20;\n"})
 
 	parseCache := utils.NewParseCache()
-	fallback, _ := createFallbackProgram([]string{gapFile}, false, tmpDir, fs, parseCache)
+	fallback, _ := createFallbackProgram([]string{gapFile}, false, tmpDir, fs, parseCache, "", "")
 	if fallback == nil {
 		return // could not build the program → cannot reproduce; parent fails
 	}

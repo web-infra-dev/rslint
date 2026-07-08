@@ -66,7 +66,8 @@ export interface ScopeFactoryOptions {
    */
   globalReturn?: boolean;
   /**
-   * `languageOptions.parserOptions.ecmaFeatures.jsxPragma`. The TS
+   * `languageOptions.parserOptions.jsxPragma` — a top-level parserOptions
+   * key (sibling of `ecmaFeatures`, not nested under it). The TS
    * scope-manager treats `<X />` as a reference to this identifier so
    * `no-unused-vars` on the JSX-pragma import doesn't false-positive.
    * Defaults to `'React'` to match the historical behaviour, but
@@ -74,8 +75,9 @@ export interface ScopeFactoryOptions {
    */
   jsxPragma?: string;
   /**
-   * `languageOptions.parserOptions.ecmaFeatures.jsxFragmentName`. The
-   * TS scope-manager treats `<>...</>` as a reference to this
+   * `languageOptions.parserOptions.jsxFragmentName` — a top-level
+   * parserOptions key (sibling of `ecmaFeatures`, not nested under it).
+   * The TS scope-manager treats `<>...</>` as a reference to this
    * identifier (defaults to `'Fragment'`). Preact users set this to
    * `'Fragment'` already; some bundlers / TS configs use a custom
    * fragment factory.
@@ -145,7 +147,8 @@ function analyze(ast: object, opts: ScopeFactoryOptions): unknown {
       // names` and similar in legacy bundles.
       impliedStrict: opts.impliedStrict ?? false,
       // Defaults preserved for back-compat; Preact / Vue JSX users
-      // override via languageOptions.parserOptions.ecmaFeatures.
+      // override via languageOptions.parserOptions.jsxPragma /
+      // jsxFragmentName (top-level, not nested under ecmaFeatures).
       jsxPragma: opts.jsxPragma ?? 'React',
       jsxFragmentName: opts.jsxFragmentName ?? 'Fragment',
     });
