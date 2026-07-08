@@ -75,6 +75,7 @@ clippy
 clonable
 clsx
 co-locate
+codegen
 codemod
 codemods
 codepoint
@@ -219,6 +220,7 @@ jakebailey
 jsnum
 jsonc
 jsonline
+jsonschema
 jsxa
 jsxtransforms
 jsxtx
@@ -252,6 +254,7 @@ menuitemradio
 metacharacter
 metacharacters
 Metas
+metaschema
 middot
 minimatch
 misalign
@@ -353,6 +356,7 @@ readonlyness
 Readonlys
 realpath
 realuser
+realworld
 recognisable
 recognise
 recognised
@@ -400,6 +404,7 @@ rstackjs
 rstest
 saddr
 samp
+santhosh
 scopemanager
 sectionhead
 Seeked
@@ -433,6 +438,7 @@ symbolname
 tabindex
 tablist
 tascript
+tekuri
 Testaa
 Testab
 Testabab
@@ -467,6 +473,7 @@ unconfigured
 undefinded
 undefinedish
 undefinedundefined
+undereferenced
 uninit
 uninitialised
 unional
