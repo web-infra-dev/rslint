@@ -329,6 +329,186 @@ func TestValidateHandlesCyclicPureRefWithoutHanging(t *testing.T) {
 	}
 }
 
+func TestValidateHandlesCyclicAllOfWithoutHanging(t *testing.T) {
+	// Two definitions whose sole allOf branch $refs back to the other: like
+	// TestValidateHandlesCyclicPureRefWithoutHanging, this is pathological
+	// enough that the underlying jsonschema library itself rejects it (at
+	// Validate time, once it tries to actually check the instance against
+	// the cyclic schema) — but defaultSources's own cycle guard must still
+	// stop collectDefaultSources from recursing forever while walking it to
+	// fill in defaults beforehand.
+	schema, err := CompileSchema([]byte(`{
+		"type": "array",
+		"definitions": {
+			"a": { "allOf": [ { "$ref": "#/definitions/b" } ] },
+			"b": { "allOf": [ { "$ref": "#/definitions/a" } ] }
+		},
+		"items": [ { "$ref": "#/definitions/a" } ],
+		"minItems": 0,
+		"maxItems": 1
+	}`))
+	if err != nil {
+		t.Fatalf("CompileSchema failed: %v", err)
+	}
+
+	// No assertion on validity: the point is that this returns at all, and
+	// doesn't corrupt the input on the way.
+	got, _ := schema.Validate([]any{map[string]any{}})
+	want := []any{map[string]any{}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestValidateFillsAllOfBranchDefaults(t *testing.T) {
+	// allOf is unambiguous — every branch must hold — unlike anyOf/oneOf, so
+	// a default declared on an allOf branch's property is filled in, exactly
+	// as if that branch's properties were merged into this level. Confirmed
+	// against ajv@6: see allOf_multiple_branches_each_contribute_defaults in
+	// testdata/ajv_defaults_fixtures.json.
+	schema, err := CompileSchema([]byte(`{
+		"type": "array",
+		"items": [
+			{
+				"type": "object",
+				"allOf": [
+					{ "properties": { "a": { "type": "string", "default": "a-default" } } },
+					{ "properties": { "b": { "type": "string", "default": "b-default" } } }
+				]
+			}
+		],
+		"minItems": 0,
+		"maxItems": 1
+	}`))
+	if err != nil {
+		t.Fatalf("CompileSchema failed: %v", err)
+	}
+
+	got, err := schema.Validate([]any{map[string]any{}})
+	if err != nil {
+		t.Fatalf("expected valid options, got error: %v", err)
+	}
+	want := []any{map[string]any{"a": "a-default", "b": "b-default"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestValidateFillsAdditionalPropertiesSchemaDefaultForExistingKey(t *testing.T) {
+	// additionalProperties as a schema never manufactures a brand-new key,
+	// but a key already present that's only matched by additionalProperties
+	// (not a named property) still gets its own nested defaults filled in.
+	// Confirmed against ajv@6.
+	schema, err := CompileSchema([]byte(`{
+		"type": "array",
+		"items": [
+			{
+				"type": "object",
+				"properties": { "known": { "type": "string" } },
+				"additionalProperties": {
+					"type": "object",
+					"properties": { "inner": { "type": "string", "default": "inner-default" } }
+				}
+			}
+		],
+		"minItems": 0,
+		"maxItems": 1
+	}`))
+	if err != nil {
+		t.Fatalf("CompileSchema failed: %v", err)
+	}
+
+	// "extra" isn't a declared property, only matched via additionalProperties.
+	got, err := schema.Validate([]any{map[string]any{"known": "x", "extra": map[string]any{}}})
+	if err != nil {
+		t.Fatalf("expected valid options, got error: %v", err)
+	}
+	want := []any{map[string]any{"known": "x", "extra": map[string]any{"inner": "inner-default"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+
+	// additionalProperties never creates a brand-new key on its own account.
+	got, err = schema.Validate([]any{map[string]any{"known": "x"}})
+	if err != nil {
+		t.Fatalf("expected valid options, got error: %v", err)
+	}
+	want = []any{map[string]any{"known": "x"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestValidateFillsPatternPropertiesDefaultForExistingKey(t *testing.T) {
+	// Same idea as additionalProperties, but matched via patternProperties.
+	// Confirmed against ajv@6.
+	schema, err := CompileSchema([]byte(`{
+		"type": "array",
+		"items": [
+			{
+				"type": "object",
+				"patternProperties": {
+					"^opt_": {
+						"type": "object",
+						"properties": { "inner": { "type": "string", "default": "pp-default" } }
+					}
+				}
+			}
+		],
+		"minItems": 0,
+		"maxItems": 1
+	}`))
+	if err != nil {
+		t.Fatalf("CompileSchema failed: %v", err)
+	}
+
+	got, err := schema.Validate([]any{map[string]any{"opt_x": map[string]any{}}})
+	if err != nil {
+		t.Fatalf("expected valid options, got error: %v", err)
+	}
+	want := []any{map[string]any{"opt_x": map[string]any{"inner": "pp-default"}}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
+func TestValidateFillsRefSiblingDefault(t *testing.T) {
+	// A literal `default` written directly beside a bare $ref (a "$ref
+	// sibling") is honored using that literal value, not the ref target's
+	// own top-level default — confirmed against ajv@6, which (unlike the
+	// underlying jsonschema library, which discards every sibling keyword
+	// next to "$ref" for Draft 4) still applies it.
+	schema, err := CompileSchema([]byte(`{
+		"type": "array",
+		"definitions": {
+			"foo": { "type": "string", "default": "ref-target-default" }
+		},
+		"items": [
+			{
+				"type": "object",
+				"properties": {
+					"foo": { "$ref": "#/definitions/foo", "default": "sibling-default" }
+				},
+				"additionalProperties": false
+			}
+		],
+		"minItems": 0,
+		"maxItems": 1
+	}`))
+	if err != nil {
+		t.Fatalf("CompileSchema failed: %v", err)
+	}
+
+	got, err := schema.Validate([]any{map[string]any{}})
+	if err != nil {
+		t.Fatalf("expected valid options, got error: %v", err)
+	}
+	want := []any{map[string]any{"foo": "sibling-default"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v, want %#v", got, want)
+	}
+}
+
 // ajvFixtureCase mirrors one entry of testdata/ajv_defaults_fixtures.json,
 // generated by scripts/gen-ajv-defaults-fixtures.js by running the same
 // {schema, input} pair through ajv@6 configured exactly the way ESLint

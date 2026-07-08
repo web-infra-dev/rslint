@@ -65,7 +65,9 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "allow": [],
@@ -125,8 +127,14 @@
       "minItems": 0,
       "maxItems": 3
     },
-    "input": ["given"],
-    "output": ["given", 1, true],
+    "input": [
+      "given"
+    ],
+    "output": [
+      "given",
+      1,
+      true
+    ],
     "valid": true,
     "errors": null
   },
@@ -147,7 +155,10 @@
       "maxItems": 2
     },
     "input": [],
-    "output": [null, 42],
+    "output": [
+      null,
+      42
+    ],
     "valid": false,
     "errors": [
       {
@@ -191,7 +202,9 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "outer": {
@@ -224,7 +237,10 @@
       "minItems": 1,
       "maxItems": 2
     },
-    "input": ["first", {}],
+    "input": [
+      "first",
+      {}
+    ],
     "output": [
       "first",
       {
@@ -244,7 +260,9 @@
           "properties": {
             "allow": {
               "type": "array",
-              "default": ["x"]
+              "default": [
+                "x"
+              ]
             }
           },
           "additionalProperties": false
@@ -255,12 +273,16 @@
     },
     "input": [
       {
-        "allow": ["y"]
+        "allow": [
+          "y"
+        ]
       }
     ],
     "output": [
       {
-        "allow": ["y"]
+        "allow": [
+          "y"
+        ]
       }
     ],
     "valid": true,
@@ -275,8 +297,13 @@
           "type": "object",
           "properties": {
             "allow": {
-              "type": ["array", "null"],
-              "default": ["x"]
+              "type": [
+                "array",
+                "null"
+              ],
+              "default": [
+                "x"
+              ]
             }
           },
           "additionalProperties": false
@@ -330,8 +357,12 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
-    "output": [{}],
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
+    ],
     "valid": false,
     "errors": [
       {
@@ -339,7 +370,10 @@
         "dataPath": "[0]",
         "schemaPath": "#/items/0/oneOf",
         "params": {
-          "passingSchemas": [0, 1]
+          "passingSchemas": [
+            0,
+            1
+          ]
         },
         "message": "should match exactly one schema in oneOf",
         "schema": [
@@ -406,8 +440,16 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [["a"]],
-    "output": [["a"]],
+    "input": [
+      [
+        "a"
+      ]
+    ],
+    "output": [
+      [
+        "a"
+      ]
+    ],
     "valid": true,
     "errors": null
   },
@@ -435,12 +477,18 @@
     },
     "input": [
       {
-        "allow": ["warn", "error"]
+        "allow": [
+          "warn",
+          "error"
+        ]
       }
     ],
     "output": [
       {
-        "allow": ["warn", "error"]
+        "allow": [
+          "warn",
+          "error"
+        ]
       }
     ],
     "valid": true,
@@ -534,7 +582,9 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "max": 3.5
@@ -574,8 +624,12 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
-    "output": [{}],
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
+    ],
     "valid": true,
     "errors": null
   },
@@ -633,7 +687,9 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
+    "input": [
+      {}
+    ],
     "output": [
       {
         "a": 1
@@ -776,7 +832,10 @@
     ],
     "output": [
       {
-        "foo": [null, 42]
+        "foo": [
+          null,
+          42
+        ]
       }
     ],
     "valid": false,
@@ -809,7 +868,9 @@
             },
             {
               "type": "string",
-              "enum": ["allow-with-description"]
+              "enum": [
+                "allow-with-description"
+              ]
             }
           ]
         }
@@ -828,8 +889,276 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [{}],
-    "output": [{}],
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "allOf_single_branch_default_applied",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "allof-default"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {
+        "mode": "allof-default"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "allOf_multiple_branches_each_contribute_defaults",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "properties": {
+                "a": {
+                  "type": "string",
+                  "default": "a-default"
+                }
+              }
+            },
+            {
+              "properties": {
+                "b": {
+                  "type": "string",
+                  "default": "b-default"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {
+        "a": "a-default",
+        "b": "b-default"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "anyOf_branch_default_still_not_applied",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "anyOf": [
+            {
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "default": "anyof-default"
+                }
+              }
+            },
+            {
+              "properties": {
+                "other": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {}
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "additionalProperties_schema_default_does_not_create_new_key",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "known": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string",
+            "default": "ap-default"
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "known": "x"
+      }
+    ],
+    "output": [
+      {
+        "known": "x"
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "additionalProperties_schema_fills_nested_default_for_existing_key",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "known": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "inner": {
+                "type": "string",
+                "default": "inner-default"
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "known": "x",
+        "extra": {}
+      }
+    ],
+    "output": [
+      {
+        "known": "x",
+        "extra": {
+          "inner": "inner-default"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "patternProperties_fills_nested_default_for_existing_key",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "object",
+          "patternProperties": {
+            "^opt_": {
+              "type": "object",
+              "properties": {
+                "inner": {
+                  "type": "string",
+                  "default": "pp-default"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {
+        "opt_x": {}
+      }
+    ],
+    "output": [
+      {
+        "opt_x": {
+          "inner": "pp-default"
+        }
+      }
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "ref_sibling_default_applied_using_literal_value_not_ref_target",
+    "schema": {
+      "type": "array",
+      "definitions": {
+        "foo": {
+          "type": "string",
+          "default": "ref-target-default"
+        }
+      },
+      "items": [
+        {
+          "type": "object",
+          "properties": {
+            "foo": {
+              "$ref": "#/definitions/foo",
+              "default": "sibling-default"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {
+        "foo": "sibling-default"
+      }
+    ],
     "valid": true,
     "errors": null
   }

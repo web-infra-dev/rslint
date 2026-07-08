@@ -444,6 +444,151 @@ const cases = [
     },
     input: [{}],
   },
+  {
+    // allOf is unambiguous (every branch must hold), unlike anyOf/oneOf: ajv
+    // fills in a default declared on a single allOf branch's property.
+    name: 'allOf_single_branch_default_applied',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+          allOf: [{ properties: { mode: { type: 'string', default: 'allof-default' } } }],
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
+  {
+    // Each allOf branch contributes its own properties' defaults; here two
+    // branches declare defaults for two different keys and both get filled.
+    name: 'allOf_multiple_branches_each_contribute_defaults',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+          allOf: [
+            { properties: { a: { type: 'string', default: 'a-default' } } },
+            { properties: { b: { type: 'string', default: 'b-default' } } },
+          ],
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
+  {
+    // Regression guard: anyOf/oneOf branch defaults must stay excluded even
+    // now that allOf branches are folded in (they are genuinely ambiguous —
+    // unlike allOf, not every branch is guaranteed to hold).
+    name: 'anyOf_branch_default_still_not_applied',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+          anyOf: [
+            { properties: { mode: { type: 'string', default: 'anyof-default' } } },
+            { properties: { other: { type: 'string' } } },
+          ],
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
+  {
+    // additionalProperties as a schema (rather than a boolean) never
+    // manufactures a brand-new key — ajv's useDefaults only ever creates
+    // keys/items declared in a schema's own `properties`/tuple `items`.
+    name: 'additionalProperties_schema_default_does_not_create_new_key',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+          properties: { known: { type: 'string' } },
+          additionalProperties: { type: 'string', default: 'ap-default' },
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{ known: 'x' }],
+  },
+  {
+    // But a key that's already present and matched only by
+    // additionalProperties (not by a named `properties` entry) still gets
+    // its own nested defaults filled in, same as any other present value.
+    name: 'additionalProperties_schema_fills_nested_default_for_existing_key',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+          properties: { known: { type: 'string' } },
+          additionalProperties: {
+            type: 'object',
+            properties: { inner: { type: 'string', default: 'inner-default' } },
+          },
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{ known: 'x', extra: {} }],
+  },
+  {
+    // Same as above but via patternProperties instead of additionalProperties.
+    name: 'patternProperties_fills_nested_default_for_existing_key',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'object',
+          patternProperties: {
+            '^opt_': {
+              type: 'object',
+              properties: { inner: { type: 'string', default: 'pp-default' } },
+            },
+          },
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{ opt_x: {} }],
+  },
+  {
+    // A literal `default` written directly beside a bare `$ref` (a "$ref
+    // sibling") is honored by ajv using that literal value — not the ref
+    // target's own top-level default (confirmed separately to never be
+    // pulled through; see ref_property_absent_ref_targets_own_default_not_pulled_through).
+    name: 'ref_sibling_default_applied_using_literal_value_not_ref_target',
+    schema: {
+      type: 'array',
+      definitions: {
+        foo: { type: 'string', default: 'ref-target-default' },
+      },
+      items: [
+        {
+          type: 'object',
+          properties: {
+            foo: { $ref: '#/definitions/foo', default: 'sibling-default' },
+          },
+          additionalProperties: false,
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [{}],
+  },
 ];
 
 function run() {
