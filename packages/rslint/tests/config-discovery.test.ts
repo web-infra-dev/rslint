@@ -186,6 +186,24 @@ describe('discoverConfigs', () => {
     }
   });
 
+  test('directory scan returns parent before deep child config', async () => {
+    const tmp = createTempDir();
+    try {
+      const deepDir = path.join(tmp, 'a', 'b', 'c');
+      fs.mkdirSync(deepDir, { recursive: true });
+      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
+      fs.writeFileSync(
+        path.join(deepDir, 'rslint.config.js'),
+        'export default []',
+      );
+
+      const result = await discoverConfigs([], [], tmp, null);
+      expect([...result.values()]).toEqual([tmp, deepDir]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
   test('mixed file and dir args still return parent before child config', async () => {
     const tmp = createTempDir();
     try {
@@ -201,6 +219,31 @@ describe('discoverConfigs', () => {
       const result = await discoverConfigs(
         [path.join(appDir, 'a.ts')],
         [tmp],
+        tmp,
+        null,
+      );
+      expect([...result.values()]).toEqual([tmp, appDir]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
+  test('file args still return parent before child config when passed child first', async () => {
+    const tmp = createTempDir();
+    try {
+      const appDir = path.join(tmp, 'packages', 'app');
+      fs.mkdirSync(appDir, { recursive: true });
+      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
+      fs.writeFileSync(
+        path.join(appDir, 'rslint.config.js'),
+        'export default []',
+      );
+      fs.writeFileSync(path.join(tmp, 'root.ts'), 'const root = 1;');
+      fs.writeFileSync(path.join(appDir, 'app.ts'), 'const app = 1;');
+
+      const result = await discoverConfigs(
+        [path.join(appDir, 'app.ts'), path.join(tmp, 'root.ts')],
+        [],
         tmp,
         null,
       );
@@ -985,13 +1028,13 @@ describe('findJSConfigsInDir', () => {
         path.join(tmp, 'packages', 'bar', 'rslint.config.mjs'),
         'export default []',
       );
-      const result = (await findJSConfigsInDir(tmp)).sort();
-      expect(result).toEqual(
-        [
-          path.join(tmp, 'rslint.config.js'),
-          path.join(tmp, 'packages', 'foo', 'rslint.config.ts'),
+      const result = await findJSConfigsInDir(tmp);
+      expect(result[0]).toBe(path.join(tmp, 'rslint.config.js'));
+      expect(new Set(result.slice(1))).toEqual(
+        new Set([
           path.join(tmp, 'packages', 'bar', 'rslint.config.mjs'),
-        ].sort(),
+          path.join(tmp, 'packages', 'foo', 'rslint.config.ts'),
+        ]),
       );
     } finally {
       cleanup(tmp);
@@ -1077,15 +1120,37 @@ describe('findJSConfigsInDir', () => {
     }
   });
 
-  test('finds all config file types', async () => {
+  test('uses config file priority within the same directory', async () => {
     const tmp = createTempDir();
     try {
       for (const name of JS_CONFIG_FILES) {
         fs.writeFileSync(path.join(tmp, name), 'export default []');
       }
-      const result = (await findJSConfigsInDir(tmp)).sort();
-      expect(result).toEqual(
-        JS_CONFIG_FILES.map((name) => path.join(tmp, name)).sort(),
+      const result = await findJSConfigsInDir(tmp);
+      expect(result).toEqual([path.join(tmp, 'rslint.config.js')]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
+  test('follows symlinked directories like tinyglobby', async () => {
+    const tmp = createTempDir();
+    const realDir = path.join(tmp, 'real');
+    const linkDir = path.join(tmp, 'link');
+    try {
+      fs.mkdirSync(realDir);
+      fs.writeFileSync(
+        path.join(realDir, 'rslint.config.js'),
+        'export default []',
+      );
+      fs.symlinkSync(realDir, linkDir, 'dir');
+
+      const result = await findJSConfigsInDir(tmp);
+      expect(new Set(result)).toEqual(
+        new Set([
+          path.join(realDir, 'rslint.config.js'),
+          path.join(linkDir, 'rslint.config.js'),
+        ]),
       );
     } finally {
       cleanup(tmp);

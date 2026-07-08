@@ -35,15 +35,10 @@ export function findJSConfigUp(startDir: string): string | null {
 }
 
 /**
- * Recursively scan a directory for all rslint JS/TS config files.
+ * Recursively scan a directory for effective rslint JS/TS config files.
  * Skips node_modules and .git directories (aligned with ESLint defaults).
- * Uses tinyglobby's async glob; the directory walk is I/O-bound, so an async
- * crawl parallelizes it across the libuv thread pool.
- *
- * tinyglobby returns POSIX-style paths even on Windows, so the result is
- * normalized through path.normalize to match the native separator that
- * findJSConfigUp / path.join produce. Without this, Map<configPath, ...>
- * dedupe against findJSConfigUp results fails on Windows.
+ * Uses tinyglobby's async crawl for filesystem traversal performance and edge
+ * cases, then applies rslint config semantics to the small candidate set.
  */
 export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
   const resolved = path.resolve(startDir);
@@ -53,7 +48,25 @@ export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
     dot: true,
     ignore: ['**/node_modules/**', '**/.git/**'],
   });
-  return matches.map((p) => path.normalize(p));
+
+  const effectiveConfigsByDir = new Map<string, string>();
+  for (const match of matches) {
+    const configPath = path.normalize(match);
+    const configDirectory = path.dirname(configPath);
+    const existing = effectiveConfigsByDir.get(configDirectory);
+    if (
+      !existing ||
+      getConfigPriority(configPath) < getConfigPriority(existing)
+    ) {
+      effectiveConfigsByDir.set(configDirectory, configPath);
+    }
+  }
+
+  const orderedConfigs = new Map<string, string>();
+  for (const configPath of effectiveConfigsByDir.values()) {
+    addConfigParentFirst(orderedConfigs, configPath);
+  }
+  return [...orderedConfigs.keys()];
 }
 
 /**
@@ -80,9 +93,7 @@ export async function discoverConfigs(
     configPath: string,
     configDirectory = path.dirname(configPath),
   ): void => {
-    if (!configs.has(configPath)) {
-      configs.set(configPath, configDirectory);
-    }
+    addConfigParentFirst(configs, configPath, configDirectory);
   };
 
   if (explicitConfig) {
@@ -124,46 +135,50 @@ export async function discoverConfigs(
   // Scan for nested configs within the target scope (no-args and dir-args).
   // runWithJSConfigs loads parents first, skips configs hidden by parent
   // global ignores, and treats every remaining broken config as fatal.
-  // Serial await (not Promise.all over scanDirs): a single async glob already
-  // saturates the libuv thread pool, so parallelizing across scanDirs adds no
-  // speed — it only creates I/O contention when scanDirs overlap (e.g. `.` plus
-  // a nested subdir each crawling the shared subtree at the same time).
+  // Serial await (not Promise.all over scanDirs): tinyglobby's async crawl
+  // already parallelizes filesystem work. Parallelizing across scan roots mainly
+  // creates duplicate I/O when roots overlap, e.g. `.` plus a nested dir.
   for (const dir of scanDirs) {
     for (const configPath of await findJSConfigsInDir(dir)) {
       addConfig(configPath);
     }
   }
 
-  return sortConfigsParentFirst(configs);
+  return configs;
 }
 
-function sortConfigsParentFirst(
+function isAncestorDirectory(ancestorDir: string, childDir: string): boolean {
+  return isRelativeChildPath(path.relative(ancestorDir, childDir));
+}
+
+function addConfigParentFirst(
   configs: Map<string, string>,
-): Map<string, string> {
-  return new Map(
-    [...configs.entries()]
-      .map(([configPath, configDirectory], index) => ({
-        configPath,
-        configDirectory,
-        index,
-      }))
-      .sort((a, b) => {
-        const aDepth = getPathDepth(a.configDirectory);
-        const bDepth = getPathDepth(b.configDirectory);
-        if (aDepth !== bDepth) return aDepth - bDepth;
+  configPath: string,
+  configDirectory = path.dirname(configPath),
+): void {
+  if (configs.has(configPath)) return;
 
-        return a.index - b.index;
-      })
-      .map(({ configPath, configDirectory }) => [configPath, configDirectory]),
+  const entries = [...configs.entries()];
+  const insertIndex = entries.findIndex(([, existingConfigDirectory]) =>
+    isAncestorDirectory(configDirectory, existingConfigDirectory),
   );
+  if (insertIndex === -1) {
+    configs.set(configPath, configDirectory);
+    return;
+  }
+
+  configs.clear();
+  for (let i = 0; i < entries.length; i++) {
+    if (i === insertIndex) {
+      configs.set(configPath, configDirectory);
+    }
+    configs.set(entries[i][0], entries[i][1]);
+  }
 }
 
-function getPathDepth(p: string): number {
-  return path
-    .normalize(p)
-    .replace(/[/\\]+$/, '')
-    .split(path.sep)
-    .filter(Boolean).length;
+function getConfigPriority(configPath: string): number {
+  const index = JS_CONFIG_FILES.indexOf(path.basename(configPath));
+  return index === -1 ? Number.POSITIVE_INFINITY : index;
 }
 
 /**
@@ -331,6 +346,8 @@ export function isConfigDirIgnoredByParentIgnores(
  * Example: root config has `{ ignores: ['__tests__/**'] }`.
  * A nested config at `__tests__/fixtures/rslint.config.js` is filtered out
  * because `__tests__/fixtures/` is within the root config's global ignores.
+ *
+ * Expects configEntries in parent-first order, as produced by discoverConfigs.
  */
 export function filterConfigsByParentIgnores(
   configEntries: ConfigEntry[],
@@ -338,16 +355,9 @@ export function filterConfigsByParentIgnores(
 ): ConfigEntry[] {
   if (configEntries.length <= 1) return configEntries;
 
-  // Sort by directory depth (shallowest first) so parents are processed first
-  const sorted = [...configEntries].sort(
-    (a, b) =>
-      resolveConfigDirectory(a.configDirectory).length -
-      resolveConfigDirectory(b.configDirectory).length,
-  );
-
   const result: ConfigEntry[] = [];
 
-  for (const config of sorted) {
+  for (const config of configEntries) {
     if (
       protectedConfigDirectories.has(config.configDirectory) ||
       !isConfigDirIgnoredByParentIgnores(config.configDirectory, result)

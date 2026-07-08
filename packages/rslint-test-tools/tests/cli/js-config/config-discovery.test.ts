@@ -148,6 +148,28 @@ describe('CLI config discovery (upward traversal)', () => {
     }
   });
 
+  test('directory discovery uses js config priority within the same directory', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': TS_CONFIG,
+      'rslint.config.js': `export default [{
+        files: ['**/*.ts'],
+        rules: { 'no-console': 'error' },
+      }];`,
+      'rslint.config.mjs': `export default [{
+        files: ['**/*.ts'],
+        rules: { 'no-debugger': 'error' },
+      }];`,
+      'test.ts': `console.log('x');\ndebugger;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      expect(result.stdout).toContain('no-console');
+      expect(result.stdout).not.toContain('no-debugger');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('broken sub-package config should be fatal when discovered', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
