@@ -186,6 +186,30 @@ describe('discoverConfigs', () => {
     }
   });
 
+  test('mixed file and dir args still return parent before child config', async () => {
+    const tmp = createTempDir();
+    try {
+      const appDir = path.join(tmp, 'packages', 'app');
+      fs.mkdirSync(appDir, { recursive: true });
+      fs.writeFileSync(path.join(tmp, 'rslint.config.js'), 'export default []');
+      fs.writeFileSync(
+        path.join(appDir, 'rslint.config.js'),
+        'export default []',
+      );
+      fs.writeFileSync(path.join(appDir, 'a.ts'), 'const a = 1;');
+
+      const result = await discoverConfigs(
+        [path.join(appDir, 'a.ts')],
+        [tmp],
+        tmp,
+        null,
+      );
+      expect([...result.values()]).toEqual([tmp, appDir]);
+    } finally {
+      cleanup(tmp);
+    }
+  });
+
   test('dir arg discovers nested configs within scope', async () => {
     const tmp = createTempDir();
     try {
@@ -509,6 +533,15 @@ describe('filterConfigsByParentIgnores', () => {
     ]);
     expect(result).toHaveLength(1);
     expect(dirs(result)).toEqual([P()]);
+  });
+
+  test('directory names starting with .. are still child directories', () => {
+    const result = filterConfigsByParentIgnores([
+      cfg(P(), globalIgnore('..foo/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('..foo'), ruleEntry(['**/*.ts'], {})),
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].configDirectory).toBe(P());
   });
 
   test('negation pattern is skipped — does not re-include or accidentally filter', () => {

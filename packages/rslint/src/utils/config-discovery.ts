@@ -148,28 +148,22 @@ function sortConfigsParentFirst(
         index,
       }))
       .sort((a, b) => {
-        if (a.configDirectory === b.configDirectory) {
-          return a.index - b.index;
-        }
-
-        const aToB = path.relative(a.configDirectory, b.configDirectory);
-        if (aToB && !aToB.startsWith('..') && !path.isAbsolute(aToB)) {
-          return -1;
-        }
-
-        const bToA = path.relative(b.configDirectory, a.configDirectory);
-        if (bToA && !bToA.startsWith('..') && !path.isAbsolute(bToA)) {
-          return 1;
-        }
-
-        const aDepth = a.configDirectory.split(path.sep).length;
-        const bDepth = b.configDirectory.split(path.sep).length;
+        const aDepth = getPathDepth(a.configDirectory);
+        const bDepth = getPathDepth(b.configDirectory);
         if (aDepth !== bDepth) return aDepth - bDepth;
 
         return a.index - b.index;
       })
       .map(({ configPath, configDirectory }) => [configPath, configDirectory]),
   );
+}
+
+function getPathDepth(p: string): number {
+  return path
+    .normalize(p)
+    .replace(/[/\\]+$/, '')
+    .split(path.sep)
+    .filter(Boolean).length;
 }
 
 /**
@@ -228,7 +222,7 @@ function isDirIgnoredByPatterns(
   parentConfigDir: string,
 ): boolean {
   const relDir = path.relative(parentConfigDir, dirPath);
-  if (!relDir || relDir.startsWith('..')) return false;
+  if (!isRelativeChildPath(relDir)) return false;
 
   const normalizedRelDir = relDir.split(path.sep).join('/');
 
@@ -276,6 +270,15 @@ function isDirIgnoredByPatterns(
   }
 
   return false;
+}
+
+function isRelativeChildPath(relPath: string): boolean {
+  return (
+    relPath !== '' &&
+    relPath !== '..' &&
+    !relPath.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relPath)
+  );
 }
 
 export interface ConfigEntry {
