@@ -192,6 +192,31 @@ describe('CLI config discovery (upward traversal)', () => {
     }
   });
 
+  test('all broken JS configs should not fall back to JSON config', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': JSON.stringify([
+        {
+          files: ['**/*.ts'],
+          rules: { 'no-debugger': 'error' },
+        },
+      ]),
+      'rslint.config.js': 'export default [INVALID ROOT CONFIG;',
+      'packages/broken/rslint.config.js':
+        'export default [INVALID CHILD CONFIG;',
+      'root.ts': 'debugger;\n',
+      'packages/broken/src/a.ts': 'debugger;\n',
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).not.toContain('no-debugger');
+      expect(result.stderr).toContain('Warning: skipping config');
+      expect(result.stderr).not.toContain('JSON configuration is deprecated');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('--config should override automatic discovery', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,

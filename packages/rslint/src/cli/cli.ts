@@ -83,10 +83,10 @@ async function runWithJSConfigs(
   // of the browser/wasm bundle, loaded only on the real CLI path.
   const { runEngine } = await import('./engine.js');
 
-  // All configs failed to load — fall back to Go loading JSON config from disk
-  // (init with no configs → Go's ConfigStdin=false branch).
+  // JS configs were discovered, but none survived loading/normalization. Do
+  // not fall back to JSON/default config; that would lint with unrelated rules.
   if (configEntries.length === 0) {
-    return runEngine({ binPath, goArgs, configs: [], cwd });
+    return 1;
   }
 
   // Filter out nested configs whose directory is covered by a parent config's
