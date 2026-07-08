@@ -6,7 +6,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/dlclark/regexp2"
 	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // CompiledSchema is a compiled JSON Schema for a rule's options array.
@@ -47,6 +49,7 @@ func CompileSchema(schemaJSON []byte) (*CompiledSchema, error) {
 
 	c := jsonschema.NewCompiler()
 	c.DefaultDraft(jsonschema.Draft4)
+	c.UseRegexpEngine(jsRegexpEngine)
 	const resourceURL = "schema.json"
 	if err := c.AddResource(resourceURL, doc); err != nil {
 		return nil, err
@@ -351,6 +354,47 @@ func resolveRef(s *jsonschema.Schema) *jsonschema.Schema {
 		s = s.Ref
 	}
 	return s
+}
+
+// jsRegexpEngine compiles pattern the way ajv itself does: as a JavaScript
+// RegExp, not a Go RE2 regexp. It's wired into every CompileSchema's
+// Compiler via [jsonschema.Compiler.UseRegexpEngine], so it governs both the
+// "pattern" keyword (a schema author's own regex, compiled once against the
+// schema) and "format": "regex" (asserting that an instance *value* is
+// itself a syntactically valid regex — e.g. a rule option like
+// eslint-plugin-vitest's consistent-test-filename `pattern`). The jsonschema
+// library's own default engine wraps Go's regexp package (RE2), which
+// rejects JavaScript-only regex features such as lookbehind
+// (`(?<=...)`/`(?<!...)`) that ajv, backed by JS's native RegExp, accepts —
+// silently rejecting an otherwise-legal ESLint config. internal/utils
+// already wraps dlclark/regexp2 in ECMAScript mode for exactly this purpose
+// (see [utils.JSRegexOptions]: "for ESLint rule options that model
+// JavaScript RegExp patterns"), so this reuses it rather than introducing a
+// second regex engine.
+func jsRegexpEngine(pattern string) (jsonschema.Regexp, error) {
+	re, err := utils.CompileRegexp2(pattern, utils.JSRegexOptions)
+	if err != nil {
+		return nil, err
+	}
+	return jsRegexp{re}, nil
+}
+
+// jsRegexp adapts *regexp2.Regexp to satisfy jsonschema.Regexp, whose
+// MatchString returns a bare bool. regexp2.Regexp.MatchString instead
+// returns (bool, error) — the error is reserved for runtime failures (e.g. a
+// MatchTimeout) rather than compile-time invalidity (already surfaced by
+// jsRegexpEngine above), so this treats one the same way every other
+// rslint caller of regexp2 does: as no match, via [utils.Regexp2MatchString].
+type jsRegexp struct {
+	re *regexp2.Regexp
+}
+
+func (r jsRegexp) String() string {
+	return r.re.String()
+}
+
+func (r jsRegexp) MatchString(s string) bool {
+	return utils.Regexp2MatchString(r.re, s)
 }
 
 // normalizeNumbers mutates v in place, converting any json.Number leaves to
