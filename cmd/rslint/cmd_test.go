@@ -31,18 +31,7 @@ import (
 func runLintPipelineForTest(t *testing.T, cwd string, args lintArgs) (int, string, string) {
 	t.Helper()
 
-	originalWD, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("getwd: %v", err)
-	}
-	if err := os.Chdir(cwd); err != nil {
-		t.Fatalf("chdir %s: %v", cwd, err)
-	}
-	defer func() {
-		if err := os.Chdir(originalWD); err != nil {
-			t.Fatalf("restore cwd: %v", err)
-		}
-	}()
+	t.Chdir(cwd)
 
 	stdoutR, stdoutW, err := os.Pipe()
 	if err != nil {

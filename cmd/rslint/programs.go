@@ -306,8 +306,8 @@ func assignLintTargetsToPrograms(
 			candidate := programFileCandidate{programIndex: i, fileName: name}
 			byPath[name] = append(byPath[name], candidate)
 			if fs != nil {
-				if real := fs.Realpath(name); real != "" && real != name {
-					byPath[real] = append(byPath[real], candidate)
+				if realPath := fs.Realpath(name); realPath != "" && realPath != name {
+					byPath[realPath] = append(byPath[realPath], candidate)
 				}
 			}
 		}

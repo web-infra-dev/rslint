@@ -267,6 +267,7 @@ libsyncrpc
 lifecycles
 Lingui
 lingui
+lintable
 lintedfile
 listitem
 llms

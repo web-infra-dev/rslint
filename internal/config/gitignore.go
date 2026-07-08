@@ -482,7 +482,7 @@ func stripAncestorConfigPrefix(glob string, configRel string) (string, bool) {
 	}
 
 	pi := 0
-	for ci := 0; ci < len(configParts); ci++ {
+	for _, configPart := range configParts {
 		if pi >= len(globParts) {
 			return "**/*", true
 		}
@@ -490,7 +490,7 @@ func stripAncestorConfigPrefix(glob string, configRel string) (string, bool) {
 		if part == "**" {
 			return strings.Join(globParts[pi:], "/"), true
 		}
-		if !matchGlob(part, configParts[ci]) {
+		if !matchGlob(part, configPart) {
 			return "", false
 		}
 		pi++
