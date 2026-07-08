@@ -2,10 +2,9 @@ import type { RslintConfigEntry } from '../define-config.js';
 
 // Aligned with official eslint-plugin-unicorn@64.x recommended.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
-// The official preset also injects `languageOptions.globals` (Array, Promise, Map, …) so
-// `no-undef` doesn't flag them; rslint's `unicorn/*` rules are natively ported and don't do
-// their own scope analysis, so that part is omitted here (see `LanguageOptions.globals`'s
-// doc comment in define-config.ts for which rules actually honour it).
+// The official preset also injects `languageOptions.globals` (Array, Promise, Map, …);
+// rslint's `unicorn/*` rules are natively ported and don't do their own scope analysis,
+// so that part is omitted here.
 const recommended: RslintConfigEntry = {
   plugins: ['unicorn'],
   rules: {

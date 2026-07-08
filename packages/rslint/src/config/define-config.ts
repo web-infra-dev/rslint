@@ -84,9 +84,7 @@ export type RuleEntry =
 export type RulesRecord = Record<string, RuleEntry>;
 
 /**
- * Parser-specific extras, nested under `parserOptions` per ESLint v10's
- * flat-config layout (`ecmaVersion`/`sourceType` moved to the top level of
- * `languageOptions`; only `ecmaFeatures` and TS-project settings remain here).
+ * Parser-specific options: TypeScript project settings and grammar toggles.
  */
 export interface ParserOptions {
   /**
@@ -125,9 +123,8 @@ export interface ParserOptions {
      */
     globalReturn?: boolean;
     /**
-     * Treat the source as if it begins with `'use strict'`. ESLint v10
-     * default is `false`. Modules are always strict regardless of this
-     * setting.
+     * Treat the source as if it begins with `'use strict'`. Modules are
+     * always strict regardless of this setting.
      */
     impliedStrict?: boolean;
   };
@@ -166,17 +163,12 @@ export interface LanguageOptions {
   /**
    * Additional identifiers to treat as globals, beyond the ECMAScript
    * built-ins (`Array`, `Promise`, `globalThis`, ...) rslint always seeds.
-   * `'readonly'` / `'writable'` control whether `no-const-assign`-style
-   * write-checks flag reassignment; `'off'` un-declares a global that a
-   * broader config entry added.
+   * `'readonly'` / `'writable'` control whether reassignment is flagged;
+   * `'off'` un-declares a global that a broader config entry added.
    *
-   * Only rules that do scope analysis honour this (community plugin rules
-   * run through rslint's ESLint-compat runtime, and any rslint-native rule
-   * that walks scope). It is NOT consulted by rslint's own `no-undef`,
-   * `no-shadow`, or `no-redeclare` — those are typed-linting rules that ask
-   * the TypeScript checker whether a name resolves (so add an ambient
-   * `.d.ts` — or `@types/*` — declaration instead if those rules flag a
-   * global as undefined).
+   * Consulted by scope-analysis-based rules only. `no-undef`, `no-shadow`,
+   * and `no-redeclare` resolve names via the TypeScript checker instead and
+   * don't read this field.
    *
    * @example
    * globals: { describe: 'readonly', it: 'readonly' }
