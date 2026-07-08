@@ -55,22 +55,22 @@ func (state *globalsState) checkAssignment(ctx rule.RuleContext, node *ast.Node)
 	if utils.IsDefaultValueInDestructuringAssignment(node) {
 		return
 	}
-	targets := collectAssignmentTargets(binary.Left)
+	targets := react_hooksutil.CollectAssignmentTargetIdentifiers(binary.Left)
 	for _, target := range targets {
-		fn := react_hooksutil.FindEnclosingFunction(target.node)
+		fn := react_hooksutil.FindEnclosingFunction(target.Node)
 		if fn == nil || state.activeFunctionKind(fn) == activeFunctionNone {
 			continue
 		}
-		if state.isLocalToFunction(fn, target.node, target.name) {
+		if state.isLocalToFunction(fn, target.Node, target.Name) {
 			continue
 		}
-		reportNode := target.node
+		reportNode := target.Node
 		if binary.OperatorToken.Kind != ast.KindEqualsToken {
 			// Upstream reports compound assignments over the whole assignment
 			// expression, while plain assignments point at the written binding.
 			reportNode = node
 		}
-		ctx.ReportNode(reportNode, buildGlobalReassignmentMessage(target.name))
+		ctx.ReportNode(reportNode, buildGlobalReassignmentMessage(target.Name))
 	}
 }
 
@@ -85,81 +85,6 @@ func buildGlobalReassignmentMessage(name string) rule.RuleMessage {
 		Data: map[string]string{
 			"name": name,
 		},
-	}
-}
-
-type assignmentTarget struct {
-	node *ast.Node
-	name string
-}
-
-func collectAssignmentTargets(node *ast.Node) []assignmentTarget {
-	var targets []assignmentTarget
-	collectAssignmentTargetsInto(node, &targets)
-	return targets
-}
-
-func collectAssignmentTargetsInto(node *ast.Node, targets *[]assignmentTarget) {
-	if node == nil {
-		return
-	}
-	node = ast.SkipParentheses(node)
-	switch node.Kind {
-	case ast.KindIdentifier:
-		name := node.AsIdentifier().Text
-		if name != "" {
-			*targets = append(*targets, assignmentTarget{node: node, name: name})
-		}
-	case ast.KindObjectLiteralExpression:
-		obj := node.AsObjectLiteralExpression()
-		if obj == nil || obj.Properties == nil {
-			return
-		}
-		for _, prop := range obj.Properties.Nodes {
-			switch prop.Kind {
-			case ast.KindShorthandPropertyAssignment:
-				shorthand := prop.AsShorthandPropertyAssignment()
-				name := prop.Name()
-				if shorthand != nil && shorthand.ObjectAssignmentInitializer != nil && name != nil && name.Kind == ast.KindIdentifier {
-					*targets = append(*targets, assignmentTarget{node: prop, name: name.AsIdentifier().Text})
-					continue
-				}
-				collectAssignmentTargetsInto(name, targets)
-			case ast.KindPropertyAssignment:
-				assignment := prop.AsPropertyAssignment()
-				if assignment != nil {
-					collectAssignmentTargetsInto(assignment.Initializer, targets)
-				}
-			case ast.KindSpreadAssignment:
-				prop.ForEachChild(func(child *ast.Node) bool {
-					collectAssignmentTargetsInto(child, targets)
-					return false
-				})
-			}
-		}
-	case ast.KindArrayLiteralExpression:
-		node.ForEachChild(func(child *ast.Node) bool {
-			collectAssignmentTargetsInto(child, targets)
-			return false
-		})
-	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-			left := ast.SkipParentheses(binary.Left)
-			if left != nil && left.Kind == ast.KindIdentifier {
-				name := left.AsIdentifier().Text
-				if name != "" {
-					*targets = append(*targets, assignmentTarget{node: node, name: name})
-				}
-				return
-			}
-			collectAssignmentTargetsInto(left, targets)
-		}
-	case ast.KindSpreadElement:
-		node.ForEachChild(func(child *ast.Node) bool {
-			collectAssignmentTargetsInto(child, targets)
-			return false
-		})
 	}
 }
 

@@ -54,7 +54,7 @@ func checkTopLevelNode(node *ast.Node) bool {
 	}
 	switch node.Kind {
 	case ast.KindFunctionDeclaration:
-		if isGeneratorFunction(node) {
+		if ast.GetFunctionFlags(node)&ast.FunctionFlagsGenerator != 0 {
 			return false
 		}
 		if name := node.Name(); isReactComponentOrHookName(name) {
@@ -121,7 +121,7 @@ func isFunctionExpressionLike(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	if node.Kind == ast.KindFunctionExpression && node.AsFunctionExpression().AsteriskToken != nil {
+	if node.Kind == ast.KindFunctionExpression && ast.GetFunctionFlags(node)&ast.FunctionFlagsGenerator != 0 {
 		return false
 	}
 	return node.Kind == ast.KindFunctionExpression || node.Kind == ast.KindArrowFunction
@@ -131,7 +131,7 @@ func isCompilerLintFunction(fn *ast.Node) bool {
 	if fn == nil {
 		return false
 	}
-	if isGeneratorFunction(fn) {
+	if ast.GetFunctionFlags(fn)&ast.FunctionFlagsGenerator != 0 {
 		return false
 	}
 	// Keep this narrower than react_hooksutil.IsComponentOrHookFn: the
@@ -183,16 +183,6 @@ func callOrCalleeIsOptionalChain(callNode *ast.Node) bool {
 	call := callNode.AsCallExpression()
 	callee := ast.SkipParentheses(call.Expression)
 	return callee != nil && ast.IsOptionalChain(callee)
-}
-
-func isGeneratorFunction(fn *ast.Node) bool {
-	switch fn.Kind {
-	case ast.KindFunctionDeclaration:
-		return fn.AsFunctionDeclaration().AsteriskToken != nil
-	case ast.KindFunctionExpression:
-		return fn.AsFunctionExpression().AsteriskToken != nil
-	}
-	return false
 }
 
 func walkUpParens(node *ast.Node) (*ast.Node, *ast.Node) {
