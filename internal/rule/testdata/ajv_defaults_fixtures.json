@@ -65,9 +65,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "allow": [],
@@ -127,14 +125,8 @@
       "minItems": 0,
       "maxItems": 3
     },
-    "input": [
-      "given"
-    ],
-    "output": [
-      "given",
-      1,
-      true
-    ],
+    "input": ["given"],
+    "output": ["given", 1, true],
     "valid": true,
     "errors": null
   },
@@ -155,10 +147,7 @@
       "maxItems": 2
     },
     "input": [],
-    "output": [
-      null,
-      42
-    ],
+    "output": [null, 42],
     "valid": false,
     "errors": [
       {
@@ -202,9 +191,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "outer": {
@@ -237,10 +224,7 @@
       "minItems": 1,
       "maxItems": 2
     },
-    "input": [
-      "first",
-      {}
-    ],
+    "input": ["first", {}],
     "output": [
       "first",
       {
@@ -260,9 +244,7 @@
           "properties": {
             "allow": {
               "type": "array",
-              "default": [
-                "x"
-              ]
+              "default": ["x"]
             }
           },
           "additionalProperties": false
@@ -273,16 +255,12 @@
     },
     "input": [
       {
-        "allow": [
-          "y"
-        ]
+        "allow": ["y"]
       }
     ],
     "output": [
       {
-        "allow": [
-          "y"
-        ]
+        "allow": ["y"]
       }
     ],
     "valid": true,
@@ -297,13 +275,8 @@
           "type": "object",
           "properties": {
             "allow": {
-              "type": [
-                "array",
-                "null"
-              ],
-              "default": [
-                "x"
-              ]
+              "type": ["array", "null"],
+              "default": ["x"]
             }
           },
           "additionalProperties": false
@@ -357,12 +330,8 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
-    "output": [
-      {}
-    ],
+    "input": [{}],
+    "output": [{}],
     "valid": false,
     "errors": [
       {
@@ -370,10 +339,7 @@
         "dataPath": "[0]",
         "schemaPath": "#/items/0/oneOf",
         "params": {
-          "passingSchemas": [
-            0,
-            1
-          ]
+          "passingSchemas": [0, 1]
         },
         "message": "should match exactly one schema in oneOf",
         "schema": [
@@ -483,16 +449,8 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      [
-        "a"
-      ]
-    ],
-    "output": [
-      [
-        "a"
-      ]
-    ],
+    "input": [["a"]],
+    "output": [["a"]],
     "valid": false,
     "errors": [
       {
@@ -512,9 +470,7 @@
             "default": "d"
           }
         },
-        "data": [
-          "a"
-        ]
+        "data": ["a"]
       }
     ]
   },
@@ -534,9 +490,7 @@
         }
       }
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "includeBoth": true
@@ -569,18 +523,12 @@
     },
     "input": [
       {
-        "allow": [
-          "warn",
-          "error"
-        ]
+        "allow": ["warn", "error"]
       }
     ],
     "output": [
       {
-        "allow": [
-          "warn",
-          "error"
-        ]
+        "allow": ["warn", "error"]
       }
     ],
     "valid": true,
@@ -674,9 +622,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "max": 3.5
@@ -716,12 +662,8 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
-    "output": [
-      {}
-    ],
+    "input": [{}],
+    "output": [{}],
     "valid": true,
     "errors": null
   },
@@ -779,9 +721,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "a": 1
@@ -924,10 +864,7 @@
     ],
     "output": [
       {
-        "foo": [
-          null,
-          42
-        ]
+        "foo": [null, 42]
       }
     ],
     "valid": false,
@@ -960,9 +897,7 @@
             },
             {
               "type": "string",
-              "enum": [
-                "allow-with-description"
-              ]
+              "enum": ["allow-with-description"]
             }
           ]
         }
@@ -981,12 +916,8 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
-    "output": [
-      {}
-    ],
+    "input": [{}],
+    "output": [{}],
     "valid": true,
     "errors": null
   },
@@ -1012,9 +943,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "mode": "allof-default"
@@ -1053,9 +982,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "a": "a-default",
@@ -1094,12 +1021,8 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
-    "output": [
-      {}
-    ],
+    "input": [{}],
+    "output": [{}],
     "valid": true,
     "errors": null
   },
@@ -1243,9 +1166,7 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
+    "input": [{}],
     "output": [
       {
         "foo": "sibling-default"

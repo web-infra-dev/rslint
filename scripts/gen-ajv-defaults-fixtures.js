@@ -495,7 +495,13 @@ const cases = [
       items: [
         {
           type: 'object',
-          allOf: [{ properties: { mode: { type: 'string', default: 'allof-default' } } }],
+          allOf: [
+            {
+              properties: {
+                mode: { type: 'string', default: 'allof-default' },
+              },
+            },
+          ],
         },
       ],
       minItems: 0,
@@ -534,7 +540,11 @@ const cases = [
         {
           type: 'object',
           anyOf: [
-            { properties: { mode: { type: 'string', default: 'anyof-default' } } },
+            {
+              properties: {
+                mode: { type: 'string', default: 'anyof-default' },
+              },
+            },
             { properties: { other: { type: 'string' } } },
           ],
         },
