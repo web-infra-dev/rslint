@@ -520,6 +520,23 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	return DefaultJestVersion
 }
 
+// IsBooleanLiteral reports whether node is a `true`/`false` literal after
+// stripping parentheses and basic TS type assertions, and returns its value.
+func IsBooleanLiteral(node *ast.Node) (value bool, ok bool) {
+	node = UnwrapBasicTypeAssertions(node)
+	if node == nil {
+		return false, false
+	}
+	switch node.Kind {
+	case ast.KindTrueKeyword:
+		return true, true
+	case ast.KindFalseKeyword:
+		return false, true
+	default:
+		return false, false
+	}
+}
+
 func IsFunction(node *ast.Node) bool {
 	return ast.IsFunctionDeclaration(node) ||
 		ast.IsFunctionExpressionOrArrowFunction(node) ||
