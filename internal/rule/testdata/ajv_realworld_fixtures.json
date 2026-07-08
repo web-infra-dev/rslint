@@ -5,12 +5,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "valueWithIgnore": {
           "enum": [
@@ -55,12 +50,8 @@
       ],
       "additionalItems": false
     },
-    "input": [
-      "always"
-    ],
-    "output": [
-      "always"
-    ],
+    "input": ["always"],
+    "output": ["always"],
     "valid": true,
     "errors": null
   },
@@ -70,12 +61,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "valueWithIgnore": {
           "enum": [
@@ -141,12 +127,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "valueWithIgnore": {
           "enum": [
@@ -191,12 +172,8 @@
       ],
       "additionalItems": false
     },
-    "input": [
-      "sometimes"
-    ],
-    "output": [
-      "sometimes"
-    ],
+    "input": ["sometimes"],
+    "output": ["sometimes"],
     "valid": false,
     "errors": [
       {
@@ -212,19 +189,9 @@
           ]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always-multiline",
-          "always",
-          "never",
-          "only-multiline"
-        ],
+        "schema": ["always-multiline", "always", "never", "only-multiline"],
         "parentSchema": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "data": "sometimes"
       },
@@ -332,12 +299,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "valueWithIgnore": {
           "enum": [
@@ -407,19 +369,9 @@
           ]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always-multiline",
-          "always",
-          "never",
-          "only-multiline"
-        ],
+        "schema": ["always-multiline", "always", "never", "only-multiline"],
         "parentSchema": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "data": {
           "arrays": "sometimes"
@@ -531,12 +483,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always-multiline",
-            "always",
-            "never",
-            "only-multiline"
-          ]
+          "enum": ["always-multiline", "always", "never", "only-multiline"]
         },
         "valueWithIgnore": {
           "enum": [
@@ -581,14 +528,8 @@
       ],
       "additionalItems": false
     },
-    "input": [
-      "always",
-      "never"
-    ],
-    "output": [
-      "always",
-      "never"
-    ],
+    "input": ["always", "never"],
+    "output": ["always", "never"],
     "valid": false,
     "errors": [
       {
@@ -603,12 +544,7 @@
         "parentSchema": {
           "definitions": {
             "value": {
-              "enum": [
-                "always-multiline",
-                "always",
-                "never",
-                "only-multiline"
-              ]
+              "enum": ["always-multiline", "always", "never", "only-multiline"]
             },
             "valueWithIgnore": {
               "enum": [
@@ -653,10 +589,7 @@
           ],
           "additionalItems": false
         },
-        "data": [
-          "always",
-          "never"
-        ]
+        "data": ["always", "never"]
       }
     ]
   },
@@ -666,11 +599,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always",
-            "as-needed",
-            "never"
-          ]
+          "enum": ["always", "as-needed", "never"]
         }
       },
       "type": "array",
@@ -711,11 +640,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always",
-            "as-needed",
-            "never"
-          ]
+          "enum": ["always", "as-needed", "never"]
         }
       },
       "type": "array",
@@ -735,12 +660,8 @@
       ],
       "additionalItems": false
     },
-    "input": [
-      "sometimes"
-    ],
-    "output": [
-      "sometimes"
-    ],
+    "input": ["sometimes"],
+    "output": ["sometimes"],
     "valid": false,
     "errors": [
       {
@@ -748,24 +669,12 @@
         "dataPath": "[0]",
         "schemaPath": "#/definitions/value/enum",
         "params": {
-          "allowedValues": [
-            "always",
-            "as-needed",
-            "never"
-          ]
+          "allowedValues": ["always", "as-needed", "never"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always",
-          "as-needed",
-          "never"
-        ],
+        "schema": ["always", "as-needed", "never"],
         "parentSchema": {
-          "enum": [
-            "always",
-            "as-needed",
-            "never"
-          ]
+          "enum": ["always", "as-needed", "never"]
         },
         "data": "sometimes"
       }
@@ -777,11 +686,7 @@
     "schema": {
       "definitions": {
         "value": {
-          "enum": [
-            "always",
-            "as-needed",
-            "never"
-          ]
+          "enum": ["always", "as-needed", "never"]
         }
       },
       "type": "array",
@@ -801,16 +706,8 @@
       ],
       "additionalItems": false
     },
-    "input": [
-      "always",
-      {},
-      "oops"
-    ],
-    "output": [
-      "always",
-      {},
-      "oops"
-    ],
+    "input": ["always", {}, "oops"],
+    "output": ["always", {}, "oops"],
     "valid": false,
     "errors": [
       {
@@ -825,11 +722,7 @@
         "parentSchema": {
           "definitions": {
             "value": {
-              "enum": [
-                "always",
-                "as-needed",
-                "never"
-              ]
+              "enum": ["always", "as-needed", "never"]
             }
           },
           "type": "array",
@@ -849,11 +742,7 @@
           ],
           "additionalItems": false
         },
-        "data": [
-          "always",
-          {},
-          "oops"
-        ]
+        "data": ["always", {}, "oops"]
       }
     ]
   },
@@ -865,11 +754,7 @@
         "basicConfig": {
           "oneOf": [
             {
-              "enum": [
-                "always",
-                "never",
-                "consistent"
-              ]
+              "enum": ["always", "never", "consistent"]
             },
             {
               "type": "object",
@@ -878,10 +763,7 @@
                   "type": "boolean"
                 },
                 "minItems": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "minimum": 0
                 }
               },
@@ -914,12 +796,8 @@
         }
       ]
     },
-    "input": [
-      "always"
-    ],
-    "output": [
-      "always"
-    ],
+    "input": ["always"],
+    "output": ["always"],
     "valid": true,
     "errors": null
   },
@@ -931,11 +809,7 @@
         "basicConfig": {
           "oneOf": [
             {
-              "enum": [
-                "always",
-                "never",
-                "consistent"
-              ]
+              "enum": ["always", "never", "consistent"]
             },
             {
               "type": "object",
@@ -944,10 +818,7 @@
                   "type": "boolean"
                 },
                 "minItems": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "minimum": 0
                 }
               },
@@ -1007,11 +878,7 @@
         "basicConfig": {
           "oneOf": [
             {
-              "enum": [
-                "always",
-                "never",
-                "consistent"
-              ]
+              "enum": ["always", "never", "consistent"]
             },
             {
               "type": "object",
@@ -1020,10 +887,7 @@
                   "type": "boolean"
                 },
                 "minItems": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "minimum": 0
                 }
               },
@@ -1056,12 +920,8 @@
         }
       ]
     },
-    "input": [
-      {}
-    ],
-    "output": [
-      {}
-    ],
+    "input": [{}],
+    "output": [{}],
     "valid": true,
     "errors": null
   },
@@ -1073,11 +933,7 @@
         "basicConfig": {
           "oneOf": [
             {
-              "enum": [
-                "always",
-                "never",
-                "consistent"
-              ]
+              "enum": ["always", "never", "consistent"]
             },
             {
               "type": "object",
@@ -1086,10 +942,7 @@
                   "type": "boolean"
                 },
                 "minItems": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "minimum": 0
                 }
               },
@@ -1139,24 +992,12 @@
         "dataPath": "[0]",
         "schemaPath": "#/definitions/basicConfig/oneOf/0/enum",
         "params": {
-          "allowedValues": [
-            "always",
-            "never",
-            "consistent"
-          ]
+          "allowedValues": ["always", "never", "consistent"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always",
-          "never",
-          "consistent"
-        ],
+        "schema": ["always", "never", "consistent"],
         "parentSchema": {
-          "enum": [
-            "always",
-            "never",
-            "consistent"
-          ]
+          "enum": ["always", "never", "consistent"]
         },
         "data": {
           "NotAKey": "always"
@@ -1178,10 +1019,7 @@
               "type": "boolean"
             },
             "minItems": {
-              "type": [
-                "integer",
-                "null"
-              ],
+              "type": ["integer", "null"],
               "minimum": 0
             }
           },
@@ -1201,11 +1039,7 @@
         "message": "should match exactly one schema in oneOf",
         "schema": [
           {
-            "enum": [
-              "always",
-              "never",
-              "consistent"
-            ]
+            "enum": ["always", "never", "consistent"]
           },
           {
             "type": "object",
@@ -1214,10 +1048,7 @@
                 "type": "boolean"
               },
               "minItems": {
-                "type": [
-                  "integer",
-                  "null"
-                ],
+                "type": ["integer", "null"],
                 "minimum": 0
               }
             },
@@ -1227,11 +1058,7 @@
         "parentSchema": {
           "oneOf": [
             {
-              "enum": [
-                "always",
-                "never",
-                "consistent"
-              ]
+              "enum": ["always", "never", "consistent"]
             },
             {
               "type": "object",
@@ -1240,10 +1067,7 @@
                   "type": "boolean"
                 },
                 "minItems": {
-                  "type": [
-                    "integer",
-                    "null"
-                  ],
+                  "type": ["integer", "null"],
                   "minimum": 0
                 }
               },
@@ -1339,35 +1163,17 @@
     "schema": {
       "definitions": {
         "paddingType": {
-          "enum": [
-            "any",
-            "never",
-            "always"
-          ]
+          "enum": ["any", "never", "always"]
         },
         "statementType": {
           "anyOf": [
             {
-              "enum": [
-                "*",
-                "block-like",
-                "function",
-                "if",
-                "return",
-                "var"
-              ]
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
             },
             {
               "type": "array",
               "items": {
-                "enum": [
-                  "*",
-                  "block-like",
-                  "function",
-                  "if",
-                  "return",
-                  "var"
-                ]
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
               },
               "minItems": 1,
               "uniqueItems": true
@@ -1390,11 +1196,7 @@
           }
         },
         "additionalProperties": false,
-        "required": [
-          "blankLine",
-          "prev",
-          "next"
-        ]
+        "required": ["blankLine", "prev", "next"]
       }
     },
     "input": [
@@ -1405,10 +1207,7 @@
       },
       {
         "blankLine": "never",
-        "prev": [
-          "if",
-          "block-like"
-        ],
+        "prev": ["if", "block-like"],
         "next": "*"
       }
     ],
@@ -1420,10 +1219,7 @@
       },
       {
         "blankLine": "never",
-        "prev": [
-          "if",
-          "block-like"
-        ],
+        "prev": ["if", "block-like"],
         "next": "*"
       }
     ],
@@ -1436,35 +1232,17 @@
     "schema": {
       "definitions": {
         "paddingType": {
-          "enum": [
-            "any",
-            "never",
-            "always"
-          ]
+          "enum": ["any", "never", "always"]
         },
         "statementType": {
           "anyOf": [
             {
-              "enum": [
-                "*",
-                "block-like",
-                "function",
-                "if",
-                "return",
-                "var"
-              ]
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
             },
             {
               "type": "array",
               "items": {
-                "enum": [
-                  "*",
-                  "block-like",
-                  "function",
-                  "if",
-                  "return",
-                  "var"
-                ]
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
               },
               "minItems": 1,
               "uniqueItems": true
@@ -1487,11 +1265,7 @@
           }
         },
         "additionalProperties": false,
-        "required": [
-          "blankLine",
-          "prev",
-          "next"
-        ]
+        "required": ["blankLine", "prev", "next"]
       }
     },
     "input": [
@@ -1541,11 +1315,7 @@
             }
           },
           "additionalProperties": false,
-          "required": [
-            "blankLine",
-            "prev",
-            "next"
-          ]
+          "required": ["blankLine", "prev", "next"]
         },
         "data": {
           "blankLine": "always",
@@ -1560,35 +1330,17 @@
     "schema": {
       "definitions": {
         "paddingType": {
-          "enum": [
-            "any",
-            "never",
-            "always"
-          ]
+          "enum": ["any", "never", "always"]
         },
         "statementType": {
           "anyOf": [
             {
-              "enum": [
-                "*",
-                "block-like",
-                "function",
-                "if",
-                "return",
-                "var"
-              ]
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
             },
             {
               "type": "array",
               "items": {
-                "enum": [
-                  "*",
-                  "block-like",
-                  "function",
-                  "if",
-                  "return",
-                  "var"
-                ]
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
               },
               "minItems": 1,
               "uniqueItems": true
@@ -1611,30 +1363,20 @@
           }
         },
         "additionalProperties": false,
-        "required": [
-          "blankLine",
-          "prev",
-          "next"
-        ]
+        "required": ["blankLine", "prev", "next"]
       }
     },
     "input": [
       {
         "blankLine": "always",
-        "prev": [
-          "if",
-          "if"
-        ],
+        "prev": ["if", "if"],
         "next": "*"
       }
     ],
     "output": [
       {
         "blankLine": "always",
-        "prev": [
-          "if",
-          "if"
-        ],
+        "prev": ["if", "if"],
         "next": "*"
       }
     ],
@@ -1655,28 +1397,11 @@
           ]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "*",
-          "block-like",
-          "function",
-          "if",
-          "return",
-          "var"
-        ],
+        "schema": ["*", "block-like", "function", "if", "return", "var"],
         "parentSchema": {
-          "enum": [
-            "*",
-            "block-like",
-            "function",
-            "if",
-            "return",
-            "var"
-          ]
+          "enum": ["*", "block-like", "function", "if", "return", "var"]
         },
-        "data": [
-          "if",
-          "if"
-        ]
+        "data": ["if", "if"]
       },
       {
         "keyword": "uniqueItems",
@@ -1691,22 +1416,12 @@
         "parentSchema": {
           "type": "array",
           "items": {
-            "enum": [
-              "*",
-              "block-like",
-              "function",
-              "if",
-              "return",
-              "var"
-            ]
+            "enum": ["*", "block-like", "function", "if", "return", "var"]
           },
           "minItems": 1,
           "uniqueItems": true
         },
-        "data": [
-          "if",
-          "if"
-        ]
+        "data": ["if", "if"]
       },
       {
         "keyword": "anyOf",
@@ -1716,26 +1431,12 @@
         "message": "should match some schema in anyOf",
         "schema": [
           {
-            "enum": [
-              "*",
-              "block-like",
-              "function",
-              "if",
-              "return",
-              "var"
-            ]
+            "enum": ["*", "block-like", "function", "if", "return", "var"]
           },
           {
             "type": "array",
             "items": {
-              "enum": [
-                "*",
-                "block-like",
-                "function",
-                "if",
-                "return",
-                "var"
-              ]
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
             },
             "minItems": 1,
             "uniqueItems": true
@@ -1744,36 +1445,19 @@
         "parentSchema": {
           "anyOf": [
             {
-              "enum": [
-                "*",
-                "block-like",
-                "function",
-                "if",
-                "return",
-                "var"
-              ]
+              "enum": ["*", "block-like", "function", "if", "return", "var"]
             },
             {
               "type": "array",
               "items": {
-                "enum": [
-                  "*",
-                  "block-like",
-                  "function",
-                  "if",
-                  "return",
-                  "var"
-                ]
+                "enum": ["*", "block-like", "function", "if", "return", "var"]
               },
               "minItems": 1,
               "uniqueItems": true
             }
           ]
         },
-        "data": [
-          "if",
-          "if"
-        ]
+        "data": ["if", "if"]
       }
     ]
   },
@@ -1788,11 +1472,7 @@
           "$defs": {
             "arrayOption": {
               "type": "string",
-              "enum": [
-                "array",
-                "generic",
-                "array-simple"
-              ]
+              "enum": ["array", "generic", "array-simple"]
             }
           },
           "additionalProperties": false,
@@ -1835,11 +1515,7 @@
           "$defs": {
             "arrayOption": {
               "type": "string",
-              "enum": [
-                "array",
-                "generic",
-                "array-simple"
-              ]
+              "enum": ["array", "generic", "array-simple"]
             }
           },
           "additionalProperties": false,
@@ -1873,25 +1549,13 @@
         "dataPath": "[0].default",
         "schemaPath": "#/items/0/$defs/arrayOption/enum",
         "params": {
-          "allowedValues": [
-            "array",
-            "generic",
-            "array-simple"
-          ]
+          "allowedValues": ["array", "generic", "array-simple"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "array",
-          "generic",
-          "array-simple"
-        ],
+        "schema": ["array", "generic", "array-simple"],
         "parentSchema": {
           "type": "string",
-          "enum": [
-            "array",
-            "generic",
-            "array-simple"
-          ]
+          "enum": ["array", "generic", "array-simple"]
         },
         "data": "tuple"
       }
@@ -1908,11 +1572,7 @@
           "$defs": {
             "arrayOption": {
               "type": "string",
-              "enum": [
-                "array",
-                "generic",
-                "array-simple"
-              ]
+              "enum": ["array", "generic", "array-simple"]
             }
           },
           "additionalProperties": false,
@@ -1955,11 +1615,7 @@
           "$defs": {
             "arrayOption": {
               "type": "string",
-              "enum": [
-                "array",
-                "generic",
-                "array-simple"
-              ]
+              "enum": ["array", "generic", "array-simple"]
             }
           },
           "additionalProperties": false,
@@ -1995,9 +1651,7 @@
                 },
                 {
                   "type": "string",
-                  "enum": [
-                    "allow-with-description"
-                  ]
+                  "enum": ["allow-with-description"]
                 },
                 {
                   "type": "object",
@@ -2034,12 +1688,8 @@
       "minItems": 0,
       "maxItems": 1
     },
-    "input": [
-      {}
-    ],
-    "output": [
-      {}
-    ],
+    "input": [{}],
+    "output": [{}],
     "valid": true,
     "errors": null
   },
@@ -2060,9 +1710,7 @@
                 },
                 {
                   "type": "string",
-                  "enum": [
-                    "allow-with-description"
-                  ]
+                  "enum": ["allow-with-description"]
                 },
                 {
                   "type": "object",
@@ -2129,9 +1777,7 @@
                 },
                 {
                   "type": "string",
-                  "enum": [
-                    "allow-with-description"
-                  ]
+                  "enum": ["allow-with-description"]
                 },
                 {
                   "type": "object",
@@ -2202,9 +1848,7 @@
                 },
                 {
                   "type": "string",
-                  "enum": [
-                    "allow-with-description"
-                  ]
+                  "enum": ["allow-with-description"]
                 },
                 {
                   "type": "object",
@@ -2273,19 +1917,13 @@
         "dataPath": "[0]['ts-check']",
         "schemaPath": "#/items/0/$defs/directiveConfigSchema/oneOf/1/enum",
         "params": {
-          "allowedValues": [
-            "allow-with-description"
-          ]
+          "allowedValues": ["allow-with-description"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "allow-with-description"
-        ],
+        "schema": ["allow-with-description"],
         "parentSchema": {
           "type": "string",
-          "enum": [
-            "allow-with-description"
-          ]
+          "enum": ["allow-with-description"]
         },
         "data": "nope"
       },
@@ -2324,9 +1962,7 @@
           },
           {
             "type": "string",
-            "enum": [
-              "allow-with-description"
-            ]
+            "enum": ["allow-with-description"]
           },
           {
             "type": "object",
@@ -2346,9 +1982,7 @@
             },
             {
               "type": "string",
-              "enum": [
-                "allow-with-description"
-              ]
+              "enum": ["allow-with-description"]
             },
             {
               "type": "object",
@@ -2378,9 +2012,7 @@
               "oneOf": [
                 {
                   "type": "boolean",
-                  "enum": [
-                    true
-                  ]
+                  "enum": [true]
                 },
                 {
                   "type": "string"
@@ -2427,9 +2059,7 @@
           "Object": true,
           "Bad": {
             "message": "no",
-            "suggest": [
-              "Good"
-            ]
+            "suggest": ["Good"]
           }
         }
       }
@@ -2441,9 +2071,7 @@
           "Object": true,
           "Bad": {
             "message": "no",
-            "suggest": [
-              "Good"
-            ]
+            "suggest": ["Good"]
           }
         }
       }
@@ -2464,9 +2092,7 @@
               "oneOf": [
                 {
                   "type": "boolean",
-                  "enum": [
-                    true
-                  ]
+                  "enum": [true]
                 },
                 {
                   "type": "string"
@@ -2533,9 +2159,7 @@
         "schema": "boolean",
         "parentSchema": {
           "type": "boolean",
-          "enum": [
-            true
-          ]
+          "enum": [true]
         },
         "data": 123
       },
@@ -2544,19 +2168,13 @@
         "dataPath": "[0].types['Foo']",
         "schemaPath": "#/items/0/$defs/banConfig/oneOf/0/enum",
         "params": {
-          "allowedValues": [
-            true
-          ]
+          "allowedValues": [true]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          true
-        ],
+        "schema": [true],
         "parentSchema": {
           "type": "boolean",
-          "enum": [
-            true
-          ]
+          "enum": [true]
         },
         "data": 123
       },
@@ -2614,9 +2232,7 @@
         "schema": [
           {
             "type": "boolean",
-            "enum": [
-              true
-            ]
+            "enum": [true]
           },
           {
             "type": "string"
@@ -2644,9 +2260,7 @@
           "oneOf": [
             {
               "type": "boolean",
-              "enum": [
-                true
-              ]
+              "enum": [true]
             },
             {
               "type": "string"
@@ -2707,10 +2321,7 @@
             },
             "prefer": {
               "type": "string",
-              "enum": [
-                "class-property",
-                "parameter-property"
-              ]
+              "enum": ["class-property", "parameter-property"]
             }
           }
         }
@@ -2720,19 +2331,13 @@
     },
     "input": [
       {
-        "allow": [
-          "readonly",
-          "private readonly"
-        ],
+        "allow": ["readonly", "private readonly"],
         "prefer": "class-property"
       }
     ],
     "output": [
       {
-        "allow": [
-          "readonly",
-          "private readonly"
-        ],
+        "allow": ["readonly", "private readonly"],
         "prefer": "class-property"
       }
     ],
@@ -2771,10 +2376,7 @@
             },
             "prefer": {
               "type": "string",
-              "enum": [
-                "class-property",
-                "parameter-property"
-              ]
+              "enum": ["class-property", "parameter-property"]
             }
           }
         }
@@ -2784,16 +2386,12 @@
     },
     "input": [
       {
-        "allow": [
-          "static"
-        ]
+        "allow": ["static"]
       }
     ],
     "output": [
       {
-        "allow": [
-          "static"
-        ]
+        "allow": ["static"]
       }
     ],
     "valid": false,
@@ -2881,9 +2479,7 @@
         "styles": {
           "anyOf": [
             {
-              "enum": [
-                false
-              ]
+              "enum": [false]
             },
             {
               "$ref": "#/definitions/booleanObject"
@@ -2965,9 +2561,7 @@
         "styles": {
           "anyOf": [
             {
-              "enum": [
-                false
-              ]
+              "enum": [false]
             },
             {
               "$ref": "#/definitions/booleanObject"
@@ -3007,18 +2601,12 @@
         "dataPath": "[0].styles['lodash']",
         "schemaPath": "#/anyOf/0/enum",
         "params": {
-          "allowedValues": [
-            false
-          ]
+          "allowedValues": [false]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          false
-        ],
+        "schema": [false],
         "parentSchema": {
-          "enum": [
-            false
-          ]
+          "enum": [false]
         },
         "data": {
           "named": "yes"
@@ -3046,9 +2634,7 @@
         "message": "should match some schema in anyOf",
         "schema": [
           {
-            "enum": [
-              false
-            ]
+            "enum": [false]
           },
           {
             "$ref": "#/definitions/booleanObject"
@@ -3057,9 +2643,7 @@
         "parentSchema": {
           "anyOf": [
             {
-              "enum": [
-                false
-              ]
+              "enum": [false]
             },
             {
               "$ref": "#/definitions/booleanObject"
@@ -3081,10 +2665,7 @@
           "type": "object",
           "properties": {
             "when": {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             },
             "allowMultiline": {
               "type": "boolean"
@@ -3093,10 +2674,7 @@
               "type": "object",
               "properties": {
                 "objectLiterals": {
-                  "enum": [
-                    "always",
-                    "never"
-                  ]
+                  "enum": ["always", "never"]
                 }
               }
             }
@@ -3136,10 +2714,7 @@
               ]
             },
             {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             }
           ]
         },
@@ -3153,10 +2728,7 @@
               "type": "object",
               "properties": {
                 "objectLiterals": {
-                  "enum": [
-                    "always",
-                    "never"
-                  ]
+                  "enum": ["always", "never"]
                 }
               }
             }
@@ -3189,10 +2761,7 @@
           "type": "object",
           "properties": {
             "when": {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             },
             "allowMultiline": {
               "type": "boolean"
@@ -3201,10 +2770,7 @@
               "type": "object",
               "properties": {
                 "objectLiterals": {
-                  "enum": [
-                    "always",
-                    "never"
-                  ]
+                  "enum": ["always", "never"]
                 }
               }
             }
@@ -3244,10 +2810,7 @@
               ]
             },
             {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             }
           ]
         },
@@ -3261,10 +2824,7 @@
               "type": "object",
               "properties": {
                 "objectLiterals": {
-                  "enum": [
-                    "always",
-                    "never"
-                  ]
+                  "enum": ["always", "never"]
                 }
               }
             }
@@ -3303,10 +2863,7 @@
           "type": "object",
           "properties": {
             "when": {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             },
             "allowMultiline": {
               "type": "boolean"
@@ -3315,10 +2872,7 @@
               "type": "object",
               "properties": {
                 "objectLiterals": {
-                  "enum": [
-                    "always",
-                    "never"
-                  ]
+                  "enum": ["always", "never"]
                 }
               }
             }
@@ -3358,10 +2912,7 @@
               ]
             },
             {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             }
           ]
         },
@@ -3375,10 +2926,7 @@
               "type": "object",
               "properties": {
                 "objectLiterals": {
-                  "enum": [
-                    "always",
-                    "never"
-                  ]
+                  "enum": ["always", "never"]
                 }
               }
             }
@@ -3404,21 +2952,12 @@
         "dataPath": "[0].when",
         "schemaPath": "#/definitions/basicConfig/properties/when/enum",
         "params": {
-          "allowedValues": [
-            "always",
-            "never"
-          ]
+          "allowedValues": ["always", "never"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always",
-          "never"
-        ],
+        "schema": ["always", "never"],
         "parentSchema": {
-          "enum": [
-            "always",
-            "never"
-          ]
+          "enum": ["always", "never"]
         },
         "data": "sometimes"
       },
@@ -3427,21 +2966,12 @@
         "dataPath": "[0]",
         "schemaPath": "#/items/0/anyOf/1/enum",
         "params": {
-          "allowedValues": [
-            "always",
-            "never"
-          ]
+          "allowedValues": ["always", "never"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always",
-          "never"
-        ],
+        "schema": ["always", "never"],
         "parentSchema": {
-          "enum": [
-            "always",
-            "never"
-          ]
+          "enum": ["always", "never"]
         },
         "data": {
           "when": "sometimes"
@@ -3473,10 +3003,7 @@
             ]
           },
           {
-            "enum": [
-              "always",
-              "never"
-            ]
+            "enum": ["always", "never"]
           }
         ],
         "parentSchema": {
@@ -3500,10 +3027,7 @@
               ]
             },
             {
-              "enum": [
-                "always",
-                "never"
-              ]
+              "enum": ["always", "never"]
             }
           ]
         },
@@ -3519,11 +3043,7 @@
     "schema": {
       "definitions": {
         "optionValue": {
-          "enum": [
-            "always",
-            "never",
-            "any"
-          ]
+          "enum": ["always", "never", "any"]
         }
       },
       "type": "array",
@@ -3585,11 +3105,7 @@
     "schema": {
       "definitions": {
         "optionValue": {
-          "enum": [
-            "always",
-            "never",
-            "any"
-          ]
+          "enum": ["always", "never", "any"]
         }
       },
       "type": "array",
@@ -3645,24 +3161,12 @@
         "dataPath": "[0].html.normal",
         "schemaPath": "#/definitions/optionValue/enum",
         "params": {
-          "allowedValues": [
-            "always",
-            "never",
-            "any"
-          ]
+          "allowedValues": ["always", "never", "any"]
         },
         "message": "should be equal to one of the allowed values",
-        "schema": [
-          "always",
-          "never",
-          "any"
-        ],
+        "schema": ["always", "never", "any"],
         "parentSchema": {
-          "enum": [
-            "always",
-            "never",
-            "any"
-          ]
+          "enum": ["always", "never", "any"]
         },
         "data": "sometimes"
       }
@@ -3674,11 +3178,7 @@
     "schema": {
       "definitions": {
         "optionValue": {
-          "enum": [
-            "always",
-            "never",
-            "any"
-          ]
+          "enum": ["always", "never", "any"]
         }
       },
       "type": "array",
@@ -3713,14 +3213,8 @@
       ],
       "maxItems": 1
     },
-    "input": [
-      {},
-      {}
-    ],
-    "output": [
-      {},
-      {}
-    ],
+    "input": [{}, {}],
+    "output": [{}, {}],
     "valid": false,
     "errors": [
       {
@@ -3735,11 +3229,7 @@
         "parentSchema": {
           "definitions": {
             "optionValue": {
-              "enum": [
-                "always",
-                "never",
-                "any"
-              ]
+              "enum": ["always", "never", "any"]
             }
           },
           "type": "array",
@@ -3774,10 +3264,7 @@
           ],
           "maxItems": 1
         },
-        "data": [
-          {},
-          {}
-        ]
+        "data": [{}, {}]
       }
     ]
   }
