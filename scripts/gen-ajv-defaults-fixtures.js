@@ -205,19 +205,61 @@ const cases = [
     input: [{}],
   },
   {
-    name: 'list_style_items_default_not_applied_per_element',
+    // A list-style (single-schema, non-tuple) `items` schema still gets its
+    // default filled in for each already-present element independently.
+    name: 'list_style_items_default_applied_per_element',
     schema: {
       type: 'array',
       items: [
         {
           type: 'array',
-          items: { type: 'string', default: 'x' },
+          items: {
+            type: 'object',
+            properties: { foo: { type: 'string', default: 'd' } },
+          },
+        },
+      ],
+      minItems: 0,
+      maxItems: 1,
+    },
+    input: [[{}, { foo: 'x' }]],
+  },
+  {
+    // list-style `items` never grows the array to satisfy minItems — it says
+    // nothing about how many elements there are, unlike a tuple position
+    // with its own literal default.
+    name: 'list_style_items_does_not_grow_array_to_satisfy_minItems',
+    schema: {
+      type: 'array',
+      items: [
+        {
+          type: 'array',
+          minItems: 2,
+          items: { type: 'string', default: 'd' },
         },
       ],
       minItems: 0,
       maxItems: 1,
     },
     input: [['a']],
+  },
+  {
+    // The real-world case this was modeled after: a rule's own top-level
+    // options schema is itself list-style (a single object schema, not a
+    // tuple), the way @graphql-eslint/eslint-plugin's relay-arguments does.
+    // An empty `{}` option gets its declared default filled in, satisfying
+    // minProperties — matching ajv, this used to be silently skipped.
+    name: 'top_level_list_style_items_default_applied',
+    schema: {
+      type: 'array',
+      maxItems: 1,
+      items: {
+        type: 'object',
+        minProperties: 1,
+        properties: { includeBoth: { type: 'boolean', default: true } },
+      },
+    },
+    input: [{}],
   },
   {
     name: 'no_defaults_needed_output_unchanged',

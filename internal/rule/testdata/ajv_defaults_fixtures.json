@@ -425,15 +425,58 @@
     ]
   },
   {
-    "name": "list_style_items_default_not_applied_per_element",
+    "name": "list_style_items_default_applied_per_element",
     "schema": {
       "type": "array",
       "items": [
         {
           "type": "array",
           "items": {
+            "type": "object",
+            "properties": {
+              "foo": {
+                "type": "string",
+                "default": "d"
+              }
+            }
+          }
+        }
+      ],
+      "minItems": 0,
+      "maxItems": 1
+    },
+    "input": [
+      [
+        {},
+        {
+          "foo": "x"
+        }
+      ]
+    ],
+    "output": [
+      [
+        {
+          "foo": "d"
+        },
+        {
+          "foo": "x"
+        }
+      ]
+    ],
+    "valid": true,
+    "errors": null
+  },
+  {
+    "name": "list_style_items_does_not_grow_array_to_satisfy_minItems",
+    "schema": {
+      "type": "array",
+      "items": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "items": {
             "type": "string",
-            "default": "x"
+            "default": "d"
           }
         }
       ],
@@ -449,6 +492,55 @@
       [
         "a"
       ]
+    ],
+    "valid": false,
+    "errors": [
+      {
+        "keyword": "minItems",
+        "dataPath": "[0]",
+        "schemaPath": "#/items/0/minItems",
+        "params": {
+          "limit": 2
+        },
+        "message": "should NOT have fewer than 2 items",
+        "schema": 2,
+        "parentSchema": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "default": "d"
+          }
+        },
+        "data": [
+          "a"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "top_level_list_style_items_default_applied",
+    "schema": {
+      "type": "array",
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "includeBoth": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    },
+    "input": [
+      {}
+    ],
+    "output": [
+      {
+        "includeBoth": true
+      }
     ],
     "valid": true,
     "errors": null

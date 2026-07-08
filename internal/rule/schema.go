@@ -82,8 +82,10 @@ var EmptyArraySchema = MustCompileSchema([]byte(`{"type": "array", "maxItems": 0
 //
 // Defaults are applied the way ajv's `useDefaults` option does: object
 // `properties` (including keys only matched by `patternProperties` or a
-// schema-valued `additionalProperties`, for keys already present) and
-// tuple-style array `items` are filled in, including through a `$ref` once
+// schema-valued `additionalProperties`, for keys already present) and array
+// `items` — both tuple-style (a slot's own default can grow the array) and
+// list-style (the same schema applied to every already-present element,
+// never growing the array) — are filled in, including through a `$ref` once
 // the property/item it's attached to is already present, and through every
 // `allOf` branch (unambiguous, since all of them must hold) — see
 // [applyDefaults]. Defaults are never applied inside `anyOf`/`oneOf`/`not`,
@@ -96,10 +98,10 @@ func (s *CompiledSchema) Validate(options any) (any, error) {
 	return options, nil
 }
 
-// applyDefaults recursively fills missing object properties and array tuple
-// items in v with the defaults declared on s. It mutates and returns v (or,
-// for a tuple that must grow, a value built from appending onto v) rather
-// than copying it — matching ajv's own useDefaults, which also inserts its
+// applyDefaults recursively fills missing object properties and array items
+// in v with the defaults declared on s. It mutates and returns v (or, for a
+// tuple that must grow, a value built from appending onto v) rather than
+// copying it — matching ajv's own useDefaults, which also inserts its
 // defaults directly into the instance being validated rather than a copy.
 //
 // A tuple item is filled only when it is genuinely absent (i.e. beyond the
@@ -108,6 +110,13 @@ func (s *CompiledSchema) Validate(options any) (any, error) {
 // item's default can be inserted even while an earlier, default-less item is
 // still missing — matching ajv, this leaves a hole (nil) at that earlier
 // position rather than refusing to fill the later one.
+//
+// A list-style `items` schema (a single schema applied to every element,
+// rather than a tuple array) is different: since it says nothing about how
+// many elements there are, it never grows v — confirmed against ajv@6, which
+// likewise never pads a too-short array on a list-style `items` schema's
+// account (unlike a tuple position with its own literal default, which
+// does). It only ever fills defaults into elements v already has.
 //
 // A property/item schema contributes a default to fill an absent slot only
 // via [literalDefault] — a literal `default` written directly on that exact
@@ -160,27 +169,37 @@ func applyDefaults(s *jsonschema.Schema, v any, doc any) any {
 		}
 		return val
 	case []any:
-		items, ok := resolveRef(s).Items.([]*jsonschema.Schema)
-		if !ok {
-			return val
-		}
-		origLen := len(val)
-		for i, item := range items {
-			if i < origLen {
-				val[i] = applyDefaults(item, val[i], doc)
-				continue
+		switch items := resolveRef(s).Items.(type) {
+		case []*jsonschema.Schema:
+			origLen := len(val)
+			for i, item := range items {
+				if i < origLen {
+					val[i] = applyDefaults(item, val[i], doc)
+					continue
+				}
+				def, ok := literalDefault(item, doc)
+				if !ok {
+					// No default to contribute at this position: don't grow
+					// the array on its account (ajv likewise emits no code
+					// at all for a tuple position without a declared
+					// default).
+					continue
+				}
+				for len(val) < i {
+					val = append(val, nil) // pad any not-yet-visited gap up to i
+				}
+				val = append(val, applyDefaults(item, normalizeNumbers(def), doc))
 			}
-			def, ok := literalDefault(item, doc)
-			if !ok {
-				// No default to contribute at this position: don't grow the
-				// array on its account (ajv likewise emits no code at all for
-				// a tuple position without a declared default).
-				continue
+		case *jsonschema.Schema:
+			// List-style items: the same schema governs every element, so
+			// each element already present gets its own defaults filled in
+			// independently — but, matching ajv, `items` never determines
+			// the array's length, so a too-short array is never padded on
+			// its account (unlike a tuple position with its own literal
+			// default, which does grow the array — see the case above).
+			for i := range val {
+				val[i] = applyDefaults(items, val[i], doc)
 			}
-			for len(val) < i {
-				val = append(val, nil) // pad any not-yet-visited gap up to i
-			}
-			val = append(val, applyDefaults(item, normalizeNumbers(def), doc))
 		}
 		return val
 	default:
