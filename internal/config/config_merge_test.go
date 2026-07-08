@@ -295,11 +295,8 @@ func TestMergeLanguageOptions(t *testing.T) {
 		}
 	})
 
-	// Regression test for https://github.com/web-infra-dev/rslint/issues/1230:
-	// a later entry overriding only parserOptions.jsxPragma must not discard
-	// an earlier entry's parserOptions.project — the Raw map merge used to be
-	// a one-level shallow overwrite, so setting ANY key under `parserOptions`
-	// replaced the whole nested object.
+	// A later entry overriding only parserOptions.jsxPragma must not discard
+	// an earlier entry's parserOptions.project.
 	t.Run("raw parserOptions deep merge preserves sibling keys", func(t *testing.T) {
 		base := &LanguageOptions{
 			Raw: map[string]any{

@@ -136,11 +136,7 @@ export interface LintFileRequest {
       };
       /**
        * `@typescript-eslint/parser`-compatible top-level `parserOptions`
-       * knobs (siblings of `ecmaFeatures`, NOT nested under it). Consumed
-       * by the scope-manager factory below so `<Pragma />` / `<>...</>`
-       * resolve to the configured identifier instead of hard-coded
-       * `React` / `Fragment` — see
-       * https://github.com/web-infra-dev/rslint/issues/1230.
+       * knobs (siblings of `ecmaFeatures`, NOT nested under it).
        */
       jsxPragma?: string | null;
       jsxFragmentName?: string | null;
@@ -292,14 +288,11 @@ export function lintFile(
       // are filled in by `scope-factory` to match ESLint v10.
       impliedStrict: ecmaFeatures?.impliedStrict,
       globalReturn: ecmaFeatures?.globalReturn,
-      // `jsxPragma` / `jsxFragmentName` are top-level `parserOptions` keys
-      // (siblings of `ecmaFeatures`), NOT nested under it — reading them
-      // off `ecmaFeatures` (the pre-fix code didn't forward them at all)
-      // silently fell back to `scope-factory`'s 'React'/'Fragment'
-      // defaults for every Preact/Vue/custom-pragma config. `?? undefined`
-      // normalizes an explicit `null` (parserOptions.jsxPragma=null is
-      // typescript-eslint's "disable pragma tracking") to "use the
-      // scope-factory default" — rslint doesn't yet expose that opt-out.
+      // `jsxPragma` / `jsxFragmentName` are top-level `parserOptions` keys,
+      // siblings of `ecmaFeatures` — NOT nested under it. `?? undefined`
+      // normalizes an explicit `null` (typescript-eslint's "disable pragma
+      // tracking") to "use the scope-factory default" — rslint doesn't yet
+      // expose that opt-out.
       jsxPragma: parserOptions?.jsxPragma ?? undefined,
       jsxFragmentName: parserOptions?.jsxFragmentName ?? undefined,
     });

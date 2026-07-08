@@ -94,11 +94,7 @@ type ParserOptions struct {
 	// JsxPragma / JsxFragmentName mirror @typescript-eslint/parser's
 	// `parserOptions.jsxPragma` / `parserOptions.jsxFragmentName` — the
 	// identifier implicitly referenced by JSX elements / fragments (Preact's
-	// `h`/`Fragment`, a custom factory, ...). Consumed by
-	// ResolveJsxPragmaOptions to seed CompilerOptions.JsxFactory /
-	// JsxFragmentFactory for Programs synthesized without a tsconfig (see
-	// cmd/rslint/programs.go), so the Go-native `no-unused-vars` implicit-
-	// usage check (markJsxFactoryUsed) doesn't hard-code "React".
+	// `h`/`Fragment`, a custom factory, ...).
 	JsxPragma       *string `json:"jsxPragma,omitempty"`
 	JsxFragmentName *string `json:"jsxFragmentName,omitempty"`
 }
@@ -584,12 +580,8 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 	}
 	// Deep-merge the raw languageOptions map (override wins per key; nested
 	// objects like `parserOptions` are merged key-by-key rather than replaced
-	// wholesale). Without this, overriding only `parserOptions.jsxPragma` in a
-	// later entry silently dropped an earlier entry's `parserOptions.project`
-	// (and any other nested parserOptions/globals) because the whole
-	// `parserOptions` object was swapped out — see
-	// https://github.com/web-infra-dev/rslint/issues/1230. merged is a shallow
-	// copy of base, so build a fresh map rather than mutating base.Raw.
+	// wholesale). merged is a shallow copy of base, so build a fresh map
+	// rather than mutating base.Raw.
 	if len(override.Raw) > 0 {
 		merged.Raw = deepMergeRawMaps(base.Raw, override.Raw)
 	}
@@ -626,11 +618,7 @@ func deepMergeRawMaps(base, override map[string]any) map[string]any {
 // earlier ones (matching GetConfigForFile's merge order). It exists for the
 // Programs that synthesize CompilerOptions for a batch of files instead of
 // resolving a single file's merged config — the no-tsconfig directory scan
-// and the gap-file fallback Program (cmd/rslint/programs.go) — so their
-// JsxFactory / JsxFragmentFactory aren't hard-coded to TypeScript's "React"
-// default when the user only configured Preact/Vue-style pragmas via rslint
-// config rather than tsconfig.json. See
-// https://github.com/web-infra-dev/rslint/issues/1230.
+// and the gap-file fallback Program (cmd/rslint/programs.go).
 func ResolveJsxPragmaOptions(entries RslintConfig) (jsxFactory, jsxFragmentFactory string) {
 	for _, entry := range entries {
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {

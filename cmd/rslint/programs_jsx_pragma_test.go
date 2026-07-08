@@ -15,15 +15,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// TestCreateProgramsForConfig_NoTsconfig_JsxPragma is a regression test for
-// https://github.com/web-infra-dev/rslint/issues/1230: a project with NO
+// TestCreateProgramsForConfig_NoTsconfig_JsxPragma: a project with no
 // tsconfig.json (so createProgramsForConfig takes the directory-scan
 // fallback branch) that sets languageOptions.parserOptions.jsxPragma to a
 // non-default value (e.g. Preact's "h") must have that value reach the
 // synthesized Program's CompilerOptions.JsxFactory, so the Go-native
-// `@typescript-eslint/no-unused-vars` rule's implicit-JSX-usage check
-// (markJsxFactoryUsed) marks the configured pragma's import as used
-// instead of hard-coding "React".
+// `@typescript-eslint/no-unused-vars` rule marks the configured pragma's
+// import as used.
 func TestCreateProgramsForConfig_NoTsconfig_JsxPragma(t *testing.T) {
 	rslintconfig.RegisterAllRules()
 

@@ -151,10 +151,8 @@ func createProgramsForConfig(
 // createFallbackProgram creates a Program for "gap" files — files matched by
 // config `files` patterns but not included in any tsconfig. Uses minimal
 // compiler options sufficient for AST parsing (no type checking).
-// jsxFactory / jsxFragmentFactory come from the owning config's
-// languageOptions.parserOptions.jsxPragma / jsxFragmentName (see
-// rslintconfig.ResolveJsxPragmaOptions); empty strings leave TypeScript's
-// own "React" / "Fragment" defaults in place.
+// Empty jsxFactory / jsxFragmentFactory leave TypeScript's own "React" /
+// "Fragment" defaults in place.
 func createFallbackProgram(
 	gapFiles []string,
 	singleThreaded bool,
@@ -281,10 +279,7 @@ func buildProgramsWithGapFallback(
 // resolveGapJsxPragma resolves the jsxPragma / jsxFragmentName to seed the
 // gap-file fallback Program's CompilerOptions with. In multi-config mode
 // (configMap non-nil) the gap-file batch can span multiple config
-// directories, so this unions across all of them — a best-effort default for
-// the (rare) case where directories disagree, matching the same
-// single-Program-for-many-files tradeoff the fallback Program already makes.
-// Single-config mode resolves directly against rslintConfig.
+// directories, so this unions across all of them.
 func resolveGapJsxPragma(configMap map[string]rslintconfig.RslintConfig, rslintConfig rslintconfig.RslintConfig) (jsxFactory, jsxFragmentFactory string) {
 	if configMap != nil {
 		for _, entries := range configMap {

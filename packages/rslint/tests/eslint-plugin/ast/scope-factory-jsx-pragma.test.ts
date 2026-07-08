@@ -1,16 +1,8 @@
 /**
- * Regression test pinning that `languageOptions.parserOptions.jsxPragma` /
- * `jsxFragmentName` actually reach the (TS) scope analyzer.
- *
- * These are top-level `parserOptions` keys — siblings of `ecmaFeatures`,
- * NOT nested under it — per `@typescript-eslint/types`' `ParserOptions`.
- * Pre-fix, `ecma-language-plugin.ts` only ever read
- * `parserOptions.ecmaFeatures.*` and silently dropped `jsxPragma` /
- * `jsxFragmentName` entirely, so `makeScopeManagerFactory` always fell back
- * to its 'React' / 'Fragment' defaults — breaking Preact/Vue/custom-pragma
- * configs (`<h />` with `import { h } from 'preact'` was flagged as an
- * unused import by any scope-based unused-import check). See
- * https://github.com/web-infra-dev/rslint/issues/1230.
+ * Pins that `languageOptions.parserOptions.jsxPragma` / `jsxFragmentName`
+ * reach the (TS) scope analyzer. These are top-level `parserOptions` keys —
+ * siblings of `ecmaFeatures`, not nested under it — per
+ * `@typescript-eslint/types`' `ParserOptions`.
  *
  * `jsxPragma` only affects the TS scope-manager (`.tsx`/`.ts`), so the probe
  * uses a `.tsx` file.
