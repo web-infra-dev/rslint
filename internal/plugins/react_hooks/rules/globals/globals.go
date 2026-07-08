@@ -366,32 +366,7 @@ func functionIdentifierName(fn *ast.Node) string {
 }
 
 func walkRenderParentBody(fn *ast.Node, visit func(*ast.Node) bool) {
-	body := react_hooksutil.GetFunctionBody(fn)
-	if body == nil {
-		return
-	}
-	var walk func(*ast.Node) bool
-	walk = func(node *ast.Node) bool {
-		if node == nil {
-			return false
-		}
-		if node != body && utils.IsFunctionLikeContainer(node) {
-			return false
-		}
-		if visit(node) {
-			return true
-		}
-		stop := false
-		node.ForEachChild(func(child *ast.Node) bool {
-			if walk(child) {
-				stop = true
-				return true
-			}
-			return false
-		})
-		return stop
-	}
-	walk(body)
+	react_hooksutil.WalkFunctionBody(fn, visit)
 }
 
 func functionReturnsJsx(fn *ast.Node) bool {

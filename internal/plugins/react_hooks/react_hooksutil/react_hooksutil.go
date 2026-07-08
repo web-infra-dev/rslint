@@ -412,6 +412,38 @@ func GetFunctionBody(fn *ast.Node) *ast.Node {
 	return nil
 }
 
+// WalkFunctionBody visits the executable body of fn. Nested function-like
+// containers are passed to visit, but their bodies are not traversed. It returns
+// true when visit stops the walk.
+func WalkFunctionBody(fn *ast.Node, visit func(*ast.Node) bool) bool {
+	body := GetFunctionBody(fn)
+	if body == nil {
+		return false
+	}
+	var walk func(*ast.Node) bool
+	walk = func(node *ast.Node) bool {
+		if node == nil {
+			return false
+		}
+		if node != fn && IsFunctionLikeContainer(node) {
+			return visit(node)
+		}
+		if visit(node) {
+			return true
+		}
+		stop := false
+		node.ForEachChild(func(child *ast.Node) bool {
+			if walk(child) {
+				stop = true
+				return true
+			}
+			return false
+		})
+		return stop
+	}
+	return walk(body)
+}
+
 // HasAsyncModifier reports whether the function-like node carries
 // the `async` modifier.
 func HasAsyncModifier(fn *ast.Node) bool {
