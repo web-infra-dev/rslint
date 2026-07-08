@@ -62,11 +62,7 @@ export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
     }
   }
 
-  const orderedConfigs = new Map<string, string>();
-  for (const configPath of effectiveConfigsByDir.values()) {
-    addConfigParentFirst(orderedConfigs, configPath);
-  }
-  return [...orderedConfigs.keys()];
+  return [...effectiveConfigsByDir.values()];
 }
 
 /**
@@ -93,7 +89,9 @@ export async function discoverConfigs(
     configPath: string,
     configDirectory = path.dirname(configPath),
   ): void => {
-    addConfigParentFirst(configs, configPath, configDirectory);
+    if (!configs.has(configPath)) {
+      configs.set(configPath, configDirectory);
+    }
   };
 
   if (explicitConfig) {
@@ -133,11 +131,11 @@ export async function discoverConfigs(
   }
 
   // Scan for nested configs within the target scope (no-args and dir-args).
-  // runWithJSConfigs loads parents first, skips configs hidden by parent
-  // global ignores, and treats every remaining broken config as fatal.
-  // Serial await (not Promise.all over scanDirs): tinyglobby's async crawl
-  // already parallelizes filesystem work. Parallelizing across scan roots mainly
-  // creates duplicate I/O when roots overlap, e.g. `.` plus a nested dir.
+  // Broken configs are tolerated by runWithJSConfigs (skipped with warning).
+  // Serial await (not Promise.all over scanDirs): a single async glob already
+  // saturates the libuv thread pool, so parallelizing across scanDirs adds no
+  // speed — it only creates I/O contention when scanDirs overlap (e.g. `.` plus
+  // a nested subdir each crawling the shared subtree at the same time).
   for (const dir of scanDirs) {
     for (const configPath of await findJSConfigsInDir(dir)) {
       addConfig(configPath);
@@ -145,35 +143,6 @@ export async function discoverConfigs(
   }
 
   return configs;
-}
-
-function isAncestorDirectory(ancestorDir: string, childDir: string): boolean {
-  return isRelativeChildPath(path.relative(ancestorDir, childDir));
-}
-
-function addConfigParentFirst(
-  configs: Map<string, string>,
-  configPath: string,
-  configDirectory = path.dirname(configPath),
-): void {
-  if (configs.has(configPath)) return;
-
-  const entries = [...configs.entries()];
-  const insertIndex = entries.findIndex(([, existingConfigDirectory]) =>
-    isAncestorDirectory(configDirectory, existingConfigDirectory),
-  );
-  if (insertIndex === -1) {
-    configs.set(configPath, configDirectory);
-    return;
-  }
-
-  configs.clear();
-  for (let i = 0; i < entries.length; i++) {
-    if (i === insertIndex) {
-      configs.set(configPath, configDirectory);
-    }
-    configs.set(entries[i][0], entries[i][1]);
-  }
 }
 
 function getConfigPriority(configPath: string): number {
@@ -311,32 +280,6 @@ function resolveConfigDirectory(configDirectory: string): string {
   return dir;
 }
 
-export function isConfigDirIgnoredByParentIgnores(
-  configDirectory: string,
-  parentConfigs: ConfigEntry[],
-): boolean {
-  const configDir = resolveConfigDirectory(configDirectory);
-
-  for (const parent of parentConfigs) {
-    const parentDir = resolveConfigDirectory(parent.configDirectory);
-    if (
-      !configDir.startsWith(parentDir + path.sep) &&
-      configDir !== parentDir
-    ) {
-      continue;
-    }
-
-    const globalIgnores = getGlobalIgnores(parent.entries);
-    if (globalIgnores.length === 0) continue;
-
-    if (isDirIgnoredByPatterns(configDir, globalIgnores, parentDir)) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 /**
  * Filter out nested configs whose directory is covered by an ancestor config's
  * global ignores. Aligns with ESLint v10 behavior: when traversing directories,
@@ -346,8 +289,6 @@ export function isConfigDirIgnoredByParentIgnores(
  * Example: root config has `{ ignores: ['__tests__/**'] }`.
  * A nested config at `__tests__/fixtures/rslint.config.js` is filtered out
  * because `__tests__/fixtures/` is within the root config's global ignores.
- *
- * Expects configEntries in parent-first order, as produced by discoverConfigs.
  */
 export function filterConfigsByParentIgnores(
   configEntries: ConfigEntry[],
@@ -355,13 +296,41 @@ export function filterConfigsByParentIgnores(
 ): ConfigEntry[] {
   if (configEntries.length <= 1) return configEntries;
 
+  const resolvedDirs = new Map<ConfigEntry, string>();
+  for (const entry of configEntries) {
+    resolvedDirs.set(entry, resolveConfigDirectory(entry.configDirectory));
+  }
+
+  const sorted = [...configEntries].sort(
+    (a, b) =>
+      (resolvedDirs.get(a)?.length ?? 0) - (resolvedDirs.get(b)?.length ?? 0),
+  );
+
   const result: ConfigEntry[] = [];
 
-  for (const config of configEntries) {
-    if (
-      protectedConfigDirectories.has(config.configDirectory) ||
-      !isConfigDirIgnoredByParentIgnores(config.configDirectory, result)
-    ) {
+  for (const config of sorted) {
+    let ignored = false;
+    const configDir = resolvedDirs.get(config)!;
+
+    for (const parent of result) {
+      const parentDir = resolvedDirs.get(parent)!;
+      if (
+        !configDir.startsWith(parentDir + path.sep) &&
+        configDir !== parentDir
+      ) {
+        continue;
+      }
+
+      const globalIgnores = getGlobalIgnores(parent.entries);
+      if (globalIgnores.length === 0) continue;
+
+      if (isDirIgnoredByPatterns(configDir, globalIgnores, parentDir)) {
+        ignored = true;
+        break;
+      }
+    }
+
+    if (!ignored || protectedConfigDirectories.has(config.configDirectory)) {
       result.push(config);
     }
   }
