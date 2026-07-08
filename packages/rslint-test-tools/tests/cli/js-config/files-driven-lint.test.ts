@@ -195,6 +195,69 @@ describe('Files-driven lint: gap file auto-degrade', () => {
     }
   });
 
+  test('project without tsconfig should lint targets but gate type-aware rules', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: ['**/*.ts'],
+          rules: {
+            '@typescript-eslint/ban-ts-comment': 'error',
+            '@typescript-eslint/no-unsafe-member-access': 'error',
+          },
+          plugins: ['@typescript-eslint'],
+        },
+      ];`,
+      'src/index.ts': `// @ts-ignore\nlet value: any = 1;\nvalue.deep = 2;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+      const resultRules = diagnostics.map((d: any) => d.ruleName);
+
+      expect(resultRules).toContain('@typescript-eslint/ban-ts-comment');
+      expect(resultRules).not.toContain(
+        '@typescript-eslint/no-unsafe-member-access',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('project without tsconfig should keep import rule module resolution', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: ['**/*.ts'],
+          rules: {
+            'import/default': 'error',
+          },
+          plugins: ['import'],
+        },
+      ];`,
+      'src/index.ts': `import missingDefault from './mod';\nconsole.log(missingDefault);\n`,
+      'src/mod.ts': `export const named = 1;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(result.exitCode).toBe(1);
+      expect(diagnostics.map((d: any) => d.ruleName)).toContain(
+        'import/default',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('JSON config without files field should scan default lintable extensions', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': JSON.stringify({
@@ -291,6 +354,41 @@ describe('Files-driven lint: gap file auto-degrade', () => {
           expect(d.ruleName).not.toMatch(/^TypeScript\(/);
         }
       }
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('JS config without files field should scan default lintable extensions', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          rules: {
+            'no-debugger': 'error',
+          },
+        },
+      ];`,
+      'src/index.ts': `debugger;\n`,
+      'scripts/build.jsx': `debugger;\n`,
+      'styles/site.css': `debugger;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('src/index.ts')),
+      ).toBe(true);
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('scripts/build.jsx')),
+      ).toBe(true);
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('styles/site.css')),
+      ).toBe(false);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -538,6 +636,38 @@ describe('Files-driven lint: CLI interaction', () => {
       // no-inferrable-types should have removed the type annotation
       expect(fixed).not.toContain(': number');
       expect(fixed).toContain('const x = 42');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('--fix should keep remaining target syntax diagnostics after relint', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: ['**/*.ts'],
+          rules: {
+            '@typescript-eslint/no-inferrable-types': 'error',
+          },
+          plugins: ['@typescript-eslint'],
+        },
+      ];`,
+      'src/fixable.ts': `const x: number = 42;\n`,
+      'src/bad.ts': `const = ;\n`,
+    });
+    try {
+      const result = await runRslint(
+        ['--fix', '--format', 'jsonline'],
+        tempDir,
+      );
+      const fs = await import('node:fs/promises');
+      const fixed = await fs.readFile(`${tempDir}/src/fixable.ts`, 'utf8');
+
+      expect(fixed).toContain('const x = 42');
+      expect(fixed).not.toContain(': number');
+      expect(result.exitCode).toBe(1);
+      expect(result.stdout).toContain('src/bad.ts');
+      expect(result.stdout).toContain('TypeScript(TS');
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -1033,6 +1163,295 @@ describe('Files-driven lint: recommended + user override cascade', () => {
 });
 
 describe('Files-driven lint: edge cases', () => {
+  test('syntax error outside config files should not fail tsconfig-backed lint', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: { target: 'ES2020', module: 'ESNext', strict: true },
+        include: ['**/*.ts'],
+      }),
+      'rslint.config.mjs': `export default [
+        {
+          files: ['src/**/*.ts'],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ['./tsconfig.json'],
+            },
+          },
+          rules: {
+            'no-debugger': 'error',
+          },
+        },
+      ];`,
+      'src/index.ts': `debugger;\n`,
+      'test/bad.ts': `const = ;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(diagnostics.map((d: any) => d.ruleName)).toContain('no-debugger');
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('test/bad.ts')),
+      ).toBe(false);
+      expect(result.stderr).not.toContain('test/bad.ts');
+      expect(result.stderr).not.toContain('TS1134');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('type-check still reports tsconfig files outside config files without linting them', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+          skipLibCheck: true,
+        },
+        include: ['**/*.ts'],
+      }),
+      'rslint.config.mjs': `export default [
+        {
+          files: ['src/**/*.ts'],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ['./tsconfig.json'],
+            },
+          },
+          rules: {
+            'no-debugger': 'error',
+          },
+        },
+      ];`,
+      'src/index.ts': `debugger;\nconst ok: number = 1;\n`,
+      'test/bad.ts': `debugger;\nconst bad: number = "oops";\n`,
+    });
+    try {
+      const result = await runRslint(
+        ['--type-check', '--format', 'jsonline'],
+        tempDir,
+      );
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(result.exitCode).toBe(1);
+      expect(
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('src/index.ts') && d.ruleName === 'no-debugger',
+        ),
+      ).toBe(true);
+      expect(
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('test/bad.ts') &&
+            d.ruleName === 'TypeScript(TS2322)',
+        ),
+      ).toBe(true);
+      expect(
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('test/bad.ts') && d.ruleName === 'no-debugger',
+        ),
+      ).toBe(false);
+
+      const typeCheckOnlyResult = await runRslint(
+        ['--type-check-only', '--format', 'jsonline'],
+        tempDir,
+      );
+      const typeCheckOnlyDiagnostics = typeCheckOnlyResult.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(typeCheckOnlyResult.exitCode).toBe(1);
+      expect(
+        typeCheckOnlyDiagnostics.some(
+          (d: any) =>
+            d.filePath.includes('test/bad.ts') &&
+            d.ruleName === 'TypeScript(TS2322)',
+        ),
+      ).toBe(true);
+      expect(
+        typeCheckOnlyDiagnostics.some((d: any) => d.ruleName === 'no-debugger'),
+      ).toBe(false);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('type-check-only still reports syntax errors outside config files from tsconfig', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: { target: 'ES2020', module: 'ESNext', strict: true },
+        include: ['**/*.ts'],
+      }),
+      'rslint.config.mjs': `export default [
+        {
+          files: ['src/**/*.ts'],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ['./tsconfig.json'],
+            },
+          },
+          rules: {
+            'no-debugger': 'error',
+          },
+        },
+      ];`,
+      'src/index.ts': `debugger;\n`,
+      'test/bad.ts': `debugger;\nconst = ;\n`,
+    });
+    try {
+      const result = await runRslint(
+        ['--type-check-only', '--format', 'jsonline'],
+        tempDir,
+      );
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(result.exitCode).toBe(1);
+      expect(
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('test/bad.ts') &&
+            d.ruleName.startsWith('TypeScript(TS'),
+        ),
+      ).toBe(true);
+      expect(diagnostics.some((d: any) => d.ruleName === 'no-debugger')).toBe(
+        false,
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('syntax error outside config files should not fail no-tsconfig lint', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: ['src/**/*.ts'],
+          rules: {
+            'no-debugger': 'error',
+          },
+        },
+      ];`,
+      'src/index.ts': `debugger;\n`,
+      'test/bad.ts': `const = ;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(diagnostics.map((d: any) => d.ruleName)).toContain('no-debugger');
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('test/bad.ts')),
+      ).toBe(false);
+      expect(result.stderr).not.toContain('test/bad.ts');
+      expect(result.stderr).not.toContain('TS1134');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('syntax error inside config files should be reported in no-tsconfig lint', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: ['src/**/*.ts'],
+          rules: {},
+        },
+      ];`,
+      'src/bad.ts': `const = ;\n`,
+      'test/ok.ts': `const ok = 1;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(result.exitCode).toBe(1);
+      expect(
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('src/bad.ts') &&
+            d.ruleName.startsWith('TypeScript(TS'),
+        ),
+      ).toBe(true);
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('test/ok.ts')),
+      ).toBe(false);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('syntax error inside config files should still be reported', async () => {
+    const tempDir = await createTempDir({
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: { target: 'ES2020', module: 'ESNext', strict: true },
+        include: ['**/*.ts'],
+      }),
+      'rslint.config.mjs': `export default [
+        {
+          files: ['src/**/*.ts'],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ['./tsconfig.json'],
+            },
+          },
+          rules: {},
+        },
+      ];`,
+      'src/bad.ts': `const = ;\n`,
+      'test/ok.ts': `const ok = 1;\n`,
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+      const diagnostics = result.stdout
+        .trim()
+        .split('\n')
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l));
+
+      expect(
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('src/bad.ts') &&
+            d.ruleName.startsWith('TypeScript(TS'),
+        ),
+      ).toBe(true);
+      expect(
+        diagnostics.some((d: any) => d.filePath.includes('test/ok.ts')),
+      ).toBe(false);
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('gap file with syntax errors should still be linted (not crash)', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': JSON.stringify({

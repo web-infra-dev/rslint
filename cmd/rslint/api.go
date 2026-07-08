@@ -151,7 +151,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Create programs from all tsconfig files found in rslint config
 	programs := []*compiler.Program{}
 	for _, configFileName := range tsConfigs {
-		program, err := utils.CreateProgram(false, fs, configDirectory, configFileName, host)
+		program, err := utils.CreateProgramLenient(false, fs, configDirectory, configFileName, host)
 		if err != nil {
 			return nil, fmt.Errorf("error creating TS program for %s: %w", configFileName, err)
 		}
@@ -192,6 +192,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
+		if d.SourceFile != nil {
+			sourceFilesLock.Lock()
+			filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
+			if sf, ok := d.SourceFile.(*ast.SourceFile); ok {
+				sourceFiles[filePath] = sf
+			}
+			sourceFilesLock.Unlock()
+		}
 
 		diagnosticStart := d.Range.Pos()
 		diagnosticEnd := d.Range.End()
@@ -291,6 +299,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// rules through GetActiveRulesForFile. --api takes one resolved config
 	// (single-config mode), so configMap / programConfigDirs are nil.
 	fileFilters := buildFileFilters(programs, nil, nil, rslintConfig, configDirectory)
+	shouldReportLintSyntax := func(filePath string) bool {
+		return rslintConfig.GetConfigForFile(filePath, configDirectory) != nil
+	}
+	for _, diagnostic := range collectTargetSyntacticDiagnostics(programs, targetsByProgram, nil, false, false, shouldReportLintSyntax) {
+		diagnosticCollector(diagnostic)
+	}
 
 	// Run linter
 	lintResult, err := linter.RunLinter(linter.RunLinterOptions{

@@ -267,6 +267,39 @@ func TestHandleLint_ExplicitFileOutsideFilesIsCountedWithNoRules(t *testing.T) {
 	}
 }
 
+func TestHandleLint_ExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "explicit.js")
+	if err := os.WriteFile(target, []byte("const = ;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	config := json.RawMessage(`[{
+		"files": ["**/*.ts"],
+		"rules": { "no-debugger": "error" }
+	}]`)
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 1 {
+		t.Fatalf("explicit files-scope miss should still count as one lint result, got %d", response.FileCount)
+	}
+	if len(response.Diagnostics) != 0 {
+		t.Fatalf("expected no syntax or rule diagnostics because no config entry matches the file, got %+v", response.Diagnostics)
+	}
+	if response.RuleCount != 0 {
+		t.Fatalf("expected no executed rules, got %d", response.RuleCount)
+	}
+}
+
 func TestHandleLint_ExplicitFileEntryIgnoredIsCountedWithNoRules(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "ignored.js")

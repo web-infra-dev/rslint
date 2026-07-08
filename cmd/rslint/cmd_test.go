@@ -960,11 +960,11 @@ func TestFormatAllowFileWarning_UnknownKindIsEmpty(t *testing.T) {
 func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 	// No allowFiles → no work, no warnings. Important so callers can rely
 	// on a non-nil result implying actual user-specified files.
-	got := collectAllowFileWarnings(nil, nil, nil, nil, "/work")
+	got := collectAllowFileWarnings(nil, nil, nil, nil, "/work", true)
 	if got != nil {
 		t.Errorf("empty allowFiles should produce nil, got %+v", got)
 	}
-	got = collectAllowFileWarnings([]string{}, nil, nil, nil, "/work")
+	got = collectAllowFileWarnings([]string{}, nil, nil, nil, "/work", true)
 	if got != nil {
 		t.Errorf("empty allowFiles (non-nil slice) should still produce nil, got %+v", got)
 	}
@@ -985,6 +985,7 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 			{Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		configDir,
+		true,
 	)
 	if len(warnings) != 0 {
 		t.Fatalf("files scope miss should not emit warning, got %+v", warnings)
@@ -1009,6 +1010,7 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFileOutsideProgram(t *test
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		tspath.GetDirectoryPath(target),
+		true,
 	)
 	if len(warnings) != 0 {
 		t.Fatalf("existing files outside Program should be handled by fallback, got warnings %+v", warnings)
@@ -1025,6 +1027,7 @@ func TestCollectAllowFileWarnings_MissingFileWarns(t *testing.T) {
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		tspath.GetDirectoryPath(target),
+		true,
 	)
 	if len(warnings) != 1 {
 		t.Fatalf("expected one missing-file warning, got %+v", warnings)
@@ -1050,6 +1053,35 @@ func TestCollectAllowFileWarnings_GlobalIgnoreStillWarns(t *testing.T) {
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
 		configDir,
+		true,
+	)
+	if len(warnings) != 1 {
+		t.Fatalf("expected one warning, got %+v", warnings)
+	}
+	if warnings[0].Kind != allowFileIgnored {
+		t.Fatalf("expected allowFileIgnored, got %+v", warnings[0])
+	}
+}
+
+func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
+	dir := t.TempDir()
+	target := tspath.NormalizePath(filepath.Join(dir, "node_modules/pkg/a.ts"))
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatalf("mkdir target dir: %v", err)
+	}
+	if err := os.WriteFile(target, []byte("const value = 1;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	warnings := collectAllowFileWarnings(
+		[]string{target},
+		nil,
+		nil,
+		rslintconfig.RslintConfig{
+			{Rules: rslintconfig.Rules{"no-console": "error"}},
+		},
+		tspath.NormalizePath(dir),
+		true,
 	)
 	if len(warnings) != 1 {
 		t.Fatalf("expected one warning, got %+v", warnings)
@@ -1179,6 +1211,64 @@ func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 	}
 	if strings.Contains(stdout, "no-debugger") {
 		t.Fatalf("files-scope miss must not run no-debugger, stdout=%q", stdout)
+	}
+}
+
+func TestCLIExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
+		{ "files": ["**/*.ts"], "rules": { "no-debugger": "error" } }
+	]`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	explicit := tspath.NormalizePath(filepath.Join(dir, "explicit.js"))
+	if err := os.WriteFile(explicit, []byte("const = ;\n"), 0o644); err != nil {
+		t.Fatalf("write explicit file: %v", err)
+	}
+
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		Config:         "rslint.jsonc",
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+		AllowFiles:     []string{explicit},
+	})
+	if code != 0 {
+		t.Fatalf("expected explicit files-scope miss to exit cleanly, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "linted 1 file with 0 rules") {
+		t.Fatalf("expected the explicit file to be counted with zero matching rules, stdout=%q stderr=%q", stdout, stderr)
+	}
+	if strings.Contains(stdout, "TypeScript(") || strings.Contains(stderr, "TS1134") {
+		t.Fatalf("files-scope miss must not surface syntax diagnostics, stdout=%q stderr=%q", stdout, stderr)
+	}
+}
+
+func TestCLIExplicitMalformedFileWithRuleOverlayReportsSyntaxDiagnostic(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
+		{ "files": ["**/*.ts"], "rules": {} }
+	]`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	explicit := tspath.NormalizePath(filepath.Join(dir, "explicit.js"))
+	if err := os.WriteFile(explicit, []byte("const = ;\n"), 0o644); err != nil {
+		t.Fatalf("write explicit file: %v", err)
+	}
+
+	code, stdout, stderr := runLintPipelineForTest(t, dir, lintArgs{
+		Config:         "rslint.jsonc",
+		Format:         "default",
+		NoColor:        true,
+		SingleThreaded: true,
+		AllowFiles:     []string{explicit},
+		RuleFlags:      []string{"no-debugger:error"},
+	})
+	if code != 1 {
+		t.Fatalf("expected syntax diagnostic to fail, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "TypeScript(TS") || !strings.Contains(stdout, "explicit.js") {
+		t.Fatalf("expected syntax diagnostic for explicit.js, stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 

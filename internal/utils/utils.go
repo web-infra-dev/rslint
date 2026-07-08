@@ -383,7 +383,7 @@ var ExcludePaths = []string{"/node_modules/", "bundled:"}
 
 // DefaultExcludeDirNames contains directory names that are always excluded
 // from file scanning. This is the single source of truth for default directory
-// exclusions, used by DiscoverGapFiles and the no-tsconfig fallback.
+// exclusions used by lint target discovery and fallback Program roots.
 // Aligned with JS-side SCAN_EXCLUDE_DIRS: new Set(['node_modules', '.git']).
 var DefaultExcludeDirNames = []string{"node_modules", ".git"}
 

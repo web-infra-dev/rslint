@@ -722,6 +722,7 @@ func collectAllowFileWarnings(
 	configMap map[string]rslintconfig.RslintConfig,
 	rslintConfig rslintconfig.RslintConfig,
 	currentDirectory string,
+	useCaseSensitive bool,
 ) []allowFileWarning {
 	if len(allowFiles) == 0 {
 		return nil
@@ -753,7 +754,8 @@ func collectAllowFileWarnings(
 			cfgDir = currentDirectory
 			cfg = rslintConfig
 		}
-		if cfg != nil && cfg.IsFileIgnored(f, cfgDir) {
+		if rslintconfig.IsDefaultExcludedPath(f, cfgDir, useCaseSensitive) ||
+			(cfg != nil && cfg.IsFileIgnored(f, cfgDir)) {
 			out = append(out, allowFileWarning{Path: f, Kind: allowFileIgnored})
 			continue
 		}
@@ -1061,28 +1063,12 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// the same predicate used by the linter — blocked dirs' files
 			// are never linted, so their .gitignore patterns are irrelevant.
 			//
-			// Concurrency:
-			//   - When singleThreaded is set, both stages run sequentially in
-			//     the main goroutine (no goroutines spawned at all).
-			//   - Otherwise, gitignore reads run in parallel across configs
-			//     (independent FS reads via cachedvfs, which is concurrent-
-			//     safe). createProgramsForConfig still runs serially in the
-			//     main goroutine — typescript-go's API is invoked one config
-			//     at a time. The two stages overlap: gitignore goroutines
-			//     run alongside the createPrograms loop.
-			//
 			// configMap is NOT mutated by gitignore goroutines; results are
 			// collected via channel and merged in the main goroutine after
 			// the createPrograms loop, so the createPrograms loop sees the
 			// pre-augmentation entries (createProgramsForConfig only reads
 			// languageOptions.parserOptions.project — Ignores entries are
 			// no-ops for it; verified in LoadTsConfigsFromRslintConfig).
-			// Read each config's gitignore on the shared WorkGroup (honoring
-			// --singleThreaded). In the parallel path these overlap with the
-			// serial createProgramsForConfig loop below; that is safe because
-			// createProgramsForConfig only reads parserOptions.project, never
-			// Ignores, so observing the pre-augmentation configMap is fine.
-			// Results are merged after the loop — target discovery needs them.
 			type giResult struct {
 				configDir string
 				globs     []string
@@ -1218,7 +1204,17 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Program. Shared with the --api path via buildProgramsWithLintTargets, so
 	// target discovery, fallback creation, and type-aware gating stay aligned.
 	programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
-		programs, targetConfigMap, targetRslintConfig, currentDirectory, programConfigDirs, configTargetFiles, fs, allowFiles, allowDirs, parseCache, singleThreaded,
+		programs,
+		targetConfigMap,
+		targetRslintConfig,
+		currentDirectory,
+		programConfigDirs,
+		configTargetFiles,
+		fs,
+		allowFiles,
+		allowDirs,
+		parseCache,
+		singleThreaded,
 	)
 
 	// Initial build (including any fallback) is complete: evict cache
@@ -1298,13 +1294,31 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// Build per-program file filters for global ignores. Target ownership and
 	// deduplication were already resolved in targetsByProgram.
 	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
+	shouldReportLintSyntax := func(filePath string) bool {
+		if configMap != nil {
+			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
+			return cfg != nil && cfg.GetConfigForFile(filePath, cfgDir) != nil
+		}
+		return rslintConfig.GetConfigForFile(filePath, currentDirectory) != nil
+	}
 
-	// Programs not backed by a real tsconfig (the gap-file fallback AND the
-	// no-tsconfig directory-scan program) are excluded from --type-check: their
-	// CompilerOptions are synthesized defaults, not the user's tsconfig, so
-	// semantic diagnostics there would be unreliable. This honors the "Gap files"
-	// contract in website/docs/en/guide/type-checking.md.
+	// Programs not backed by a real tsconfig are excluded from --type-check:
+	// their CompilerOptions are synthesized defaults, not the user's tsconfig,
+	// so semantic diagnostics there would be unreliable. This includes the
+	// AST-only fallback used for selected files outside tsconfig coverage and
+	// for projects with no tsconfig at all, honoring the "Gap files" contract
+	// in website/docs/en/guide/type-checking.md.
 	skipTypeCheck := buildTypeCheckSkipMask(programs)
+	for _, diagnostic := range collectTargetSyntacticDiagnostics(
+		programs,
+		targetsByProgram,
+		skipTypeCheck,
+		typeCheck,
+		typeCheckOnly,
+		shouldReportLintSyntax,
+	) {
+		diagnosticsChan <- diagnostic
+	}
 
 	// In --type-check-only mode, skip the lint phase entirely by passing
 	// nil for GetRulesForFile. RunLinter's Phase 1 is gated on this being
@@ -1370,7 +1384,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// these are lint-phase concepts and would mislead users about Phase 2
 	// (which runs program-wide regardless of CLI scope and rslint ignores).
 	if !typeCheckOnly {
-		warnings := collectAllowFileWarnings(allowFiles, programs, configMap, rslintConfig, currentDirectory)
+		warnings := collectAllowFileWarnings(allowFiles, programs, configMap, rslintConfig, currentDirectory, fs.UseCaseSensitiveFileNames())
 		for _, w := range warnings {
 			fmt.Fprintln(os.Stderr, formatAllowFileWarning(w, comparePathOptions))
 		}
@@ -1411,6 +1425,14 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			fixTargetsByProgram := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fs)
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			var passDiags []rule.RuleDiagnostic
+			passDiags = append(passDiags, collectTargetSyntacticDiagnostics(
+				newPrograms,
+				fixTargetsByProgram,
+				fixSkipMask,
+				typeCheck,
+				typeCheckOnly,
+				shouldReportLintSyntax,
+			)...)
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,

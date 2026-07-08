@@ -195,8 +195,13 @@ The parser and program builder are tolerant enough to support editor and fallbac
 
 - ts-go can continue producing ASTs after syntax errors
 - LSP delays lint on rapid edits to avoid repeated work on broken intermediate text
-- fallback Programs for gap files are created leniently so parse failures there do not fail the whole run
-- CLI reports syntax diagnostics separately when program creation fails in the strict tsconfig-backed path
+- CLI/API create tsconfig-backed Programs leniently so plain lint can decide
+  syntax diagnostics from the final lint target set instead of failing during
+  broad tsconfig construction
+- `--type-check` and `--type-check-only` still surface TypeScript syntactic and
+  semantic diagnostics from the tsconfig-backed Program boundary
+- fallback Programs for selected files outside tsconfig coverage are AST-only
+  and intentionally skipped by the type-check phase
 
 ## 5. Abstract Syntax Tree (AST)
 
@@ -493,9 +498,9 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--lsp`: starts the LSP server
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
-4. **Program Creation**: Go builds one or more tsconfig-backed Programs, plus optional no-tsconfig Programs for projects without tsconfig coverage
+4. **Program Creation**: Go builds one or more tsconfig-backed Programs from configured or auto-detected tsconfigs
 5. **Lint Target Selection**: Go resolves the lint target set from CLI/API targets, config `files`, default lintable extensions, global ignores, and `.gitignore`
-6. **Program Binding**: selected files are bound to existing Programs when possible; selected files outside every Program are parsed through an AST-only fallback Program
+6. **Program Binding**: selected files are bound to existing Programs when possible; selected files outside every tsconfig-backed Program, including projects with no tsconfig, are parsed through an AST-only fallback Program
 7. **Rule Resolution**: `getRulesForFile` resolves enabled rules per selected file, filtering type-aware rules off no-type-info gap files
 8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a second program-level pass runs after Phase 1 and aggregates `tsc --noEmit`-aligned diagnostics through the internal `collectNoEmitDiagnostics()` helper
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
@@ -800,7 +805,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Config Entry**: One flat-config object whose `files`, `ignores`, `settings`, and `rules` participate in per-file config merging
 - **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and type-info requirement
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
-- **Fallback Program**: Extra `Program` created for no-tsconfig projects or for gap files; gap-file fallbacks are intentionally non-type-aware
+- **Fallback Program**: Extra AST-only `Program` created from selected lint targets that are not covered by any tsconfig-backed Program; fallback files are intentionally non-type-aware
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file
 - **Gap File**: A file matched by config but not present in any tsconfig-backed Program
 - **Inspector**: Auxiliary backend path that returns node, type, symbol, signature, and flow information for Playground inspection

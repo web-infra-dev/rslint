@@ -8,6 +8,50 @@ import {
 } from './helpers.js';
 
 describe('CLI config discovery (upward traversal)', () => {
+  test('invalid empty files array should fail before linting', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: [],
+          rules: { 'no-debugger': 'error' },
+        },
+      ];`,
+      'src/index.js': 'debugger;\n',
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('invalid config');
+      expect(result.stderr).toContain('"files" must be a non-empty array');
+      expect(result.stdout).not.toContain('no-debugger');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('invalid files value should fail before linting', async () => {
+    const tempDir = await createTempDir({
+      'rslint.config.mjs': `export default [
+        {
+          files: '**/*.js',
+          rules: { 'no-debugger': 'error' },
+        },
+      ];`,
+      'src/index.js': 'debugger;\n',
+    });
+    try {
+      const result = await runRslint(['--format', 'jsonline'], tempDir);
+
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr).toContain('invalid config');
+      expect(result.stderr).toContain('"files" must be an array');
+      expect(result.stdout).not.toContain('no-debugger');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('should find config in parent directory', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,

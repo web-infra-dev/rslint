@@ -176,6 +176,176 @@ func TestDiscoverGapFiles_AllowDirsScope(t *testing.T) {
 	assert.Equal(t, gapFiles[0], paths["scripts/b.ts"])
 }
 
+func TestDiscoverLintFiles_AllowDirsStartsWalkAtScopedRoot(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"packages/app/src/a.ts",
+		"packages/other/src/b.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+	appDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app"))
+	spy := &gitignoreSpyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{appDir}, true)
+
+	assert.DeepEqual(t, targets, []string{paths["packages/app/src/a.ts"]})
+
+	rootDir := tspath.NormalizePath(configDir)
+	otherDir := tspath.NormalizePath(filepath.Join(configDir, "packages/other"))
+	for _, accessed := range spy.accessedDirs {
+		if accessed == rootDir {
+			t.Fatalf("scoped walk should not open config root %s; accessed=%v", rootDir, spy.accessedDirs)
+		}
+		if strings.HasPrefix(accessed, otherDir) {
+			t.Fatalf("scoped walk should not enter sibling %s; accessed=%v", otherDir, spy.accessedDirs)
+		}
+	}
+}
+
+func TestDiscoverLintFiles_AllowDirsSkipsDefaultExcludedRoot(t *testing.T) {
+	configDir, _ := setupDiscoveryFixture(t, []string{
+		"node_modules/pkg/a.ts",
+		"src/a.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+	nodeModulesDir := tspath.NormalizePath(filepath.Join(configDir, "node_modules"))
+	spy := &spyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{nodeModulesDir}, true)
+
+	assert.DeepEqual(t, targets, []string{})
+	for _, accessed := range spy.snapshotAccessedDirs() {
+		if strings.Contains(accessed, "node_modules") {
+			t.Fatalf("default-excluded initial root should not be entered; accessed=%v", spy.snapshotAccessedDirs())
+		}
+	}
+}
+
+func TestDiscoverLintFiles_AllowDirsSkipsGloballyIgnoredRoot(t *testing.T) {
+	configDir, _ := setupDiscoveryFixture(t, []string{
+		"dist/a.ts",
+		"src/a.ts",
+	})
+
+	config := RslintConfig{
+		{Ignores: []string{"dist/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+	distDir := tspath.NormalizePath(filepath.Join(configDir, "dist"))
+	spy := &spyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{distDir}, true)
+
+	assert.DeepEqual(t, targets, []string{})
+	for _, accessed := range spy.snapshotAccessedDirs() {
+		if accessed == distDir || strings.HasPrefix(accessed, distDir+"/") {
+			t.Fatalf("globally ignored initial root should not be entered; accessed=%v", spy.snapshotAccessedDirs())
+		}
+	}
+}
+
+func TestDiscoverLintFiles_AllowDirsKeepsIgnoredRootWithNegation(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"dist/drop.ts",
+		"dist/keep.ts",
+	})
+
+	config := RslintConfig{
+		{Ignores: []string{"dist/**/*", "!dist/keep.ts"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+	distDir := tspath.NormalizePath(filepath.Join(configDir, "dist"))
+	spy := &spyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{distDir}, true)
+
+	assert.DeepEqual(t, targets, []string{paths["dist/keep.ts"]})
+	enteredDist := false
+	for _, accessed := range spy.snapshotAccessedDirs() {
+		if accessed == distDir {
+			enteredDist = true
+			break
+		}
+	}
+	assert.Assert(t, enteredDist, "negated ignored root must still be entered")
+}
+
+func TestDiscoverLintFiles_EmptyAllowDirsDoesNotWalk(t *testing.T) {
+	configDir, _ := setupDiscoveryFixture(t, []string{
+		"src/a.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+	spy := &spyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{}, true)
+
+	assert.Equal(t, len(targets), 0)
+	assert.Equal(t, len(spy.snapshotAccessedDirs()), 0)
+}
+
+func TestDiscoverLintFiles_ExplicitFileSkipsNestedDefaultExcludedDir(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"packages/app/node_modules/pkg/a.ts",
+		"src/a.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	targets := DiscoverLintFiles(
+		config,
+		configDir,
+		osvfs.FS(),
+		[]string{paths["packages/app/node_modules/pkg/a.ts"]},
+		nil,
+		true,
+	)
+
+	assert.DeepEqual(t, targets, []string{})
+}
+
+func TestDiscoverLintFiles_OverlappingAllowDirsWalkChildOnce(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"packages/app/src/a.ts",
+		"packages/app/src/nested/b.ts",
+		"packages/other/src/c.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+	appDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app"))
+	srcDir := tspath.NormalizePath(filepath.Join(configDir, "packages/app/src"))
+	spy := &spyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFiles(config, configDir, spy, nil, []string{appDir, srcDir}, true)
+
+	expected := []string{paths["packages/app/src/a.ts"], paths["packages/app/src/nested/b.ts"]}
+	assert.DeepEqual(t, targets, expected)
+
+	srcAccesses := 0
+	for _, accessed := range spy.snapshotAccessedDirs() {
+		if accessed == srcDir {
+			srcAccesses++
+		}
+	}
+	assert.Equal(t, srcAccesses, 1, "overlapping allowDirs should not walk child roots twice")
+}
+
+func TestIsFileInAllowedDirsHonorsCaseSensitivity(t *testing.T) {
+	assert.Assert(t, isFileInAllowedDirs("/Repo/Src/a.ts", []string{"/repo/src"}, false))
+	assert.Assert(t, !isFileInAllowedDirs("/Repo/Src/a.ts", []string{"/repo/src"}, true))
+}
+
 func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
@@ -353,6 +523,38 @@ func TestDiscoverLintFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 
 	expected := []string{rootPaths["root.ts"]}
 	assert.DeepEqual(t, targets, expected)
+}
+
+func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testing.T) {
+	rootDir, rootPaths := setupDiscoveryFixture(t, []string{
+		"root.ts",
+		"pkg/child.ts",
+	})
+	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
+
+	configMap := map[string]RslintConfig{
+		rootDir: {
+			{Files: []string{"**/*.ts"}, Rules: Rules{"root-rule": "error"}},
+		},
+		childDir: {
+			{Files: []string{"**/*.ts"}, Rules: Rules{"child-rule": "error"}},
+		},
+	}
+	spy := &spyFS{FS: osvfs.FS()}
+
+	targets := DiscoverLintFilesMultiConfig(configMap, spy, nil, []string{rootDir}, true)
+
+	expected := []string{rootPaths["pkg/child.ts"], rootPaths["root.ts"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, targets, expected)
+
+	childAccesses := 0
+	for _, accessed := range spy.snapshotAccessedDirs() {
+		if accessed == childDir {
+			childAccesses++
+		}
+	}
+	assert.Equal(t, childAccesses, 1, "child config directory should be entered only by its owning config")
 }
 
 func TestDiscoverGapFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
@@ -632,6 +834,14 @@ func (s *spyFS) snapshotAccessedDirs() []string {
 	return out
 }
 
+type caseInsensitiveSpyFS struct {
+	*spyFS
+}
+
+func (s *caseInsensitiveSpyFS) UseCaseSensitiveFileNames() bool {
+	return false
+}
+
 func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/index.ts",
@@ -649,6 +859,26 @@ func TestDiscoverGapFiles_PrunesNodeModulesAtWalkLevel(t *testing.T) {
 	for _, dir := range spy.snapshotAccessedDirs() {
 		if strings.Contains(dir, "node_modules") {
 			t.Errorf("node_modules directory was entered during walk (GetAccessibleEntries called for %s)", dir)
+		}
+	}
+}
+
+func TestDiscoverGapFiles_PrunesDefaultExcludesCaseInsensitive(t *testing.T) {
+	configDir, _ := setupDiscoveryFixture(t, []string{
+		"src/index.ts",
+		"Node_Modules/pkg/index.ts",
+	})
+
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	spy := &caseInsensitiveSpyFS{spyFS: &spyFS{FS: osvfs.FS()}}
+	DiscoverGapFiles(config, configDir, spy, map[string]struct{}{}, nil, nil, true)
+
+	for _, dir := range spy.snapshotAccessedDirs() {
+		if strings.Contains(dir, "Node_Modules") {
+			t.Errorf("Node_Modules directory was entered on case-insensitive FS (GetAccessibleEntries called for %s)", dir)
 		}
 	}
 }

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"sort"
@@ -10,9 +10,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/vfsmatch"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -74,8 +74,10 @@ func parallelGitignoreAndPrograms(
 	return rslintConfig, progs, 0
 }
 
-// createProgramsForConfig creates TypeScript programs for a single config entry.
-// It handles tsconfig extraction, auto-detection, deduplication, and the no-tsconfig fallback.
+// createProgramsForConfig creates tsconfig-backed TypeScript programs for a
+// single config entry. Configs without a tsconfig deliberately return no
+// Program here; buildProgramsWithLintTargets later creates an AST-only fallback
+// from the final files-driven lint target set.
 // seenTsConfigs is used for cross-config tsconfig deduplication (pass nil to skip).
 // Returns the created programs or an error exit code (> 0).
 func createProgramsForConfig(
@@ -95,50 +97,22 @@ func createProgramsForConfig(
 	var programs []*compiler.Program
 	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 
-	if len(tsConfigs) > 0 {
-		for _, tc := range tsConfigs {
-			// Cross-config deduplication
-			if seenTsConfigs != nil {
-				normalized := tspath.NormalizePath(tc)
-				if _, exists := seenTsConfigs[normalized]; exists {
-					continue
-				}
-				seenTsConfigs[normalized] = struct{}{}
+	for _, tc := range tsConfigs {
+		// Cross-config deduplication
+		if seenTsConfigs != nil {
+			normalized := tspath.NormalizePath(tc)
+			if _, exists := seenTsConfigs[normalized]; exists {
+				continue
 			}
+			seenTsConfigs[normalized] = struct{}{}
+		}
 
-			program, err := utils.CreateProgram(singleThreaded, fsys, configDir, tc, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, tspath.ComparePathsOptions{
-					CurrentDirectory:          configDir,
-					UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-				}) {
-					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-				}
-				return nil, 1
-			}
-			programs = append(programs, program)
+		program, err := utils.CreateProgramLenient(singleThreaded, fsys, configDir, tc, host)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+			return nil, 1
 		}
-	} else {
-		// No tsconfig fallback: scan directory for pure JS projects
-		sourceExts := rslintconfig.DefaultLintFileExtensions
-		excludes := utils.DefaultExcludeDirNames
-		includes := []string{"**/*"}
-		rootFiles := vfsmatch.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, vfsmatch.UnlimitedDepth)
-		if len(rootFiles) > 0 {
-			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, tspath.ComparePathsOptions{
-					CurrentDirectory:          configDir,
-					UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-				}) {
-					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
-				}
-				return nil, 1
-			}
-			programs = append(programs, program)
-		}
+		programs = append(programs, program)
 	}
 
 	return programs, 0
@@ -156,10 +130,12 @@ func createFallbackProgram(
 ) (*compiler.Program, int) {
 	host := utils.WithParseCache(utils.CreateCompilerHost(configDir, fsys), parseCache)
 	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
-		Target:  core.ScriptTargetESNext,
-		Module:  core.ModuleKindESNext,
-		Jsx:     core.JsxEmitPreserve,
-		AllowJs: core.TSTrue,
+		Target:    core.ScriptTargetESNext,
+		Module:    core.ModuleKindESNext,
+		Jsx:       core.JsxEmitPreserve,
+		AllowJs:   core.TSTrue,
+		NoLib:     core.TSTrue,
+		NoResolve: core.TSTrue,
 	}, gapFiles, host)
 	if err != nil {
 		// Non-fatal: gap files failing to parse should not block the entire run.
@@ -174,10 +150,10 @@ func createFallbackProgram(
 // AST-only fallback Program for selected files absent from every existing
 // Program, and returns the per-program target plan consumed by RunLinter.
 //
-// The appended fallback Program (like the no-tsconfig directory-scan Program)
-// carries synthesized CompilerOptions with no ConfigFilePath, which is how
-// buildTypeCheckSkipMask later recognizes and excludes it from the CLI
-// --type-check phase — no index needs to be threaded out of here.
+// The appended fallback Program carries synthesized CompilerOptions with no
+// ConfigFilePath, which is how buildTypeCheckSkipMask later recognizes and
+// excludes it from the CLI --type-check phase — no index needs to be threaded
+// out of here.
 //
 // The type-info set is captured from the tsconfig Programs BEFORE the fallback
 // is appended, so fallback files are deliberately absent from it. That absence
@@ -227,7 +203,7 @@ func buildProgramsWithLintTargets(
 	if len(gapFiles) > 0 {
 		// Build type-info set from existing (tsconfig) Programs BEFORE
 		// appending the fallback, so fallback files are NOT in this set.
-		typeInfoFiles = utils.CollectProgramFiles(programs, fs, singleThreaded)
+		typeInfoFiles = programFiles
 		capturedGapFiles = gapFiles
 
 		fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache)
@@ -255,7 +231,7 @@ func discoverLintFilesMultiConfig(
 
 	seen := make(map[string]struct{})
 	var allTargets []string
-	for configDir, cfg := range configMap {
+	for configDir := range configMap {
 		configAllowFiles := allowFiles
 		configAllowDirs := allowDirs
 		if targetFiles, scoped := configTargetFiles[configDir]; scoped {
@@ -263,12 +239,8 @@ func discoverLintFilesMultiConfig(
 			configAllowDirs = nil
 		}
 
-		targets := rslintconfig.DiscoverLintFiles(cfg, configDir, fs, configAllowFiles, configAllowDirs, singleThreaded)
+		targets := rslintconfig.DiscoverLintFilesForConfigInMap(configMap, configDir, fs, configAllowFiles, configAllowDirs, singleThreaded)
 		for _, f := range targets {
-			ownerDir, _ := rslintconfig.FindNearestConfig(f, configMap)
-			if ownerDir != configDir {
-				continue
-			}
 			if _, exists := seen[f]; !exists {
 				seen[f] = struct{}{}
 				allTargets = append(allTargets, f)
@@ -405,19 +377,13 @@ func toFileFilters(in []func(string) bool) []linter.FileFilter {
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which
 // programs must be excluded from the type-check phase. A program is skipped
 // when it was NOT built from a real tsconfig on disk — i.e. its CompilerOptions
-// carry no ConfigFilePath. That covers both synthetic-options program kinds:
-//
-//   - the no-tsconfig directory-scan Program (createProgramsForConfig's else
-//     branch), built with default options for a config directory that has no
-//     tsconfig; and
-//   - the gap-file fallback Program (createFallbackProgram).
+// carry no ConfigFilePath. That covers the AST-only fallback Program used for
+// selected files absent from every tsconfig-backed Program, including projects
+// with no tsconfig at all.
 //
 // Their options are synthesized, not the user's tsconfig, so semantic
-// diagnostics there are unreliable and must not be surfaced. Concretely, the
-// scan program sets neither Target nor Lib, so its default lib can lack modern
-// globals like Symbol.asyncDispose and emit spurious diagnostics against
-// typings pulled in from node_modules. This mirrors the type-checking boundary:
-// only Programs backed by parserOptions.project or the auto-detected
+// diagnostics there are unreliable and must not be surfaced. This mirrors the
+// type-checking boundary: only Programs backed by parserOptions.project or the auto-detected
 // tsconfig.json participate in program-level --type-check diagnostics. Programs
 // built via utils.CreateProgram -> GetParsedCommandLineOfConfigFile carry a
 // non-empty ConfigFilePath.
@@ -437,4 +403,79 @@ func buildTypeCheckSkipMask(programs []*compiler.Program) []bool {
 		}
 	}
 	return mask
+}
+
+type syntacticDiagnosticKey struct {
+	path string
+	code int32
+	pos  int
+	end  int
+}
+
+func collectTargetSyntacticDiagnostics(
+	programs []*compiler.Program,
+	targetsByProgram [][]string,
+	skipTypeCheck []bool,
+	typeCheck bool,
+	typeCheckOnly bool,
+	shouldReportForFile func(string) bool,
+) []rule.RuleDiagnostic {
+	if len(programs) == 0 || len(targetsByProgram) == 0 {
+		return nil
+	}
+
+	seen := make(map[syntacticDiagnosticKey]struct{})
+	var diagnostics []rule.RuleDiagnostic
+	for i, program := range programs {
+		// When --type-check runs, tsconfig-backed Programs surface syntactic
+		// diagnostics through the type-check phase. Synthetic Programs are
+		// skipped there, so plain lint still needs to report their target
+		// syntax errors. In --type-check-only, lint-phase diagnostics stay off.
+		coveredByTypeCheck := typeCheck && (i >= len(skipTypeCheck) || !skipTypeCheck[i])
+		if coveredByTypeCheck || typeCheckOnly {
+			continue
+		}
+		if i >= len(targetsByProgram) || len(targetsByProgram[i]) == 0 {
+			continue
+		}
+
+		targets := make(map[string]struct{}, len(targetsByProgram[i]))
+		for _, target := range targetsByProgram[i] {
+			targets[target] = struct{}{}
+		}
+
+		ctx := context.Background()
+		for target := range targets {
+			if shouldReportForFile != nil && !shouldReportForFile(target) {
+				continue
+			}
+			file := program.GetSourceFile(target)
+			if file == nil {
+				continue
+			}
+			for _, diagnostic := range program.GetSyntacticDiagnostics(ctx, file) {
+				loc := diagnostic.Loc()
+				key := syntacticDiagnosticKey{
+					path: file.FileName(),
+					code: diagnostic.Code(),
+					pos:  loc.Pos(),
+					end:  loc.End(),
+				}
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+				diagnostics = append(diagnostics, rule.RuleDiagnostic{
+					RuleName:     fmt.Sprintf("TypeScript(TS%d)", diagnostic.Code()),
+					SourceFile:   file,
+					FilePath:     file.FileName(),
+					Range:        loc,
+					Message:      rule.RuleMessage{Description: diagnostic.String()},
+					Severity:     rule.SeverityError,
+					PreFormatted: true,
+				})
+			}
+		}
+	}
+	return diagnostics
 }

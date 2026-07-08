@@ -66,13 +66,10 @@ func containsTSDiagnostic(diags []rule.RuleDiagnostic, code string) bool {
 	return false
 }
 
-func TestTypeCheck_SkipsNoTsconfigFallbackPrograms(t *testing.T) {
+func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 	dir := t.TempDir()
 	writeProgramTestFiles(t, dir, map[string]string{
-		"rslint.config.ts": `import type { Bad } from './bad';
-export default [{ files: ['**/*.ts'], rules: {} }] satisfies Bad;
-`,
-		"bad.d.ts": `export type Bad = MissingGlobalType;
+		"bad.ts": `const bad: number = "oops";
 `,
 	})
 
@@ -88,25 +85,45 @@ export default [{ files: ['**/*.ts'], rules: {} }] satisfies Bad;
 	if exitCode != 0 {
 		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
 	}
+	if len(programs) != 0 {
+		t.Fatalf("expected no tsconfig-backed programs, got %d", len(programs))
+	}
+
+	programs, typeInfoFiles, gapFiles, _, _ := buildProgramsWithLintTargets(
+		programs,
+		nil,
+		rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}}},
+		dir,
+		nil,
+		nil,
+		fs,
+		nil,
+		nil,
+		utils.NewParseCache(),
+		true,
+	)
 	if len(programs) != 1 {
-		t.Fatalf("expected one synthesized fallback program, got %d", len(programs))
+		t.Fatalf("expected one files-driven fallback program, got %d", len(programs))
+	}
+	if len(gapFiles) == 0 {
+		t.Fatalf("expected files-driven fallback roots, got %v", gapFiles)
+	}
+	if typeInfoFiles == nil || len(typeInfoFiles) != 0 {
+		t.Fatalf("expected empty type-info set for no-tsconfig fallback, got %v", typeInfoFiles)
 	}
 	if got := programs[0].Options().ConfigFilePath; got != "" {
-		t.Fatalf("expected synthesized fallback program to have no ConfigFilePath, got %q", got)
+		t.Fatalf("expected files-driven fallback program to have no ConfigFilePath, got %q", got)
+	}
+	if !programs[0].Options().NoLib.IsTrue() || !programs[0].Options().NoResolve.IsTrue() {
+		t.Fatalf("expected files-driven fallback to stay AST-only, got options %+v", programs[0].Options())
 	}
 	skip := buildTypeCheckSkipMask(programs)
 	if len(skip) != 1 || !skip[0] {
 		t.Fatalf("expected no-tsconfig fallback program to be skipped for type-check, got %v", skip)
 	}
 
-	if diags := collectProgramTypeDiagnostics(t, programs, skip, nil); containsTSDiagnostic(diags, "TS2304") {
-		t.Fatalf("did not expect declaration diagnostics from a no-tsconfig fallback program: %+v", diags)
-	}
-
-	// Prove the fixture is capable of surfacing the bad declaration if the
-	// synthesized Program is not skipped. This pins the regression directly.
-	if diags := collectProgramTypeDiagnostics(t, programs, nil, nil); !containsTSDiagnostic(diags, "TS2304") {
-		t.Fatalf("expected TS2304 without the skip mask, got: %+v", diags)
+	if diags := collectProgramTypeDiagnostics(t, programs, skip, typeInfoFiles); containsTSDiagnostic(diags, "TS2322") {
+		t.Fatalf("did not expect semantic diagnostics from a no-tsconfig fallback program: %+v", diags)
 	}
 }
 
@@ -235,6 +252,9 @@ export const value: Bad | null = null;
 	}
 	if got := programs[1].Options().ConfigFilePath; got != "" {
 		t.Fatalf("expected gap fallback program to have no ConfigFilePath, got %q", got)
+	}
+	if !programs[1].Options().NoLib.IsTrue() || !programs[1].Options().NoResolve.IsTrue() {
+		t.Fatalf("expected gap fallback to stay AST-only, got options %+v", programs[1].Options())
 	}
 	skip := buildTypeCheckSkipMask(programs)
 	if len(skip) != 2 || skip[0] || !skip[1] {
