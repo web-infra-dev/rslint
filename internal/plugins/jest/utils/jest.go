@@ -193,6 +193,10 @@ func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
 	if node == nil {
 		return nil
 	}
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return nil
+	}
 
 	switch node.Kind {
 	case ast.KindIdentifier:

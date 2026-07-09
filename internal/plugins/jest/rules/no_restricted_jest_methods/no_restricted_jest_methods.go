@@ -54,6 +54,7 @@ func parseOptions(options any) map[string]restrictedMethod {
 		if !ok {
 			continue
 		}
+
 		if message == "" {
 			restricted[method] = restrictedMethod{}
 			continue
@@ -73,9 +74,18 @@ func isNestedJestFnCall(node *ast.Node) bool {
 		return false
 	}
 
-	return node.Parent.Kind == ast.KindCallExpression ||
-		node.Parent.Kind == ast.KindPropertyAccessExpression ||
-		node.Parent.Kind == ast.KindElementAccessExpression
+	parent := node.Parent
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+
+	if parent == nil {
+		return false
+	}
+
+	return parent.Kind == ast.KindCallExpression ||
+		parent.Kind == ast.KindPropertyAccessExpression ||
+		parent.Kind == ast.KindElementAccessExpression
 }
 
 var NoRestrictedJestMethodsRule = rule.Rule{

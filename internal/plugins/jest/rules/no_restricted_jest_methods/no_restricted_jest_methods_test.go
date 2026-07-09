@@ -26,6 +26,13 @@ func TestNoRestrictedJestMethodsRule(t *testing.T) {
 jest;
 `,
 			},
+			{
+				Code: `const jest = { fn: () => {} };
+jest.fn();`,
+				Options: []interface{}{
+					map[string]interface{}{"fn": nil},
+				},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -85,6 +92,20 @@ jest;
 				},
 			},
 			{
+				Code: `(jest.fn)()`,
+				Options: []interface{}{
+					map[string]interface{}{"fn": nil},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "restrictedJestMethod",
+						Message:   "Use of `fn` is disallowed",
+						Line:      1,
+						Column:    7,
+					},
+				},
+			},
+			{
 				Code: `jest.mock()`,
 				Options: []interface{}{
 					map[string]interface{}{"mock": "Do not use mocks"},
@@ -114,6 +135,23 @@ jest;
 			},
 			{
 				Code: `import { jest } from '@jest/globals';
+
+jest.advanceTimersByTime();
+`,
+				Options: []interface{}{
+					map[string]interface{}{"advanceTimersByTime": nil},
+				},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "restrictedJestMethod",
+						Message:   "Use of `advanceTimersByTime` is disallowed",
+						Line:      3,
+						Column:    6,
+					},
+				},
+			},
+			{
+				Code: `const { jest } = require('@jest/globals');
 
 jest.advanceTimersByTime();
 `,
