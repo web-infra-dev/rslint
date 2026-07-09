@@ -120,6 +120,33 @@ func TestNoRestrictedGlobalsExtras(t *testing.T) {
 				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
 			},
 
+			// ---- Dimension 4: null/boolean/BigInt computed keys ----
+			// ESLint's astUtils.getStaticStringValue resolves `null`/`true`/`false`
+			// literals (via node.value) and BigInt literals (via node.bigint) to
+			// their string form, so `window[null]` is equivalent to `window["null"]`.
+			// Regression test for a gap found in utils.GetStaticExpressionValue,
+			// which originally only handled string/numeric/template/regex literals.
+			{
+				Code:    `window[null]()`,
+				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"null"}, "checkGlobalObject": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
+			},
+			{
+				Code:    `window[true]()`,
+				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"true"}, "checkGlobalObject": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
+			},
+			{
+				Code:    `window[false]()`,
+				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"false"}, "checkGlobalObject": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 13}},
+			},
+			{
+				Code:    `window[123n]()`,
+				Options: []interface{}{map[string]interface{}{"globals": []interface{}{"123"}, "checkGlobalObject": true}},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "defaultMessage", Line: 1, Column: 8, EndLine: 1, EndColumn: 12}},
+			},
+
 			// ---- Dimension 4: nesting — a reference outside every declaring function is not shadowed ----
 			{
 				Code:    `function outer() { function inner() { var foo; } } foo;`,

@@ -1428,10 +1428,13 @@ func NormalizeBigIntLiteral(text string) string {
 //   - NoSubstitutionTemplateLiteral: returns the template text
 //   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
 //     matching JavaScript's implicit toString coercion when used as a property key
+//   - NullKeyword / TrueKeyword / FalseKeyword: return "null" / "true" / "false"
+//   - BigIntLiteral: returns the normalized decimal string (e.g. "1n" → "1")
 //
 // This is the expression-level complement to [GetStaticPropertyName]:
 // use GetStaticPropertyName for property name nodes (object keys, class members),
 // and GetStaticExpressionValue for value positions (element access arguments, etc.).
+// Mirrors ESLint's `astUtils.getStaticStringValue`.
 func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 	if node == nil {
 		return "", false
@@ -1445,6 +1448,14 @@ func GetStaticExpressionValue(node *ast.Node) (string, bool) {
 		return node.AsNoSubstitutionTemplateLiteral().Text, true
 	case ast.KindRegularExpressionLiteral:
 		return node.AsRegularExpressionLiteral().Text, true
+	case ast.KindNullKeyword:
+		return "null", true
+	case ast.KindTrueKeyword:
+		return "true", true
+	case ast.KindFalseKeyword:
+		return "false", true
+	case ast.KindBigIntLiteral:
+		return NormalizeBigIntLiteral(node.AsBigIntLiteral().Text), true
 	}
 	return "", false
 }

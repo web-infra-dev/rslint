@@ -194,10 +194,11 @@ func staticMemberProperty(node *ast.Node) (string, *ast.Node, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
-		if name == nil || name.Kind != ast.KindIdentifier {
+		propName, ok := utils.GetStaticPropertyName(name)
+		if !ok {
 			return "", nil, false
 		}
-		return name.AsIdentifier().Text, name, true
+		return propName, name, true
 	case ast.KindElementAccessExpression:
 		arg := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
 		val, ok := utils.GetStaticExpressionValue(arg)
