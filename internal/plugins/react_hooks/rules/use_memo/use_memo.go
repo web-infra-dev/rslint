@@ -53,7 +53,7 @@ var UseMemoRule = rule.Rule{
 
 func (state *useMemoState) processCallExpression(node *ast.Node) {
 	call := node.AsCallExpression()
-	if call == nil || !state.isUseMemoCallee(call.Expression) {
+	if call == nil || !react_hooksutil.IsManualUseMemoCallee(call.Expression, state.ctx.TypeChecker) {
 		return
 	}
 
@@ -78,93 +78,6 @@ func (state *useMemoState) processCallExpression(node *ast.Node) {
 
 	state.checkCallback(callback)
 	state.checkDependencyList(args.Nodes)
-}
-
-func (state *useMemoState) isUseMemoCallee(node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindIdentifier:
-		return state.isManualMemoIdentifier(node, "useMemo")
-	case ast.KindPropertyAccessExpression:
-		if ast.IsOptionalChain(node) {
-			return false
-		}
-		name := node.AsPropertyAccessExpression().Name()
-		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useMemo" {
-			return false
-		}
-		obj := ast.SkipParentheses(node.AsPropertyAccessExpression().Expression)
-		if obj == nil || obj.Kind != ast.KindIdentifier {
-			return false
-		}
-		return state.isManualMemoIdentifier(obj, "React")
-	}
-	return false
-}
-
-func (state *useMemoState) isManualMemoIdentifier(id *ast.Node, expected string) bool {
-	if id == nil || id.Kind != ast.KindIdentifier || id.AsIdentifier().Text != expected {
-		return false
-	}
-	if state.ctx.TypeChecker == nil {
-		return true
-	}
-	sym := utils.GetReferenceSymbol(id, state.ctx.TypeChecker)
-	if sym == nil || len(sym.Declarations) == 0 {
-		return true
-	}
-	for _, decl := range sym.Declarations {
-		if isManualMemoDeclaration(decl, expected) {
-			return true
-		}
-	}
-	return false
-}
-
-func isManualMemoDeclaration(decl *ast.Node, expected string) bool {
-	if decl == nil {
-		return false
-	}
-	switch decl.Kind {
-	case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier:
-		return true
-	case ast.KindBindingElement:
-		return !isInsideParameter(decl)
-	case ast.KindVariableDeclaration:
-		name := decl.Name()
-		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != expected {
-			return false
-		}
-		initializer := ast.SkipParentheses(decl.AsVariableDeclaration().Initializer)
-		if initializer == nil {
-			return true
-		}
-		if expected == "useMemo" && ast.IsFunctionExpressionOrArrowFunction(initializer) {
-			return false
-		}
-		if expected == "React" && initializer.Kind == ast.KindObjectLiteralExpression {
-			return false
-		}
-		return true
-	case ast.KindParameter, ast.KindFunctionDeclaration:
-		return false
-	}
-	return false
-}
-
-func isInsideParameter(node *ast.Node) bool {
-	for cur := node; cur != nil; cur = cur.Parent {
-		switch cur.Kind {
-		case ast.KindParameter:
-			return true
-		case ast.KindVariableDeclaration:
-			return false
-		}
-	}
-	return false
 }
 
 func (state *useMemoState) checkCallback(callback *ast.Node) {
