@@ -87,7 +87,15 @@ var PreferComparisonMatcherRule = rule.Rule{
 					return
 				}
 
-				matcherArgs := node.AsCallExpression().Arguments.Nodes
+				matcherEntry := jestFnCall.MatcherEntry
+				if matcherEntry.Node == nil ||
+					matcherEntry.Node.Parent == nil ||
+					matcherEntry.Call == nil ||
+					node != matcherEntry.Call {
+					return
+				}
+
+				matcherArgs := matcherEntry.Call.AsCallExpression().Arguments.Nodes
 				if len(matcherArgs) == 0 {
 					return
 				}
@@ -101,11 +109,6 @@ var PreferComparisonMatcherRule = rule.Rule{
 				preferredMatcher := matchers.matcher
 				if matcherValue == slices.Contains(jestFnCall.Modifiers, "not") {
 					preferredMatcher = matchers.negatedMatcher
-				}
-
-				matcherEntry := jestFnCall.MatcherEntry
-				if matcherEntry.Node == nil || matcherEntry.Node.Parent == nil {
-					return
 				}
 
 				comparison := ast.SkipParentheses(expectArgs[0])

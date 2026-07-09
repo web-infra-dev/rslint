@@ -266,6 +266,33 @@ ruleTester.run(`prefer-comparison-matcher`, {} as never, {
     { code: 'expect(5 != a).toBe(true)' },
     { code: 'expect(a == "string").toBe(true)' },
     { code: 'expect(a == "string").not.toBe(true)' },
+    { code: 'expect(value > 1)[matcher].toBe(true);' },
+    { code: 'expect(value > 1)[foo()].toBe(true);' },
   ],
-  invalid: [],
+  invalid: [
+    {
+      code: 'expect(value > 1).toBe(true).toString();',
+      output: 'expect(value).toBeGreaterThan(1).toString();',
+      errors: [
+        {
+          messageId: 'useToBeComparison',
+          data: { preferredMatcher: 'toBeGreaterThan' },
+          column: 19,
+          line: 1,
+        },
+      ],
+    },
+    {
+      code: 'expect(value > 1).toBe(true).foo(false);',
+      output: 'expect(value).toBeGreaterThan(1).foo(false);',
+      errors: [
+        {
+          messageId: 'useToBeComparison',
+          data: { preferredMatcher: 'toBeGreaterThan' },
+          column: 19,
+          line: 1,
+        },
+      ],
+    },
+  ],
 });

@@ -197,6 +197,8 @@ func TestPreferComparisonMatcherRule(t *testing.T) {
 		rule_tester.ValidTestCase{Code: `expect(5 != a).toBe(true)`},
 		rule_tester.ValidTestCase{Code: `expect(a == "string").toBe(true)`},
 		rule_tester.ValidTestCase{Code: `expect(a == "string").not.toBe(true)`},
+		rule_tester.ValidTestCase{Code: `expect(value > 1)[matcher].toBe(true);`},
+		rule_tester.ValidTestCase{Code: `expect(value > 1)[foo()].toBe(true);`},
 	)
 
 	invalidCases = append(invalidCases,
@@ -219,6 +221,20 @@ func TestPreferComparisonMatcherRule(t *testing.T) {
 			Output: []string{`expect(a).toBeGreaterThan((b, c));`},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "useToBeComparison", Line: 1, Column: 20},
+			},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   `expect(value > 1).toBe(true).toString();`,
+			Output: []string{`expect(value).toBeGreaterThan(1).toString();`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useToBeComparison", Line: 1, Column: 19},
+			},
+		},
+		rule_tester.InvalidTestCase{
+			Code:   `expect(value > 1).toBe(true).foo(false);`,
+			Output: []string{`expect(value).toBeGreaterThan(1).foo(false);`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useToBeComparison", Line: 1, Column: 19},
 			},
 		},
 	)
