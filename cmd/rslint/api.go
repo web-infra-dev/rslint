@@ -169,6 +169,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	programs, typeInfoFiles, _, _, targetsByProgram := buildProgramsWithLintTargets(
 		programs, nil, rslintConfig, configDirectory, nil, nil, fs, allowedFiles, nil, parseCache, false,
 	)
+	fileConfigResolver := rslintconfig.NewFileConfigResolver(rslintConfig, configDirectory, true)
 
 	// Collect diagnostics and source files
 	var diagnostics []api.Diagnostic
@@ -297,7 +298,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// explicit file excluded by the only matching entry is still a lint result,
 	// but runs zero rules through GetActiveRulesForFile.
 	shouldReportLintSyntax := func(filePath string) bool {
-		return rslintConfig.GetConfigForFile(filePath, configDirectory) != nil
+		return fileConfigResolver.ConfigForFile(filePath) != nil
 	}
 	for _, diagnostic := range collectTargetSyntacticDiagnostics(programs, targetsByProgram, nil, false, false, shouldReportLintSyntax) {
 		diagnosticCollector(diagnostic)
@@ -336,7 +337,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, sourceFile.FileName(), configDirectory, true, typeInfoFiles)
+			return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName(), typeInfoFiles)
 		},
 		OnDiagnostic: diagnosticCollector,
 	})

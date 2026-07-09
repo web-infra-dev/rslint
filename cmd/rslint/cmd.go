@@ -893,7 +893,7 @@ func parseLintFlags(argv []string) (args lintArgs, help bool, fatalExitCode int)
 			// config matching, dir scoping, and gitignore checks.
 			// Edge cases (e.g. user passes a symlink-resolved absolute path)
 			// are handled by isFileAllowed's os.SameFile fallback in linter.go
-			// and CollectProgramFiles's Realpath'd keys in create_program.go.
+			// and program file index realpath aliases during target binding.
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {
@@ -1279,27 +1279,22 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	}()
 
 	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
+	fileConfigResolver := newLintConfigResolver(
+		configMap,
+		rslintConfig,
+		currentDirectory,
+		enforcePlugins,
+		typeInfoFiles,
+	)
 	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-		filePath := sourceFile.FileName()
-		if configMap != nil {
-			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
-			if cfg == nil {
-				return nil
-			}
-			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(cfg, filePath, cfgDir, enforcePlugins, typeInfoFiles)
-		}
-		return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, filePath, currentDirectory, enforcePlugins, typeInfoFiles)
+		return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
 	}
 
 	// Target discovery already excluded default paths, global ignores, and
 	// .gitignore entries. Target ownership and deduplication were already
 	// resolved in targetsByProgram.
 	shouldReportLintSyntax := func(filePath string) bool {
-		if configMap != nil {
-			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
-			return cfg != nil && cfg.GetConfigForFile(filePath, cfgDir) != nil
-		}
-		return rslintConfig.GetConfigForFile(filePath, currentDirectory) != nil
+		return fileConfigResolver.ConfigForFile(filePath) != nil
 	}
 
 	// Programs not backed by a real tsconfig are excluded from --type-check:
@@ -1349,10 +1344,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// feature.
 	hasEslintPlugins := len(args.EslintPlugins) > 0
 	pluginResolver := pluginConfigResolver{
-		configMap:         configMap,
+		lintResolver:      fileConfigResolver,
 		originalConfigDir: originalConfigDir,
-		rslintConfig:      rslintConfig,
-		currentDirectory:  currentDirectory,
 	}
 	var pluginCh <-chan []rule.RuleDiagnostic
 	if hasEslintPlugins {
@@ -1419,7 +1412,8 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint: collect remaining diagnostics.
-			fixTargetsByProgram := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fs)
+			fixProgramIndex := buildProgramFileIndex(newPrograms, fs, singleThreaded)
+			fixTargetsByProgram := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fixProgramIndex)
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			var passDiags []rule.RuleDiagnostic
 			passDiags = append(passDiags, collectTargetSyntacticDiagnostics(

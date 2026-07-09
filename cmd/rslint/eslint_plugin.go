@@ -11,17 +11,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-// pluginConfigResolver bundles everything needed to resolve, per file, the
-// eslint-plugin wire configKey + merged config. configMap/originalConfigDir are
-// the multi-config maps (normalized dir → entries, and normalized dir → the raw
-// dir the JS host sent); rslintConfig/currentDirectory are the single-config
-// fallback (which never mounts plugins). Bundling them keeps the normalized-vs-
-// raw two-map duality private to resolve().
+// pluginConfigResolver resolves the eslint-plugin wire configKey plus the
+// cached merged config for a file. lintResolver owns nearest-config selection;
+// originalConfigDir maps a normalized config dir back to the raw key the JS host
+// registered its worker pool under.
 type pluginConfigResolver struct {
-	configMap         map[string]rslintconfig.RslintConfig
+	lintResolver      *lintConfigResolver
 	originalConfigDir map[string]string
-	rslintConfig      rslintconfig.RslintConfig
-	currentDirectory  string
 }
 
 // resolve returns the worker wire configKey + merged config for filePath. Go
@@ -30,18 +26,18 @@ type pluginConfigResolver struct {
 // that is what the Node worker keys its plugin map on. POSIX / single-config
 // fall back to the normalized key, where raw == normalized.
 func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *rslintconfig.MergedConfig) {
-	if r.configMap != nil {
-		cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, r.configMap)
-		if cfg == nil {
-			return "", nil
-		}
-		wireKey = cfgDir
-		if raw, ok := r.originalConfigDir[cfgDir]; ok {
-			wireKey = raw
-		}
-		return wireKey, cfg.GetConfigForFile(filePath, cfgDir)
+	if r.lintResolver == nil {
+		return "", nil
 	}
-	return r.currentDirectory, r.rslintConfig.GetConfigForFile(filePath, r.currentDirectory)
+	cfgDir, resolver, ok := r.lintResolver.resolverForFile(filePath)
+	if !ok {
+		return "", nil
+	}
+	wireKey = cfgDir
+	if raw, ok := r.originalConfigDir[cfgDir]; ok {
+		wireKey = raw
+	}
+	return wireKey, resolver.ConfigForFile(filePath)
 }
 
 // buildPluginFileInputs collects, from RunLinter's lint targets, the files that

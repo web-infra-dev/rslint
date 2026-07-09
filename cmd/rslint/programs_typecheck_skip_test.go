@@ -323,3 +323,82 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 		t.Fatalf("expected lib.ts bound to the tsconfig Program, got %v", targetsByProgram)
 	}
 }
+
+func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *testing.T) {
+	realDir := t.TempDir()
+	linkDir := filepath.Join(filepath.Dir(realDir), filepath.Base(realDir)+"-link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	defer os.Remove(linkDir)
+
+	writeProgramTestFiles(t, realDir, map[string]string{
+		"src/a.ts":      "export const a = 1;\n",
+		"tsconfig.json": `{"include": ["src/a.ts"]}`,
+	})
+
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	parseCache := utils.NewParseCache()
+	cfg := rslintconfig.RslintConfig{{
+		Files: []string{"**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{
+			ParserOptions: &rslintconfig.ParserOptions{
+				Project: rslintconfig.ProjectPaths{"./tsconfig.json"},
+			},
+		},
+		Rules: rslintconfig.Rules{"no-debugger": "error"},
+	}}
+
+	linkDir = tspath.NormalizePath(linkDir)
+	realTarget := tspath.NormalizePath(filepath.Join(realDir, "src/a.ts"))
+	programs, exitCode := createProgramsForConfig(linkDir, cfg, true, fs, nil, parseCache)
+	if exitCode != 0 {
+		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
+	}
+	if len(programs) != 1 {
+		t.Fatalf("expected one tsconfig-backed program, got %d", len(programs))
+	}
+
+	var sourceName string
+	for _, sf := range programs[0].GetSourceFiles() {
+		if strings.HasSuffix(sf.FileName(), "/src/a.ts") {
+			sourceName = sf.FileName()
+			break
+		}
+	}
+	if sourceName == "" {
+		t.Fatal("expected program to include src/a.ts")
+	}
+	if sourceName == realTarget {
+		t.Skip("compiler already canonicalized source file to realpath")
+	}
+
+	programs, typeInfoFiles, gapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+		programs,
+		nil,
+		cfg,
+		linkDir,
+		nil,
+		nil,
+		fs,
+		[]string{realTarget},
+		nil,
+		parseCache,
+		true,
+	)
+	if len(programs) != 1 {
+		t.Fatalf("realpath target should reuse existing Program, got %d programs", len(programs))
+	}
+	if len(gapFiles) != 0 {
+		t.Fatalf("realpath target should not become a gap file, got %v", gapFiles)
+	}
+	if typeInfoFiles != nil {
+		t.Fatalf("no fallback appended, so typeInfoFiles should stay nil, got %v", typeInfoFiles)
+	}
+	if len(targetFiles) != 1 || targetFiles[0] != realTarget {
+		t.Fatalf("expected realpath target as the only discovered target, got %v", targetFiles)
+	}
+	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 || targetsByProgram[0][0] != sourceName {
+		t.Fatalf("expected realpath target to bind back to source name %q, got %v", sourceName, targetsByProgram)
+	}
+}

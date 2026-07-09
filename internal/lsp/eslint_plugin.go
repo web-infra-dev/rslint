@@ -76,7 +76,8 @@ func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *str
 	configKey := s.pluginConfigKeyForURI(uri)
 	filePath := uriToPath(uri)
 
-	enabledRules, merged := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, filePath, configCwd, isJSConfig)
+	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, configCwd, isJSConfig)
+	enabledRules, merged := fileConfigResolver.EnabledRulesForFile(filePath)
 	if merged == nil {
 		// File is globally ignored — no plugin (or native) diagnostics.
 		return linter.EslintPluginFileInput{}, false

@@ -183,7 +183,7 @@ func buildProgramsWithLintTargets(
 	var typeInfoFiles map[string]struct{}
 	var capturedGapFiles []string
 
-	programFiles := utils.CollectProgramFiles(programs, fs, singleThreaded)
+	programIndex := buildProgramFileIndex(programs, fs, singleThreaded)
 
 	var targetFiles []string
 	if configMap != nil {
@@ -194,7 +194,7 @@ func buildProgramsWithLintTargets(
 
 	gapFiles := make([]string, 0, len(targetFiles))
 	for _, target := range targetFiles {
-		if _, inProgram := programFiles[target]; !inProgram {
+		if _, inProgram := programIndex.files[target]; !inProgram {
 			gapFiles = append(gapFiles, target)
 		}
 	}
@@ -202,16 +202,17 @@ func buildProgramsWithLintTargets(
 	if len(gapFiles) > 0 {
 		// Build type-info set from existing (tsconfig) Programs BEFORE
 		// appending the fallback, so fallback files are NOT in this set.
-		typeInfoFiles = programFiles
+		typeInfoFiles = cloneStringSet(programIndex.files)
 		capturedGapFiles = gapFiles
 
 		fallback, _ := createFallbackProgram(gapFiles, singleThreaded, currentDirectory, fs, parseCache)
 		if fallback != nil {
+			addProgramToFileIndex(&programIndex, fallback, len(programs), fs, singleThreaded)
 			programs = append(programs, fallback)
 		}
 	}
 
-	targetsByProgram := assignLintTargetsToPrograms(programs, configMap, programConfigDirs, targetFiles, fs)
+	targetsByProgram := assignLintTargetsToPrograms(programs, configMap, programConfigDirs, targetFiles, programIndex)
 
 	return programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram
 }
@@ -255,6 +256,96 @@ type programFileCandidate struct {
 	fileName     string
 }
 
+type programFileIndex struct {
+	files  map[string]struct{}
+	byPath map[string][]programFileCandidate
+}
+
+type indexedProgram struct {
+	program      *compiler.Program
+	programIndex int
+}
+
+func buildProgramFileIndex(programs []*compiler.Program, fs vfs.FS, singleThreaded bool) programFileIndex {
+	index := programFileIndex{
+		files:  make(map[string]struct{}),
+		byPath: make(map[string][]programFileCandidate),
+	}
+	indexedPrograms := make([]indexedProgram, 0, len(programs))
+	for i, program := range programs {
+		indexedPrograms = append(indexedPrograms, indexedProgram{
+			program:      program,
+			programIndex: i,
+		})
+	}
+	addProgramsToFileIndex(&index, indexedPrograms, fs, singleThreaded)
+	return index
+}
+
+func addProgramToFileIndex(index *programFileIndex, program *compiler.Program, programIndex int, fs vfs.FS, singleThreaded bool) {
+	addProgramsToFileIndex(index, []indexedProgram{{
+		program:      program,
+		programIndex: programIndex,
+	}}, fs, singleThreaded)
+}
+
+func addProgramsToFileIndex(index *programFileIndex, programs []indexedProgram, fs vfs.FS, singleThreaded bool) {
+	if len(programs) == 0 {
+		return
+	}
+
+	candidatesByName := make(map[string][]programFileCandidate)
+	names := make([]string, 0)
+	for _, entry := range programs {
+		if entry.program == nil {
+			continue
+		}
+		for _, sf := range entry.program.GetSourceFiles() {
+			name := sf.FileName()
+			candidate := programFileCandidate{programIndex: entry.programIndex, fileName: name}
+			index.files[name] = struct{}{}
+			index.byPath[name] = append(index.byPath[name], candidate)
+			if _, seen := candidatesByName[name]; !seen {
+				names = append(names, name)
+			}
+			candidatesByName[name] = append(candidatesByName[name], candidate)
+		}
+	}
+	if fs == nil || len(candidatesByName) == 0 {
+		return
+	}
+
+	resolved := make([]string, len(names))
+	wg := core.NewWorkGroup(singleThreaded)
+	for i := range names {
+		wg.Queue(func() {
+			if realPath := fs.Realpath(names[i]); realPath != "" && realPath != names[i] {
+				resolved[i] = realPath
+			}
+		})
+	}
+	wg.RunAndWait()
+
+	for i, realPath := range resolved {
+		if realPath == "" {
+			continue
+		}
+		index.files[realPath] = struct{}{}
+		index.byPath[realPath] = append(index.byPath[realPath], candidatesByName[names[i]]...)
+	}
+}
+
+func cloneStringSet(set map[string]struct{}) map[string]struct{} {
+	if set == nil {
+		return nil
+	}
+	cloned := make(map[string]struct{}, len(set))
+	for key := range set {
+		cloned[key] = struct{}{}
+	}
+	return cloned
+}
+
 // assignLintTargetsToPrograms binds resolved lint targets to exactly one
 // Program. It accepts imported non-root SourceFiles; ownership/dedup is driven
 // by the target plan, not by CommandLine().FileNames().
@@ -263,30 +354,16 @@ func assignLintTargetsToPrograms(
 	configMap map[string]rslintconfig.RslintConfig,
 	programConfigDirs []string,
 	targetFiles []string,
-	fs vfs.FS,
+	programIndex programFileIndex,
 ) [][]string {
 	targetsByProgram := make([][]string, len(programs))
 	if len(programs) == 0 || len(targetFiles) == 0 {
 		return targetsByProgram
 	}
 
-	byPath := make(map[string][]programFileCandidate)
-	for i, prog := range programs {
-		for _, sf := range prog.GetSourceFiles() {
-			name := sf.FileName()
-			candidate := programFileCandidate{programIndex: i, fileName: name}
-			byPath[name] = append(byPath[name], candidate)
-			if fs != nil {
-				if realPath := fs.Realpath(name); realPath != "" && realPath != name {
-					byPath[realPath] = append(byPath[realPath], candidate)
-				}
-			}
-		}
-	}
-
 	seenProgramFile := make([]map[string]struct{}, len(programs))
 	for _, target := range targetFiles {
-		candidates := byPath[target]
+		candidates := programIndex.byPath[target]
 		if len(candidates) == 0 {
 			continue
 		}

@@ -27,7 +27,10 @@ func TestPluginConfigResolver_NormalizedMatchRawWireKey(t *testing.T) {
 	norm := tspath.NormalizePath(raw) // "C:/proj"
 
 	// Windows: file matches on the normalized key, wire key is the RAW string.
-	r := pluginConfigResolver{configMap: p.ConfigMap, originalConfigDir: p.OriginalConfigDir}
+	r := pluginConfigResolver{
+		lintResolver:      newLintConfigResolver(p.ConfigMap, nil, "", false, nil),
+		originalConfigDir: p.OriginalConfigDir,
+	}
 	wireKey, merged := r.resolve(norm + "/src/a.ts")
 	if wireKey != raw {
 		t.Errorf("wire configKey = %q, want RAW %q (not the normalized %q)", wireKey, raw, norm)
@@ -38,7 +41,13 @@ func TestPluginConfigResolver_NormalizedMatchRawWireKey(t *testing.T) {
 
 	// POSIX / no raw mapping: wireKey falls back to the (already-slash) key.
 	posix := pluginConfigResolver{
-		configMap: map[string]rslintconfig.RslintConfig{"/posix/proj": p.ConfigMap[norm]},
+		lintResolver: newLintConfigResolver(
+			map[string]rslintconfig.RslintConfig{"/posix/proj": p.ConfigMap[norm]},
+			nil,
+			"",
+			false,
+			nil,
+		),
 	}
 	if wk, m := posix.resolve("/posix/proj/a.ts"); wk != "/posix/proj" || m == nil {
 		t.Errorf("POSIX fallback: wireKey=%q merged-nil=%v, want /posix/proj + non-nil", wk, m == nil)
@@ -110,14 +119,74 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 	}
 
 	// Multi-config, file under no config -> ("", nil).
-	r := pluginConfigResolver{configMap: p.ConfigMap, originalConfigDir: p.OriginalConfigDir}
+	r := pluginConfigResolver{
+		lintResolver:      newLintConfigResolver(p.ConfigMap, nil, "", false, nil),
+		originalConfigDir: p.OriginalConfigDir,
+	}
 	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
 		t.Errorf("no-match -> (\"\",nil), got (%q, nil=%v)", wk, m == nil)
 	}
 
 	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
-	single := pluginConfigResolver{rslintConfig: p.ConfigMap["/proj"], currentDirectory: "/proj"}
+	single := pluginConfigResolver{
+		lintResolver: newLintConfigResolver(nil, p.ConfigMap["/proj"], "/proj", false, nil),
+	}
 	if wk, m := single.resolve("/proj/a.ts"); wk != "/proj" || m == nil {
 		t.Errorf("single-config -> (currentDirectory, merged), got (%q, nil=%v)", wk, m == nil)
 	}
+}
+
+func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
+	rslintconfig.RegisterAllRules()
+
+	configMap := map[string]rslintconfig.RslintConfig{
+		"/repo": {{
+			Files: []string{"**/*.ts"},
+			Rules: rslintconfig.Rules{"no-console": "error"},
+		}},
+		"/repo/packages/app": {{
+			Files: []string{"**/*.ts"},
+			Rules: rslintconfig.Rules{
+				"@typescript-eslint/require-await": "error",
+				"no-debugger":                      "error",
+			},
+		}},
+	}
+	typeInfoFiles := map[string]struct{}{
+		"/repo/packages/app/src/typed.ts": {},
+	}
+	resolver := newLintConfigResolver(configMap, nil, "", false, typeInfoFiles)
+
+	gapRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/packages/app/src/gap.ts"))
+	if gapRules["@typescript-eslint/require-await"] {
+		t.Fatal("expected type-aware app rule to be filtered for file without type info")
+	}
+	if !gapRules["no-debugger"] {
+		t.Fatal("expected nearest app config to enable no-debugger")
+	}
+	if gapRules["no-console"] {
+		t.Fatal("did not expect parent config rule for file owned by nearest app config")
+	}
+
+	typedRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/packages/app/src/typed.ts"))
+	if !typedRules["@typescript-eslint/require-await"] || !typedRules["no-debugger"] {
+		t.Fatalf("expected typed app file to keep both app rules, got %v", typedRules)
+	}
+
+	rootRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/root.ts"))
+	if !rootRules["no-console"] || rootRules["no-debugger"] {
+		t.Fatalf("expected root file to use root config only, got %v", rootRules)
+	}
+
+	if rules := resolver.ActiveRulesForFile("/outside/a.ts"); len(rules) != 0 {
+		t.Fatalf("expected file outside every config to have no rules, got %v", rules)
+	}
+}
+
+func configuredRuleNameSet(rules []linter.ConfiguredRule) map[string]bool {
+	names := make(map[string]bool, len(rules))
+	for _, r := range rules {
+		names[r.Name] = true
+	}
+	return names
 }

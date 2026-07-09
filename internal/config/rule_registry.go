@@ -48,8 +48,17 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 		return nil, nil // file is globally ignored
 	}
 
-	globals := ExtractGlobals(mergedConfig.LanguageOptions)
+	return r.GetEnabledRulesForMergedConfig(mergedConfig, enforcePlugins), mergedConfig
+}
 
+// GetEnabledRulesForMergedConfig converts an already-resolved config into
+// enabled rule handlers without re-running files/ignores matching.
+func (r *RuleRegistry) GetEnabledRulesForMergedConfig(mergedConfig *MergedConfig, enforcePlugins bool) []linter.ConfiguredRule {
+	if mergedConfig == nil {
+		return nil
+	}
+
+	globals := ExtractGlobals(mergedConfig.LanguageOptions)
 	var enabledRules []linter.ConfiguredRule
 	for ruleName, ruleConfig := range mergedConfig.Rules {
 		if ruleConfig.IsEnabled() {
@@ -90,7 +99,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	return enabledRules, mergedConfig
+	return enabledRules
 }
 
 // GetActiveRulesForFile returns the lint rules that should run on a file.

@@ -766,8 +766,9 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 	if rslintConfig.IsFileIgnored(filename, cwd) {
 		return []rule.RuleDiagnostic{}, nil
 	}
+	fileConfigResolver := config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins)
 	// Files outside the config's `files` set should not spin up TypeScript LS.
-	if rslintConfig.GetConfigForFile(filename, cwd) == nil {
+	if fileConfigResolver.ConfigForFile(filename) == nil {
 		return []rule.RuleDiagnostic{}, nil
 	}
 
@@ -814,7 +815,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		Program: program,
 		File:    filename,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return lspActiveRulesForFile(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins, hasTypeInfo)
+			return fileConfigResolver.ActiveRulesForFileHasTypeInfo(sourceFile.FileName(), hasTypeInfo)
 		},
 		OnDiagnostic: diagnosticCollector,
 	})
@@ -826,11 +827,8 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 }
 
 func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
-	activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, filePath, cwd, enforcePlugins)
-	if !hasTypeInfo {
-		activeRules = linter.FilterNonTypeAwareRules(activeRules)
-	}
-	return activeRules
+	return config.NewFileConfigResolver(rslintConfig, cwd, enforcePlugins).
+		ActiveRulesForFileHasTypeInfo(filePath, hasTypeInfo)
 }
 
 // Helper function to check if two ranges overlap
