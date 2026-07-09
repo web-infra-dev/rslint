@@ -122,13 +122,8 @@ type exportKey struct {
 }
 
 func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, seen map[exportKey]bool) (bool, bool) {
-	resolved := ctx.Program.GetResolvedModuleFromModuleSpecifier(origin, moduleSpecifier)
-	if resolved == nil || resolved.ResolvedFileName == "" {
-		return false, false
-	}
-
-	sourceFile := ctx.Program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)
-	if sourceFile == nil {
+	_, sourceFile, ok := ResolveSourceFileFromSourceFile(ctx, origin, moduleSpecifier)
+	if !ok {
 		return false, false
 	}
 	if IsImportPathIgnored(ctx.Settings, sourceFile.FileName()) {
@@ -143,13 +138,8 @@ func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier 
 		return nil, false
 	}
 
-	resolved := ctx.Program.GetResolvedModuleFromModuleSpecifier(origin, moduleSpecifier)
-	if resolved == nil || resolved.ResolvedFileName == "" {
-		return nil, false
-	}
-
-	sourceFile := ctx.Program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)
-	if sourceFile == nil {
+	_, sourceFile, ok := ResolveSourceFileFromSourceFile(ctx, origin, moduleSpecifier)
+	if !ok {
 		return nil, false
 	}
 	if IsImportPathIgnored(ctx.Settings, sourceFile.FileName()) {

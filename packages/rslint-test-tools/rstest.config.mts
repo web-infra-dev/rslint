@@ -130,6 +130,8 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/first.test.ts',
     './tests/eslint-plugin-import/rules/namespace.test.ts',
     './tests/eslint-plugin-import/rules/newline-after-import.test.ts',
+    './tests/eslint-plugin-import/rules/no-cycle.test.ts',
+    './tests/eslint-plugin-import/rules/no-default-export.test.ts',
     './tests/eslint-plugin-import/rules/no-duplicates.test.ts',
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-mutable-exports.test.ts',
@@ -213,6 +215,10 @@ export default defineConfig({
     './tests/eslint-plugin-react-hooks/rules/exhaustive-deps.test.ts',
     './tests/eslint-plugin-react-hooks/rules/component-hook-factories.test.ts',
     './tests/eslint-plugin-react-hooks/rules/error-boundaries.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/globals.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/immutability.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/incompatible-library.test.ts',
+    './tests/eslint-plugin-react-hooks/rules/use-memo.test.ts',
 
     // eslint-plugin-jsx-a11y
     './tests/eslint-plugin-jsx-a11y/rules/alt-text.test.ts',

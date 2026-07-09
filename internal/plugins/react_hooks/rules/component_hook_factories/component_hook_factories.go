@@ -4,16 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/react_hooksutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
-
-type componentHookFactoriesOptions struct {
-	hookPattern *regexp2.Regexp
-}
 
 // ComponentHookFactoriesRule is the rslint port of upstream
 // `react-hooks/component-hook-factories`.
@@ -25,9 +19,8 @@ type componentHookFactoriesOptions struct {
 var ComponentHookFactoriesRule = rule.Rule{
 	Name: "react-hooks/component-hook-factories",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
 		check := func(node *ast.Node) {
-			validateNoDynamicallyCreatedComponentsOrHooks(ctx, node, opts)
+			validateNoDynamicallyCreatedComponentsOrHooks(ctx, node)
 		}
 		return rule.RuleListeners{
 			ast.KindFunctionDeclaration: check,
@@ -37,27 +30,7 @@ var ComponentHookFactoriesRule = rule.Rule{
 	},
 }
 
-func parseOptions(raw any) componentHookFactoriesOptions {
-	optsMap := utils.GetOptionsMap(raw)
-	if optsMap == nil {
-		return componentHookFactoriesOptions{}
-	}
-	environment, ok := optsMap["environment"].(map[string]interface{})
-	if !ok {
-		return componentHookFactoriesOptions{}
-	}
-	pattern, ok := environment["hookPattern"].(string)
-	if !ok || pattern == "" {
-		return componentHookFactoriesOptions{}
-	}
-	compiled, err := utils.CompileRegexp2(pattern, utils.JSRegexOptions)
-	if err != nil {
-		return componentHookFactoriesOptions{}
-	}
-	return componentHookFactoriesOptions{hookPattern: compiled}
-}
-
-func validateNoDynamicallyCreatedComponentsOrHooks(ctx rule.RuleContext, fn *ast.Node, opts componentHookFactoriesOptions) {
+func validateNoDynamicallyCreatedComponentsOrHooks(ctx rule.RuleContext, fn *ast.Node) {
 	if isInsideClass(fn) {
 		return
 	}
@@ -72,9 +45,7 @@ func validateNoDynamicallyCreatedComponentsOrHooks(ctx rule.RuleContext, fn *ast
 	}
 
 	walkDirectChildren(fn, func(nestedFn *ast.Node) {
-		nestedType := react_hooksutil.GetCompilerReactFunctionType(nestedFn, react_hooksutil.CompilerFunctionOptions{
-			HookPattern: opts.hookPattern,
-		})
+		nestedType := react_hooksutil.GetCompilerReactFunctionType(nestedFn)
 		if nestedType == "" {
 			return
 		}

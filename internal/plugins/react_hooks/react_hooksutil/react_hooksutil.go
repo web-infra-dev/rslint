@@ -17,7 +17,6 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/dlclark/regexp2"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -28,10 +27,6 @@ const (
 	CompilerReactFunctionComponent CompilerReactFunctionType = "Component"
 	CompilerReactFunctionHook      CompilerReactFunctionType = "Hook"
 )
-
-type CompilerFunctionOptions struct {
-	HookPattern *regexp2.Regexp
-}
 
 // hookNameTailRegex matches the suffix part of a hook identifier:
 // after the leading `use`, the next character must be uppercase Latin
@@ -158,24 +153,18 @@ func IsHookCallee(node *ast.Node) bool {
 
 // IsCompilerHookCallee is the React Compiler variant of IsHookCallee:
 // it accepts `useFoo` / `Namespace.useFoo`, but not the bare `use`.
-func IsCompilerHookCallee(node *ast.Node, hookPattern *regexp2.Regexp) bool {
+func IsCompilerHookCallee(node *ast.Node) bool {
 	if node == nil {
 		return false
-	}
-	isHookName := func(name string) bool {
-		if hookPattern != nil {
-			return utils.Regexp2MatchString(hookPattern, name)
-		}
-		return IsCompilerHookName(name)
 	}
 	n := ast.SkipParentheses(node)
 	switch n.Kind {
 	case ast.KindIdentifier:
-		return isHookName(n.AsIdentifier().Text)
+		return IsCompilerHookName(n.AsIdentifier().Text)
 	case ast.KindPropertyAccessExpression:
 		pae := n.AsPropertyAccessExpression()
 		prop := pae.Name()
-		if prop == nil || prop.Kind != ast.KindIdentifier || !isHookName(prop.AsIdentifier().Text) {
+		if prop == nil || prop.Kind != ast.KindIdentifier || !IsCompilerHookName(prop.AsIdentifier().Text) {
 			return false
 		}
 		obj := ast.SkipParentheses(pae.Expression)
@@ -194,30 +183,195 @@ func IsCompilerFunctionKind(node *ast.Node) bool {
 	return ast.IsFunctionDeclaration(node) || ast.IsFunctionExpressionOrArrowFunction(node)
 }
 
+// AccessChainRootIdentifier returns the identifier at the root of an access
+// chain like `value.x.y` or `(value as T)["x"]`.
+func AccessChainRootIdentifier(node *ast.Node) *ast.Node {
+	node = utils.SkipAssertionsAndParens(node)
+	for node != nil && ast.IsAccessExpression(node) {
+		node = utils.SkipAssertionsAndParens(utils.AccessExpressionObject(node))
+	}
+	if node != nil && node.Kind == ast.KindIdentifier {
+		return node
+	}
+	return nil
+}
+
+// ImportSpecifierImportedName returns the module-exported name for an import
+// specifier. For `import {foo as bar}`, this is `foo`; for `import {bar}`,
+// this is `bar`.
+func ImportSpecifierImportedName(spec *ast.ImportSpecifier) string {
+	if spec == nil {
+		return ""
+	}
+	name := spec.Name()
+	if spec.PropertyName != nil {
+		name = spec.PropertyName
+	}
+	return moduleExportNameText(name)
+}
+
+func moduleExportNameText(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral:
+		return node.Text()
+	}
+	return ""
+}
+
+// AssignmentTargetIdentifier is a binding written by an assignment target.
+// Identifier points at the actual identifier node, while Node is the broader
+// target to report when destructuring defaults need the full assignment node.
+type AssignmentTargetIdentifier struct {
+	Identifier *ast.Node
+	Node       *ast.Node
+	Name       string
+}
+
+// CollectAssignmentTargetIdentifiers returns every identifier written by an
+// assignment target, including nested array/object destructuring targets and
+// default values in destructuring patterns. It only peels parentheses, matching
+// the upstream globals rule's assignment-target handling.
+func CollectAssignmentTargetIdentifiers(node *ast.Node) []AssignmentTargetIdentifier {
+	var targets []AssignmentTargetIdentifier
+	collectAssignmentTargetIdentifiersInto(node, &targets, false)
+	return targets
+}
+
+// CollectAssignmentTargetIdentifiersThroughAssertions is the same assignment
+// target collector, but it also peels TS assertion wrappers before matching the
+// target shape.
+func CollectAssignmentTargetIdentifiersThroughAssertions(node *ast.Node) []AssignmentTargetIdentifier {
+	var targets []AssignmentTargetIdentifier
+	collectAssignmentTargetIdentifiersInto(node, &targets, true)
+	return targets
+}
+
+func collectAssignmentTargetIdentifiersInto(node *ast.Node, targets *[]AssignmentTargetIdentifier, throughAssertions bool) {
+	node = skipAssignmentTargetWrappers(node, throughAssertions)
+	if node == nil {
+		return
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		appendAssignmentTargetIdentifier(targets, node, node)
+	case ast.KindObjectLiteralExpression:
+		obj := node.AsObjectLiteralExpression()
+		if obj == nil || obj.Properties == nil {
+			return
+		}
+		for _, prop := range obj.Properties.Nodes {
+			switch prop.Kind {
+			case ast.KindShorthandPropertyAssignment:
+				shorthand := prop.AsShorthandPropertyAssignment()
+				name := prop.Name()
+				if shorthand != nil && shorthand.ObjectAssignmentInitializer != nil {
+					appendAssignmentTargetIdentifier(targets, name, prop)
+					continue
+				}
+				collectAssignmentTargetIdentifiersInto(name, targets, throughAssertions)
+			case ast.KindPropertyAssignment:
+				assignment := prop.AsPropertyAssignment()
+				if assignment != nil {
+					collectAssignmentTargetIdentifiersInto(assignment.Initializer, targets, throughAssertions)
+				}
+			case ast.KindSpreadAssignment:
+				spread := prop.AsSpreadAssignment()
+				if spread != nil {
+					collectAssignmentTargetIdentifiersInto(spread.Expression, targets, throughAssertions)
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		array := node.AsArrayLiteralExpression()
+		if array == nil || array.Elements == nil {
+			return
+		}
+		for _, elem := range array.Elements.Nodes {
+			collectAssignmentTargetIdentifiersInto(elem, targets, throughAssertions)
+		}
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+			return
+		}
+		left := skipAssignmentTargetWrappers(binary.Left, throughAssertions)
+		if left != nil && left.Kind == ast.KindIdentifier {
+			appendAssignmentTargetIdentifier(targets, left, node)
+			return
+		}
+		collectAssignmentTargetIdentifiersInto(left, targets, throughAssertions)
+	case ast.KindSpreadElement:
+		spread := node.AsSpreadElement()
+		if spread != nil {
+			collectAssignmentTargetIdentifiersInto(spread.Expression, targets, throughAssertions)
+		}
+	}
+}
+
+func skipAssignmentTargetWrappers(node *ast.Node, throughAssertions bool) *ast.Node {
+	if throughAssertions {
+		return utils.SkipAssertionsAndParens(node)
+	}
+	return ast.SkipParentheses(node)
+}
+
+func appendAssignmentTargetIdentifier(targets *[]AssignmentTargetIdentifier, id, reportNode *ast.Node) {
+	if id == nil || id.Kind != ast.KindIdentifier {
+		return
+	}
+	name := id.AsIdentifier().Text
+	if name == "" {
+		return
+	}
+	if reportNode == nil {
+		reportNode = id
+	}
+	*targets = append(*targets, AssignmentTargetIdentifier{
+		Identifier: id,
+		Node:       reportNode,
+		Name:       name,
+	})
+}
+
+// ContainsNode reports whether `descendant` is inside `ancestor` in the same
+// source file.
+func ContainsNode(ancestor, descendant *ast.Node) bool {
+	if ancestor == nil || descendant == nil {
+		return false
+	}
+	if descendant.Pos() < ancestor.Pos() || descendant.End() > ancestor.End() {
+		return false
+	}
+	return ast.GetSourceFileOfNode(ancestor) == ast.GetSourceFileOfNode(descendant)
+}
+
 // GetCompilerReactFunctionType mirrors the React Compiler classifier used by
 // the Factories diagnostic: a PascalCase function is a component only when it
 // directly creates JSX or calls a hook, has component-like parameters, and does
 // not return obviously non-ReactNode values; a hook-like function must directly
 // create JSX or call a hook; memo/forwardRef callbacks are components.
-func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) CompilerReactFunctionType {
+func GetCompilerReactFunctionType(fn *ast.Node) CompilerReactFunctionType {
 	name := GetFunctionName(fn)
 	if name != nil && name.Kind == ast.KindIdentifier && IsComponentNameStr(name.AsIdentifier().Text) {
-		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) &&
+		if CallsHooksOrCreatesJsx(fn) &&
 			IsValidCompilerComponentParams(fn) &&
 			!ReturnsCompilerNonNode(fn) {
 			return CompilerReactFunctionComponent
 		}
 		return ""
 	}
-	if name != nil && IsCompilerHookCallee(name, opts.HookPattern) {
-		if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+	if name != nil && IsCompilerHookCallee(name) {
+		if CallsHooksOrCreatesJsx(fn) {
 			return CompilerReactFunctionHook
 		}
 		return ""
 	}
 	if ast.IsFunctionExpressionOrArrowFunction(fn) {
 		if IsForwardRefOrMemoCallback(fn, "forwardRef") || IsForwardRefOrMemoCallback(fn, "memo") {
-			if CallsHooksOrCreatesJsx(fn, opts.HookPattern) {
+			if CallsHooksOrCreatesJsx(fn) {
 				return CompilerReactFunctionComponent
 			}
 		}
@@ -228,7 +382,7 @@ func GetCompilerReactFunctionType(fn *ast.Node, opts CompilerFunctionOptions) Co
 // CallsHooksOrCreatesJsx reports whether `fn` directly creates JSX or directly
 // calls a compiler hook. Nested function bodies are skipped, matching React
 // Compiler's traversal boundary.
-func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
+func CallsHooksOrCreatesJsx(fn *ast.Node) bool {
 	found := false
 	var walk func(*ast.Node)
 	walk = func(node *ast.Node) {
@@ -243,7 +397,7 @@ func CallsHooksOrCreatesJsx(fn *ast.Node, hookPattern *regexp2.Regexp) bool {
 			return
 		}
 		if ast.IsCallExpression(node) {
-			if IsCompilerHookCallee(node.AsCallExpression().Expression, hookPattern) {
+			if IsCompilerHookCallee(node.AsCallExpression().Expression) {
 				found = true
 				return
 			}
@@ -350,19 +504,10 @@ func IsCompilerNonNode(node *ast.Node) bool {
 	return ast.IsBigIntLiteral(n)
 }
 
-// IsFunctionLikeContainer reports whether `node` is one of the
-// function-like kinds the upstream rules treat as a "code path"
-// boundary.
+// IsFunctionLikeContainer keeps the react-hooks shared API while delegating to
+// the repository-wide function-scope boundary helper.
 func IsFunctionLikeContainer(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-	switch node.Kind {
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-		ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
-		return true
-	}
-	return false
+	return utils.IsFunctionLikeContainer(node)
 }
 
 // FindEnclosingFunction walks up from `node` and returns the nearest
@@ -496,11 +641,11 @@ func GetFunctionName(fn *ast.Node) *ast.Node {
 	return nil
 }
 
-// GetForwardRefOrMemoCallbackCall returns the CallExpression when `fn` is the
-// immediate argument of a call whose callee is `<name>` or `React.<name>`.
+// GetReactCallbackCall returns the CallExpression when `fn` is the immediate
+// argument of a call whose callee is `<name>` or `React.<name>`.
 // Parenthesized callback expressions are transparent: `memo((() => null))` is
 // the same callback shape as `memo(() => null)`.
-func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
+func GetReactCallbackCall(fn *ast.Node, name string) *ast.Node {
 	if fn == nil {
 		return nil
 	}
@@ -532,6 +677,12 @@ func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
 		return nil
 	}
 	return p
+}
+
+// GetForwardRefOrMemoCallbackCall is kept for existing callers that only check
+// React's `memo` / `forwardRef` callback shapes.
+func GetForwardRefOrMemoCallbackCall(fn *ast.Node, name string) *ast.Node {
+	return GetReactCallbackCall(fn, name)
 }
 
 // IsForwardRefOrMemoCallback reports whether `fn` is the immediate

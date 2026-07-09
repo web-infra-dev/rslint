@@ -96,7 +96,6 @@ func IsWriteReference(node *ast.Node) bool {
 		// ...x in object destructuring assignment context
 		return IsInDestructuringAssignment(parent)
 
-
 	case ast.KindForInStatement, ast.KindForOfStatement:
 		// for (x in obj) / for (x of arr) — x is a write target
 		stmt := parent.AsForInOrOfStatement()
@@ -192,4 +191,38 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 		current = current.Parent
 	}
 	return false
+}
+
+// IsDefaultValueInDestructuringAssignment checks whether node is a
+// BinaryExpression(=) used as a default value inside a destructuring assignment
+// target, such as `x = 5` in `[x = 5] = values` or `y = 5` in
+// `({x: y = 5} = value)`.
+func IsDefaultValueInDestructuringAssignment(node *ast.Node) bool {
+	if node == nil || node.Kind != ast.KindBinaryExpression {
+		return false
+	}
+	binary := node.AsBinaryExpression()
+	if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+		return false
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindArrayLiteralExpression:
+		return isArrayOrObjectDestructuringAssignmentPattern(parent)
+	case ast.KindPropertyAssignment:
+		assignment := parent.AsPropertyAssignment()
+		return assignment != nil &&
+			assignment.Initializer == node &&
+			isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
+	case ast.KindSpreadElement:
+		return isArrayOrObjectDestructuringAssignmentPattern(parent.Parent)
+	}
+	return false
+}
+
+func isArrayOrObjectDestructuringAssignmentPattern(node *ast.Node) bool {
+	return node != nil && ast.IsArrayLiteralOrObjectLiteralDestructuringPattern(node)
 }

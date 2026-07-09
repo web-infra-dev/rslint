@@ -117,13 +117,7 @@ func stripAsExpression(node *ast.Node) *ast.Node {
 // check runs only after the cheap position comparison so we don't pay the
 // parent-chain walk on the common "obviously outside" path.
 func containsNode(ancestor, descendant *ast.Node) bool {
-	if ancestor == nil || descendant == nil {
-		return false
-	}
-	if descendant.Pos() < ancestor.Pos() || descendant.End() > ancestor.End() {
-		return false
-	}
-	return ast.GetSourceFileOfNode(ancestor) == ast.GetSourceFileOfNode(descendant)
+	return react_hooksutil.ContainsNode(ancestor, descendant)
 }
 
 // nodeText returns the trimmed source text for `node`.
