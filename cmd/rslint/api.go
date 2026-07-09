@@ -292,13 +292,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 	}
 
-	// Exclude global ignores from the lint scope (and therefore from FileCount
-	// and the LintedFiles list built below), matching the CLI (cmd.go).
-	// Entry-level ignores are not global target exclusions: an explicit file
-	// excluded by the only matching entry is still a lint result, but runs zero
-	// rules through GetActiveRulesForFile. --api takes one resolved config
-	// (single-config mode), so configMap / programConfigDirs are nil.
-	fileFilters := buildFileFilters(programs, nil, nil, rslintConfig, configDirectory)
+	// Target discovery already excluded default paths, global ignores, and
+	// .gitignore entries. Entry-level ignores are not target exclusions: an
+	// explicit file excluded by the only matching entry is still a lint result,
+	// but runs zero rules through GetActiveRulesForFile.
 	shouldReportLintSyntax := func(filePath string) bool {
 		return rslintConfig.GetConfigForFile(filePath, configDirectory) != nil
 	}
@@ -308,11 +305,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Run linter
 	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
-		Programs:         programs,
-		SingleThreaded:   false, // Don't use single-threaded mode for IPC
-		Scope:            linter.FileScope{Files: allowedFiles},
-		PerProgramFilter: toFileFilters(fileFilters),
-		TargetFiles:      targetsByProgram,
+		Programs:       programs,
+		SingleThreaded: false, // Don't use single-threaded mode for IPC
+		Scope:          linter.FileScope{Files: allowedFiles},
+		TargetFiles:    targetsByProgram,
 		// Defense-in-depth alongside the GetRulesForFile gate: RunLinter passes
 		// a nil TypeChecker to rules running on files outside this set (gap /
 		// fallback files), so a non-type-aware rule with optional TypeChecker
@@ -393,11 +389,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 	}
 
-	// The files actually linted (config ignores already excluded by the
-	// PerProgramFilter above). sourceFiles was populated by GetRulesForFile for
-	// every linted file under its program-canonical relative path — the same
-	// path space as Diagnostic.FilePath — so the JS side can seed one result per
-	// entry. Sorted for a deterministic response.
+	// The files actually linted (target discovery already excluded global
+	// ignores and gitignore entries). sourceFiles was populated by
+	// GetRulesForFile for every linted file under its program-canonical
+	// relative path — the same path space as Diagnostic.FilePath — so the JS
+	// side can seed one result per entry. Sorted for a deterministic response.
 	lintedFiles := make([]string, 0, len(sourceFiles))
 	for filePath := range sourceFiles {
 		lintedFiles = append(lintedFiles, filePath)

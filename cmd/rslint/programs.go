@@ -11,7 +11,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
-	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -314,64 +313,6 @@ func assignLintTargetsToPrograms(
 		sort.Strings(targetsByProgram[i])
 	}
 	return targetsByProgram
-}
-
-// buildFileFilters returns per-program file filters for config `ignores`.
-// Target ownership/deduplication is handled by DiscoverLintFilesMultiConfig and
-// assignLintTargetsToPrograms before RunLinter receives TargetFiles.
-//
-// These filters are consumed by RunLinter only in Phase 1 (lint). Phase 2
-// (type-check) does NOT consult them — type-check mirrors `tsgo --noEmit`
-// over the full tsconfig-determined program. See linter.go RunLinter doc
-// and website/docs/en/guide/type-checking.md for the contract.
-//
-// The returned slice is always len(programs). Entries are never nil — ignore
-// semantics must apply to every program in Phase 1, including the gap-file
-// fallback program.
-//
-// singleConfig / singleConfigDir are used when configMap is nil (single-config
-// mode). When configMap is non-nil, the per-file nearest config is looked up.
-func buildFileFilters(
-	programs []*compiler.Program,
-	configMap map[string]rslintconfig.RslintConfig,
-	programConfigDirs []string,
-	singleConfig rslintconfig.RslintConfig,
-	singleConfigDir string,
-) []func(string) bool {
-	filters := make([]func(string) bool, len(programs))
-	for i := range programs {
-		filters[i] = func(fileName string) bool {
-			// Ignore check: resolve the config that governs this file and
-			// consult its global `ignores` patterns.
-			var cfg rslintconfig.RslintConfig
-			var cwd string
-			if configMap != nil {
-				cwd, cfg = rslintconfig.FindNearestConfig(fileName, configMap)
-			} else {
-				cfg = singleConfig
-				cwd = singleConfigDir
-			}
-			if cfg != nil && cfg.IsFileIgnored(fileName, cwd) {
-				return false
-			}
-			return true
-		}
-	}
-	return filters
-}
-
-// toFileFilters converts the legacy `[]func(string) bool` per-program filter
-// slice (used by buildFileFilters) into linter.FileFilter typed entries. The
-// underlying functions are identical; this is purely a type adapter.
-func toFileFilters(in []func(string) bool) []linter.FileFilter {
-	if in == nil {
-		return nil
-	}
-	out := make([]linter.FileFilter, len(in))
-	for i, f := range in {
-		out[i] = f
-	}
-	return out
 }
 
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which

@@ -1291,9 +1291,9 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, filePath, currentDirectory, enforcePlugins, typeInfoFiles)
 	}
 
-	// Build per-program file filters for global ignores. Target ownership and
-	// deduplication were already resolved in targetsByProgram.
-	fileFilters := buildFileFilters(programs, configMap, programConfigDirs, rslintConfig, currentDirectory)
+	// Target discovery already excluded default paths, global ignores, and
+	// .gitignore entries. Target ownership and deduplication were already
+	// resolved in targetsByProgram.
 	shouldReportLintSyntax := func(filePath string) bool {
 		if configMap != nil {
 			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
@@ -1332,7 +1332,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		Programs:              programs,
 		SingleThreaded:        singleThreaded,
 		Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-		PerProgramFilter:      toFileFilters(fileFilters),
 		TargetFiles:           targetsByProgram,
 		GetRulesForFile:       rulesForFile,
 		TypeInfoFiles:         typeInfoFiles,
@@ -1420,8 +1419,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			parseCache.RetainOnly(append(slices.Clone(newPrograms), programs...))
 
 			// Re-lint: collect remaining diagnostics.
-			// Rebuild global-ignore filters for the new programs.
-			fixFileFilters := buildFileFilters(newPrograms, configMap, newProgramConfigDirs, rslintConfig, currentDirectory)
 			fixTargetsByProgram := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fs)
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
 			var passDiags []rule.RuleDiagnostic
@@ -1437,7 +1434,6 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
-				PerProgramFilter:      toFileFilters(fixFileFilters),
 				TargetFiles:           fixTargetsByProgram,
 				GetRulesForFile:       getRulesForFile,
 				TypeInfoFiles:         typeInfoFiles,
