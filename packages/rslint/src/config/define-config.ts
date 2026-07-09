@@ -106,10 +106,34 @@ export interface ParserOptions {
 }
 
 /**
+ * Access level for a declared global variable.
+ */
+export type GlobalAccess = boolean | 'readonly' | 'writable' | 'off';
+
+/**
+ * Map of global variable name to its access level.
+ *
+ * @example
+ * globals: { myGlobal: 'readonly' }
+ */
+export type GlobalsConfig = Record<string, GlobalAccess>;
+
+/**
  * Language-specific configuration.
  */
 export interface LanguageOptions {
   parserOptions?: ParserOptions;
+  /**
+   * Global variables available in this file's scope, e.g. from a browser
+   * or Node.js runtime. `'readonly'`/`true` allows reading; `'writable'`
+   * allows reassignment. Only the string `'off'` un-declares a global
+   * (undoes one a base config added) — `false` still declares it (as
+   * read-only), matching ESLint's own `normalizeConfigGlobal`.
+   *
+   * @example
+   * globals: { myGlobal: 'readonly' }
+   */
+  globals?: GlobalsConfig;
 }
 
 /**
