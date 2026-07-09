@@ -89,7 +89,7 @@ func TestTypeCheck_SkipsNoTsconfigTargetFallbackProgram(t *testing.T) {
 		t.Fatalf("expected no tsconfig-backed programs, got %d", len(programs))
 	}
 
-	programs, typeInfoFiles, gapFiles, _, _ := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, gapFiles, _, _, _ := buildProgramsWithLintTargets(
 		programs,
 		nil,
 		rslintconfig.RslintConfig{{Files: []string{"**/*.ts"}}},
@@ -227,7 +227,7 @@ export const value: Bad | null = null;
 		t.Fatalf("expected tsconfig-backed program to participate in type-check, got %v", skip)
 	}
 
-	programs, typeInfoFiles, gapFiles, _, _ := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, gapFiles, _, _, _ := buildProgramsWithLintTargets(
 		programs,
 		nil,
 		cfg,
@@ -294,7 +294,7 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 	}
 
 	libPath := tspath.NormalizePath(filepath.Join(dir, "lib.ts"))
-	programs, typeInfoFiles, gapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, gapFiles, targetFiles, targetsByProgram, _ := buildProgramsWithLintTargets(
 		programs,
 		nil,
 		cfg,
@@ -373,7 +373,7 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 		t.Skip("compiler already canonicalized source file to realpath")
 	}
 
-	programs, typeInfoFiles, gapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, gapFiles, targetFiles, targetsByProgram, configPathBySourcePath := buildProgramsWithLintTargets(
 		programs,
 		nil,
 		cfg,
@@ -400,5 +400,8 @@ func TestBuildProgramsWithLintTargets_BindsRealpathTargetToProgramSourceName(t *
 	}
 	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 || targetsByProgram[0][0] != sourceName {
 		t.Fatalf("expected realpath target to bind back to source name %q, got %v", sourceName, targetsByProgram)
+	}
+	if configPathBySourcePath[sourceName] != realTarget {
+		t.Fatalf("expected source path %q to resolve config through target path %q, got %v", sourceName, realTarget, configPathBySourcePath)
 	}
 }

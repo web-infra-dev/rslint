@@ -1203,7 +1203,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 	// then bind selected files to existing Programs or an AST-only fallback
 	// Program. Shared with the --api path via buildProgramsWithLintTargets, so
 	// target discovery, fallback creation, and type-aware gating stay aligned.
-	programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram, configPathBySourcePath := buildProgramsWithLintTargets(
 		programs,
 		targetConfigMap,
 		targetRslintConfig,
@@ -1285,6 +1285,7 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 		currentDirectory,
 		enforcePlugins,
 		typeInfoFiles,
+		configPathBySourcePath,
 	)
 	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 		return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
@@ -1413,8 +1414,27 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 
 			// Re-lint: collect remaining diagnostics.
 			fixProgramIndex := buildProgramFileIndex(newPrograms, fs, singleThreaded)
-			fixTargetsByProgram := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fixProgramIndex)
+			fixTargetsByProgram, fixConfigPathBySourcePath := assignLintTargetsToPrograms(newPrograms, targetConfigMap, newProgramConfigDirs, targetFiles, fixProgramIndex, fs)
 			fixSkipMask := buildTypeCheckSkipMask(newPrograms)
+			fixTypeInfoFiles := buildTypeInfoFilesForPrograms(newPrograms, fixSkipMask, fs, singleThreaded)
+			fixConfigResolver := newLintConfigResolver(
+				configMap,
+				rslintConfig,
+				currentDirectory,
+				enforcePlugins,
+				fixTypeInfoFiles,
+				fixConfigPathBySourcePath,
+			)
+			fixGetRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+				return fixConfigResolver.ActiveRulesForFile(sourceFile.FileName())
+			}
+			var fixRulesForFile linter.RuleHandler
+			if !typeCheckOnly {
+				fixRulesForFile = fixGetRulesForFile
+			}
+			fixShouldReportLintSyntax := func(filePath string) bool {
+				return fixConfigResolver.ConfigForFile(filePath) != nil
+			}
 			var passDiags []rule.RuleDiagnostic
 			passDiags = append(passDiags, collectTargetSyntacticDiagnostics(
 				newPrograms,
@@ -1422,15 +1442,15 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 				fixSkipMask,
 				typeCheck,
 				typeCheckOnly,
-				shouldReportLintSyntax,
+				fixShouldReportLintSyntax,
 			)...)
 			fixRunOpts := linter.RunLinterOptions{
 				Programs:              newPrograms,
 				SingleThreaded:        singleThreaded,
 				Scope:                 linter.FileScope{Files: allowFiles, Dirs: allowDirs},
 				TargetFiles:           fixTargetsByProgram,
-				GetRulesForFile:       getRulesForFile,
-				TypeInfoFiles:         typeInfoFiles,
+				GetRulesForFile:       fixRulesForFile,
+				TypeInfoFiles:         fixTypeInfoFiles,
 				TypeCheck:             typeCheck,
 				SkipTypeCheckPrograms: fixSkipMask,
 				OnDiagnostic: func(d rule.RuleDiagnostic) {
@@ -1444,7 +1464,10 @@ func executeLintPipeline(args lintArgs, ctx context.Context, dispatch linter.Esl
 			// plugin diagnostics from being lost when allDiags is replaced.
 			var fixPluginCh <-chan []rule.RuleDiagnostic
 			if hasEslintPlugins {
-				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginResolver)
+				fixPluginInputs := buildPluginFileInputs(fixRunOpts, pluginConfigResolver{
+					lintResolver:      fixConfigResolver,
+					originalConfigDir: originalConfigDir,
+				})
 				fixPluginCh = dispatchPluginLintAsync(ctx, dispatch, fixPluginInputs, fix, pluginSuggestionsMode(fix))
 			}
 			passResult, _ := linter.RunLinter(fixRunOpts)

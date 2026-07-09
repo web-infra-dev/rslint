@@ -1119,7 +1119,7 @@ func TestCLIRuleOverlayDoesNotWidenTargetDiscovery(t *testing.T) {
 	if exitCode != 0 {
 		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
 	}
-	programs, typeInfoFiles, _, targetFiles, targetsByProgram := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, _, targetFiles, targetsByProgram, _ := buildProgramsWithLintTargets(
 		programs, nil, targetConfig, dir, nil, nil, fs, nil, []string{tspath.NormalizePath(dir)}, parseCache, true,
 	)
 	if len(targetFiles) != 1 || !strings.HasSuffix(targetFiles[0], "/a.ts") {

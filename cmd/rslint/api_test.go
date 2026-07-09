@@ -635,6 +635,51 @@ func TestHandleLint_NoConfigEnablesNoRules(t *testing.T) {
 	}
 }
 
+func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *testing.T) {
+	realDir := t.TempDir()
+	linkDir := filepath.Join(filepath.Dir(realDir), filepath.Base(realDir)+"-link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	defer os.Remove(linkDir)
+
+	srcDir := filepath.Join(realDir, "src")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("mkdir src: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(srcDir, "a.ts"), []byte("const clean = 1;\n"), 0o644); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "tsconfig.json"), []byte(`{"include":["src/a.ts"]}`), 0o644); err != nil {
+		t.Fatalf("write tsconfig: %v", err)
+	}
+
+	config := json.RawMessage(`[{
+		"languageOptions": { "parserOptions": { "project": ["./tsconfig.json"] } },
+		"plugins": ["@typescript-eslint"],
+		"rules": { "@typescript-eslint/no-unsafe-member-access": "error" }
+	}]`)
+	realTarget := filepath.Join(realDir, "src", "a.ts")
+
+	handler := &IPCHandler{}
+	response, err := handler.HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  linkDir,
+		WorkingDirectory: linkDir,
+		Files:            []string{realTarget},
+		FileContents:     map[string]string{realTarget: "let b: any = 10;\nb.c = 20;\n"},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if len(response.Diagnostics) != 1 {
+		t.Fatalf("expected one type-aware overlay diagnostic, got %d: %+v", len(response.Diagnostics), response.Diagnostics)
+	}
+	if got := response.Diagnostics[0].RuleName; got != "@typescript-eslint/no-unsafe-member-access" {
+		t.Fatalf("expected no-unsafe-member-access diagnostic from typed overlay content, got %q", got)
+	}
+}
+
 // scenario b (in-memory file命门): a requested file outside every tsconfig
 // Program (a "gap" file) must still be linted by non-type-aware rules via the
 // fallback Program — it must NOT be silently skipped with 0 diagnostics.

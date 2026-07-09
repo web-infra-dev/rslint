@@ -40,6 +40,11 @@ type Settings map[string]interface{}
 // An omitted `files` field remains valid and means "use rslint's default
 // lintable extensions"; explicit null/empty arrays are invalid.
 func (config *RslintConfig) UnmarshalJSON(data []byte) error {
+	if strings.TrimSpace(string(data)) == "null" {
+		*config = nil
+		return nil
+	}
+
 	var rawEntries []json.RawMessage
 	if err := json.Unmarshal(data, &rawEntries); err != nil {
 		return err

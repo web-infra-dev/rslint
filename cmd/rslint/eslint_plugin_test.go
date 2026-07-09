@@ -28,7 +28,7 @@ func TestPluginConfigResolver_NormalizedMatchRawWireKey(t *testing.T) {
 
 	// Windows: file matches on the normalized key, wire key is the RAW string.
 	r := pluginConfigResolver{
-		lintResolver:      newLintConfigResolver(p.ConfigMap, nil, "", false, nil),
+		lintResolver:      newLintConfigResolver(p.ConfigMap, nil, "", false, nil, nil),
 		originalConfigDir: p.OriginalConfigDir,
 	}
 	wireKey, merged := r.resolve(norm + "/src/a.ts")
@@ -46,6 +46,7 @@ func TestPluginConfigResolver_NormalizedMatchRawWireKey(t *testing.T) {
 			nil,
 			"",
 			false,
+			nil,
 			nil,
 		),
 	}
@@ -120,7 +121,7 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 
 	// Multi-config, file under no config -> ("", nil).
 	r := pluginConfigResolver{
-		lintResolver:      newLintConfigResolver(p.ConfigMap, nil, "", false, nil),
+		lintResolver:      newLintConfigResolver(p.ConfigMap, nil, "", false, nil, nil),
 		originalConfigDir: p.OriginalConfigDir,
 	}
 	if wk, m := r.resolve("/elsewhere/a.ts"); wk != "" || m != nil {
@@ -129,7 +130,7 @@ func TestPluginConfigResolver_Branches(t *testing.T) {
 
 	// Single-config (configMap==nil): wireKey is currentDirectory; merged from rslintConfig.
 	single := pluginConfigResolver{
-		lintResolver: newLintConfigResolver(nil, p.ConfigMap["/proj"], "/proj", false, nil),
+		lintResolver: newLintConfigResolver(nil, p.ConfigMap["/proj"], "/proj", false, nil, nil),
 	}
 	if wk, m := single.resolve("/proj/a.ts"); wk != "/proj" || m == nil {
 		t.Errorf("single-config -> (currentDirectory, merged), got (%q, nil=%v)", wk, m == nil)
@@ -155,7 +156,7 @@ func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
 	typeInfoFiles := map[string]struct{}{
 		"/repo/packages/app/src/typed.ts": {},
 	}
-	resolver := newLintConfigResolver(configMap, nil, "", false, typeInfoFiles)
+	resolver := newLintConfigResolver(configMap, nil, "", false, typeInfoFiles, nil)
 
 	gapRules := configuredRuleNameSet(resolver.ActiveRulesForFile("/repo/packages/app/src/gap.ts"))
 	if gapRules["@typescript-eslint/require-await"] {
@@ -180,6 +181,39 @@ func TestLintConfigResolver_NearestConfigAndTypeInfoGate(t *testing.T) {
 
 	if rules := resolver.ActiveRulesForFile("/outside/a.ts"); len(rules) != 0 {
 		t.Fatalf("expected file outside every config to have no rules, got %v", rules)
+	}
+}
+
+func TestLintConfigResolver_UsesConfigPathAliasForRulesAndGlobals(t *testing.T) {
+	rslintconfig.RegisterAllRules()
+
+	cfg := rslintconfig.RslintConfig{{
+		Files: []string{"src/**/*.ts"},
+		LanguageOptions: &rslintconfig.LanguageOptions{Raw: map[string]any{
+			"globals": map[string]any{
+				"aliasedGlobal": "readonly",
+			},
+		}},
+		Rules: rslintconfig.Rules{"no-console": "error"},
+	}}
+	resolver := newLintConfigResolver(
+		nil,
+		cfg,
+		"/repo",
+		false,
+		map[string]struct{}{"/outside/real-a.ts": {}},
+		map[string]string{"/outside/real-a.ts": "/repo/src/a.ts"},
+	)
+
+	rules := resolver.ActiveRulesForFile("/outside/real-a.ts")
+	if len(rules) != 1 || rules[0].Name != "no-console" {
+		t.Fatalf("expected aliased source path to use config path rules, got %v", configuredRuleNameSet(rules))
+	}
+	if !rules[0].Globals["aliasedGlobal"] {
+		t.Fatalf("expected aliased source path to carry globals from config path")
+	}
+	if resolver.ConfigForFile("/outside/real-a.ts") == nil {
+		t.Fatalf("expected aliased source path to resolve merged config")
 	}
 }
 

@@ -8,11 +8,12 @@ import (
 )
 
 type lintConfigResolver struct {
-	configMap        map[string]rslintconfig.RslintConfig
-	rslintConfig     rslintconfig.RslintConfig
-	currentDirectory string
-	enforcePlugins   bool
-	typeInfoFiles    map[string]struct{}
+	configMap              map[string]rslintconfig.RslintConfig
+	rslintConfig           rslintconfig.RslintConfig
+	currentDirectory       string
+	enforcePlugins         bool
+	typeInfoFiles          map[string]struct{}
+	configPathBySourcePath map[string]string
 
 	mu              sync.Mutex
 	singleResolver  *rslintconfig.FileConfigResolver
@@ -25,14 +26,16 @@ func newLintConfigResolver(
 	currentDirectory string,
 	enforcePlugins bool,
 	typeInfoFiles map[string]struct{},
+	configPathBySourcePath map[string]string,
 ) *lintConfigResolver {
 	return &lintConfigResolver{
-		configMap:        configMap,
-		rslintConfig:     rslintConfig,
-		currentDirectory: currentDirectory,
-		enforcePlugins:   enforcePlugins,
-		typeInfoFiles:    typeInfoFiles,
-		configResolvers:  make(map[string]*rslintconfig.FileConfigResolver),
+		configMap:              configMap,
+		rslintConfig:           rslintConfig,
+		currentDirectory:       currentDirectory,
+		enforcePlugins:         enforcePlugins,
+		typeInfoFiles:          typeInfoFiles,
+		configPathBySourcePath: configPathBySourcePath,
+		configResolvers:        make(map[string]*rslintconfig.FileConfigResolver),
 	}
 }
 
@@ -65,18 +68,38 @@ func (r *lintConfigResolver) resolverForFile(filePath string) (string, *rslintco
 	return r.currentDirectory, resolver, true
 }
 
+func (r *lintConfigResolver) configPathFor(filePath string) string {
+	if r == nil || len(r.configPathBySourcePath) == 0 {
+		return filePath
+	}
+	if configPath := r.configPathBySourcePath[filePath]; configPath != "" {
+		return configPath
+	}
+	return filePath
+}
+
 func (r *lintConfigResolver) ConfigForFile(filePath string) *rslintconfig.MergedConfig {
-	_, resolver, ok := r.resolverForFile(filePath)
+	configPath := r.configPathFor(filePath)
+	_, resolver, ok := r.resolverForFile(configPath)
 	if !ok {
 		return nil
 	}
-	return resolver.ConfigForFile(filePath)
+	return resolver.ConfigForFile(configPath)
 }
 
 func (r *lintConfigResolver) ActiveRulesForFile(filePath string) []linter.ConfiguredRule {
-	_, resolver, ok := r.resolverForFile(filePath)
+	configPath := r.configPathFor(filePath)
+	_, resolver, ok := r.resolverForFile(configPath)
 	if !ok {
 		return nil
 	}
-	return resolver.ActiveRulesForFile(filePath, r.typeInfoFiles)
+	activeRules, _ := resolver.EnabledRulesForFile(configPath)
+	if r.typeInfoFiles != nil {
+		if _, hasTypeInfo := r.typeInfoFiles[filePath]; !hasTypeInfo {
+			if _, hasTypeInfo = r.typeInfoFiles[configPath]; !hasTypeInfo {
+				activeRules = linter.FilterNonTypeAwareRules(activeRules)
+			}
+		}
+	}
+	return activeRules
 }

@@ -179,7 +179,7 @@ func buildProgramsWithLintTargets(
 	allowDirs []string,
 	parseCache *utils.ParseCache,
 	singleThreaded bool,
-) ([]*compiler.Program, map[string]struct{}, []string, []string, [][]string) {
+) ([]*compiler.Program, map[string]struct{}, []string, []string, [][]string, map[string]string) {
 	var typeInfoFiles map[string]struct{}
 	var capturedGapFiles []string
 
@@ -194,7 +194,7 @@ func buildProgramsWithLintTargets(
 
 	gapFiles := make([]string, 0, len(targetFiles))
 	for _, target := range targetFiles {
-		if _, inProgram := programIndex.files[target]; !inProgram {
+		if len(programIndex.candidatesFor(target, fs)) == 0 {
 			gapFiles = append(gapFiles, target)
 		}
 	}
@@ -212,9 +212,9 @@ func buildProgramsWithLintTargets(
 		}
 	}
 
-	targetsByProgram := assignLintTargetsToPrograms(programs, configMap, programConfigDirs, targetFiles, programIndex)
+	targetsByProgram, configPathBySourcePath := assignLintTargetsToPrograms(programs, configMap, programConfigDirs, targetFiles, programIndex, fs)
 
-	return programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram
+	return programs, typeInfoFiles, capturedGapFiles, targetFiles, targetsByProgram, configPathBySourcePath
 }
 
 func discoverLintFilesMultiConfig(
@@ -259,6 +259,23 @@ type programFileCandidate struct {
 type programFileIndex struct {
 	files  map[string]struct{}
 	byPath map[string][]programFileCandidate
+}
+
+func (index programFileIndex) candidatesFor(path string, fs vfs.FS) []programFileCandidate {
+	if len(index.byPath) == 0 {
+		return nil
+	}
+	if candidates := index.byPath[path]; len(candidates) > 0 {
+		return candidates
+	}
+	if fs == nil {
+		return nil
+	}
+	realPath := fs.Realpath(path)
+	if realPath == "" || realPath == path {
+		return nil
+	}
+	return index.byPath[realPath]
 }
 
 type indexedProgram struct {
@@ -355,15 +372,17 @@ func assignLintTargetsToPrograms(
 	programConfigDirs []string,
 	targetFiles []string,
 	programIndex programFileIndex,
-) [][]string {
+	fs vfs.FS,
+) ([][]string, map[string]string) {
 	targetsByProgram := make([][]string, len(programs))
 	if len(programs) == 0 || len(targetFiles) == 0 {
-		return targetsByProgram
+		return targetsByProgram, nil
 	}
 
 	seenProgramFile := make([]map[string]struct{}, len(programs))
+	configPathBySourcePath := make(map[string]string)
 	for _, target := range targetFiles {
-		candidates := programIndex.byPath[target]
+		candidates := programIndex.candidatesFor(target, fs)
 		if len(candidates) == 0 {
 			continue
 		}
@@ -385,11 +404,40 @@ func assignLintTargetsToPrograms(
 		}
 		seenProgramFile[chosen.programIndex][chosen.fileName] = struct{}{}
 		targetsByProgram[chosen.programIndex] = append(targetsByProgram[chosen.programIndex], chosen.fileName)
+		if chosen.fileName != target {
+			configPathBySourcePath[chosen.fileName] = target
+		}
 	}
 	for i := range targetsByProgram {
 		sort.Strings(targetsByProgram[i])
 	}
-	return targetsByProgram
+	if len(configPathBySourcePath) == 0 {
+		configPathBySourcePath = nil
+	}
+	return targetsByProgram, configPathBySourcePath
+}
+
+func buildTypeInfoFilesForPrograms(programs []*compiler.Program, skipTypeCheck []bool, fs vfs.FS, singleThreaded bool) map[string]struct{} {
+	if len(skipTypeCheck) == 0 {
+		return nil
+	}
+
+	index := programFileIndex{
+		files:  make(map[string]struct{}),
+		byPath: make(map[string][]programFileCandidate),
+	}
+	indexedPrograms := make([]indexedProgram, 0, len(programs))
+	for i, program := range programs {
+		if i < len(skipTypeCheck) && skipTypeCheck[i] {
+			continue
+		}
+		indexedPrograms = append(indexedPrograms, indexedProgram{
+			program:      program,
+			programIndex: i,
+		})
+	}
+	addProgramsToFileIndex(&index, indexedPrograms, fs, singleThreaded)
+	return index.files
 }
 
 // buildTypeCheckSkipMask returns a parallel-to-programs []bool marking which

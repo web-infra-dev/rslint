@@ -29,7 +29,8 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 	if r.lintResolver == nil {
 		return "", nil
 	}
-	cfgDir, resolver, ok := r.lintResolver.resolverForFile(filePath)
+	configPath := r.lintResolver.configPathFor(filePath)
+	cfgDir, resolver, ok := r.lintResolver.resolverForFile(configPath)
 	if !ok {
 		return "", nil
 	}
@@ -37,7 +38,7 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 	if raw, ok := r.originalConfigDir[cfgDir]; ok {
 		wireKey = raw
 	}
-	return wireKey, resolver.ConfigForFile(filePath)
+	return wireKey, resolver.ConfigForFile(configPath)
 }
 
 // buildPluginFileInputs collects, from RunLinter's lint targets, the files that

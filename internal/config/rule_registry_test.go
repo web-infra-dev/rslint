@@ -634,6 +634,12 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 	cfg := RslintConfig{
 		{
 			Files: []string{"src/**/*.ts"},
+			LanguageOptions: &LanguageOptions{Raw: map[string]any{
+				"globals": map[string]any{
+					"readonlyGlobal": "readonly",
+					"disabledGlobal": "off",
+				},
+			}},
 			Rules: Rules{
 				"@typescript-eslint/require-await": "error",
 				"no-console":                       "warn",
@@ -654,6 +660,16 @@ func TestFileConfigResolver_MatchesRegistryAndFiltersTypeAwareRules(t *testing.T
 		for name := range want {
 			if !got[name] {
 				t.Fatalf("resolver rules differ from registry rules: got %v want %v", ruleNames(cachedRules), ruleNames(registryRules))
+			}
+		}
+	}
+	for _, rules := range [][]linter.ConfiguredRule{cachedRules, registryRules} {
+		for _, rule := range rules {
+			if !rule.Globals["readonlyGlobal"] {
+				t.Fatalf("expected resolver/registry rule %q to carry declared global", rule.Name)
+			}
+			if rule.Globals["disabledGlobal"] {
+				t.Fatalf("expected resolver/registry rule %q to carry disabled global as false", rule.Name)
 			}
 		}
 	}

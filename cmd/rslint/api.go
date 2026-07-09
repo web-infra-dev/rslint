@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	api "github.com/web-infra-dev/rslint/internal/api"
@@ -87,17 +88,16 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 	}
 	// Apply file contents if provided
+	var fileContents map[string]string
 	if len(req.FileContents) > 0 {
 		if allowedFiles == nil {
 			allowedFiles = make([]string, 0, len(req.FileContents))
 		}
-		fileContents := make(map[string]string, len(req.FileContents))
+		fileContents = make(map[string]string, len(req.FileContents))
 		for k, v := range req.FileContents {
 			normalizedPath := addAllowedFile(k)
 			fileContents[normalizedPath] = v
 		}
-		fs = utils.NewOverlayVFS(fs, fileContents)
-
 	}
 
 	// Initialize rule registry with all available rules
@@ -121,6 +121,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		configDirectory = currentDirectory
 	}
 	configDirectory = tspath.NormalizePath(configDirectory)
+	if len(fileContents) > 0 {
+		addEquivalentFileContentPaths(fileContents, configDirectory, currentDirectory, fs)
+		fs = utils.NewOverlayVFS(fs, fileContents)
+	}
 	var gitignoreGlobs []string
 	if len(allowedFiles) > 0 {
 		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobsForFiles(configDirectory, fs, allowedFiles)
@@ -166,10 +170,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// list).
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	programs, typeInfoFiles, _, _, targetsByProgram := buildProgramsWithLintTargets(
+	programs, typeInfoFiles, _, _, targetsByProgram, configPathBySourcePath := buildProgramsWithLintTargets(
 		programs, nil, rslintConfig, configDirectory, nil, nil, fs, allowedFiles, nil, parseCache, false,
 	)
-	fileConfigResolver := rslintconfig.NewFileConfigResolver(rslintConfig, configDirectory, true)
+	fileConfigResolver := newLintConfigResolver(nil, rslintConfig, configDirectory, true, typeInfoFiles, configPathBySourcePath)
 
 	// Collect diagnostics and source files
 	var diagnostics []api.Diagnostic
@@ -337,7 +341,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName(), typeInfoFiles)
+			return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
 		},
 		OnDiagnostic: diagnosticCollector,
 	})
@@ -433,6 +437,56 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		response.EncodedSourceFiles = encodedSourceFiles
 	}
 	return response, nil
+}
+
+func addEquivalentFileContentPaths(fileContents map[string]string, configDirectory string, currentDirectory string, fs vfs.FS) {
+	if len(fileContents) == 0 || fs == nil {
+		return
+	}
+
+	type fileContentEntry struct {
+		path    string
+		content string
+	}
+	entries := make([]fileContentEntry, 0, len(fileContents))
+	for filePath, content := range fileContents {
+		entries = append(entries, fileContentEntry{path: filePath, content: content})
+	}
+
+	comparePathOptions := tspath.ComparePathsOptions{
+		CurrentDirectory:          currentDirectory,
+		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
+	}
+	addAlias := func(alias string, content string) {
+		if alias == "" {
+			return
+		}
+		if _, exists := fileContents[alias]; exists {
+			return
+		}
+		fileContents[alias] = content
+	}
+	addDirectoryAlias := func(fromDir string, toDir string, filePath string, content string) {
+		if fromDir == "" || toDir == "" || !tspath.ContainsPath(fromDir, filePath, comparePathOptions) {
+			return
+		}
+		relativePath := tspath.GetRelativePathFromDirectory(fromDir, filePath, comparePathOptions)
+		if relativePath == "" {
+			return
+		}
+		addAlias(tspath.ResolvePath(toDir, relativePath), content)
+	}
+
+	realConfigDirectory := fs.Realpath(configDirectory)
+	for _, entry := range entries {
+		if realPath := fs.Realpath(entry.path); realPath != "" && realPath != entry.path {
+			addAlias(realPath, entry.content)
+		}
+		if realConfigDirectory != "" && tspath.ComparePaths(configDirectory, realConfigDirectory, comparePathOptions) != 0 {
+			addDirectoryAlias(configDirectory, realConfigDirectory, entry.path, entry.content)
+			addDirectoryAlias(realConfigDirectory, configDirectory, entry.path, entry.content)
+		}
+	}
 }
 
 // HandleGetAstInfo handles get AST info requests in IPC mode
