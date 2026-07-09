@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
@@ -119,6 +120,99 @@ func IsUseEffectEventCallee(node *ast.Node) bool {
 // callee — either bare `use` or `React.use`.
 func IsUseIdentifier(node *ast.Node) bool {
 	return IsReactCalleeNamed(node, "use")
+}
+
+// IsManualUseMemoCallee reports whether `node` is a direct `useMemo` or
+// `React.useMemo` callee according to React Compiler's manual memoization
+// input surface. It intentionally does not recognize import aliases or
+// element-access forms; existing React Compiler lint ports rely on the same
+// direct-call contract.
+func IsManualUseMemoCallee(node *ast.Node, typeChecker *checker.Checker) bool {
+	node = ast.SkipParentheses(node)
+	if node == nil {
+		return false
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		return isManualMemoIdentifier(node, "useMemo", typeChecker)
+	case ast.KindPropertyAccessExpression:
+		if ast.IsOptionalChain(node) {
+			return false
+		}
+		access := node.AsPropertyAccessExpression()
+		name := access.Name()
+		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != "useMemo" {
+			return false
+		}
+		obj := ast.SkipParentheses(access.Expression)
+		if obj == nil || obj.Kind != ast.KindIdentifier {
+			return false
+		}
+		return isManualMemoIdentifier(obj, "React", typeChecker)
+	}
+	return false
+}
+
+func isManualMemoIdentifier(id *ast.Node, expected string, typeChecker *checker.Checker) bool {
+	if id == nil || id.Kind != ast.KindIdentifier || id.AsIdentifier().Text != expected {
+		return false
+	}
+	if typeChecker == nil {
+		return true
+	}
+	sym := utils.GetReferenceSymbol(id, typeChecker)
+	if sym == nil || len(sym.Declarations) == 0 {
+		return true
+	}
+	for _, decl := range sym.Declarations {
+		if isManualMemoDeclaration(decl, expected) {
+			return true
+		}
+	}
+	return false
+}
+
+func isManualMemoDeclaration(decl *ast.Node, expected string) bool {
+	if decl == nil {
+		return false
+	}
+	switch decl.Kind {
+	case ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportSpecifier:
+		return true
+	case ast.KindBindingElement:
+		return !isInsideParameter(decl)
+	case ast.KindVariableDeclaration:
+		name := decl.Name()
+		if name == nil || name.Kind != ast.KindIdentifier || name.AsIdentifier().Text != expected {
+			return false
+		}
+		initializer := ast.SkipParentheses(decl.AsVariableDeclaration().Initializer)
+		if initializer == nil {
+			return true
+		}
+		if expected == "useMemo" && ast.IsFunctionExpressionOrArrowFunction(initializer) {
+			return false
+		}
+		if expected == "React" && initializer.Kind == ast.KindObjectLiteralExpression {
+			return false
+		}
+		return true
+	case ast.KindParameter, ast.KindFunctionDeclaration:
+		return false
+	}
+	return false
+}
+
+func isInsideParameter(node *ast.Node) bool {
+	for cur := node; cur != nil; cur = cur.Parent {
+		switch cur.Kind {
+		case ast.KindParameter:
+			return true
+		case ast.KindVariableDeclaration:
+			return false
+		}
+	}
+	return false
 }
 
 // IsHookCallee mirrors upstream's `isHook(node)`: the callee is
