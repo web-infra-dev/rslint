@@ -130,6 +130,7 @@ var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
 type ParsedJestFnMemberEntry struct {
 	Name string
 	Node *ast.Node
+	Call *ast.Node
 }
 
 func JoinJestFnMemberEntries(entries []ParsedJestFnMemberEntry) string {
@@ -210,9 +211,13 @@ func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
 				Node: nameNode,
 			})
 		}
-		return left
+		return nil
 	case ast.KindCallExpression:
-		return GetJestFnMemberEntries(node.AsCallExpression().Expression)
+		entries := GetJestFnMemberEntries(node.AsCallExpression().Expression)
+		if len(entries) > 0 {
+			entries[len(entries)-1].Call = node
+		}
+		return entries
 	case ast.KindTaggedTemplateExpression:
 		return GetJestFnMemberEntries(node.AsTaggedTemplateExpression().Tag)
 	default:
@@ -518,6 +523,23 @@ func GetJestVersion(ctx rule.RuleContext) string {
 	}
 
 	return DefaultJestVersion
+}
+
+// IsBooleanLiteral reports whether node is a `true`/`false` literal after
+// stripping parentheses and basic TS type assertions, and returns its value.
+func IsBooleanLiteral(node *ast.Node) (value bool, ok bool) {
+	node = UnwrapBasicTypeAssertions(node)
+	if node == nil {
+		return false, false
+	}
+	switch node.Kind {
+	case ast.KindTrueKeyword:
+		return true, true
+	case ast.KindFalseKeyword:
+		return false, true
+	default:
+		return false, false
+	}
 }
 
 func IsFunction(node *ast.Node) bool {

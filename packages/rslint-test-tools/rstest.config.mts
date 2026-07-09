@@ -509,6 +509,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-unneeded-async-expect-function.test.ts',
     './tests/eslint-plugin-jest/rules/no-duplicate-hooks.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-called-with.test.ts',
+    './tests/eslint-plugin-jest/rules/prefer-comparison-matcher.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-each.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-equality-matcher.test.ts',
     './tests/eslint-plugin-jest/rules/prefer-expect-resolves.test.ts',
