@@ -69,8 +69,12 @@ func TestConstructorSuperRule(t *testing.T) {
 			{Code: `class A extends B { constructor() { for (;;) { super(); break; } } }`},
 			{Code: `class A extends B { constructor() { label: while (true) { super(); break label; } } }`},
 
-			// do-while always runs its body at least once, regardless of the condition
-			{Code: `class A extends B { constructor() { do { super(); } while (false); } }`},
+			// do-while always runs its body at least once, regardless of the
+			// condition, but only counts as a clean single call if it breaks
+			// out immediately afterward (otherwise it's a duplicate - see
+			// invalid cases below)
+			{Code: `class A extends B { constructor() { do { super(); break; } while (true); } }`},
+			{Code: `class A extends B { constructor() { do { super(); break; } while (false); } }`},
 
 			// try/finally: finally always runs, so super() there satisfies the
 			// requirement regardless of what the try/catch do
@@ -184,6 +188,57 @@ func TestConstructorSuperRule(t *testing.T) {
 				Code: `class A extends B { constructor() { if (a) super(); else super(); super(); } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "duplicate", Line: 1, Column: 67},
+				},
+			},
+
+			// super() inside a loop without a guaranteed break right after it
+			// can be revisited on a later iteration - a duplicate, regardless
+			// of whether the loop's condition provably allows only one pass
+			{
+				Code: `class A extends B { constructor() { while (true) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 52},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { while (true) { super(); continue; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 52},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { do { super(); } while (true); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { do { super(); } while (false); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 42},
+				},
+			},
+			{
+				Code: `class A extends B { constructor() { for (;;) { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 48},
+				},
+			},
+
+			// finally always runs after the try block, so a second super()
+			// call there duplicates the try block's call
+			{
+				Code: `class A extends B { constructor() { try { super(); } finally { super(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 64},
+				},
+			},
+			// a trailing super() after a try that already satisfied the
+			// requirement is a duplicate too
+			{
+				Code: `class A extends B { constructor() { try { super(); } finally { } super(); } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "duplicate", Line: 1, Column: 66},
 				},
 			},
 
