@@ -142,7 +142,7 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 	// The propertyName of an ExportSpecifier in a re-export is the source module's export name.
 	// Note: without `from`, export { X as Y } refers to local X, so only skip when moduleSpecifier exists.
 	if parent.Kind == ast.KindExportSpecifier && parent.PropertyName() == node {
-		if isReExport(parent) {
+		if utils.IsReExportSpecifier(parent) {
 			return true
 		}
 	}
@@ -214,7 +214,7 @@ func isInTypeOnlyPosition(node *ast.Node) bool {
 		// ExpressionWithTypeArguments wraps identifiers in heritage clauses.
 		// It is type-only EXCEPT in class extends (which is a value position).
 		case ast.KindExpressionWithTypeArguments:
-			if !isClassExtendsClause(current) {
+			if !utils.IsClassExtendsHeritageClause(current) {
 				return true
 			}
 			// class extends — value position, keep walking
@@ -224,8 +224,6 @@ func isInTypeOnlyPosition(node *ast.Node) bool {
 	return false
 }
 
-// isClassExtendsClause returns true if the ExpressionWithTypeArguments node
-// is inside a class (not interface) extends clause.
 // isTypeOfOperand checks if the identifier is the sole operand of a typeof
 // expression, walking through any ParenthesizedExpression wrappers.
 // typeof x      → Identifier.Parent = TypeOfExpression → true
@@ -237,33 +235,4 @@ func isTypeOfOperand(node *ast.Node) bool {
 		current = current.Parent
 	}
 	return current != nil && current.Kind == ast.KindTypeOfExpression
-}
-
-// isReExport checks if an ExportSpecifier belongs to a re-export statement
-// (i.e., `export { ... } from 'module'`).
-// Parent chain: ExportSpecifier → NamedExports → ExportDeclaration.
-func isReExport(exportSpecifier *ast.Node) bool {
-	namedExports := exportSpecifier.Parent
-	if namedExports == nil {
-		return false
-	}
-	exportDecl := namedExports.Parent
-	if exportDecl == nil || exportDecl.Kind != ast.KindExportDeclaration {
-		return false
-	}
-	return exportDecl.AsExportDeclaration().ModuleSpecifier != nil
-}
-
-func isClassExtendsClause(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil || parent.Kind != ast.KindHeritageClause {
-		return false
-	}
-	clause := parent.AsHeritageClause()
-	if clause.Token != ast.KindExtendsKeyword {
-		return false
-	}
-	grandparent := parent.Parent
-	return grandparent != nil &&
-		(grandparent.Kind == ast.KindClassDeclaration || grandparent.Kind == ast.KindClassExpression)
 }

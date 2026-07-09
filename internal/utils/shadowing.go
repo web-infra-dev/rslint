@@ -92,7 +92,7 @@ func GetReferenceSymbol(node *ast.Node, typeChecker *checker.Checker) *ast.Symbo
 	}
 	if parent != nil && parent.Kind == ast.KindExportSpecifier &&
 		!ast.IsTypeOnlyImportOrExportDeclaration(parent) &&
-		!isReExportSpecifier(parent) {
+		!IsReExportSpecifier(parent) {
 		spec := parent.AsExportSpecifier()
 		isLocalName := spec != nil &&
 			((spec.PropertyName != nil && spec.PropertyName == node) ||

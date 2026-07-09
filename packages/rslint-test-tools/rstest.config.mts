@@ -432,6 +432,7 @@ export default defineConfig({
     './tests/eslint/rules/no-regex-spaces.test.ts',
     './tests/eslint/rules/prefer-regex-literals.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
+    './tests/eslint/rules/no-restricted-globals.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
     './tests/eslint/rules/no-restricted-syntax.test.ts',
     './tests/eslint/rules/no-obj-calls.test.ts',
