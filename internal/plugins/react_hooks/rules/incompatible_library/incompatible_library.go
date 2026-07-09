@@ -131,7 +131,7 @@ func (state *incompatibleLibraryState) processNamedImports(moduleName string, no
 		if spec == nil || spec.Name() == nil || spec.IsTypeOnly {
 			continue
 		}
-		importedName := importSpecifierImportedName(spec)
+		importedName := react_hooksutil.ImportSpecifierImportedName(spec)
 		localName := spec.Name()
 		switch {
 		case moduleName == "react-hook-form" && importedName == "useForm":
@@ -715,27 +715,6 @@ func (state *incompatibleLibraryState) lookup(name string) bindingKind {
 		}
 	}
 	return bindingUnknown
-}
-
-func importSpecifierImportedName(spec *ast.ImportSpecifier) string {
-	if spec.PropertyName != nil {
-		return moduleExportNameText(spec.PropertyName)
-	}
-	if spec.Name() != nil {
-		return spec.Name().Text()
-	}
-	return ""
-}
-
-func moduleExportNameText(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-	switch node.Kind {
-	case ast.KindIdentifier, ast.KindStringLiteral:
-		return node.Text()
-	}
-	return ""
 }
 
 func bindingElementPropertyName(node *ast.Node) string {

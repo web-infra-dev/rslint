@@ -8,6 +8,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/immutability"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/incompatible_library"
 	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/rules_of_hooks"
+	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/use_memo"
+	"github.com/web-infra-dev/rslint/internal/plugins/react_hooks/rules/void_use_memo"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -20,5 +22,7 @@ func GetAllRules() []rule.Rule {
 		globals.GlobalsRule,
 		immutability.ImmutabilityRule,
 		incompatible_library.IncompatibleLibraryRule,
+		use_memo.UseMemoRule,
+		void_use_memo.VoidUseMemoRule,
 	}
 }
