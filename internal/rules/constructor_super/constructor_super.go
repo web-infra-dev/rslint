@@ -484,7 +484,7 @@ func checkAllPathsHaveSuper(body *ast.Node) bool {
 
 // analyzeStatements checks if super() is called in all code paths
 func analyzeStatements(statements []*ast.Node) bool {
-	for i, stmt := range statements {
+	for _, stmt := range statements {
 		if stmt == nil {
 			continue
 		}
@@ -507,11 +507,9 @@ func analyzeStatements(statements []*ast.Node) bool {
 					// Has else clause - both branches must have super or terminate
 					elseHasSuper := statementHasSuper(elseStmt)
 					if thenHasSuper && elseHasSuper {
-						// Both branches have super or terminate, so we can continue
-						// Check remaining statements
-						if i+1 < len(statements) {
-							return analyzeStatements(statements[i+1:])
-						}
+						// Both branches call super() (or terminate) on every path,
+						// so the requirement is already satisfied - trailing
+						// statements need not call super() again.
 						return true
 					}
 				}
@@ -520,10 +518,8 @@ func analyzeStatements(statements []*ast.Node) bool {
 		case ast.KindSwitchStatement:
 			// Switch with super in all cases (including default)
 			if switchHasSuper(stmt) {
-				// All switch paths have super, check remaining statements
-				if i+1 < len(statements) {
-					return analyzeStatements(statements[i+1:])
-				}
+				// All switch paths already satisfy the requirement; trailing
+				// statements need not call super() again.
 				return true
 			}
 
@@ -546,10 +542,127 @@ func analyzeStatements(statements []*ast.Node) bool {
 					}
 				}
 			}
+
+		case ast.KindBlock:
+			// A nested block is transparent to control flow.
+			if analyzeStatements(stmt.Statements()) {
+				return true
+			}
+
+		case ast.KindLabeledStatement:
+			// Labels don't affect control flow reachability of the wrapped statement.
+			labeledStmt := stmt.AsLabeledStatement()
+			if labeledStmt != nil && analyzeStatements([]*ast.Node{labeledStmt.Statement}) {
+				return true
+			}
+
+		case ast.KindTryStatement:
+			tryStmt := stmt.AsTryStatement()
+			if tryStmt != nil && tryStatementHasSuper(tryStmt) {
+				return true
+			}
+
+		case ast.KindWhileStatement:
+			// A `while (true)` (or other always-truthy condition) loop always
+			// executes its body at least once.
+			whileStmt := stmt.AsWhileStatement()
+			if whileStmt != nil && isAlwaysTruthyCondition(whileStmt.Expression) &&
+				loopBodyGuaranteesSuper(loopBodyStatements(whileStmt.Statement)) {
+				return true
+			}
+
+		case ast.KindForStatement:
+			// `for (;;)` or `for (...; true; ...)` always executes its body at
+			// least once.
+			forStmt := stmt.AsForStatement()
+			if forStmt != nil && (forStmt.Condition == nil || isAlwaysTruthyCondition(forStmt.Condition)) &&
+				loopBodyGuaranteesSuper(loopBodyStatements(forStmt.Statement)) {
+				return true
+			}
+
+		case ast.KindDoStatement:
+			// A do-while loop always executes its body at least once,
+			// regardless of the condition.
+			doStmt := stmt.AsDoStatement()
+			if doStmt != nil && loopBodyGuaranteesSuper(loopBodyStatements(doStmt.Statement)) {
+				return true
+			}
 		}
 	}
 
 	return false
+}
+
+// loopBodyStatements returns the statement list making up a loop body,
+// handling both block bodies (`while (x) { ... }`) and single-statement
+// bodies without braces (`while (x) foo();`).
+func loopBodyStatements(body *ast.Node) []*ast.Node {
+	if body == nil {
+		return nil
+	}
+	if body.Kind == ast.KindBlock {
+		return body.Statements()
+	}
+	return []*ast.Node{body}
+}
+
+// isAlwaysTruthyCondition reports whether a loop condition is a literal that
+// always evaluates to true, meaning the loop body is guaranteed to run.
+func isAlwaysTruthyCondition(expr *ast.Node) bool {
+	return expr != nil && expr.Kind == ast.KindTrueKeyword
+}
+
+// loopBodyGuaranteesSuper reports whether a loop body that is guaranteed to
+// execute at least once is also guaranteed to call super() before it can be
+// exited via break/continue. It only recognizes the common, unambiguous
+// top-level pattern of statements executed in sequence; anything that might
+// hide a break/continue (nested blocks, if/switch/try, nested loops, labels,
+// ...) causes it to bail out conservatively (return false) rather than risk
+// missing a real "super() not called" case.
+func loopBodyGuaranteesSuper(stmts []*ast.Node) bool {
+	for _, stmt := range stmts {
+		if stmt == nil {
+			continue
+		}
+		if hasSuperCall(stmt) {
+			return true
+		}
+		switch stmt.Kind {
+		case ast.KindReturnStatement, ast.KindThrowStatement:
+			return true
+		case ast.KindBreakStatement, ast.KindContinueStatement:
+			return false
+		case ast.KindExpressionStatement, ast.KindVariableStatement, ast.KindEmptyStatement:
+			continue
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// tryStatementHasSuper reports whether a try statement guarantees super() is
+// called. A finally block that calls super() on every path guarantees it
+// regardless of the try/catch outcome (finally always runs). Otherwise, both
+// the try block and (if present) the catch block must independently
+// guarantee it - if there is no catch clause, an exception thrown before
+// super() propagates out of the constructor, which is an acceptable
+// terminating path (like an explicit throw).
+func tryStatementHasSuper(tryStmt *ast.TryStatement) bool {
+	if tryStmt.FinallyBlock != nil && analyzeStatements(tryStmt.FinallyBlock.Statements()) {
+		return true
+	}
+	if tryStmt.TryBlock == nil || !analyzeStatements(tryStmt.TryBlock.Statements()) {
+		return false
+	}
+	if tryStmt.CatchClause == nil {
+		return true
+	}
+	catchClause := tryStmt.CatchClause.AsCatchClause()
+	if catchClause == nil || catchClause.Block == nil {
+		return false
+	}
+	return analyzeStatements(catchClause.Block.Statements())
 }
 
 // expressionHasSuper checks if an expression contains a super() call
@@ -603,16 +716,7 @@ func statementHasSuper(stmt *ast.Node) bool {
 		return false
 	}
 
-	if stmt.Kind == ast.KindBlock {
-		return analyzeStatements(stmt.Statements())
-	}
-
-	// Return and throw statements are valid path terminators
-	if stmt.Kind == ast.KindReturnStatement || stmt.Kind == ast.KindThrowStatement {
-		return true
-	}
-
-	return hasSuperCall(stmt)
+	return analyzeStatements([]*ast.Node{stmt})
 }
 
 // switchHasSuper checks if a switch statement has super in all branches
