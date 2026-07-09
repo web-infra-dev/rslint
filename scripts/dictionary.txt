@@ -604,3 +604,5 @@ supa
 Värde
 Dmts
 Dcts
+tanstack
+predeclare
