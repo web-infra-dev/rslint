@@ -196,6 +196,146 @@ func AccessChainRootIdentifier(node *ast.Node) *ast.Node {
 	return nil
 }
 
+// ImportSpecifierImportedName returns the module-exported name for an import
+// specifier. For `import {foo as bar}`, this is `foo`; for `import {bar}`,
+// this is `bar`.
+func ImportSpecifierImportedName(spec *ast.ImportSpecifier) string {
+	if spec == nil {
+		return ""
+	}
+	name := spec.Name()
+	if spec.PropertyName != nil {
+		name = spec.PropertyName
+	}
+	return moduleExportNameText(name)
+}
+
+func moduleExportNameText(node *ast.Node) string {
+	if node == nil {
+		return ""
+	}
+	switch node.Kind {
+	case ast.KindIdentifier, ast.KindStringLiteral:
+		return node.Text()
+	}
+	return ""
+}
+
+// AssignmentTargetIdentifier is a binding written by an assignment target.
+// Identifier points at the actual identifier node, while Node is the broader
+// target to report when destructuring defaults need the full assignment node.
+type AssignmentTargetIdentifier struct {
+	Identifier *ast.Node
+	Node       *ast.Node
+	Name       string
+}
+
+// CollectAssignmentTargetIdentifiers returns every identifier written by an
+// assignment target, including nested array/object destructuring targets and
+// default values in destructuring patterns. It only peels parentheses, matching
+// the upstream globals rule's assignment-target handling.
+func CollectAssignmentTargetIdentifiers(node *ast.Node) []AssignmentTargetIdentifier {
+	var targets []AssignmentTargetIdentifier
+	collectAssignmentTargetIdentifiersInto(node, &targets, false)
+	return targets
+}
+
+// CollectAssignmentTargetIdentifiersThroughAssertions is the same assignment
+// target collector, but it also peels TS assertion wrappers before matching the
+// target shape.
+func CollectAssignmentTargetIdentifiersThroughAssertions(node *ast.Node) []AssignmentTargetIdentifier {
+	var targets []AssignmentTargetIdentifier
+	collectAssignmentTargetIdentifiersInto(node, &targets, true)
+	return targets
+}
+
+func collectAssignmentTargetIdentifiersInto(node *ast.Node, targets *[]AssignmentTargetIdentifier, throughAssertions bool) {
+	node = skipAssignmentTargetWrappers(node, throughAssertions)
+	if node == nil {
+		return
+	}
+	switch node.Kind {
+	case ast.KindIdentifier:
+		appendAssignmentTargetIdentifier(targets, node, node)
+	case ast.KindObjectLiteralExpression:
+		obj := node.AsObjectLiteralExpression()
+		if obj == nil || obj.Properties == nil {
+			return
+		}
+		for _, prop := range obj.Properties.Nodes {
+			switch prop.Kind {
+			case ast.KindShorthandPropertyAssignment:
+				shorthand := prop.AsShorthandPropertyAssignment()
+				name := prop.Name()
+				if shorthand != nil && shorthand.ObjectAssignmentInitializer != nil {
+					appendAssignmentTargetIdentifier(targets, name, prop)
+					continue
+				}
+				collectAssignmentTargetIdentifiersInto(name, targets, throughAssertions)
+			case ast.KindPropertyAssignment:
+				assignment := prop.AsPropertyAssignment()
+				if assignment != nil {
+					collectAssignmentTargetIdentifiersInto(assignment.Initializer, targets, throughAssertions)
+				}
+			case ast.KindSpreadAssignment:
+				spread := prop.AsSpreadAssignment()
+				if spread != nil {
+					collectAssignmentTargetIdentifiersInto(spread.Expression, targets, throughAssertions)
+				}
+			}
+		}
+	case ast.KindArrayLiteralExpression:
+		array := node.AsArrayLiteralExpression()
+		if array == nil || array.Elements == nil {
+			return
+		}
+		for _, elem := range array.Elements.Nodes {
+			collectAssignmentTargetIdentifiersInto(elem, targets, throughAssertions)
+		}
+	case ast.KindBinaryExpression:
+		binary := node.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+			return
+		}
+		left := skipAssignmentTargetWrappers(binary.Left, throughAssertions)
+		if left != nil && left.Kind == ast.KindIdentifier {
+			appendAssignmentTargetIdentifier(targets, left, node)
+			return
+		}
+		collectAssignmentTargetIdentifiersInto(left, targets, throughAssertions)
+	case ast.KindSpreadElement:
+		spread := node.AsSpreadElement()
+		if spread != nil {
+			collectAssignmentTargetIdentifiersInto(spread.Expression, targets, throughAssertions)
+		}
+	}
+}
+
+func skipAssignmentTargetWrappers(node *ast.Node, throughAssertions bool) *ast.Node {
+	if throughAssertions {
+		return utils.SkipAssertionsAndParens(node)
+	}
+	return ast.SkipParentheses(node)
+}
+
+func appendAssignmentTargetIdentifier(targets *[]AssignmentTargetIdentifier, id, reportNode *ast.Node) {
+	if id == nil || id.Kind != ast.KindIdentifier {
+		return
+	}
+	name := id.AsIdentifier().Text
+	if name == "" {
+		return
+	}
+	if reportNode == nil {
+		reportNode = id
+	}
+	*targets = append(*targets, AssignmentTargetIdentifier{
+		Identifier: id,
+		Node:       reportNode,
+		Name:       name,
+	})
+}
+
 // ContainsNode reports whether `descendant` is inside `ancestor` in the same
 // source file.
 func ContainsNode(ancestor, descendant *ast.Node) bool {
