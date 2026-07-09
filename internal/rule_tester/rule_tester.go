@@ -26,8 +26,10 @@ type ValidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Options  any                    `json:"options"`
 	Settings map[string]interface{} `json:"settings"`
-	// Globals simulates a merged `languageOptions.globals` (name → declared)
-	// for rules that read ctx.Globals (e.g. no-undef).
+	// Globals simulates a config-declared `languageOptions.globals` (name →
+	// declared) for rules that read ctx.Globals (e.g. no-undef). Inline
+	// `/* global */` comments in Code are picked up automatically by the
+	// linter and merged with this — no separate field needed for those.
 	Globals  map[string]bool `json:"globals"`
 	TSConfig string          `json:"tsConfig"`
 	Tsx      bool            `json:"tsx"`
@@ -58,8 +60,10 @@ type InvalidTestCase struct {
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
 	Settings map[string]interface{} `json:"settings"`
-	// Globals simulates a merged `languageOptions.globals` (name → declared)
-	// for rules that read ctx.Globals (e.g. no-undef).
+	// Globals simulates a config-declared `languageOptions.globals` (name →
+	// declared) for rules that read ctx.Globals (e.g. no-undef). Inline
+	// `/* global */` comments in Code are picked up automatically by the
+	// linter and merged with this — no separate field needed for those.
 	Globals  map[string]bool `json:"globals"`
 	TSConfig string          `json:"tsConfig"`
 	Options  any             `json:"options"`

@@ -2,7 +2,6 @@ package no_undef
 
 import (
 	"fmt"
-	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -26,25 +25,6 @@ func parseOptions(opts any) options {
 	return result
 }
 
-var globalCommentPattern = regexp.MustCompile(`/\*\s*global\s+([^*]+)\*/`)
-var globalNamePattern = regexp.MustCompile(`(\w+)\s*(?::\s*\w+)?`)
-
-// parseGlobalComments scans source text for /*global ...*/ block comments and
-// returns the set of variable names declared in them.
-func parseGlobalComments(sourceText string) map[string]bool {
-	globals := make(map[string]bool)
-	for _, match := range globalCommentPattern.FindAllStringSubmatch(sourceText, -1) {
-		if len(match) > 1 {
-			for _, nameMatch := range globalNamePattern.FindAllStringSubmatch(match[1], -1) {
-				if len(nameMatch) > 1 {
-					globals[nameMatch[1]] = true
-				}
-			}
-		}
-	}
-	return globals
-}
-
 var NoUndefRule = rule.Rule{
 	Name:             "no-undef",
 	RequiresTypeInfo: true,
@@ -57,9 +37,6 @@ var NoUndefRule = rule.Rule{
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}
-
-		// Parse /*global ...*/ comments to find declared globals
-		declaredGlobals := parseGlobalComments(ctx.SourceFile.Text())
 
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {
@@ -85,12 +62,8 @@ var NoUndefRule = rule.Rule{
 
 				name := node.Text()
 
-				// Skip identifiers declared via /*global*/ comments
-				if declaredGlobals[name] {
-					return
-				}
-
-				// Skip identifiers declared via languageOptions.globals
+				// Skip identifiers declared via languageOptions.globals or
+				// /* global */ comments (merged into ctx.Globals by the linter).
 				if ctx.Globals[name] {
 					return
 				}

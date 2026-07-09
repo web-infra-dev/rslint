@@ -9,9 +9,11 @@ import (
 type ConfiguredRule struct {
 	Name     string
 	Settings map[string]interface{}
-	// Globals is the resolved `languageOptions.globals` for this file (name →
-	// declared), threaded to rules that consult ctx.Globals (e.g. no-undef).
-	// Nil when the config declares none.
+	// Globals is the config-declared `languageOptions.globals` for this file
+	// (name → declared). The linter merges this with inline `/* global */`
+	// comments (parsed once per file, same as DisableManager) before exposing
+	// the combined result to rules as ctx.Globals — rules never parse either
+	// source themselves. Nil when the config declares none.
 	Globals          map[string]bool
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
