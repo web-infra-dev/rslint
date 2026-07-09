@@ -33,13 +33,13 @@ async function runWithJSConfigs(
   goArgs: string[],
   cwd: string,
   singleThreaded: boolean,
-  protectedConfigFiles = new Map<string, string[]>(),
+  explicitFileTargetsByConfigPath = new Map<string, string[]>(),
 ): Promise<number> {
   const configEntries: ConfigEntry[] = [];
   const dirToPath = new Map<string, string>();
   const isSingleConfig = configs.size === 1;
-  const protectedConfigDirs = new Set(
-    [...protectedConfigFiles.keys()].map((configPath) =>
+  const explicitFileConfigDirs = new Set(
+    [...explicitFileTargetsByConfigPath.keys()].map((configPath) =>
       path.dirname(configPath),
     ),
   );
@@ -89,25 +89,30 @@ async function runWithJSConfigs(
     return 1;
   }
 
-  // Filter out nested configs whose directory is covered by a parent config's
-  // global ignores (ESLint v10 alignment). Then hand the configs to Go in the
-  // IPC `init` payload (no more `--config-stdin` stdin pipe).
-  const unprotectedEntries = filterConfigsByParentIgnores(configEntries);
-  const unprotectedDirs = new Set(
-    unprotectedEntries.map((entry) => entry.configDirectory),
+  // Directory traversal drops nested configs hidden behind a parent config's
+  // global ignores. Explicit file args are different: ESLint resolves the
+  // nearest config for each file even if directory traversal would not enter
+  // that subtree. Keep those explicit-file configs, but scope them to the
+  // explicit files so they do not reopen full directory discovery.
+  const directoryFilteredEntries = filterConfigsByParentIgnores(configEntries);
+  const directoryFilteredDirs = new Set(
+    directoryFilteredEntries.map((entry) => entry.configDirectory),
   );
   const filteredEntries = filterConfigsByParentIgnores(
     configEntries,
-    protectedConfigDirs,
+    explicitFileConfigDirs,
   );
-  const wireConfigEntries = filteredEntries.map((ce) => ({
-    configPath: dirToPath.get(ce.configDirectory) ?? '',
-    configDirectory: ce.configDirectory,
-    entries: ce.entries,
-    targetFiles: unprotectedDirs.has(ce.configDirectory)
-      ? undefined
-      : protectedConfigFiles.get(dirToPath.get(ce.configDirectory) ?? ''),
-  }));
+  const wireConfigEntries = filteredEntries.map((ce) => {
+    const configPath = dirToPath.get(ce.configDirectory) ?? '';
+    return {
+      configPath,
+      configDirectory: ce.configDirectory,
+      entries: ce.entries,
+      targetFiles: directoryFilteredDirs.has(ce.configDirectory)
+        ? undefined
+        : explicitFileTargetsByConfigPath.get(configPath),
+    };
+  });
   const { eslintPluginEntries, pluginConfigs } =
     collectPluginMeta(wireConfigEntries);
   return runEngine({
@@ -154,16 +159,17 @@ export async function run(
 
   // Discover JS/TS configs
   const configs = await discoverConfigs(files, dirs, cwd, args.config);
-  const protectedConfigFiles = new Map<string, string[]>();
+  const explicitFileTargetsByConfigPath = new Map<string, string[]>();
   if (!args.config) {
     for (const file of files) {
       const nearestConfig = findJSConfigUp(path.dirname(file));
       if (nearestConfig) {
-        const protectedFiles = protectedConfigFiles.get(nearestConfig);
-        if (protectedFiles) {
-          protectedFiles.push(file);
+        const explicitTargets =
+          explicitFileTargetsByConfigPath.get(nearestConfig);
+        if (explicitTargets) {
+          explicitTargets.push(file);
         } else {
-          protectedConfigFiles.set(nearestConfig, [file]);
+          explicitFileTargetsByConfigPath.set(nearestConfig, [file]);
         }
       }
     }
@@ -188,7 +194,7 @@ export async function run(
       goArgs,
       cwd,
       args.singleThreaded,
-      protectedConfigFiles,
+      explicitFileTargetsByConfigPath,
     );
   }
 

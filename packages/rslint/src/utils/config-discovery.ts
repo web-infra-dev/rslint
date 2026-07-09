@@ -265,13 +265,22 @@ function isRelativeChildPath(relPath: string): boolean {
   );
 }
 
+function isSameOrChildDirectory(parentDir: string, childDir: string): boolean {
+  const relPath = path.relative(parentDir, childDir);
+  return relPath === '' || isRelativeChildPath(relPath);
+}
+
 export interface ConfigEntry {
   configDirectory: string;
   entries: RslintConfigEntry[];
 }
 
 function resolveConfigDirectory(configDirectory: string): string {
-  let dir = configDirectory.replace(/[/\\]+$/, '');
+  let dir = configDirectory;
+  const root = path.parse(dir).root;
+  while (dir.length > root.length && /[/\\]$/.test(dir)) {
+    dir = dir.slice(0, -1);
+  }
   try {
     dir = fs.realpathSync(dir);
   } catch {
@@ -289,12 +298,20 @@ function resolveConfigDirectory(configDirectory: string): string {
  * Example: root config has `{ ignores: ['__tests__/**'] }`.
  * A nested config at `__tests__/fixtures/rslint.config.js` is filtered out
  * because `__tests__/fixtures/` is within the root config's global ignores.
+ *
+ * `forceIncludeConfigDirectories` is for explicit CLI file targets: ESLint
+ * resolves the nearest config for an explicit file even when a parent global
+ * ignore would have blocked directory traversal into that subtree.
  */
 export function filterConfigsByParentIgnores(
   configEntries: ConfigEntry[],
-  protectedConfigDirectories = new Set<string>(),
+  forceIncludeConfigDirectories = new Set<string>(),
 ): ConfigEntry[] {
   if (configEntries.length <= 1) return configEntries;
+
+  const forceIncludedDirs = new Set(
+    [...forceIncludeConfigDirectories].map(resolveConfigDirectory),
+  );
 
   const resolvedDirs = new Map<ConfigEntry, string>();
   for (const entry of configEntries) {
@@ -314,10 +331,7 @@ export function filterConfigsByParentIgnores(
 
     for (const parent of result) {
       const parentDir = resolvedDirs.get(parent)!;
-      if (
-        !configDir.startsWith(parentDir + path.sep) &&
-        configDir !== parentDir
-      ) {
+      if (!isSameOrChildDirectory(parentDir, configDir)) {
         continue;
       }
 
@@ -330,7 +344,7 @@ export function filterConfigsByParentIgnores(
       }
     }
 
-    if (!ignored || protectedConfigDirectories.has(config.configDirectory)) {
+    if (!ignored || forceIncludedDirs.has(configDir)) {
       result.push(config);
     }
   }

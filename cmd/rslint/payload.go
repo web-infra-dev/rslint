@@ -15,7 +15,7 @@ type configPayloadEntry struct {
 	TargetFiles     []string                  `json:"targetFiles,omitempty"`
 }
 
-// parsedPayload is the result of parsing a config-stdin payload.
+// parsedPayload is the result of parsing the serialized JS-config payload.
 type parsedPayload struct {
 	// configMap maps normalized configDirectory to config entries (multi-config mode).
 	// nil when using legacy single-config mode.
@@ -44,7 +44,7 @@ type parsedPayload struct {
 	IsMultiConfig bool
 }
 
-// parseConfigPayload parses the JSON payload from --config-stdin.
+// parseConfigPayload parses the serialized JS-config payload.
 // It supports both the new multi-config format ({ configs: [...] })
 // and the legacy single-config format ({ configDirectory, entries }).
 func parseConfigPayload(data []byte) (*parsedPayload, error) {

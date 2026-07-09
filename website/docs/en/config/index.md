@@ -104,7 +104,7 @@ Glob patterns specifying which files this config entry applies to. If omitted, t
 
 If `files` is present, it must contain at least one pattern. Use an omitted `files` field for shared/default entries; `files: []` is invalid.
 
-Lint targets are selected from the CLI/API target range, then filtered by `files`, global ignores, and `.gitignore`. Explicit file arguments are the exception: an explicit file can still appear as a lint result even when it does not match any `files` pattern, but no rules run for it unless `GetConfigForFile` finds a matching entry. Global ignores and `.gitignore` still remove explicit files from the result set.
+Lint targets are selected from the CLI/API target range, then filtered by `files`, global ignores, and `.gitignore`. Explicit file arguments are the exception: an explicit file can still appear as a lint result even when it does not match any `files` pattern, but no rules run unless at least one config entry applies to that file. Global ignores and `.gitignore` still remove explicit files from the result set.
 
 Each non-global entry that omits `files` contributes this default set:
 

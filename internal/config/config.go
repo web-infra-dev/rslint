@@ -31,40 +31,54 @@ type ConfigEntry struct {
 	Rules           Rules            `json:"rules"`
 	Plugins         []string         `json:"plugins,omitempty"`
 	Settings        Settings         `json:"settings,omitempty"`
-
-	filesPresent bool
 }
 
 // Settings represents shared settings accessible to rules
 type Settings map[string]interface{}
 
-// UnmarshalJSON records whether the `files` key was present so validation can
-// distinguish an omitted field from an explicit null/empty array.
-func (entry *ConfigEntry) UnmarshalJSON(data []byte) error {
+// UnmarshalJSON rejects invalid explicit `files` values at the config boundary.
+// An omitted `files` field remains valid and means "use rslint's default
+// lintable extensions"; explicit null/empty arrays are invalid.
+func (config *RslintConfig) UnmarshalJSON(data []byte) error {
+	var rawEntries []json.RawMessage
+	if err := json.Unmarshal(data, &rawEntries); err != nil {
+		return err
+	}
+
 	type configEntryAlias ConfigEntry
+	entries := make(RslintConfig, 0, len(rawEntries))
+	for index, rawEntry := range rawEntries {
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(rawEntry, &raw); err != nil {
+			return err
+		}
 
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return err
+		if rawFiles, ok := raw["files"]; ok {
+			var files []string
+			if err := json.Unmarshal(rawFiles, &files); err != nil {
+				return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array: %w", index, err)
+			}
+			if len(files) == 0 {
+				return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
+			}
+		}
+
+		var decoded configEntryAlias
+		if err := json.Unmarshal(rawEntry, &decoded); err != nil {
+			return err
+		}
+		entries = append(entries, ConfigEntry(decoded))
 	}
 
-	var decoded configEntryAlias
-	if err := json.Unmarshal(data, &decoded); err != nil {
-		return err
-	}
-
-	*entry = ConfigEntry(decoded)
-	if _, ok := raw["files"]; ok {
-		entry.filesPresent = true
-	}
+	*config = entries
 	return nil
 }
 
-// ValidateConfig checks config invariants that depend on preserving the
-// distinction between an omitted field and an explicitly-authored empty value.
+// ValidateConfig checks config invariants for configs constructed in Go. JSON
+// config ingress rejects explicit null/empty `files` during unmarshaling.
 func ValidateConfig(config RslintConfig) error {
 	for index, entry := range config {
-		if (entry.filesPresent || entry.Files != nil) && len(entry.Files) == 0 {
+		if entry.Files != nil && len(entry.Files) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
 		}
 	}

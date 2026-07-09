@@ -437,8 +437,8 @@ The loading flow differs by config type:
 
 1. `packages/rslint/src/cli/cli.ts` discovers one or more config files
 2. each config is loaded and normalized on the Node side
-3. the Node wrapper sends a stdin payload to the Go binary via `--config-stdin`
-4. Go parses either a multi-config payload or a legacy single-config payload
+3. the Node wrapper sends the normalized config list to Go in the IPC `init` payload
+4. Go parses either a multi-config payload or a legacy single-config payload shape
 5. nearest-config lookup is used later to decide target ownership and rule selection
 
 **JSON config**:
@@ -490,9 +490,9 @@ rslint [options] [files...]
 
 The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli/cli.ts`) and the Go binary (`cmd/rslint/`).
 
-1. **Node.js Wrapper**: parses args, discovers JS/TS configs, and decides whether to use `--config-stdin`
+1. **Node.js Wrapper**: parses args, discovers JS/TS configs, and decides whether Go should load JSON config itself
 2. **Config Path Selection**:
-   - JS/TS configs are normalized in Node and piped to Go
+   - JS/TS configs are normalized in Node and sent to Go in the IPC `init` payload
    - JSON configs are loaded directly by Go
 3. **Mode Selection**:
    - `--lsp`: starts the LSP server
@@ -807,7 +807,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
 - **Fallback Program**: Extra AST-only `Program` created from selected lint targets that are not covered by any tsconfig-backed Program; fallback files are intentionally non-type-aware
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file
-- **Gap File**: A file matched by config but not present in any tsconfig-backed Program
+- **Gap File**: A selected lint target that is not present in any tsconfig-backed Program
 - **Inspector**: Auxiliary backend path that returns node, type, symbol, signature, and flow information for Playground inspection
 - **IPC API**: Length-prefixed JSON message protocol exposed by `cmd/rslint --api` for Node and WASM clients
 - **Listener**: Callback registered by a rule for an AST kind or synthetic listener kind

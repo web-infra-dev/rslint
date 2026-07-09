@@ -47,10 +47,22 @@ func TestValidateConfig_RejectsEmptyFilesOnIgnoreOnlyEntry(t *testing.T) {
 
 func TestValidateConfig_RejectsNullFilesFromJSON(t *testing.T) {
 	var cfg RslintConfig
-	if err := json.Unmarshal([]byte(`[{"files": null, "rules": {}}]`), &cfg); err != nil {
-		t.Fatalf("json.Unmarshal returned error: %v", err)
+	err := json.Unmarshal([]byte(`[{"files": null, "rules": {}}]`), &cfg)
+	if err == nil {
+		t.Fatal("expected null files field to be rejected while unmarshaling")
 	}
-	if err := ValidateConfig(cfg); err == nil {
-		t.Fatal("expected null files field to be rejected")
+	if got := err.Error(); got != `config entry at index 0: key "files": expected value to be a non-empty array` {
+		t.Fatalf("unexpected error: %q", got)
+	}
+}
+
+func TestValidateConfig_RejectsEmptyFilesArrayFromJSON(t *testing.T) {
+	var cfg RslintConfig
+	err := json.Unmarshal([]byte(`[{"files": [], "rules": {}}]`), &cfg)
+	if err == nil {
+		t.Fatal("expected empty files array to be rejected while unmarshaling")
+	}
+	if got := err.Error(); got != `config entry at index 0: key "files": expected value to be a non-empty array` {
+		t.Fatalf("unexpected error: %q", got)
 	}
 }

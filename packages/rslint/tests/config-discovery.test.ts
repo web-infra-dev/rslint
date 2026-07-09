@@ -597,6 +597,23 @@ describe('filterConfigsByParentIgnores', () => {
     expect(result).toHaveLength(1);
   });
 
+  test('trailing slash normalization preserves filesystem root', () => {
+    const root = path.parse(path.resolve('/')).root;
+    const child = path.join(root, 'rslint-root-child');
+    const result = filterConfigsByParentIgnores([
+      cfg(
+        root,
+        globalIgnore('rslint-root-child/**'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
+      cfg(child, ruleEntry(['**/*.ts'], {})),
+    ]);
+
+    expect(result).toHaveLength(1);
+    expect(dirs(result)).toContain(root);
+    expect(dirs(result)).not.toContain(child);
+  });
+
   // --- Cross-package ignore isolation ---
 
   test('child global ignore does NOT bubble up to filter parent', () => {
