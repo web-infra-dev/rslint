@@ -90,6 +90,11 @@ var NoUndefRule = rule.Rule{
 					return
 				}
 
+				// Skip identifiers declared via languageOptions.globals
+				if ctx.Globals[name] {
+					return
+				}
+
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "undef",
 					Description: fmt.Sprintf("'%s' is not defined.", name),

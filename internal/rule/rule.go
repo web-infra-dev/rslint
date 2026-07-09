@@ -211,8 +211,11 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 }
 
 type RuleContext struct {
-	SourceFile                 *ast.SourceFile
-	Settings                   map[string]interface{}
+	SourceFile *ast.SourceFile
+	Settings   map[string]interface{}
+	// Globals is the resolved `languageOptions.globals` for this file (name →
+	// declared). Nil when the config declares none.
+	Globals                    map[string]bool
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager

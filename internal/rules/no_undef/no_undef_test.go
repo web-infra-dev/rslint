@@ -105,6 +105,9 @@ func TestNoUndefRule(t *testing.T) {
 			{Code: `/*global a, b*/ a = 1; b = 2;`},
 			{Code: `/*global myVar:writable*/ myVar = 1;`},
 
+			// === languageOptions.globals ===
+			{Code: `myConfiguredGlobal;`, Globals: map[string]bool{"myConfiguredGlobal": true}},
+
 			// === Namespace ===
 			{Code: `namespace MyNS { export var x = 1; } MyNS.x;`},
 
@@ -324,6 +327,15 @@ func TestNoUndefRule(t *testing.T) {
 				Code: `/*global otherVar*/ unknownVar123 = 1;`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 21},
+				},
+			},
+
+			// === languageOptions.globals explicitly "off" still reports ===
+			{
+				Code:    `myOffGlobal123;`,
+				Globals: map[string]bool{"myOffGlobal123": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 1},
 				},
 			},
 

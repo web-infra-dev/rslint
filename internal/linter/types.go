@@ -7,8 +7,12 @@ import (
 )
 
 type ConfiguredRule struct {
-	Name             string
-	Settings         map[string]interface{}
+	Name     string
+	Settings map[string]interface{}
+	// Globals is the resolved `languageOptions.globals` for this file (name →
+	// declared), threaded to rules that consult ctx.Globals (e.g. no-undef).
+	// Nil when the config declares none.
+	Globals          map[string]bool
 	Severity         rule.DiagnosticSeverity
 	RequiresTypeInfo bool
 	// IsEslintPluginRule marks a rule that executes in the Node plugin-lint

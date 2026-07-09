@@ -152,6 +152,7 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 				SourceFile:     file,
 				Program:        opts.Program,
 				Settings:       r.Settings,
+				Globals:        r.Globals,
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
 				ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
