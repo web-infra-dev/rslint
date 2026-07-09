@@ -48,6 +48,8 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 		return nil, nil // file is globally ignored
 	}
 
+	globals := ExtractGlobals(mergedConfig.LanguageOptions)
+
 	var enabledRules []linter.ConfiguredRule
 	for ruleName, ruleConfig := range mergedConfig.Rules {
 		if ruleConfig.IsEnabled() {
@@ -67,6 +69,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
 					Name:               ruleName,
 					Settings:           CloneSettings(mergedConfig.Settings),
+					Globals:            globals,
 					Severity:           ruleConfig.GetSeverity(),
 					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,

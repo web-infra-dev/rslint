@@ -211,8 +211,15 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 }
 
 type RuleContext struct {
-	SourceFile                 *ast.SourceFile
-	Settings                   map[string]interface{}
+	SourceFile *ast.SourceFile
+	Settings   map[string]interface{}
+	// Globals is the fully resolved set of declared global names for this
+	// file — config `languageOptions.globals` merged with inline
+	// `/* global */` comments, computed once per file by the linter (see
+	// DisableManager, built the same way). Rules should read this instead of
+	// parsing comments or config themselves. Nil when none are declared;
+	// a name maps to false only if some source explicitly set it to "off".
+	Globals                    map[string]bool
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager

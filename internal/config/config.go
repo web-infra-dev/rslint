@@ -584,6 +584,31 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 	return &merged
 }
 
+// ExtractGlobals reads the effective `languageOptions.globals` for a merged
+// config (the buggy shallow-merged Raw map — see mergeLanguageOptions) and
+// normalizes it to a simple "is this name declared" set.
+//
+// Matches ESLint's own normalizeConfigGlobal (lib/languages/js/source-code/
+// source-code.js): only the string `"off"` un-declares a global. Every other
+// accepted value — including boolean `false` and `null`, which both map to
+// `"readonly"` — still declares it. (`false` does NOT mean "off"; that's a
+// common mix-up since other ESLint config knobs use `false`/`"off"`
+// interchangeably, but globals don't.)
+func ExtractGlobals(langOpts *LanguageOptions) map[string]bool {
+	if langOpts == nil || langOpts.Raw == nil {
+		return nil
+	}
+	raw, ok := langOpts.Raw["globals"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	globals := make(map[string]bool, len(raw))
+	for name, value := range raw {
+		globals[name] = value != "off"
+	}
+	return globals
+}
+
 // RulePluginPrefix extracts the plugin prefix from a rule name.
 // "@typescript-eslint/no-explicit-any" → "@typescript-eslint"
 // "import/no-unresolved" → "import"
