@@ -262,6 +262,72 @@ func TestBuildPluginFileInput_TextOverridePrecedence(t *testing.T) {
 	}
 }
 
+func TestBuildPluginFileInput_RespectsFiles(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tplfiles", RuleNames: []string{"no-foo"}},
+	})
+
+	s := newTestServer()
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tplfiles"},
+			Rules:   config.Rules{"tplfiles/no-foo": "error"},
+		},
+	}
+	s.documents["file:///proj/matched.ts"] = "foo();"
+	s.documents["file:///proj/outside.js"] = "foo();"
+
+	if in, ok := s.buildPluginFileInput("file:///proj/matched.ts", nil); !ok {
+		t.Fatal("expected matching TS file to produce plugin input")
+	} else if len(in.Rules) != 1 || in.Rules[0].Name != "tplfiles/no-foo" {
+		t.Fatalf("expected tplfiles/no-foo for matching file, got %+v", in.Rules)
+	}
+
+	if in, ok := s.buildPluginFileInput("file:///proj/outside.js", nil); ok {
+		t.Fatalf("files-scope miss must not dispatch plugin lint, got input %+v", in)
+	}
+}
+
+func TestBuildPluginFileInput_NestedEncodedConfigKeyAndCwd(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tprootcfg", RuleNames: []string{"no-root"}},
+		{Prefix: "tpnestedcfg", RuleNames: []string{"no-foo"}},
+	})
+
+	s := newTestServer()
+	s.jsConfigs["file:///Users/John%20Doe/my%20project"] = config.RslintConfig{
+		{
+			Files:   []string{"**/*.ts"},
+			Plugins: []string{"tprootcfg"},
+			Rules:   config.Rules{"tprootcfg/no-root": "error"},
+		},
+	}
+	s.jsConfigs["file:///Users/John%20Doe/my%20project/packages/foo"] = config.RslintConfig{
+		{
+			Files:   []string{"src/**/*.ts"},
+			Plugins: []string{"tpnestedcfg"},
+			Rules:   config.Rules{"tpnestedcfg/no-foo": "error"},
+		},
+	}
+	uri := lsproto.DocumentUri("file:///Users/John%20Doe/my%20project/packages/foo/src/index.ts")
+	s.documents[uri] = "foo();"
+
+	in, ok := s.buildPluginFileInput(uri, nil)
+	if !ok {
+		t.Fatal("expected nested encoded config to produce plugin input")
+	}
+	if in.ConfigKey != "file:///Users/John%20Doe/my%20project/packages/foo" {
+		t.Fatalf("configKey = %q, want encoded nested config URI", in.ConfigKey)
+	}
+	if in.Path != "/Users/John Doe/my project/packages/foo/src/index.ts" {
+		t.Fatalf("path = %q, want decoded filesystem path", in.Path)
+	}
+	if len(in.Rules) != 1 || in.Rules[0].Name != "tpnestedcfg/no-foo" {
+		t.Fatalf("expected only the nested plugin rule, got %+v", in.Rules)
+	}
+}
+
 // TestLintPluginRulesSync_RebuildsWithFixes verifies the synchronous fixAll
 // helper turns a mocked worker result into a RuleDiagnostic carrying the fix
 // (so ApplyRuleFixes can apply it) with the configured severity reattached.
@@ -840,6 +906,80 @@ func TestDispatchPluginLint_SupersedeCancelsPrior(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("supersede did not $/cancelRequest the prior reverse request")
+	}
+}
+
+func TestDispatchPluginLint_FilesMissCancelsPriorWithoutNewRequest(t *testing.T) {
+	config.RegisterEslintPluginRules([]config.EslintPluginEntry{
+		{Prefix: "tpfilescancel", RuleNames: []string{"no-bar"}},
+	})
+	s, queue := newTestServerWithQueue()
+	s.pendingServerRequests = make(map[jsonrpc.ID]chan *lsproto.ResponseMessage)
+	s.backgroundCtx = context.Background()
+	s.pluginReverseTimeout = 500 * time.Millisecond
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{Plugins: []string{"tpfilescancel"}, Rules: config.Rules{"tpfilescancel/no-bar": "error"}},
+	}
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	s.documents[uri] = "const bar = 1;"
+	s.docGeneration[uri] = 1
+
+	s.dispatchPluginLint(uri, 1)
+
+	var firstID *jsonrpc.ID
+	deadline := time.Now().Add(2 * time.Second)
+	for firstID == nil {
+		if time.Now().After(deadline) {
+			t.Fatal("first dispatch never registered its reverse-request id")
+		}
+		s.inflightPluginDispatchMu.Lock()
+		if h := s.inflightPluginDispatch[uri]; h != nil {
+			firstID = h.reqID
+		}
+		s.inflightPluginDispatchMu.Unlock()
+		time.Sleep(2 * time.Millisecond)
+	}
+
+	select {
+	case msg := <-queue:
+		if req := msg.AsRequest(); req.Method != methodPluginLint {
+			t.Fatalf("first message = %q, want %q", req.Method, methodPluginLint)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("first reverse request was not sent")
+	}
+
+	// Reconfigure the same open TS file out of the plugin entry's files scope.
+	// The next dispatch has no plugin work, but it still must cancel the stale
+	// in-flight worker from the previous generation.
+	s.jsConfigs["file:///proj"] = config.RslintConfig{
+		{
+			Files:   []string{"**/*.js"},
+			Plugins: []string{"tpfilescancel"},
+			Rules:   config.Rules{"tpfilescancel/no-bar": "error"},
+		},
+	}
+	s.docGeneration[uri] = 2
+	s.dispatchPluginLint(uri, 2)
+
+	select {
+	case msg := <-queue:
+		req := msg.AsRequest()
+		if req.Method != lsproto.MethodCancelRequest {
+			t.Fatalf("files-miss dispatch queued %q, want only %q", req.Method, lsproto.MethodCancelRequest)
+		}
+		cp, ok := req.Params.(*lsproto.CancelParams)
+		if !ok || cp.Id.String == nil || *cp.Id.String != firstID.String() {
+			t.Fatalf("cancel targeted %+v, want the prior id %s", req.Params, firstID.String())
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("files-miss dispatch did not cancel the prior reverse request")
+	}
+
+	select {
+	case msg := <-queue:
+		t.Fatalf("files-miss dispatch must not send a new pluginLint request, got %q", msg.AsRequest().Method)
+	default:
 	}
 }
 

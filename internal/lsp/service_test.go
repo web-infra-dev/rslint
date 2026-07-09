@@ -3,13 +3,23 @@ package lsp
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // newTestServer creates a minimal Server for handler unit tests.
@@ -1643,6 +1653,91 @@ func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
 
 // ======== runLintWithSession: ignored-file short-circuit ========
 
+func TestIsLintableScriptFile_UsesDefaultLintExtensions(t *testing.T) {
+	tests := []struct {
+		name string
+		want bool
+	}{
+		{"a.js", true},
+		{"a.mjs", true},
+		{"a.cjs", true},
+		{"a.jsx", true},
+		{"a.ts", true},
+		{"a.mts", true},
+		{"a.cts", true},
+		{"a.tsx", true},
+		{"style.css", false},
+		{"data.json", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			uri := lsproto.DocumentUri("file:///project/" + tt.name)
+			if got := isLintableScriptFile(uri); got != tt.want {
+				t.Fatalf("isLintableScriptFile(%q) = %v, want %v", uri, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
+	config.RegisterAllRules()
+
+	dir := t.TempDir()
+	srcDir := filepath.Join(dir, "src")
+	if err := os.MkdirAll(srcDir, 0o755); err != nil {
+		t.Fatalf("mkdir src: %v", err)
+	}
+	tsFile := tspath.NormalizePath(filepath.Join(srcDir, "matched.ts"))
+	jsFile := tspath.NormalizePath(filepath.Join(srcDir, "outside.js"))
+	for _, file := range []string{tsFile, jsFile} {
+		if err := os.WriteFile(file, []byte("debugger;\n"), 0o644); err != nil {
+			t.Fatalf("write %s: %v", file, err)
+		}
+	}
+
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	host := utils.CreateCompilerHost(dir, fs)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{
+		Target:  core.ScriptTargetESNext,
+		Module:  core.ModuleKindESNext,
+		AllowJs: core.TSTrue,
+		CheckJs: core.TSTrue,
+	}, []string{tsFile, jsFile}, host)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
+	}
+
+	cfg := config.RslintConfig{
+		{
+			Files: []string{"**/*.ts"},
+			Rules: config.Rules{"no-debugger": "error"},
+		},
+	}
+	collect := func(file string) []rule.RuleDiagnostic {
+		t.Helper()
+		var diags []rule.RuleDiagnostic
+		linter.LintSingleFile(linter.LintSingleFileOptions{
+			Program: program,
+			File:    file,
+			GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+				return lspActiveRulesForFile(cfg, sourceFile.FileName(), dir, false, true)
+			},
+			OnDiagnostic: func(d rule.RuleDiagnostic) {
+				diags = append(diags, d)
+			},
+		})
+		return diags
+	}
+
+	if got := collect(tsFile); len(got) != 1 {
+		t.Fatalf("matching TS file should run no-debugger once, got %d diagnostics: %+v", len(got), got)
+	}
+	if got := collect(jsFile); len(got) != 0 {
+		t.Fatalf("files-scope miss must not run LSP native rules, got %+v", got)
+	}
+}
+
 // runLintWithSession must early-return for files matching the config's
 // `ignores` patterns, WITHOUT touching the session. This test proves the
 // guard semantically (not just by coincidence of a no-op session):
@@ -1661,6 +1756,7 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 	cfg := config.RslintConfig{
 		// Global ignores entry: hides everything under lib/.
 		{Ignores: []string{"lib/**"}},
+		{Rules: config.Rules{"no-debugger": "error"}},
 	}
 
 	ignoredURI := lsproto.DocumentUri("file:///project/lib/util.ts")
@@ -1697,5 +1793,47 @@ func TestRunLintWithSession_IgnoredFileShortCircuits(t *testing.T) {
 			}
 		}()
 		_, _ = runLintWithSession(normalURI, nil, ctx, cfg, cwd, false, nil, nil)
+	})
+}
+
+func TestRunLintWithSession_FilesMissShortCircuits(t *testing.T) {
+	ctx := context.Background()
+	cwd := "/project"
+	cfg := config.RslintConfig{
+		{
+			Files: []string{"**/*.ts"},
+			Rules: config.Rules{"no-debugger": "error"},
+		},
+	}
+
+	missedURI := lsproto.DocumentUri("file:///project/src/outside.js")
+	matchedURI := lsproto.DocumentUri("file:///project/src/main.ts")
+
+	t.Run("files miss returns empty without touching session", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("runLintWithSession panicked on files miss (early-return missing?): %v", r)
+			}
+		}()
+
+		diags, err := runLintWithSession(missedURI, nil, ctx, cfg, cwd, false, nil, nil)
+		if err != nil {
+			t.Fatalf("expected nil error, got %v", err)
+		}
+		if diags == nil {
+			t.Fatal("expected non-nil empty slice (LSP protocol expects [], not null)")
+		}
+		if len(diags) != 0 {
+			t.Errorf("expected 0 diagnostics for files miss, got %d: %+v", len(diags), diags)
+		}
+	})
+
+	t.Run("files match falls through to session (nil-session panic)", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatal("expected panic when matching file is given a nil session, got none")
+			}
+		}()
+		_, _ = runLintWithSession(matchedURI, nil, ctx, cfg, cwd, false, nil, nil)
 	})
 }

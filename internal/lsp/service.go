@@ -557,7 +557,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 	if s.session == nil {
 		return empty, nil
 	}
-	if !isTypeScriptFile(string(uri)) {
+	if !isLintableScriptFile(uri) {
 		return empty, nil
 	}
 
@@ -711,12 +711,8 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnosti
 	}
 }
 
-func isTypeScriptFile(uri string) bool {
-	path := strings.ToLower(uri)
-	return strings.HasSuffix(path, ".ts") ||
-		strings.HasSuffix(path, ".tsx") ||
-		strings.HasSuffix(path, ".js") ||
-		strings.HasSuffix(path, ".jsx")
+func isLintableScriptFile(uri lsproto.DocumentUri) bool {
+	return config.IsSupportedLintFile(uriToPath(uri))
 }
 
 func uriToPath(uri lsproto.DocumentUri) string {
@@ -770,6 +766,10 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 	if rslintConfig.IsFileIgnored(filename, cwd) {
 		return []rule.RuleDiagnostic{}, nil
 	}
+	// Files outside the config's `files` set should not spin up TypeScript LS.
+	if rslintConfig.GetConfigForFile(filename, cwd) == nil {
+		return []rule.RuleDiagnostic{}, nil
+	}
 
 	// GetLanguageService flushes any pending changes (from DidChangeFile) and
 	// returns a language service whose program reflects the latest overlay content.
@@ -814,11 +814,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		Program: program,
 		File:    filename,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
-			if !hasTypeInfo {
-				activeRules = linter.FilterNonTypeAwareRules(activeRules)
-			}
-			return activeRules
+			return lspActiveRulesForFile(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins, hasTypeInfo)
 		},
 		OnDiagnostic: diagnosticCollector,
 	})
@@ -827,6 +823,14 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		diagnostics = []rule.RuleDiagnostic{}
 	}
 	return diagnostics, nil
+}
+
+func lspActiveRulesForFile(rslintConfig config.RslintConfig, filePath string, cwd string, enforcePlugins bool, hasTypeInfo bool) []linter.ConfiguredRule {
+	activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, filePath, cwd, enforcePlugins)
+	if !hasTypeInfo {
+		activeRules = linter.FilterNonTypeAwareRules(activeRules)
+	}
+	return activeRules
 }
 
 // Helper function to check if two ranges overlap
@@ -1067,7 +1071,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 
 	ctx := s.backgroundCtx
 
-	if !isTypeScriptFile(string(uri)) {
+	if !isLintableScriptFile(uri) {
 		return
 	}
 
