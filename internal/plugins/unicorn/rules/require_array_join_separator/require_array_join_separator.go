@@ -120,7 +120,7 @@ func appendSeparatorFix(closing core.TextRange, penultimateKind ast.Kind, isProt
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/require-array-join-separator.md
 var RequireArrayJoinSeparatorRule = rule.Rule{
 	Name: "unicorn/require-array-join-separator",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		zeroArguments := 0
 		oneArgument := 1
 		return rule.RuleListeners{
