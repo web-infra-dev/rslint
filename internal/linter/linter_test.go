@@ -3,6 +3,7 @@ package linter
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -107,6 +108,74 @@ func TestRunLinter_ExecutedRules(t *testing.T) {
 	}
 }
 
+func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
+	source := "#!/usr/bin/env node\n" +
+		"/*global configOn:off, inlineOn, repeated:off */\n" +
+		"/*global repeated, inlineOn:off */"
+	program, paths := createTestProgramWithFiles(t, map[string]string{"globals.ts": source})
+	configGlobals := map[string]bool{"configOn": true, "configOff": false}
+
+	var captured *rule.RuleContext
+	result, err := runLinterPositional([]*compiler.Program{program}, true, []string{paths["globals.ts"]}, nil, utils.ExcludePaths,
+		func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{{
+				Name:     "capture-globals",
+				Globals:  configGlobals,
+				Severity: rule.SeverityWarning,
+				Run: func(ctx rule.RuleContext) rule.RuleListeners {
+					captured = &ctx
+					return nil
+				},
+			}}
+		},
+		false, func(rule.RuleDiagnostic) {}, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if result.LintedFileCount != 1 || captured == nil {
+		t.Fatalf("captured context = %v, linted files = %d; want one", captured != nil, result.LintedFileCount)
+	}
+
+	if !reflect.DeepEqual(captured.ConfigGlobals, configGlobals) {
+		t.Errorf("ConfigGlobals = %#v, want %#v", captured.ConfigGlobals, configGlobals)
+	}
+	wantGlobals := map[string]bool{
+		"configOn": false, "configOff": false, "inlineOn": false, "repeated": true,
+	}
+	if !reflect.DeepEqual(captured.Globals, wantGlobals) {
+		t.Errorf("Globals = %#v, want %#v", captured.Globals, wantGlobals)
+	}
+
+	wantInline := []struct {
+		name      string
+		declared  bool
+		positions []int
+	}{
+		{name: "configOn", declared: false, positions: []int{strings.Index(source, "configOn")}},
+		{name: "inlineOn", declared: false, positions: []int{strings.Index(source, "inlineOn"), strings.LastIndex(source, "inlineOn")}},
+		{name: "repeated", declared: true, positions: []int{strings.Index(source, "repeated"), strings.LastIndex(source, "repeated")}},
+	}
+	if len(captured.InlineGlobals) != len(wantInline) {
+		t.Fatalf("InlineGlobals has %d entries, want %d: %#v", len(captured.InlineGlobals), len(wantInline), captured.InlineGlobals)
+	}
+	for i, want := range wantInline {
+		got := captured.InlineGlobals[i]
+		if got.Name != want.name || got.Declared != want.declared {
+			t.Errorf("InlineGlobals[%d] = (%q, %v), want (%q, %v)", i, got.Name, got.Declared, want.name, want.declared)
+		}
+		if len(got.NameRanges) != len(want.positions) {
+			t.Fatalf("InlineGlobals[%d].NameRanges has %d entries, want %d", i, len(got.NameRanges), len(want.positions))
+		}
+		for rangeIndex, textRange := range got.NameRanges {
+			wantPosition := want.positions[rangeIndex]
+			if textRange.Pos() != wantPosition || source[textRange.Pos():textRange.End()] != want.name {
+				t.Errorf("InlineGlobals[%d].NameRanges[%d] = %d:%d (%q), want %d:%d (%q)", i, rangeIndex, textRange.Pos(), textRange.End(), source[textRange.Pos():textRange.End()], wantPosition, wantPosition+len(want.name), want.name)
+			}
+		}
+	}
+}
+
 func TestRunLinter_ExecutedRulesPerFile(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"a.ts": "const a = 1;",
@@ -160,4 +229,3 @@ func TestRunLinter_ExecutedRulesEmpty(t *testing.T) {
 		t.Errorf("Expected 0 executed rules, got %d", len(result.ExecutedRules))
 	}
 }
-

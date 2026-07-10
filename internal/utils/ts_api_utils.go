@@ -367,6 +367,7 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 	// serially within this single ForEachComment call, so the parallel
 	// per-file lint workers each get their own, never sharing one.
 	commentFactory := &ast.NodeFactory{}
+	sawToken := false
 
 	ForEachToken(
 		node,
@@ -374,6 +375,7 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 			if token.Pos() == token.End() {
 				return
 			}
+			sawToken = true
 
 			if token.Kind != ast.KindJsxText {
 				pos := token.Pos()
@@ -395,6 +397,17 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 		},
 		sourceFile,
 	)
+
+	// A source file containing only comments has no non-empty token to own its
+	// leading trivia. Ask the TypeScript scanner for that leading trivia once;
+	// restricting this fallback to the SourceFile keeps subtree calls scoped to
+	// their node. Files with syntax stay on the normal token-owned path above.
+	if !sawToken && node == &sourceFile.Node {
+		pos := len(scanner.GetShebang(fullText))
+		for comment := range scanner.GetLeadingCommentRanges(commentFactory, fullText, pos) {
+			callback(&comment)
+		}
+	}
 }
 
 // Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L84
