@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	jestUtils "github.com/web-infra-dev/rslint/internal/plugins/jest/utils"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -96,14 +95,6 @@ func isChainRestricted(chain string, restriction restrictedMatcher) bool {
 	return chain == restriction.Chain
 }
 
-func restrictedRange(entries []jestUtils.ParsedJestFnMemberEntry) (core.TextRange, bool) {
-	if len(entries) == 0 || entries[0].Node == nil || entries[len(entries)-1].Node == nil {
-		return core.TextRange{}, false
-	}
-
-	return core.NewTextRange(entries[0].Node.Pos(), entries[len(entries)-1].Node.End()), true
-}
-
 var NoRestrictedMatchersRule = rule.Rule{
 	Name: "jest/no-restricted-matchers",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -120,7 +111,7 @@ var NoRestrictedMatchersRule = rule.Rule{
 				}
 
 				chain := strings.Join(jestFnCall.Members, ".")
-				reportRange, ok := restrictedRange(jestFnCall.MemberEntries)
+				reportRange, ok := jestUtils.JestFnMemberEntriesRange(jestFnCall.MemberEntries)
 				if !ok {
 					return
 				}
