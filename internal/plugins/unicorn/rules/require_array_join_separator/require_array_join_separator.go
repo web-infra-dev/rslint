@@ -53,10 +53,10 @@ func isArrayPrototypeProperty(node *ast.Node, property string) bool {
 	return isIdentifierNamed(ast.SkipParentheses(prototypeAccess.Expression), "Array")
 }
 
-func callParenthesesRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, core.TextRange, core.TextRange, ast.Kind, bool) {
+func directCallParenthesesRange(sourceFile *ast.SourceFile, node *ast.Node) (core.TextRange, core.TextRange, bool) {
 	call := node.AsCallExpression()
 	if call == nil || call.Expression == nil {
-		return core.TextRange{}, core.TextRange{}, core.TextRange{}, ast.KindUnknown, false
+		return core.TextRange{}, core.TextRange{}, false
 	}
 
 	scanStart := call.Expression.End()
@@ -65,37 +65,42 @@ func callParenthesesRange(sourceFile *ast.SourceFile, node *ast.Node) (core.Text
 	}
 
 	s := scanner.GetScannerForSourceFile(sourceFile, scanStart)
-	var opening core.TextRange
-	var previous core.TextRange
-	previousKind := ast.KindUnknown
-	depth := 0
-	foundOpening := false
-	for s.TokenStart() < node.End() {
-		switch s.Token() {
-		case ast.KindOpenParenToken:
-			if !foundOpening {
-				opening = s.TokenRange()
-				foundOpening = true
-			}
-			depth++
-		case ast.KindCloseParenToken:
-			if !foundOpening {
-				return core.TextRange{}, core.TextRange{}, core.TextRange{}, ast.KindUnknown, false
-			}
-			depth--
-			if depth == 0 {
-				return opening, s.TokenRange(), previous, previousKind, true
-			}
-		default:
-			if foundOpening {
-				previous = s.TokenRange()
-				previousKind = s.Token()
-			}
-		}
+	for s.Token() != ast.KindOpenParenToken && s.TokenStart() < node.End() {
 		s.Scan()
 	}
+	if s.Token() != ast.KindOpenParenToken {
+		return core.TextRange{}, core.TextRange{}, false
+	}
+	opening := s.TokenRange()
+	s.Scan()
+	if s.Token() != ast.KindCloseParenToken || s.TokenEnd() != node.End() {
+		return core.TextRange{}, core.TextRange{}, false
+	}
 
-	return core.TextRange{}, core.TextRange{}, core.TextRange{}, ast.KindUnknown, false
+	return opening, s.TokenRange(), true
+}
+
+func prototypeCallSuffix(sourceFile *ast.SourceFile, node *ast.Node, argument *ast.Node) (core.TextRange, int, ast.Kind, bool) {
+	if argument == nil {
+		return core.TextRange{}, 0, ast.KindUnknown, false
+	}
+
+	// Start after the argument so regex literals and nested calls inside it are
+	// never re-scanned as ordinary tokens. Only trivia, an optional trailing
+	// comma, and the call's closing parenthesis can occur in this suffix.
+	s := scanner.GetScannerForSourceFile(sourceFile, argument.End())
+	penultimateEnd := argument.End()
+	penultimateKind := ast.KindUnknown
+	if s.Token() == ast.KindCommaToken {
+		penultimateEnd = s.TokenEnd()
+		penultimateKind = ast.KindCommaToken
+		s.Scan()
+	}
+	if s.Token() != ast.KindCloseParenToken || s.TokenEnd() != node.End() {
+		return core.TextRange{}, 0, ast.KindUnknown, false
+	}
+
+	return s.TokenRange(), penultimateEnd, penultimateKind, true
 }
 
 func appendSeparatorFix(closing core.TextRange, penultimateKind ast.Kind, isPrototypeMethod bool) rule.RuleFix {
@@ -120,6 +125,7 @@ var RequireArrayJoinSeparatorRule = rule.Rule{
 		oneArgument := 1
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
+				var prototypeArgument *ast.Node
 				call, directMethod := unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
 					Method:              "join",
 					ArgumentsLength:     &zeroArguments,
@@ -131,21 +137,30 @@ var RequireArrayJoinSeparatorRule = rule.Rule{
 						ArgumentsLength: &oneArgument,
 					})
 					arguments := node.Arguments()
-					if !directMethod || len(arguments) != 1 || ast.IsSpreadElement(arguments[0]) ||
+					if !directMethod || ast.IsSpreadElement(arguments[0]) ||
 						!isArrayPrototypeProperty(call.Object, "join") {
 						return
 					}
+					prototypeArgument = arguments[0]
 				}
 
-				opening, closing, penultimate, penultimateKind, ok := callParenthesesRange(ctx.SourceFile, node)
-				if !ok {
-					return
-				}
-
-				isPrototypeMethod := len(node.Arguments()) == 1
-				start := opening.Pos()
+				isPrototypeMethod := prototypeArgument != nil
+				var closing core.TextRange
+				var start int
+				penultimateKind := ast.KindUnknown
 				if isPrototypeMethod {
-					start = penultimate.End()
+					var ok bool
+					closing, start, penultimateKind, ok = prototypeCallSuffix(ctx.SourceFile, node, prototypeArgument)
+					if !ok {
+						return
+					}
+				} else {
+					opening, directClosing, ok := directCallParenthesesRange(ctx.SourceFile, node)
+					if !ok {
+						return
+					}
+					closing = directClosing
+					start = opening.Pos()
 				}
 				reportRange := core.NewTextRange(start, closing.End())
 				ctx.ReportRangeWithFixes(

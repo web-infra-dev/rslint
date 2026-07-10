@@ -93,6 +93,32 @@ func TestRequireArrayJoinSeparatorExtras(t *testing.T) {
 				Output:   []string{`foo.join( /* keep */ ',')`},
 				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: messageID, Message: message, Line: 1, Column: 9, EndLine: 1, EndColumn: 23}},
 			},
+			// ---- Dimension 3: nested closing parentheses determine the report range ----
+			{
+				Code:     `[].join.call(f(x,))`,
+				FileName: "file.ts",
+				Output:   []string{`[].join.call(f(x,), ',')`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: messageID, Message: message, Line: 1, Column: 19, EndLine: 1, EndColumn: 20}},
+			},
+			{
+				Code:     `[].join.call((foo))`,
+				FileName: "file.ts",
+				Output:   []string{`[].join.call((foo), ',')`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: messageID, Message: message, Line: 1, Column: 19, EndLine: 1, EndColumn: 20}},
+			},
+			// ---- Dimension 3: regex parentheses inside the argument are not re-scanned ----
+			{
+				Code:     `[].join.call(s.replace(/\)/g, ''))`,
+				FileName: "file.ts",
+				Output:   []string{`[].join.call(s.replace(/\)/g, ''), ',')`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: messageID, Message: message, Line: 1, Column: 34, EndLine: 1, EndColumn: 35}},
+			},
+			{
+				Code:     `[].join.call(s.split(/\(/))`,
+				FileName: "file.ts",
+				Output:   []string{`[].join.call(s.split(/\(/), ',')`},
+				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: messageID, Message: message, Line: 1, Column: 27, EndLine: 1, EndColumn: 28}},
+			},
 			// ---- Real-user: array-like values borrowed through an empty array ----
 			// Locks in upstream isPrototypeProperty() empty-array arm.
 			{
