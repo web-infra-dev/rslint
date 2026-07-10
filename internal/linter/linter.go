@@ -137,9 +137,9 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		disableManager := rule.NewDisableManager(file, comments)
 
 		// Parse inline `/* global */` comments once per file, same as
-		// DisableManager above — rules read the merged result off ctx.Globals
-		// instead of parsing comments or config themselves.
-		inlineGlobals := rule.ParseInlineGlobals(file, comments)
+		// DisableManager above. Rules receive both declaration metadata and the
+		// merged result instead of parsing comments or config themselves.
+		inlineGlobals, inlineGlobalDeclarations := rule.ParseInlineGlobals(file, comments)
 
 		// For gap files (not in caller's TypeInfoFiles), pass nil TypeChecker
 		// as defense-in-depth. Type-aware rules are already filtered out by
@@ -157,6 +157,8 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 				SourceFile:     file,
 				Program:        opts.Program,
 				Settings:       r.Settings,
+				ConfigGlobals:  r.Globals,
+				InlineGlobals:  inlineGlobalDeclarations,
 				Globals:        rule.MergeGlobals(r.Globals, inlineGlobals),
 				TypeChecker:    fileChecker,
 				DisableManager: disableManager,
