@@ -4,7 +4,6 @@ import {
   waitForDiagnostics,
   waitForContentChange,
   findFixAllAction,
-  prewarmOnSaveFixAll,
   requestFixAll,
   withTmpFile,
   withOnSaveFixAll,
@@ -13,14 +12,6 @@ import {
 
 suite('rslint fixAll - cascade (multi-pass)', function () {
   this.timeout(120000);
-
-  // Prime the on-save fixAll pipeline once so the first real test below
-  // doesn't pay VS Code's codeActionsOnSave + LSP cold-start cost (~30s on
-  // Windows under load). See fixall-helpers.ts:prewarmOnSaveFixAll.
-  suiteSetup(async function () {
-    this.timeout(120000);
-    await prewarmOnSaveFixAll();
-  });
 
   test('no-wrapper-object-types triggers no-inferrable-types in second pass', async () => {
     const cascadeContent = [
@@ -76,7 +67,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
 
       // Event-driven wait: resolves the moment the on-save fixAll edit
       // lands on the document, instead of polling on a 500ms interval.
-      // 60s budget gives Windows runners headroom even after pre-warm.
+      // 60s budget gives Windows runners headroom under load.
       // The helper rejects with a descriptive timeout error including the
       // last seen document content; let that propagate verbatim so the
       // original stack survives.

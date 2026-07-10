@@ -116,7 +116,10 @@ suite('rslint object-form plugins integration', function () {
         `prefer-array-some did not appear; cannot exercise fixAll. Got: ${messages(diagnostics)}`,
       );
 
-      await doc.save();
+      assert.ok(
+        await doc.save(),
+        'Document should complete the plugin code-action-on-save pipeline',
+      );
 
       const start = Date.now();
       while (doc.getText().includes('.filter(') && Date.now() - start < 20000) {
@@ -137,6 +140,11 @@ suite('rslint object-form plugins integration', function () {
         previous,
         vscode.ConfigurationTarget.Workspace,
       );
+      if (vscode.window.activeTextEditor?.document.uri.fsPath === tmpFile) {
+        await vscode.commands.executeCommand(
+          'workbench.action.closeActiveEditor',
+        );
+      }
       if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
     }
   });

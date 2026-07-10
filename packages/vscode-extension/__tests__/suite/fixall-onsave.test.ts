@@ -1,50 +1,19 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   waitForDiagnostics,
   waitForDiagnosticsCount,
   waitForContentChange,
   withOnSaveFixAll,
-  prewarmOnSaveFixAll,
   replaceAll,
-  getFixturesDir,
 } from './fixall-helpers';
 
 suite('rslint fixAll - on-save', function () {
   this.timeout(120000);
 
-  // Prime the on-save fixAll pipeline once before the first test that
-  // exercises it. The helper is process-wide idempotent — if another
-  // suite has already warmed it, this resolves immediately.
-  suiteSetup(async function () {
-    this.timeout(120000);
-    await prewarmOnSaveFixAll();
-  });
-
   test('generic source.fixAll triggers rslint via on-save', async () => {
-    const fixturesDir = getFixturesDir();
-    const tmpFile = path.join(
-      fixturesDir,
-      'src',
-      `_fixall_generic_${Date.now()}.ts`,
-    );
-    fs.writeFileSync(tmpFile, '// placeholder\n', 'utf-8');
-
-    try {
-      const config = vscode.workspace.getConfiguration('editor');
-      const previousValue = config.get('codeActionsOnSave');
-      await config.update(
-        'codeActionsOnSave',
-        { 'source.fixAll': 'explicit' },
-        vscode.ConfigurationTarget.Workspace,
-      );
-
-      try {
-        const doc = await vscode.workspace.openTextDocument(tmpFile);
-        const editor = await vscode.window.showTextDocument(doc);
-
+    await withOnSaveFixAll(
+      async (doc, editor) => {
         await replaceAll(
           editor,
           "const gfVal: string = 'x';\nconst gfRes = (gfVal as string).trim();\n",
@@ -59,32 +28,23 @@ suite('rslint fixAll - on-save', function () {
           return;
         }
 
-        await doc.save();
-
-        const startTime = Date.now();
-        while (
-          doc.getText().includes('gfVal as string') &&
-          Date.now() - startTime < 20000
-        ) {
-          await new Promise((r) => setTimeout(r, 500));
-        }
+        assert.ok(
+          await doc.save(),
+          'Document should complete the generic source.fixAll save pipeline',
+        );
+        await waitForContentChange(
+          doc,
+          (content) => !content.includes('gfVal as string'),
+          60000,
+        );
 
         assert.ok(
           !doc.getText().includes('gfVal as string'),
           `Generic source.fixAll should trigger rslint fixAll.\nContent: ${doc.getText()}`,
         );
-      } finally {
-        await config.update(
-          'codeActionsOnSave',
-          previousValue,
-          vscode.ConfigurationTarget.Workspace,
-        );
-      }
-    } finally {
-      if (fs.existsSync(tmpFile)) {
-        fs.unlinkSync(tmpFile);
-      }
-    }
+      },
+      { 'source.fixAll': 'explicit' },
+    );
   });
 
   test('fixable issues get auto-fixed', async () => {
@@ -219,7 +179,7 @@ suite('rslint fixAll - on-save', function () {
   test('edit then immediately save (debounce not fired)', async () => {
     await withOnSaveFixAll(async (doc, editor) => {
       await replaceAll(editor, '// clean start\nexport {};\n');
-      await doc.save();
+      assert.ok(await doc.save(), 'Initial clean document should save');
       await waitForDiagnosticsCount(doc, 0);
 
       await replaceAll(
@@ -227,7 +187,10 @@ suite('rslint fixAll - on-save', function () {
         "const quickVal: string = 'x';\nconst quickRes = (quickVal as string).trim();\n",
       );
 
-      await doc.save();
+      assert.ok(
+        await doc.save(),
+        'Edited document should complete the code-action-on-save pipeline',
+      );
 
       // Event-driven wait — Windows CI needs more headroom than the previous
       // 20 s polling loop, and `onDidChangeTextDocument` resolves the moment
