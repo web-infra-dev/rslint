@@ -16,6 +16,15 @@ func TestNoSparseArraysRule(t *testing.T) {
 		// Valid cases - ported from ESLint
 		[]rule_tester.ValidTestCase{
 			{Code: `var a = [ 1, 2, ]`},
+			// Destructuring assignment targets are parsed as ArrayLiteralExpression
+			// too, but omitted elements there are valid ES6 syntax for skipping
+			// items, not sparse array literals.
+			{Code: `[, suggestion] = await all();`},
+			{Code: `[, , endLine, endChar] = o.range;`},
+			{Code: `[, ref, authorName] = match;`},
+			{Code: `[a, , b] = [1, 2, 3];`},
+			{Code: `for ([, x] of y) {}`},
+			{Code: `[[, a]] = b;`},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -51,6 +60,14 @@ func TestNoSparseArraysRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpectedSparseArray", Line: 1, Column: 1},
 					{MessageId: "unexpectedSparseArray", Line: 1, Column: 1},
+				},
+			},
+			{
+				// The destructuring target `[a, b]` is not sparse, but the
+				// RHS is a genuine sparse array literal and must still be flagged.
+				Code: `[a, b] = [1, , 2];`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpectedSparseArray", Line: 1, Column: 10},
 				},
 			},
 		},
