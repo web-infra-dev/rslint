@@ -44,6 +44,9 @@ func TestNoLabelVarRule(t *testing.T) {
 			{Code: `class C { m() { q: for(;;) { break q; } } }`},
 			{Code: `const fn = (a) => { q: for(;;) { break q; } };`},
 			{Code: `function* gen() { q: for(;;) { break q; } }`},
+
+			// ---- Declared global that does not clash with the label name ----
+			{Code: `q: for(;;) { break q; }`, Globals: map[string]bool{"myConfiguredGlobal": true}},
 		},
 
 		[]rule_tester.InvalidTestCase{
@@ -213,6 +216,21 @@ func TestNoLabelVarRule(t *testing.T) {
 				Code: `var a = 1; function f() { a: for(;;) { b: for(;;) { break b; } } }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "identifierClashWithLabel", Line: 1, Column: 27},
+				},
+			},
+
+			// ---- Config-declared / `/* global */` comment globals (strategy B path) ----
+			{
+				Code:    `myConfiguredGlobal: for(;;) { break myConfiguredGlobal; }`,
+				Globals: map[string]bool{"myConfiguredGlobal": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 1},
+				},
+			},
+			{
+				Code: `/* global fromComment */ fromComment: for(;;) { break fromComment; }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "identifierClashWithLabel", Line: 1, Column: 26},
 				},
 			},
 

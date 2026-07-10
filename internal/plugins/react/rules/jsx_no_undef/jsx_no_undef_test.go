@@ -29,11 +29,24 @@ func TestJsxNoUndefRule(t *testing.T) {
 			`,
 			Tsx: true,
 		},
-		// SKIP: rslint does not support ESLint's `globals` option.
+		// Declared global (script file — no import/export — so `Text` is
+		// visible without `allowGlobals`, matching ESLint).
 		{
-			Code: `var React, Text; React.render(<Text />);`,
-			Tsx:  true,
-			Skip: true,
+			Code:    `var React; React.render(<Text />);`,
+			Tsx:     true,
+			Globals: map[string]bool{"Text": true},
+		},
+		// Declared global in a module file with `allowGlobals: true`.
+		{
+			Code: `
+				import React from "react";
+				export const TextWrapper = function (props) {
+					return <Text />;
+				};
+			`,
+			Tsx:     true,
+			Globals: map[string]bool{"Text": true},
+			Options: map[string]interface{}{"allowGlobals": true},
 		},
 		{
 			Code: `
@@ -143,6 +156,9 @@ func TestJsxNoUndefRule(t *testing.T) {
 			},
 		},
 		{
+			// Module file (has `export`): with `allowGlobals: false` (the
+			// default), a declared global is still invisible to the
+			// module's top-level scope, matching ESLint.
 			Code: `
 				const TextWrapper = function (props) {
 					return (
@@ -152,6 +168,7 @@ func TestJsxNoUndefRule(t *testing.T) {
 				export default TextWrapper;
 			`,
 			Tsx:     true,
+			Globals: map[string]bool{"Text": true},
 			Options: map[string]interface{}{"allowGlobals": false},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "undefined", Message: "'Text' is not defined."},
@@ -182,9 +199,8 @@ func TestJsxNoUndefRule(t *testing.T) {
 				{MessageId: "undefined", Message: "'Missing' is not defined.", Line: 3, Column: 3, EndLine: 3, EndColumn: 10},
 			},
 		},
-		// `allowGlobals: true` is accepted but has no effect in rslint —
-		// undeclared names are still reported. Documented as a difference
-		// from ESLint.
+		// `allowGlobals: true` only widens the search to declared globals —
+		// a name that isn't declared anywhere is still reported.
 		{
 			Code:    `var x = <Undeclared />;`,
 			Tsx:     true,
