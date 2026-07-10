@@ -19,14 +19,14 @@ var nativeBuiltins = map[string]bool{
 	"FinalizationRegistry": true, "Float16Array": true, "Float32Array": true, "Float64Array": true, "Function": true,
 	"Infinity": true, "Int16Array": true, "Int32Array": true, "Int8Array": true, "Intl": true, "Iterator": true,
 	"JSON": true,
-	"Map": true, "Math": true,
+	"Map":  true, "Math": true,
 	"NaN": true, "Number": true,
-	"Object": true,
+	"Object":  true,
 	"Promise": true, "Proxy": true,
 	"RangeError": true, "ReferenceError": true, "Reflect": true, "RegExp": true,
 	"Set": true, "SharedArrayBuffer": true, "String": true, "Symbol": true, "SyntaxError": true,
 	"TypeError": true,
-	"URIError": true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
+	"URIError":  true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
 	"WeakMap": true, "WeakRef": true, "WeakSet": true,
 }
 
@@ -142,6 +142,14 @@ var NoExtendNativeRule = rule.Rule{
 				}
 
 				if utils.IsShadowed(node, name) {
+					return
+				}
+
+				// A config `/* global Object: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `globalScope.set.get(name)` would be
+				// undefined and the rule stays silent.
+				if declared, ok := ctx.Globals[name]; ok && !declared {
 					return
 				}
 

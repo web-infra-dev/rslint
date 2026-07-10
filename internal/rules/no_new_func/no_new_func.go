@@ -39,6 +39,13 @@ var NoNewFuncRule = rule.Rule{
 			if utils.IsShadowed(id, "Function") {
 				return false
 			}
+			// A config `/* global Function: off */` / `languageOptions.globals`
+			// entry un-declares the builtin, so `Function` no longer resolves
+			// to a known global — ESLint's `globalScope.set.get("Function")`
+			// would be undefined and the rule stays silent.
+			if declared, ok := ctx.Globals["Function"]; ok && !declared {
+				return false
+			}
 			if ctx.TypeChecker != nil {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(id)
 				if symbol == nil {

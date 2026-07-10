@@ -41,6 +41,14 @@ var NoNewWrappersRule = rule.Rule{
 					return
 				}
 
+				// A config `/* global String: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `getVariableByName` would return
+				// undefined and the rule stays silent.
+				if declared, ok := ctx.Globals[name]; ok && !declared {
+					return
+				}
+
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "noConstructor",
 					Description: fmt.Sprintf("Do not use %s as a constructor.", name),

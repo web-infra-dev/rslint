@@ -62,6 +62,9 @@ func TestNoNewWrappersRule(t *testing.T) {
 			// --- Shadowing: for-let/of (inside loop body) ---
 			{Code: `function test() { for (let Boolean in {}) { new Boolean(); } }`},
 			{Code: `function test() { for (let String of []) { new String(); } }`},
+
+			// --- Config `/* global String: off */` un-declares the builtin ---
+			{Code: `new String('a');`, Globals: map[string]bool{"String": false}},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -149,6 +152,13 @@ func TestNoNewWrappersRule(t *testing.T) {
 					{MessageId: "noConstructor", Line: 1, Column: 16},
 					{MessageId: "noConstructor", Line: 1, Column: 34},
 				},
+			},
+
+			// Config declares String as a writable global — still the builtin.
+			{
+				Code:    `new String('a');`,
+				Globals: map[string]bool{"String": true},
+				Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "noConstructor", Line: 1, Column: 1}},
 			},
 		},
 	)

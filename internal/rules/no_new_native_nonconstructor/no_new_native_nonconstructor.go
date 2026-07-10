@@ -30,7 +30,15 @@ var NoNewNativeNonconstructorRule = rule.Rule{
 				}
 
 				name := callee.AsIdentifier().Text
-					if _, ok := nativeNonconstructorNames[name]; !ok || utils.IsShadowed(callee, name) {
+				if _, ok := nativeNonconstructorNames[name]; !ok || utils.IsShadowed(callee, name) {
+					return
+				}
+
+				// A config `/* global Symbol: off */` / `languageOptions.globals`
+				// entry un-declares the builtin, so it no longer resolves to a
+				// known global — ESLint's `globalScope.set.get(name)` would be
+				// undefined and the rule stays silent.
+				if declared, ok := ctx.Globals[name]; ok && !declared {
 					return
 				}
 
