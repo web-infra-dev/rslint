@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -312,33 +313,19 @@ func reportExpressionNode(node *ast.Node) *ast.Node {
 // utils.IsSpecificMemberAccess intentionally accepts bracket access and
 // optional chains, which would diverge from this rule's upstream matcher.
 func isNonOptionalMethodCall(node *ast.Node, objects []string, method string, minimumArguments int, argumentsLength int) bool {
-	call := node.AsCallExpression()
-	if call == nil || call.QuestionDotToken != nil {
+	options := unicornutil.DotMethodCallOptions{Method: method}
+	if minimumArguments >= 0 {
+		options.MinimumArguments = &minimumArguments
+	}
+	if argumentsLength >= 0 {
+		options.ArgumentsLength = &argumentsLength
+	}
+	call, ok := unicornutil.MatchDotMethodCall(node, options)
+	if !ok {
 		return false
 	}
 
-	args := node.Arguments()
-	if minimumArguments >= 0 && len(args) < minimumArguments {
-		return false
-	}
-	if argumentsLength >= 0 && len(args) != argumentsLength {
-		return false
-	}
-
-	rawCallee := call.Expression
-	callee := ast.SkipParentheses(rawCallee)
-	if callee == nil || (rawCallee != callee && ast.IsOptionalChain(callee)) ||
-		callee.Kind != ast.KindPropertyAccessExpression {
-		return false
-	}
-
-	propertyAccess := callee.AsPropertyAccessExpression()
-	if propertyAccess == nil || propertyAccess.QuestionDotToken != nil ||
-		!isIdentifierNamed(propertyAccess.Name(), method) {
-		return false
-	}
-
-	object := ast.SkipParentheses(propertyAccess.Expression)
+	object := ast.SkipParentheses(call.Object)
 	return object != nil && object.Kind == ast.KindIdentifier &&
 		slices.Contains(objects, object.AsIdentifier().Text)
 }

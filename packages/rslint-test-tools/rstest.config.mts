@@ -554,6 +554,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/no-useless-switch-case.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
+    './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',
 
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
   ],
