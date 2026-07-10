@@ -1135,7 +1135,7 @@ var RequireAtomicUpdatesRule = rule.Rule{
 	Name:             "require-atomic-updates",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		allowProperties := false
 		optsMap := utils.GetOptionsMap(options)
 		if optsMap != nil {

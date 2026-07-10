@@ -81,7 +81,7 @@ func parseOptions(raw any) options {
 var InteractiveSupportsFocusRule = rule.Rule{
 	Name: "jsx-a11y/interactive-supports-focus",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		sourceText := ctx.SourceFile.Text()
 

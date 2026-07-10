@@ -98,7 +98,7 @@ func isChainRestricted(chain string, restriction restrictedMatcher) bool {
 var NoRestrictedMatchersRule = rule.Rule{
 	Name: "jest/no-restricted-matchers",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		restrictedMatchers := parseOptions(options)
 		if len(restrictedMatchers) == 0 {
 			return rule.RuleListeners{}

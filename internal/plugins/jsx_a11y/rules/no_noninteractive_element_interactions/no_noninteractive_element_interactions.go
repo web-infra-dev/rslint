@@ -125,7 +125,7 @@ func parseOptions(raw any) options {
 var NoNoninteractiveElementInteractionsRule = rule.Rule{
 	Name: "jsx-a11y/no-noninteractive-element-interactions",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		interactiveProps := defaultInteractiveProps
 		if opts.Handlers != nil {

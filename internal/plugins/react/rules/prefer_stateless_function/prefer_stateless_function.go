@@ -962,7 +962,7 @@ func analyzeES5Object(obj *ast.Node, flags *componentFlags, pragma, createClass 
 var PreferStatelessFunctionRule = rule.Rule{
 	Name: "react/prefer-stateless-function",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

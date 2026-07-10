@@ -156,7 +156,7 @@ var PreferReadonlyParameterTypesRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-readonly-parameter-types",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		checkParameters := func(node *ast.Node) {

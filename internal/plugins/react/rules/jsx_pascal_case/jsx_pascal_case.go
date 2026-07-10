@@ -149,7 +149,7 @@ func ignoreCheck(patterns []compiledPattern, name string) bool {
 var JsxPascalCaseRule = rule.Rule{
 	Name: "react/jsx-pascal-case",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		cfg := parseOptions(options)
 
 		check := func(element *ast.Node) {

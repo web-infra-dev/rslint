@@ -24,7 +24,7 @@ import (
 var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 	Name: "init-declarations",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

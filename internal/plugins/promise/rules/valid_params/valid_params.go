@@ -88,7 +88,7 @@ func calledMemberName(node *ast.Node) string {
 var ValidParamsRule = rule.Rule{
 	Name: "promise/valid-params",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

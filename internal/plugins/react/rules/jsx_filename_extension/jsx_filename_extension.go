@@ -15,7 +15,7 @@ import (
 var JsxFilenameExtensionRule = rule.Rule{
 	Name: "react/jsx-filename-extension",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// Default options
 		extensions := []string{".jsx"}
 		allow := "always"

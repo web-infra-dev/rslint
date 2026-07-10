@@ -449,7 +449,7 @@ var FilenameCaseRule = rule.Rule{
 	// children but never the SourceFile node itself, so a
 	// `ast.KindSourceFile` listener would silently never fire.)
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}

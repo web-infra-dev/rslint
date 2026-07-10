@@ -415,7 +415,7 @@ func reportWithOptionalFix(ctx rule.RuleContext, node *ast.Node, messageId, desc
 var JsxNoTargetBlankRule = rule.Rule{
 	Name: "react/jsx-no-target-blank",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		linkComponents := reactutil.ReadComponentsFromSettings(ctx.Settings, "linkComponents", "linkAttribute", "href", reactutil.DefaultLinkComponents())
 		formComponents := reactutil.ReadComponentsFromSettings(ctx.Settings, "formComponents", "formAttribute", "action", reactutil.DefaultFormComponents())

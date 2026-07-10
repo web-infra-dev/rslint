@@ -49,7 +49,7 @@ func parseOptions(raw any) options {
 var NoImplicitCoercionRule = rule.Rule{
 	Name: "no-implicit-coercion",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// report emits the diagnostic for `node` (replaced with `recommendation`).

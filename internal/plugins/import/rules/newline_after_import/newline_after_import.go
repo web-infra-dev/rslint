@@ -60,7 +60,7 @@ func makeMessage(typ string, count int) rule.RuleMessage {
 var NewlineAfterImportRule = rule.Rule{
 	Name: "import/newline-after-import",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// The linter visits SourceFile's children (not the SourceFile node itself),

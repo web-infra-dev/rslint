@@ -154,7 +154,7 @@ var NoMisusedSpreadRule = rule.CreateRule(rule.Rule{
 	Name:             "no-misused-spread",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(NoMisusedSpreadOptions)
 		if !ok {
 			opts = NoMisusedSpreadOptions{}

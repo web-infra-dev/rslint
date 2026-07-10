@@ -22,7 +22,7 @@ var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 	Name:             "require-array-sort-compare",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(RequireArraySortCompareOptions)
 		if !ok {
 			opts = RequireArraySortCompareOptions{}

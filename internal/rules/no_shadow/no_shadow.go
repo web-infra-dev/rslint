@@ -1325,7 +1325,7 @@ func RunTSESLint(ctx rule.RuleContext, options []any) rule.RuleListeners {
 
 func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleListeners {
 	return func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptionsWith(rawOptions, defaults)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}

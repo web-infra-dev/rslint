@@ -79,7 +79,7 @@ type options struct {
 var NoInstanceofBuiltinsRule = rule.Rule{
 	Name: "unicorn/no-instanceof-builtins",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

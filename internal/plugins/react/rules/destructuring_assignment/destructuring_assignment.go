@@ -420,7 +420,7 @@ func parseOptions(options any) ruleOptions {
 var DestructuringAssignmentRule = rule.Rule{
 	Name: "react/destructuring-assignment",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

@@ -2060,7 +2060,7 @@ func collectReExportedNames(ctx rule.RuleContext) map[string]bool {
 // ---- Main run function ----
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.UnwrapOptions(_options)
+	options := rule.LegacyUnwrapOptions(_options)
 	selectors := parseOptions(options)
 
 	if len(selectors) == 0 {

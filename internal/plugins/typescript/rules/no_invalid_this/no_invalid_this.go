@@ -54,7 +54,7 @@ func parseOptions(raw any) ruleOptions {
 }
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.UnwrapOptions(_options)
+	options := rule.LegacyUnwrapOptions(_options)
 	opts := parseOptions(options)
 	sf := ctx.SourceFile
 

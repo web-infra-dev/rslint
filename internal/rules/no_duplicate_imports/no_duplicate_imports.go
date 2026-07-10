@@ -226,7 +226,7 @@ func reportMessage(ctx *rule.RuleContext, node *ast.Node, id, module string) {
 var NoDuplicateImportsRule = rule.Rule{
 	Name: "no-duplicate-imports",
 	Run: func(ctx rule.RuleContext, _rawOpts []any) rule.RuleListeners {
-		rawOpts := rule.UnwrapOptions(_rawOpts)
+		rawOpts := rule.LegacyUnwrapOptions(_rawOpts)
 		opts := parseOptions(rawOpts)
 		modules := map[string][]*entry{}
 

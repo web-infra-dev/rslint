@@ -89,7 +89,7 @@ func parseOptions(opts any) useIsNaNOptions {
 var UseIsNaNRule = rule.Rule{
 	Name: "use-isnan",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// Comparison operators to check

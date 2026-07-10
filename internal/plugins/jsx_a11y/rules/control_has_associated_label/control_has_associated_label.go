@@ -80,7 +80,7 @@ func parseOptions(raw any) options {
 var ControlHasAssociatedLabelRule = rule.Rule{
 	Name: "jsx-a11y/control-has-associated-label",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		// Upstream `newIgnoreElements = new Set([].concat(ignoreElements,
 		// ignoreList))` where `ignoreList = ['link']`. The `link` entry is

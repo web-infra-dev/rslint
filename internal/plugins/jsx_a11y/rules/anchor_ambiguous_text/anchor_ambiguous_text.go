@@ -265,7 +265,7 @@ func parseOptions(raw any) options {
 var AnchorAmbiguousTextRule = rule.Rule{
 	Name: "jsx-a11y/anchor-ambiguous-text",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// Pre-build the lookup set so each check is O(1) on the wordlist.

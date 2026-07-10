@@ -92,7 +92,7 @@ func buildUnexpectedMessage(operator string) rule.RuleMessage {
 var NoBitwiseRule = rule.Rule{
 	Name: "no-bitwise",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// report emits the diagnostic after shared allow / int32Hint filtering.

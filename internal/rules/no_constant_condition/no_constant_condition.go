@@ -722,7 +722,7 @@ func checkCondition(ctx *rule.RuleContext, node *ast.Node, opts Options) {
 var NoConstantConditionRule = rule.Rule{
 	Name: "no-constant-condition",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

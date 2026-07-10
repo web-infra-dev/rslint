@@ -17,7 +17,7 @@ func messageUnusedExpression() rule.RuleMessage {
 var NoUnusedExpressionsRule = rule.Rule{
 	Name: "no-unused-expressions",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := utils.ParseNoUnusedExpressionOptions(rawOptions)
 
 		return rule.RuleListeners{

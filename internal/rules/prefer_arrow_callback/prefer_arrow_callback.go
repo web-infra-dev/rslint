@@ -499,7 +499,7 @@ func buildFixes(ctx rule.RuleContext, node *ast.Node, scope scopeInfo, info call
 var PreferArrowCallbackRule = rule.Rule{
 	Name: "prefer-arrow-callback",
 	Run: func(ctx rule.RuleContext, _raw []any) rule.RuleListeners {
-		raw := rule.UnwrapOptions(_raw)
+		raw := rule.LegacyUnwrapOptions(_raw)
 		opts := parseOptions(raw)
 		return rule.RuleListeners{
 			ast.KindFunctionExpression: func(node *ast.Node) {

@@ -32,7 +32,7 @@ var unexpectedMessage = rule.RuleMessage{
 var NoElseReturnRule = rule.Rule{
 	Name: "no-else-return",
 	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
-		ruleOptions := rule.UnwrapOptions(_ruleOptions)
+		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
 		opts := parseOptions(ruleOptions)
 		check := checkIfWithoutElse
 		if !opts.allowElseIf {

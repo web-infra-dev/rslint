@@ -40,7 +40,7 @@ func parseOptions(opts any) buttonHasTypeOptions {
 var ButtonHasTypeRule = rule.Rule{
 	Name: "react/button-has-type",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		cfg := parseOptions(options)
 
 		reportMissing := func(node *ast.Node) {

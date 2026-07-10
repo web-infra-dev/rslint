@@ -389,7 +389,7 @@ func checkTypeMembers(ctx rule.RuleContext, members []*ast.Node, opts Options) {
 var AccessorPairsRule = rule.Rule{
 	Name: "accessor-pairs",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		if !opts.SetWithoutGet && !opts.GetWithoutSet {
 			return rule.RuleListeners{}

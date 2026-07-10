@@ -158,7 +158,7 @@ func parseOptions(raw any) options {
 var LabelHasAssociatedControlRule = rule.Rule{
 	Name: "jsx-a11y/label-has-associated-control",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// `labelComponentNames = ['label'].concat(labelComponents)` upstream.

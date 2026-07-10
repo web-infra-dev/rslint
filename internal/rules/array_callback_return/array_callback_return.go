@@ -293,7 +293,7 @@ func checkCallbackReturn(ctx rule.RuleContext, funcNode *ast.Node, methodName st
 var ArrayCallbackReturnRule = rule.Rule{
 	Name: "array-callback-return",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -320,7 +320,7 @@ func isClassMember(node *ast.Node) bool {
 var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 	Name: "explicit-member-accessibility",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		sf := ctx.SourceFile
 

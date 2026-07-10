@@ -78,7 +78,7 @@ func message(id string) rule.RuleMessage {
 var JsxNoBindRule = rule.Rule{
 	Name: "react/jsx-no-bind",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// blockVariableNameSets tracks, per enclosing Block (keyed by node

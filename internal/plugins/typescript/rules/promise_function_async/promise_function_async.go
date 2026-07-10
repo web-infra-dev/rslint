@@ -28,7 +28,7 @@ var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 	Name:             "promise-function-async",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(PromiseFunctionAsyncOptions)
 		if !ok {
 			opts = PromiseFunctionAsyncOptions{}

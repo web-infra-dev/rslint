@@ -87,7 +87,7 @@ type curlyChecker struct {
 var CurlyRule = rule.Rule{
 	Name: "curly",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		c := &curlyChecker{
 			ctx:     ctx,
 			sf:      ctx.SourceFile,

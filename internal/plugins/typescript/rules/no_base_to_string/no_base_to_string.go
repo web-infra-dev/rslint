@@ -52,7 +52,7 @@ var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 	Name:             "no-base-to-string",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(NoBaseToStringOptions)
 		if !ok {
 			opts = NoBaseToStringOptions{

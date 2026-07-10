@@ -408,7 +408,7 @@ func findTopLevelMemberAccess(node *ast.Node) *ast.Node {
 var ValidExpectRule = rule.Rule{
 	Name: "jest/valid-expect",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		arrayExceptions := map[string]bool{}
 		asyncInserted := map[*ast.Node]bool{}

@@ -25,7 +25,7 @@ var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 })
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.UnwrapOptions(_options)
+	options := rule.LegacyUnwrapOptions(_options)
 	opts := RestrictTemplateExpressionsOptions{
 		AllowNumber:  false,
 		AllowBoolean: false,

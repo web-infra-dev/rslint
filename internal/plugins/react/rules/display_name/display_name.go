@@ -1323,7 +1323,7 @@ func (w *nodeWalker) isNestedMemo(node *ast.Node) bool {
 var DisplayNameRule = rule.Rule{
 	Name: "react/display-name",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

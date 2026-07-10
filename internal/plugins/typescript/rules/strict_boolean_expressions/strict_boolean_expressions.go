@@ -280,7 +280,7 @@ var StrictBooleanExpressionsRule = rule.CreateRule(rule.Rule{
 	Name:             "strict-boolean-expressions",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _optionsRaw []any) rule.RuleListeners {
-		optionsRaw := rule.UnwrapOptions(_optionsRaw)
+		optionsRaw := rule.LegacyUnwrapOptions(_optionsRaw)
 		opts := parseOptions(optionsRaw)
 		tc := ctx.TypeChecker
 		sf := ctx.SourceFile

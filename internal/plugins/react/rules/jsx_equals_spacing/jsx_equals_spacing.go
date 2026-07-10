@@ -127,7 +127,7 @@ func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,
 		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.UnwrapOptions(_options)
+			options := rule.LegacyUnwrapOptions(_options)
 			config := parseOption(options)
 			sf := ctx.SourceFile
 			if sf == nil {

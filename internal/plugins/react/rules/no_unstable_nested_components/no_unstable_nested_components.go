@@ -510,7 +510,7 @@ func generateErrorMessageWithParentName(parentName string) string {
 var NoUnstableNestedComponentsRule = rule.Rule{
 	Name: "react/no-unstable-nested-components",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		// componentEnv bundles every per-invocation derivative the helpers
 		// below need. Building it once at rule entry avoids both repeated

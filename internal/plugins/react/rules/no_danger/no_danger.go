@@ -17,7 +17,7 @@ var dangerousProps = map[string]bool{
 var NoDangerRule = rule.Rule{
 	Name: "react/no-danger",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		var customComponentNames []string
 		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
 			if arr, ok := optsMap["customComponentNames"].([]interface{}); ok {

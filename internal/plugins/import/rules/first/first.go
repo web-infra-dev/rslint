@@ -15,7 +15,7 @@ import (
 var FirstRule = rule.Rule{
 	Name: "import/first",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// The linter visits SourceFile's children but never fires a KindSourceFile
 		// listener, so run the check eagerly before returning listeners.
 		checkFirst(ctx, options)

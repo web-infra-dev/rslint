@@ -127,7 +127,7 @@ func findCallbackAncestor(node *ast.Node, opts Options) *ast.Node {
 var NoPromiseInCallbackRule = rule.Rule{
 	Name: "promise/no-promise-in-callback",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

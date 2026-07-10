@@ -31,7 +31,7 @@ import (
 var JsxIndentRule = rule.Rule{
 	Name: "react/jsx-indent",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		indentType, indentSize, indentChar := parseIndentOption(options)
 		checkAttributes, indentLogicalExpressions := parseSecondOption(options)
 

@@ -76,7 +76,7 @@ var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
 })
 
 func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-	rawOptions := rule.UnwrapOptions(_rawOptions)
+	rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 	opts := parseOptions(rawOptions)
 	functionStack := make([]*functionInfo, 0)
 

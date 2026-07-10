@@ -36,7 +36,7 @@ func parseOptions(opts any) options {
 var NoUselessRenameRule = rule.Rule{
 	Name: "no-useless-rename",
 	Run: func(ctx rule.RuleContext, _optionsAny []any) rule.RuleListeners {
-		optionsAny := rule.UnwrapOptions(_optionsAny)
+		optionsAny := rule.LegacyUnwrapOptions(_optionsAny)
 		opts := parseOptions(optionsAny)
 		sf := ctx.SourceFile
 

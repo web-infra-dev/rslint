@@ -70,7 +70,7 @@ func getPropertyAccessName(node *ast.Node) string {
 var ForbidPropTypesRule = rule.Rule{
 	Name: "react/forbid-prop-types",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		propWrappers := reactutil.GetPropWrapperFunctions(ctx.Settings)
 

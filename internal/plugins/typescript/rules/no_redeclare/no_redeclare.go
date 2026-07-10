@@ -84,7 +84,7 @@ func (s *scopeDecls) add(name string, d declInfo) {
 var NoRedeclareRule = rule.CreateRule(rule.Rule{
 	Name: "no-redeclare",
 	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.UnwrapOptions(_opts)
+		opts := rule.LegacyUnwrapOptions(_opts)
 		o := parseOptions(opts)
 
 		analyzeHoist := func(bodyNode *ast.Node, params []*ast.Node, isProgram bool) {

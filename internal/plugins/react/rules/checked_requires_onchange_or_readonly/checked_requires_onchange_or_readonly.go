@@ -47,7 +47,7 @@ func parseOptions(opts any) options {
 var CheckedRequiresOnchangeOrReadonlyRule = rule.Rule{
 	Name: "react/checked-requires-onchange-or-readonly",
 	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.UnwrapOptions(_opts)
+		opts := rule.LegacyUnwrapOptions(_opts)
 		o := parseOptions(opts)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 

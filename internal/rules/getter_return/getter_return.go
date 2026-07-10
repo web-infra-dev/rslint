@@ -100,7 +100,7 @@ func reportGetterReturn(ctx rule.RuleContext, funcNode *ast.Node, reportNode *as
 var GetterReturnRule = rule.Rule{
 	Name: "getter-return",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -15,7 +15,7 @@ import (
 var NoIrregularWhitespaceRule = rule.Rule{
 	Name: "no-irregular-whitespace",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		checkNoIrregularWhitespace(ctx, opts)
 		return rule.RuleListeners{}

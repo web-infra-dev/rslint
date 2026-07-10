@@ -15,7 +15,7 @@ var globalObjects = []string{"window", "global", "globalThis"}
 var NoEvalRule = rule.Rule{
 	Name: "no-eval",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		allowIndirect := false
 		optsMap := utils.GetOptionsMap(options)
 		if optsMap != nil {

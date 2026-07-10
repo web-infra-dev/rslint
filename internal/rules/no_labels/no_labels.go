@@ -31,7 +31,7 @@ func getBodyKind(node *ast.Node) string {
 var NoLabelsRule = rule.Rule{
 	Name: "no-labels",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		allowLoop := false
 		allowSwitch := false
 		optsMap := utils.GetOptionsMap(options)

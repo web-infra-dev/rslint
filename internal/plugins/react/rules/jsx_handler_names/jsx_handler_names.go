@@ -226,7 +226,7 @@ func isPlainMemberAccess(node *ast.Node) bool {
 var JsxHandlerNamesRule = rule.Rule{
 	Name: "react/jsx-handler-names",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

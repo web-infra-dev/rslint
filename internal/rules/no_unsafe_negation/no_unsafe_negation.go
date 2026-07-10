@@ -14,7 +14,7 @@ import (
 var NoUnsafeNegationRule = rule.Rule{
 	Name: "no-unsafe-negation",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -15,7 +15,7 @@ const (
 var JsxFragmentsRule = rule.Rule{
 	Name: "react/jsx-fragments",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		mode := parseMode(rawOptions)
 		reactPragma := reactutil.GetReactPragma(ctx.Settings)
 		fragmentPragma := reactutil.GetReactFragmentPragma(ctx.Settings)

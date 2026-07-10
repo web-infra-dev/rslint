@@ -98,7 +98,7 @@ func renderTemplate(tmpl string, data map[string]string) string {
 const resolveDepth = 8
 
 func runRule(ctx rule.RuleContext, _input []any) rule.RuleListeners {
-	input := rule.UnwrapOptions(_input)
+	input := rule.LegacyUnwrapOptions(_input)
 	opts := parseOptions(input)
 	// Upstream: `const rule = config.rule ? new RegExp(config.rule) : null;`
 	// followed by `if (!rule) return;` in every listener.

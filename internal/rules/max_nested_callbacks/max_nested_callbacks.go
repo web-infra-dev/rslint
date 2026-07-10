@@ -13,7 +13,7 @@ import (
 var MaxNestedCallbacksRule = rule.Rule{
 	Name: "max-nested-callbacks",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		threshold := parseThreshold(options)
 
 		// `callbackStack` mirrors ESLint's stack of FunctionExpression /

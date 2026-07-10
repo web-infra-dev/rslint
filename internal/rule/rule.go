@@ -82,14 +82,14 @@ func NormalizeOptions(raw any) []any {
 	return []any{raw}
 }
 
-// UnwrapOptions is NormalizeOptions' inverse: it collapses a rule's options
+// LegacyUnwrapOptions is NormalizeOptions' inverse: it collapses a rule's options
 // array (Run's []any parameter — ESLint's context.options, the config array
 // after the severity level) back to the single bare value most existing rule
 // implementations parse. Empty → nil; a single element → that element;
 // otherwise the slice itself. This is the compatibility shim old
 // `parseOptions(options any)` bodies call so they don't need to change beyond
 // their Run signature.
-func UnwrapOptions(options []any) any {
+func LegacyUnwrapOptions(options []any) any {
 	switch len(options) {
 	case 0:
 		return nil

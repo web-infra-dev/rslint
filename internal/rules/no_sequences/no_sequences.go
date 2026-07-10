@@ -97,7 +97,7 @@ func firstCommaToken(node *ast.Node) *ast.Node {
 var NoSequencesRule = rule.Rule{
 	Name: "no-sequences",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

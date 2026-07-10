@@ -53,7 +53,7 @@ func MakeNoMethodSetStateRule(cfg NoMethodSetStateConfig) rule.Rule {
 	return rule.Rule{
 		Name: cfg.RuleName,
 		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-			options := rule.UnwrapOptions(_options)
+			options := rule.LegacyUnwrapOptions(_options)
 			if cfg.ShouldBeNoop != nil && cfg.ShouldBeNoop(ctx.Settings) {
 				return rule.RuleListeners{}
 			}

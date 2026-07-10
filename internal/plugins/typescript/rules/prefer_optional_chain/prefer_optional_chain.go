@@ -36,7 +36,7 @@ func buildOptionalChainSuggestMessage() rule.RuleMessage {
 var PreferOptionalChainRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-optional-chain",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(PreferOptionalChainOptions)
 		if !ok {
 			opts = PreferOptionalChainOptions{}

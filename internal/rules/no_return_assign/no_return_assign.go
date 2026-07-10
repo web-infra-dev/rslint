@@ -42,7 +42,7 @@ func parseMode(options any) string {
 var NoReturnAssignRule = rule.Rule{
 	Name: "no-return-assign",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		always := parseMode(options) == "always"
 
 		return rule.RuleListeners{

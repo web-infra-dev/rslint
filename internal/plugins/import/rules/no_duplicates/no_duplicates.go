@@ -40,7 +40,7 @@ func parseOptions(options any) ruleOptions {
 var NoDuplicatesRule = rule.Rule{
 	Name: "import/no-duplicates",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		sourceFile := ctx.SourceFile

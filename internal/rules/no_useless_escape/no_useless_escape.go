@@ -22,7 +22,7 @@ import (
 var NoUselessEscapeRule = rule.Rule{
 	Name: "no-useless-escape",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		allowed := parseAllowRegexCharacters(options)
 
 		return rule.RuleListeners{

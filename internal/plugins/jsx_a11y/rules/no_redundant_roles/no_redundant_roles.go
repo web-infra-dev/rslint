@@ -94,7 +94,7 @@ func parseOptions(raw any) map[string][]string {
 var NoRedundantRolesRule = rule.Rule{
 	Name: "jsx-a11y/no-redundant-roles",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node) {

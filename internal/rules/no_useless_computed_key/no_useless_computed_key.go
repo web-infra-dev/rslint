@@ -126,7 +126,7 @@ func hasCommentsBetween(text string, start, end int) bool {
 var NoUselessComputedKeyRule = rule.Rule{
 	Name: "no-useless-computed-key",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// check inspects a container node (PropertyAssignment / Method /

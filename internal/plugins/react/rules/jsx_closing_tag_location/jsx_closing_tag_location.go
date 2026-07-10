@@ -14,7 +14,7 @@ import (
 var JsxClosingTagLocationRule = rule.Rule{
 	Name: "react/jsx-closing-tag-location",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// Default: "tag-aligned"
 		location := "tag-aligned"
 

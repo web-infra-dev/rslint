@@ -55,7 +55,7 @@ func containsThisType(node *ast.Node) bool {
 }
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.UnwrapOptions(_options)
+	options := rule.LegacyUnwrapOptions(_options)
 	opt := mode(utils.GetOptionsString(options))
 	if opt == "" {
 		opt = modeProperty

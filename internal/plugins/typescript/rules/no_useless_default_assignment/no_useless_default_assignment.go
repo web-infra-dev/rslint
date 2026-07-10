@@ -72,7 +72,7 @@ func buildUselessUndefinedMessage(kind string) rule.RuleMessage {
 }
 
 func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-	options := rule.UnwrapOptions(_options)
+	options := rule.LegacyUnwrapOptions(_options)
 	if ctx.TypeChecker == nil {
 		return rule.RuleListeners{}
 	}

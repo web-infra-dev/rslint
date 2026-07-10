@@ -68,7 +68,7 @@ func parseOptions(options any) Options {
 var NoHooksRule = rule.Rule{
 	Name: "jest/no-hooks",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

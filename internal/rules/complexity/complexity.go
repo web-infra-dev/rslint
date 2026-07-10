@@ -16,7 +16,7 @@ const defaultThreshold = 20
 var ComplexityRule = rule.Rule{
 	Name: "complexity",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		threshold, isModified := parseOptions(options)
 
 		// counters maps a "code path owner" node to its complexity counter.

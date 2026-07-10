@@ -354,7 +354,7 @@ func declarationListDeclaresBlockScopedArguments(node *ast.Node) bool {
 var ObjectShorthandRule = rule.Rule{
 	Name: "object-shorthand",
 	Run: func(ctx rule.RuleContext, _optionsAny []any) rule.RuleListeners {
-		optionsAny := rule.UnwrapOptions(_optionsAny)
+		optionsAny := rule.LegacyUnwrapOptions(_optionsAny)
 		opts := parseOptions(optionsAny)
 		sourceText := ctx.SourceFile.Text()
 

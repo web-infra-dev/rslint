@@ -33,7 +33,7 @@ var defaultNoNamespaceOptions = NoNamespaceOptions{
 var NoNamespaceRule = rule.CreateRule(rule.Rule{
 	Name: "no-namespace",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := defaultNoNamespaceOptions
 
 		// Parse options with dual-format support (handles both array and object formats)

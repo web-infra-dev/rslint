@@ -45,7 +45,7 @@ var globalObjectNames = map[string]struct{}{
 var PreferNumberPropertiesRule = rule.Rule{
 	Name: "unicorn/prefer-number-properties",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		report := func(ref globalReference) {

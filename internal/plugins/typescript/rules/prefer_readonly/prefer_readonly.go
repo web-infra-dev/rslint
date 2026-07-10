@@ -403,7 +403,7 @@ var PreferReadonlyRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-readonly",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _rawOpts []any) rule.RuleListeners {
-		rawOpts := rule.UnwrapOptions(_rawOpts)
+		rawOpts := rule.LegacyUnwrapOptions(_rawOpts)
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

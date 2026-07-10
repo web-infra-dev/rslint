@@ -17,7 +17,7 @@ import (
 var MaxLinesRule = rule.Rule{
 	Name: "max-lines",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// The linter never fires a KindSourceFile listener, so run eagerly.
 		checkMaxLines(ctx, options)
 		return rule.RuleListeners{}

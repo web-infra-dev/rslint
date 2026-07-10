@@ -701,7 +701,7 @@ func handleTemplate(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, renam
 var JsxNoLiteralsRule = rule.Rule{
 	Name: "react/jsx-no-literals",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		cfg := parseConfig(options)
 		var renamedImports map[string]string
 		if cfg.hasElementOverrides() {

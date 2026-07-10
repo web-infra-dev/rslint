@@ -193,7 +193,7 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Name:             "unbound-method",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(UnboundMethodOptions)
 		if !ok {
 			opts = UnboundMethodOptions{}

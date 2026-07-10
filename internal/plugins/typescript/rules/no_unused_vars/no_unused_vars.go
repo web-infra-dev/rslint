@@ -1819,7 +1819,7 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unused-vars",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		ac := &analysisContext{

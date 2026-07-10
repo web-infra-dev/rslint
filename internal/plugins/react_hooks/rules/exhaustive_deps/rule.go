@@ -48,7 +48,7 @@ type runCaches struct {
 var ExhaustiveDepsRule = rule.Rule{
 	Name: "react-hooks/exhaustive-deps",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options, ctx.Settings)
 		sf := ctx.SourceFile
 		tc := ctx.TypeChecker

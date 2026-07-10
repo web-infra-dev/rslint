@@ -17,7 +17,7 @@ var NoEmptyInterfaceRule = rule.CreateRule(rule.Rule{
 	Name:             "no-empty-interface",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := NoEmptyInterfaceOptions{
 			AllowSingleExtends: false,
 		}

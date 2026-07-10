@@ -134,7 +134,7 @@ type callExpressionFrame struct {
 var NoConditionalExpectRule = rule.Rule{
 	Name: "jest/no-conditional-expect",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		_ = options
 
 		testCallbackFunctions := collectTestFunctionCallbacks(ctx)

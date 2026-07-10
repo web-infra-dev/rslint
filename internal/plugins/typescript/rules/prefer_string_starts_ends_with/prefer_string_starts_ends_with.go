@@ -412,7 +412,7 @@ var PreferStringStartsEndsWithRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-string-starts-ends-with",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := defaultOpts
 
 		if options != nil {

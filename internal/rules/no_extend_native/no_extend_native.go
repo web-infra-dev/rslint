@@ -113,7 +113,7 @@ func skipParensUp(node *ast.Node) *ast.Node {
 var NoExtendNativeRule = rule.Rule{
 	Name: "no-extend-native",
 	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
-		opts := rule.UnwrapOptions(_opts)
+		opts := rule.LegacyUnwrapOptions(_opts)
 		o := parseOptions(opts)
 
 		return rule.RuleListeners{

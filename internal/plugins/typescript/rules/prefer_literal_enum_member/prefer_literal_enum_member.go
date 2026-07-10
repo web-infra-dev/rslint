@@ -31,7 +31,7 @@ var defaultOptions = PreferLiteralEnumMemberOptions{
 var PreferLiteralEnumMemberRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-literal-enum-member",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := defaultOptions
 
 		if options != nil {

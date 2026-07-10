@@ -326,7 +326,7 @@ func isStatelessKindForIgnore(node *ast.Node) bool {
 var NoMultiCompRule = rule.Rule{
 	Name: "react/no-multi-comp",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

@@ -10,7 +10,7 @@ import (
 var StylePropObjectRule = rule.Rule{
 	Name: "react/style-prop-object",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// Parse the `allow` option: list of component names to skip
 		var allowedComponents map[string]bool
 		optsMap := utils.GetOptionsMap(options)

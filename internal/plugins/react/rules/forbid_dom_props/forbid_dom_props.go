@@ -159,7 +159,7 @@ func stringLiteralValue(attr *ast.Node) (string, bool) {
 var ForbidDomPropsRule = rule.Rule{
 	Name: "react/forbid-dom-props",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		cfg := parseOptions(options)
 		// Empty config short-circuits the whole listener — matches the
 		// no-options / `forbid: []` path where upstream's Map iteration

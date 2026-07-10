@@ -191,7 +191,7 @@ func buildDefaultAssignmentFix(sf *ast.SourceFile, cond *ast.ConditionalExpressi
 var NoUnneededTernaryRule = rule.Rule{
 	Name: "no-unneeded-ternary",
 	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
-		ruleOptions := rule.UnwrapOptions(_ruleOptions)
+		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
 		opts := parseOptions(ruleOptions)
 
 		condExprMsg := rule.RuleMessage{

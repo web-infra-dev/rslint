@@ -10,7 +10,7 @@ import (
 var NoEmptyPatternRule = rule.Rule{
 	Name: "no-empty-pattern",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -1990,7 +1990,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 	Name:             "no-deprecated",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		if ctx.TypeChecker == nil || ctx.SourceFile == nil {
 			return rule.RuleListeners{}
 		}

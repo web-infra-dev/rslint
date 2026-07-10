@@ -10,7 +10,7 @@ import (
 var NoUnsafeOptionalChainingRule = rule.Rule{
 	Name: "no-unsafe-optional-chaining",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		unsafeOptionalChainMsg := rule.RuleMessage{

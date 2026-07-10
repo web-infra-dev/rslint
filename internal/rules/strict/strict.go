@@ -350,7 +350,7 @@ func buildFunctionModeListeners(ctx rule.RuleContext) rule.RuleListeners {
 var StrictRule = rule.Rule{
 	Name: "strict",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		optStr := utils.GetOptionsString(options)
 		if optStr == "" {
 			optStr = "safe"

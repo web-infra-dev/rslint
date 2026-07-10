@@ -129,7 +129,7 @@ func hasNonNullInteractiveHandler(attrs []*ast.Node, handlers []string) bool {
 var NoStaticElementInteractionsRule = rule.Rule{
 	Name: "jsx-a11y/no-static-element-interactions",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		handlers := opts.Handlers
 		if !opts.HandlersProvided {

@@ -1009,7 +1009,7 @@ func checkDescendant(ctx rule.RuleContext, baseDepth, maxDepth int, children []*
 var JsxMaxDepthRule = rule.Rule{
 	Name: "react/jsx-max-depth",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		handleJSX := func(node *ast.Node) {

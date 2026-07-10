@@ -40,7 +40,7 @@ type options struct {
 var PreferRegexLiteralsRule = rule.Rule{
 	Name: "prefer-regex-literals",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node, callee *ast.Node, argsList *ast.NodeList) {

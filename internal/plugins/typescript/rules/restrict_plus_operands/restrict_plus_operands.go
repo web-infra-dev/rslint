@@ -42,7 +42,7 @@ var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name:             "restrict-plus-operands",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(RestrictPlusOperandsOptions)
 		if !ok {
 			opts = RestrictPlusOperandsOptions{}

@@ -51,7 +51,7 @@ func parseOptions(opts any) noFallthroughOptions {
 var NoFallthroughRule = rule.Rule{
 	Name: "no-fallthrough",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -13,7 +13,7 @@ import (
 var MaxDepthRule = rule.Rule{
 	Name: "max-depth",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		maxDepth := parseMaxDepth(options)
 
 		// Stack of depth counters, one per scope-bearing container. The

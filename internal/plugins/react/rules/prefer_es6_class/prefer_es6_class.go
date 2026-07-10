@@ -119,7 +119,7 @@ func containsArg(args *ast.NodeList, target *ast.Node) bool {
 var PreferEs6ClassRule = rule.Rule{
 	Name: "react/prefer-es6-class",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		mode := parseMode(options)
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)

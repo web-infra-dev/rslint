@@ -187,7 +187,7 @@ func rootObjectName(node *ast.Node) string {
 var AlwaysReturnRule = rule.Rule{
 	Name: "promise/always-return",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {

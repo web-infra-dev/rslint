@@ -128,7 +128,7 @@ func customMessageFor(cfg bannedTypeConfig) string {
 var NoRestrictedTypesRule = rule.CreateRule(rule.Rule{
 	Name: "no-restricted-types",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		bannedTypes := map[string]bannedTypeConfig{}
 		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
 			if types, ok := optsMap["types"].(map[string]interface{}); ok {

@@ -158,7 +158,7 @@ func hasSameScopeNonVarUndefinedDeclaration(identNode *ast.Node) bool {
 var NoShadowRestrictedNamesRule = rule.Rule{
 	Name: "no-shadow-restricted-names",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		restricted := map[string]bool{
 			"undefined": true,

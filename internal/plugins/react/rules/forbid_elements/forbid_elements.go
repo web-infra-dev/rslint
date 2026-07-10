@@ -156,7 +156,7 @@ func isCreateElementCall(callee *ast.Node, pragma string, tc *checker.Checker) b
 var ForbidElementsRule = rule.Rule{
 	Name: "react/forbid-elements",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		indexed := parseOptions(options)
 		if len(indexed) == 0 {
 			return rule.RuleListeners{}

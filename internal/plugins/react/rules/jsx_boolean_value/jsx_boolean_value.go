@@ -10,7 +10,7 @@ import (
 var JsxBooleanValueRule = rule.Rule{
 	Name: "react/jsx-boolean-value",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		mode := "never" // default mode
 		var exceptions map[string]bool
 		assumeUndefinedIsFalse := false

@@ -336,7 +336,7 @@ See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you fi
 var MyRuleRule = rule.CreateRule(rule.Rule{
     Name:             "my-rule",
     RequiresTypeInfo: true,
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindSomeNode: func(node *ast.Node) {
                 // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
@@ -348,7 +348,7 @@ var MyRuleRule = rule.CreateRule(rule.Rule{
 // For typescript-eslint rules that do NOT use TypeChecker:
 var MyOtherRule = rule.CreateRule(rule.Rule{
     Name: "my-other-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 })
@@ -356,7 +356,7 @@ var MyOtherRule = rule.CreateRule(rule.Rule{
 // For ESLint Core rules:
 var MyCoreRule = rule.Rule{
     Name: "my-core-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 }
@@ -392,9 +392,15 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Most `parseOptions` bodies predate this and expect the single bare value ESLint rules traditionally parse (a lone `map[string]interface{}`, `bool`, etc., not wrapped in a slice), so unwrap first with `rule.LegacyUnwrapOptions`, then extract the map with `utils.GetOptionsMap()` — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
 
 ```go
+Run: func(ctx rule.RuleContext, newOptions []any) rule.RuleListeners {
+    options := rule.LegacyUnwrapOptions(newOptions)
+    opts := parseOptions(options)
+    // ...
+}
+
 func parseOptions(options any) Options {
     opts := Options{/* defaults */}
     optsMap := utils.GetOptionsMap(options)

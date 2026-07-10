@@ -42,7 +42,7 @@ var PreferConstRule = rule.Rule{
 	Name:             "prefer-const",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
 		// gap files / inferred-project files, but if a future caller bypasses
 		// the filter we still want to no-op rather than nil-deref.

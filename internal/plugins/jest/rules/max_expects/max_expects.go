@@ -96,7 +96,7 @@ func maybeResetCountForFunctionLike(node *ast.Node, ctx rule.RuleContext, count 
 var MaxExpectsRule = rule.Rule{
 	Name: "jest/max-expects",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		count := 0
 

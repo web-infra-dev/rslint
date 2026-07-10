@@ -156,7 +156,7 @@ func getTemplateScopeRange(node *ast.Node) (int, int, bool) {
 var NoStandaloneExpectRule = rule.Rule{
 	Name: "jest/no-standalone-expect",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		scopeStack := make([]scopeEntry, 0, 8)
 

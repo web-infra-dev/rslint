@@ -625,7 +625,7 @@ func hasOnlyOneStatement(scope *funcScope, opts typeOpts, decls []*ast.Node, sep
 var OneVarRule = rule.Rule{
 	Name: "one-var",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		funcStack := []*funcScope{{}}
 		blockStack := []*blockScope{{}}

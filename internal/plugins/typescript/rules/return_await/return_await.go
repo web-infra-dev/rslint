@@ -98,7 +98,7 @@ var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 	Name:             "return-await",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(ReturnAwaitOptions)
 		if !ok {
 			opts = ReturnAwaitOptions{}

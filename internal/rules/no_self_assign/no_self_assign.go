@@ -15,7 +15,7 @@ const skipOuterExprKinds = ast.OEKParentheses | ast.OEKTypeAssertions
 var NoSelfAssignRule = rule.Rule{
 	Name: "no-self-assign",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

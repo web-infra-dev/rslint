@@ -17,7 +17,7 @@ const (
 var NoChildrenPropRule = rule.Rule{
 	Name: "react/no-children-prop",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		allowFunctions := false
 		if optsMap := utils.GetOptionsMap(options); optsMap != nil {
 			if v, ok := optsMap["allowFunctions"].(bool); ok {

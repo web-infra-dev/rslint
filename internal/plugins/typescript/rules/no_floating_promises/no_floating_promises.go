@@ -81,7 +81,7 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-floating-promises",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(NoFloatingPromisesOptions)
 		if !ok {
 			opts = NoFloatingPromisesOptions{

@@ -70,7 +70,7 @@ func parseOptions(raw any) options {
 var NoNoninteractiveTabindexRule = rule.Rule{
 	Name: "jsx-a11y/no-noninteractive-tabindex",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		// sourceText is required by GetTabIndexEx for raw-text template
 		// literal extraction (NoSubstitutionTemplate has no RawText field).

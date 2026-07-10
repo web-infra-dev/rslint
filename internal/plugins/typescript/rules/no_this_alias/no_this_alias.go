@@ -13,7 +13,7 @@ type NoThisAliasOptions struct {
 var NoThisAliasRule = rule.CreateRule(rule.Rule{
 	Name: "no-this-alias",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := NoThisAliasOptions{
 			AllowDestructuring: true,
 			AllowedNames:       []string{},

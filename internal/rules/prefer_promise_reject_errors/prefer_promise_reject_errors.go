@@ -46,7 +46,7 @@ func checkRejectCall(ctx rule.RuleContext, callExpression *ast.Node, allowEmptyR
 var PreferPromiseRejectErrorsRule = rule.Rule{
 	Name: "prefer-promise-reject-errors",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

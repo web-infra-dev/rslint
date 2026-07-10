@@ -67,7 +67,7 @@ func isEqualityOperator(kind ast.Kind) bool {
 var ValidTypeofRule = rule.Rule{
 	Name: "valid-typeof",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

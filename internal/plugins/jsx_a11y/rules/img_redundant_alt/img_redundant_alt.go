@@ -53,7 +53,7 @@ func parseOptions(raw any) options {
 var ImgRedundantAltRule = rule.Rule{
 	Name: "jsx-a11y/img-redundant-alt",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// Upstream: `typesToValidate = ['img'].concat(componentOptions)`.

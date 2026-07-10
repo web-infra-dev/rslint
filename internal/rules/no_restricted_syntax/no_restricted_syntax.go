@@ -19,7 +19,7 @@ import (
 var NoRestrictedSyntaxRule = rule.Rule{
 	Name: "no-restricted-syntax",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		entries := parseRuleOptions(options)
 		if len(entries) == 0 {
 			return rule.RuleListeners{}

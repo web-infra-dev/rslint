@@ -350,7 +350,7 @@ func buildCallFix(ctx rule.RuleContext, callNode *ast.Node) []rule.RuleFix {
 var NoExtraBooleanCastRule = rule.Rule{
 	Name: "no-extra-boolean-cast",
 	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
-		ruleOptions := rule.UnwrapOptions(_ruleOptions)
+		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
 		opts := parseOptions(ruleOptions)
 
 		negationMsg := rule.RuleMessage{

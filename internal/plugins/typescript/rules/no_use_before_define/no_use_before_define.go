@@ -381,7 +381,7 @@ var NoUseBeforeDefineRule = rule.CreateRule(rule.Rule{
 	Name:             "no-use-before-define",
 	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		return rule.RuleListeners{
 			ast.KindIdentifier: func(node *ast.Node) {

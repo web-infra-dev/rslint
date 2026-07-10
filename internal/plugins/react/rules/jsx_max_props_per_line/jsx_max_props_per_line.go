@@ -15,7 +15,7 @@ import (
 var JsxMaxPropsPerLineRule = rule.Rule{
 	Name: "react/jsx-max-props-per-line",
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
-		options := rule.UnwrapOptions(_options)
+		options := rule.LegacyUnwrapOptions(_options)
 		// Defaults
 		singleLimit := 0 // 0 means "not explicitly set"
 		multiLimit := 0

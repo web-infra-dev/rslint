@@ -84,7 +84,7 @@ func parseOptions(raw any) options {
 var AltTextRule = rule.Rule{
 	Name: "jsx-a11y/alt-text",
 	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
-		rawOptions := rule.UnwrapOptions(_rawOptions)
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		// Precompute the set of nodeType strings that should trigger a check.
