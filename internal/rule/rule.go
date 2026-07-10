@@ -131,19 +131,13 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	// Schema is the rule's options JSON Schema (see CompileSchema and the
-	// <rule-name>.schema.json convention): a tuple describing the
-	// ESLint-style options array. Nil means the rule opts out of schema
-	// validation/defaulting — its options pass through to Run unchecked.
-	Schema []byte
-	Run    func(ctx RuleContext, options []any) RuleListeners
+	Run                func(ctx RuleContext, options []any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
 		Name:             "@typescript-eslint/" + r.Name,
 		RequiresTypeInfo: r.RequiresTypeInfo,
-		Schema:           r.Schema,
 		Run:              r.Run,
 	}
 }

@@ -242,11 +242,7 @@ Rules are defined in `internal/rule/rule.go`:
 type Rule struct {
     Name             string
     RequiresTypeInfo bool
-    // Schema is the rule's options JSON Schema (a tuple describing the
-    // ESLint-style options array). Nil means the rule opts out of schema
-    // validation/defaulting — its options pass through to Run unchecked.
-    Schema []byte
-    Run    func(ctx RuleContext, options []any) RuleListeners
+    Run              func(ctx RuleContext, options []any) RuleListeners
 }
 
 type RuleListeners map[ast.Kind]func(node *ast.Node)
