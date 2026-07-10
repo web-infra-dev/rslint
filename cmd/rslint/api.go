@@ -357,7 +357,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		output = make(map[string]string)
 		for filePath, fileDiags := range diagnosticsByFile {
 			originalContent := fileDiags[0].SourceFile.Text()
-			fixedContent, _, didFix := linter.ApplyRuleFixes(originalContent, fileDiags)
+			fixedContent, _, didFix := linter.ApplyRuleFixesWithReporter(originalContent, fileDiags, reportInvalidRuleFix)
 			if didFix {
 				output[tspath.ConvertToRelativePath(filePath, comparePathOptions)] = fixedContent
 			}

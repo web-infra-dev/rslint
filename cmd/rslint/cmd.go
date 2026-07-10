@@ -640,6 +640,18 @@ func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnos
 	return m
 }
 
+func reportInvalidRuleFix(diagnostic rule.RuleDiagnostic, fix rule.RuleFix, reason linter.InvalidFixReason) {
+	fmt.Fprintf(
+		os.Stderr,
+		"rslint: ignoring invalid fix from rule %q in %s at [%d,%d): %s\n",
+		diagnostic.RuleName,
+		diagnostic.FilePath,
+		fix.Range.Pos(),
+		fix.Range.End(),
+		reason,
+	)
+}
+
 // applyFixPass applies auto-fixes for all files in diagnosticsByFile,
 // writes fixed content to disk, and returns the number of issues fixed.
 func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
@@ -656,7 +668,7 @@ func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
 		}
 
 		originalContent := diagnosticsWithFixes[0].SourceFile.Text()
-		fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+		fixedContent, unapplied, wasFixed := linter.ApplyRuleFixesWithReporter(originalContent, diagnosticsWithFixes, reportInvalidRuleFix)
 
 		if wasFixed {
 			err := os.WriteFile(fileName, []byte(fixedContent), 0644)

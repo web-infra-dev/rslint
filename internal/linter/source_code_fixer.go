@@ -11,21 +11,50 @@ type LintMessage interface {
 	Fixes() []rule.RuleFix
 }
 
+// InvalidFixReason identifies malformed fix data that cannot be applied safely.
+type InvalidFixReason string
+
+const (
+	InvalidFixNegativeRange InvalidFixReason = "fix range contains a negative position"
+	InvalidFixInvertedRange InvalidFixReason = "fix range end precedes its start"
+	InvalidFixOutOfBounds   InvalidFixReason = "fix range exceeds the source length"
+	InvalidFixOverlap       InvalidFixReason = "fixes within one diagnostic overlap"
+)
+
+// InvalidFixReporter observes malformed fixes while the owning diagnostic is
+// left unapplied.
+type InvalidFixReporter[M LintMessage] func(diagnostic M, fix rule.RuleFix, reason InvalidFixReason)
+
 func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, bool) {
+	return ApplyRuleFixesWithReporter(code, diagnostics, nil)
+}
+
+// ApplyRuleFixesWithReporter applies valid, non-conflicting fixes and reports
+// malformed fix data instead of allowing an invalid range to panic while
+// slicing source text. Invalid diagnostics are returned in unapplied.
+func ApplyRuleFixesWithReporter[M LintMessage](code string, diagnostics []M, reportInvalid InvalidFixReporter[M]) (string, []M, bool) {
 	unapplied := []M{}
 	withFixes := []M{}
 
 	fixed := false
 
 	for _, diagnostic := range diagnostics {
-		if len(diagnostic.Fixes()) > 0 {
-			slices.SortFunc(diagnostic.Fixes(), func(a rule.RuleFix, b rule.RuleFix) int {
+		fixes := diagnostic.Fixes()
+		if len(fixes) > 0 {
+			slices.SortFunc(fixes, func(a rule.RuleFix, b rule.RuleFix) int {
 				start := a.Range.Pos() - b.Range.Pos()
 				if start == 0 {
 					return a.Range.End() - b.Range.End()
 				}
 				return start
 			})
+			if invalidFix, reason, invalid := findInvalidFix(len(code), fixes); invalid {
+				if reportInvalid != nil {
+					reportInvalid(diagnostic, invalidFix, reason)
+				}
+				unapplied = append(unapplied, diagnostic)
+				continue
+			}
 			withFixes = append(withFixes, diagnostic)
 		} else {
 			unapplied = append(unapplied, diagnostic)
@@ -84,4 +113,23 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 	builder.WriteString(code[lastFixEnd:])
 
 	return builder.String(), unapplied, fixed
+}
+
+func findInvalidFix(codeLength int, fixes []rule.RuleFix) (rule.RuleFix, InvalidFixReason, bool) {
+	previousEnd := 0
+	for i, fix := range fixes {
+		start, end := fix.Range.Pos(), fix.Range.End()
+		switch {
+		case start < 0 || end < 0:
+			return fix, InvalidFixNegativeRange, true
+		case end < start:
+			return fix, InvalidFixInvertedRange, true
+		case end > codeLength:
+			return fix, InvalidFixOutOfBounds, true
+		case i > 0 && start < previousEnd:
+			return fix, InvalidFixOverlap, true
+		}
+		previousEnd = end
+	}
+	return rule.RuleFix{}, "", false
 }

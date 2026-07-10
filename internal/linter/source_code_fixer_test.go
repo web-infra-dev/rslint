@@ -1,6 +1,7 @@
 package linter
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/core"
@@ -239,6 +240,49 @@ func TestApplyRuleFixes(t *testing.T) {
 			expectedFixedStatus: true,
 		},
 		{
+			name: "out-of-bounds fix is left unapplied",
+			code: "short",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(0, 10, "replacement")),
+			},
+			expectedCode:        "short",
+			expectedUnapplied:   1,
+			expectedFixedStatus: false,
+		},
+		{
+			name: "negative fix range is left unapplied",
+			code: "short",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(-1, 2, "replacement")),
+			},
+			expectedCode:        "short",
+			expectedUnapplied:   1,
+			expectedFixedStatus: false,
+		},
+		{
+			name: "inverted fix range is left unapplied",
+			code: "short",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(newReplaceFix(4, 2, "replacement")),
+			},
+			expectedCode:        "short",
+			expectedUnapplied:   1,
+			expectedFixedStatus: false,
+		},
+		{
+			name: "overlapping fixes in one diagnostic are left unapplied",
+			code: "abcdefghij",
+			diagnostics: []mockDiagnostic{
+				newMockDiagnostic(
+					newReplaceFix(0, 6, "first"),
+					newReplaceFix(4, 8, "second"),
+				),
+			},
+			expectedCode:        "abcdefghij",
+			expectedUnapplied:   1,
+			expectedFixedStatus: false,
+		},
+		{
 			name: "replacement followed by insertion at same end position - should skip insertion",
 			code: "ABCDEFGHIJ",
 			diagnostics: []mockDiagnostic{
@@ -253,8 +297,8 @@ func TestApplyRuleFixes(t *testing.T) {
 			name: "insertion followed by replacement starting at same position - should skip replacement",
 			code: "ABCDEFGHIJ",
 			diagnostics: []mockDiagnostic{
-				newMockDiagnostic(newInsertFix(0, "XXX")),      // Insert at 0
-				newMockDiagnostic(newReplaceFix(0, 3, "YYY")),  // Replace ABC with YYY
+				newMockDiagnostic(newInsertFix(0, "XXX")),     // Insert at 0
+				newMockDiagnostic(newReplaceFix(0, 3, "YYY")), // Replace ABC with YYY
 			},
 			expectedCode:        "XXXABCDEFGHIJ",
 			expectedUnapplied:   1,
@@ -278,6 +322,68 @@ func TestApplyRuleFixes(t *testing.T) {
 				t.Errorf("ApplyRuleFixes() fixed = %v, want %v", fixed, tt.expectedFixedStatus)
 			}
 		})
+	}
+}
+
+func TestApplyRuleFixesWithReporter(t *testing.T) {
+	code := "short"
+	diagnostics := []mockDiagnostic{
+		newMockDiagnostic(newReplaceFix(-1, 2, "negative")),
+		newMockDiagnostic(newReplaceFix(4, 2, "inverted")),
+		newMockDiagnostic(newReplaceFix(0, 10, "out-of-bounds")),
+		newMockDiagnostic(
+			newReplaceFix(0, 3, "first"),
+			newReplaceFix(2, 4, "overlap"),
+		),
+	}
+	var gotReasons []InvalidFixReason
+	result, unapplied, fixed := ApplyRuleFixesWithReporter(
+		code,
+		diagnostics,
+		func(_ mockDiagnostic, _ rule.RuleFix, reason InvalidFixReason) {
+			gotReasons = append(gotReasons, reason)
+		},
+	)
+	wantReasons := []InvalidFixReason{
+		InvalidFixNegativeRange,
+		InvalidFixInvertedRange,
+		InvalidFixOutOfBounds,
+		InvalidFixOverlap,
+	}
+
+	if result != code {
+		t.Fatalf("ApplyRuleFixesWithReporter() code = %q, want %q", result, code)
+	}
+	if len(unapplied) != len(diagnostics) {
+		t.Fatalf("unapplied count = %d, want %d", len(unapplied), len(diagnostics))
+	}
+	if fixed {
+		t.Fatal("fixed = true, want false")
+	}
+	if !slices.Equal(gotReasons, wantReasons) {
+		t.Fatalf("reported reasons = %v, want %v", gotReasons, wantReasons)
+	}
+}
+
+func TestApplyRuleFixesWithReporter_DoesNotReportNormalConflicts(t *testing.T) {
+	diagnostics := []mockDiagnostic{
+		newMockDiagnostic(newReplaceFix(0, 3, "first")),
+		newMockDiagnostic(newReplaceFix(2, 4, "second")),
+	}
+	reported := 0
+	result, unapplied, fixed := ApplyRuleFixesWithReporter(
+		"short",
+		diagnostics,
+		func(_ mockDiagnostic, _ rule.RuleFix, _ InvalidFixReason) {
+			reported++
+		},
+	)
+
+	if result != "firstrt" || len(unapplied) != 1 || !fixed {
+		t.Fatalf("result = %q, unapplied = %d, fixed = %v", result, len(unapplied), fixed)
+	}
+	if reported != 0 {
+		t.Fatalf("reported %d invalid fixes for a normal inter-diagnostic conflict", reported)
 	}
 }
 

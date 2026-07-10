@@ -627,7 +627,20 @@ func (s *Server) computeFixAllContent(ctx context.Context, uri lsproto.DocumentU
 			}
 		}
 
-		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
+		fixedContent, _, wasFixed := linter.ApplyRuleFixesWithReporter(
+			currentContent,
+			ruleDiags,
+			func(diagnostic rule.RuleDiagnostic, fix rule.RuleFix, reason linter.InvalidFixReason) {
+				log.Printf(
+					"Ignoring invalid fix from rule %q for %s at [%d,%d): %s",
+					diagnostic.RuleName,
+					diagnostic.FilePath,
+					fix.Range.Pos(),
+					fix.Range.End(),
+					reason,
+				)
+			},
+		)
 		if !wasFixed {
 			break
 		}
