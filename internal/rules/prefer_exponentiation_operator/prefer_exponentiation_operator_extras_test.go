@@ -45,6 +45,10 @@ func TestPreferExponentiationOperatorExtras(t *testing.T) {
 			// N/A: declaration/container forms do not affect this call-expression-only rule.
 			// N/A: same-kind nesting is covered by shadowed receiver cases; the rule keeps no per-container traversal state.
 			// N/A: overload signatures, abstract members, declare members, empty class/function bodies, and binding patterns are not inputs this rule inspects.
+
+			// ---- Config `/* global Math: off */` / `languageOptions.globals` un-declares the builtin ----
+			{Code: "Math.pow(a, b);", Globals: map[string]bool{"Math": false}},
+			{Code: "globalThis.Math.pow(a, b);", Globals: map[string]bool{"globalThis": false}},
 		},
 		[]rule_tester.InvalidTestCase{
 			// ---- Dimension 4: parentheses and TS wrappers around the receiver or callee are transparent ----
@@ -143,6 +147,16 @@ func TestPreferExponentiationOperatorExtras(t *testing.T) {
 
 			// Locks in upstream report() no-fix arm: comments inside the call are preserved by skipping the fix.
 			invalidNoFix("Math.pow(a /* base */, b)"),
+
+			// Config declares Math as a writable global — still the builtin.
+			{
+				Code:    "Math.pow(a, b);",
+				Output:  []string{"a**b;"},
+				Globals: map[string]bool{"Math": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useExponentiation", Line: 1, Column: 1},
+				},
+			},
 		},
 	)
 }

@@ -149,6 +149,15 @@ func TestNoEvalRule(t *testing.T) {
 			{Code: `import { eval } from 'mod'; var x = eval`},
 
 			// ================================================================
+			// Config `off` un-declares the builtin (non-call references only —
+			// direct eval() calls never consult scope, see the invalid list).
+			// ================================================================
+			{Code: `var x = eval;`, Globals: map[string]bool{"eval": false}},
+			{Code: `window.eval('foo');`, Globals: map[string]bool{"window": false}},
+			{Code: `global.eval('foo');`, Globals: map[string]bool{"global": false}},
+			{Code: `globalThis.eval('foo');`, Globals: map[string]bool{"globalThis": false}},
+
+			// ================================================================
 			// allowIndirect: true — all indirect forms allowed
 			// ================================================================
 			{Code: `(0, eval)('foo')`, Options: map[string]interface{}{"allowIndirect": true}},
@@ -810,6 +819,34 @@ func TestNoEvalRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 1},
 					{MessageId: "unexpected", Line: 1, Column: 12},
 					{MessageId: "unexpected", Line: 1, Column: 23},
+				},
+			},
+
+			// ================================================================
+			// Config `off` does not affect direct eval() calls — ESLint's own
+			// check for these never consults scope at all.
+			// ================================================================
+			{
+				Code:    `eval('foo');`,
+				Globals: map[string]bool{"eval": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 1},
+				},
+			},
+
+			// Config declares eval/window as writable globals — still the builtins.
+			{
+				Code:    `var x = eval;`,
+				Globals: map[string]bool{"eval": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code:    `window.eval('foo');`,
+				Globals: map[string]bool{"window": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 8},
 				},
 			},
 		},
