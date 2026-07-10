@@ -68,6 +68,30 @@ func IsSymbolFromDefaultLibrary(
 	return false
 }
 
+// AddDefaultLibraryGlobals adds value-space globals from the program's active
+// TypeScript default libraries to dst. Symbols are collected from a default-lib
+// source location so a same-named declaration in the linted module cannot hide
+// the global from GetSymbolsInScope.
+func AddDefaultLibraryGlobals(dst map[string]bool, program *compiler.Program, typeChecker *checker.Checker) {
+	if dst == nil || program == nil || typeChecker == nil {
+		return
+	}
+
+	for _, sourceFile := range program.GetSourceFiles() {
+		if !IsSourceFileDefaultLibrary(program, sourceFile) {
+			continue
+		}
+		for _, symbol := range typeChecker.GetSymbolsInScope(sourceFile.AsNode(), ast.SymbolFlagsValue) {
+			if symbol != nil && symbol.Name != "" && IsSymbolFromDefaultLibrary(program, symbol) {
+				dst[symbol.Name] = true
+			}
+		}
+		// Default libraries share one global scope, so one library location
+		// exposes the full active set.
+		return
+	}
+}
+
 /**
  * @example
  * ```ts

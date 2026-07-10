@@ -49,6 +49,9 @@ namespace Foo {}
 ### `builtinGlobals` (default: `true`)
 
 When `true`, the rule reports redeclaring names that shadow ECMAScript built-in globals such as `Object`, `Array`, or `Number`.
+Configured `languageOptions.globals` also participate as built-ins. Active
+`/* global */` directives participate as declarations in either mode; a final
+`:off` setting removes that inline global.
 
 ```json
 { "@typescript-eslint/no-redeclare": ["error", { "builtinGlobals": true }] }

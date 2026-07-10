@@ -10,80 +10,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// ecmaScriptGlobals lists ECMAScript built-in globals referenced by the
-// `builtinGlobals` option. We pair this with a TypeChecker-based default-
-// library scan so that environment-specific globals (DOM, Node, …) are also
-// picked up when type information is available. The hard-coded list is
-// necessary because once a user writes `var Object = 0` at module scope, the
-// TypeChecker resolves `Object` to the local binding and the default-library
-// match is lost.
-var ecmaScriptGlobals = map[string]bool{
-	"AggregateError":       true,
-	"Array":                true,
-	"ArrayBuffer":          true,
-	"AsyncDisposableStack": true,
-	"AsyncIterator":        true,
-	"Atomics":              true,
-	"BigInt":               true,
-	"BigInt64Array":        true,
-	"BigUint64Array":       true,
-	"Boolean":              true,
-	"DataView":             true,
-	"Date":                 true,
-	"decodeURI":            true,
-	"decodeURIComponent":   true,
-	"DisposableStack":      true,
-	"encodeURI":            true,
-	"encodeURIComponent":   true,
-	"Error":                true,
-	"escape":               true,
-	"EvalError":            true,
-	"FinalizationRegistry": true,
-	"Float32Array":         true,
-	"Float64Array":         true,
-	"Function":             true,
-	"globalThis":           true,
-	"Infinity":             true,
-	"Int8Array":            true,
-	"Int16Array":           true,
-	"Int32Array":           true,
-	"Intl":                 true,
-	"isFinite":             true,
-	"isNaN":                true,
-	"Iterator":             true,
-	"JSON":                 true,
-	"Map":                  true,
-	"Math":                 true,
-	"NaN":                  true,
-	"Number":               true,
-	"Object":               true,
-	"parseFloat":           true,
-	"parseInt":             true,
-	"Promise":              true,
-	"Proxy":                true,
-	"RangeError":           true,
-	"ReferenceError":       true,
-	"Reflect":              true,
-	"RegExp":               true,
-	"Set":                  true,
-	"SharedArrayBuffer":    true,
-	"String":               true,
-	"SuppressedError":      true,
-	"Symbol":               true,
-	"SyntaxError":          true,
-	"TypeError":            true,
-	"Uint8Array":           true,
-	"Uint8ClampedArray":    true,
-	"Uint16Array":          true,
-	"Uint32Array":          true,
-	"unescape":             true,
-	"URIError":             true,
-	"undefined":            true,
-	"WeakMap":              true,
-	"WeakRef":              true,
-	"WeakSet":              true,
-}
-
 // https://eslint.org/docs/latest/rules/no-shadow
 //
 // Scope semantics are reconstructed by walking the AST and tracking scopes
@@ -1349,9 +1275,7 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 		// binding), then union in whatever the default library exposes.
 		builtinGlobals := map[string]bool{}
 		if opts.builtinGlobals {
-			for name := range ecmaScriptGlobals {
-				builtinGlobals[name] = true
-			}
+			utils.AddECMAScriptGlobals(builtinGlobals)
 			// Config `languageOptions.globals` and `/* global */` comments
 			// declare additional globals beyond the ECMAScript/lib set.
 			for name, declared := range ctx.Globals {
@@ -1359,16 +1283,7 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 					builtinGlobals[name] = true
 				}
 			}
-			if ctx.TypeChecker != nil && ctx.Program != nil {
-				for _, sym := range ctx.TypeChecker.GetSymbolsInScope(ctx.SourceFile.AsNode(), ast.SymbolFlagsValue) {
-					if sym == nil || sym.Name == "" {
-						continue
-					}
-					if utils.IsSymbolFromDefaultLibrary(ctx.Program, sym) {
-						builtinGlobals[sym.Name] = true
-					}
-				}
-			}
+			utils.AddDefaultLibraryGlobals(builtinGlobals, ctx.Program, ctx.TypeChecker)
 		}
 		b.builtinGlobals = builtinGlobals
 
