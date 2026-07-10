@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_number_to_fixed_digits_argument"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -24,5 +25,6 @@ func GetAllRules() []rule.Rule {
 		prefer_array_flat_map.PreferArrayFlatMapRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
 		require_array_join_separator.RequireArrayJoinSeparatorRule,
+		require_number_to_fixed_digits_argument.RequireNumberToFixedDigitsArgumentRule,
 	}
 }

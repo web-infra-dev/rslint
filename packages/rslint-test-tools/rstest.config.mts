@@ -425,6 +425,7 @@ export default defineConfig({
     './tests/eslint/rules/no-invalid-regexp.test.ts',
     './tests/eslint/rules/no-misleading-character-class.test.ts',
     './tests/eslint/rules/no-regex-spaces.test.ts',
+    './tests/eslint/rules/no-redeclare.test.ts',
     './tests/eslint/rules/prefer-regex-literals.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
     './tests/eslint/rules/no-restricted-imports.test.ts',
@@ -555,6 +556,7 @@ export default defineConfig({
     './tests/eslint-plugin-unicorn/rules/prefer-array-flat-map.test.ts',
     './tests/eslint-plugin-unicorn/rules/prefer-number-properties.test.ts',
     './tests/eslint-plugin-unicorn/rules/require-array-join-separator.test.ts',
+    './tests/eslint-plugin-unicorn/rules/require-number-to-fixed-digits-argument.test.ts',
 
     './tests/eslint/rules/no-shadow-restricted-names.test.ts',
   ],

@@ -151,7 +151,7 @@ const recommended: RslintConfigEntry = {
     'unicorn/require-array-join-separator': 'error',
     // 'unicorn/require-module-attributes': 'error', // not implemented
     // 'unicorn/require-module-specifiers': 'error', // not implemented
-    // 'unicorn/require-number-to-fixed-digits-argument': 'error', // not implemented
+    'unicorn/require-number-to-fixed-digits-argument': 'error',
     // 'unicorn/require-post-message-target-origin': 'off', // not implemented
     // 'unicorn/string-content': 'off', // not implemented
     // 'unicorn/switch-case-braces': 'error', // not implemented

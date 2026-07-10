@@ -4,7 +4,6 @@ import {
   waitForDiagnostics,
   waitForContentChange,
   findFixAllAction,
-  prewarmOnSaveFixAll,
   requestFixAll,
   withTmpFile,
   withOnSaveFixAll,
@@ -13,14 +12,6 @@ import {
 
 suite('rslint fixAll - cascade (multi-pass)', function () {
   this.timeout(120000);
-
-  // Prime the on-save fixAll pipeline once so the first real test below
-  // doesn't pay VS Code's codeActionsOnSave + LSP cold-start cost (~30s on
-  // Windows under load). See fixall-helpers.ts:prewarmOnSaveFixAll.
-  suiteSetup(async function () {
-    this.timeout(120000);
-    await prewarmOnSaveFixAll();
-  });
 
   test('no-wrapper-object-types triggers no-inferrable-types in second pass', async () => {
     const cascadeContent = [
@@ -35,12 +26,20 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       const wrapperDiags = initialDiags.filter((d) =>
         d.message.includes('no-wrapper-object-types'),
       );
-      if (wrapperDiags.length === 0) return;
+      assert.ok(
+        wrapperDiags.length > 0,
+        `Expected no-wrapper-object-types diagnostics. Got: ${initialDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
-      if (!fixAllAction?.edit) return;
+      assert.ok(fixAllAction?.edit, 'Cascade fixAll should provide an edit');
 
-      await vscode.workspace.applyEdit(fixAllAction.edit);
+      assert.ok(
+        await vscode.workspace.applyEdit(fixAllAction.edit),
+        'Cascade fixAll edit should apply',
+      );
 
       const fixedContent = doc.getText();
       assert.ok(
@@ -69,14 +68,18 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       await replaceAll(editor, cascadeContent);
 
       const diags = await waitForDiagnostics(doc);
-      if (!diags.some((d) => d.message.includes('no-wrapper-object-types')))
-        return;
+      assert.ok(
+        diags.some((d) => d.message.includes('no-wrapper-object-types')),
+        `Expected no-wrapper-object-types before on-save cascade. Got: ${diags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
-      await doc.save();
+      assert.ok(await doc.save(), 'Cascade document should save');
 
       // Event-driven wait: resolves the moment the on-save fixAll edit
       // lands on the document, instead of polling on a 500ms interval.
-      // 60s budget gives Windows runners headroom even after pre-warm.
+      // 60s budget gives Windows runners headroom under load.
       // The helper rejects with a descriptive timeout error including the
       // last seen document content; let that propagate verbatim so the
       // original stack survives.

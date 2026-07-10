@@ -395,8 +395,15 @@ func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeT
 func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextDocumentParams) error {
 	log.Printf("Handling didSave: %s", params.TextDocument.Uri)
 	uri := params.TextDocument.Uri
-	if params.Text != nil {
-		s.documents[uri] = *params.Text
+
+	// didChange is authoritative for the current content of an open document.
+	// didSave may include the text that reached disk, but carries no document
+	// version, so a save for an older buffer can arrive after a newer didChange.
+	// Never replace the versioned document mirror with this unversioned snapshot.
+	currentContent, open := s.documents[uri]
+	forwardSave := shouldForwardDidSave(currentContent, open, params.Text)
+	if !forwardSave {
+		log.Printf("Ignoring stale didSave for open document %s", uri)
 	}
 
 	// Clear pending debounce lint for this URI — pushDiagnostics below
@@ -405,10 +412,20 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 
 	// Notify session about the save event
 	if s.session != nil {
-		s.session.DidSaveFile(ctx, uri)
+		if forwardSave {
+			s.session.DidSaveFile(ctx, uri)
+		}
 		s.pushDiagnostics(uri)
 	}
 	return nil
+}
+
+// shouldForwardDidSave suppresses only saves that are known to describe an
+// older version of an open document. Saves without text and saves for documents
+// not tracked as open are forwarded for LSP client compatibility and so tsgo
+// can observe out-of-band disk changes.
+func shouldForwardDidSave(currentContent string, open bool, savedText *string) bool {
+	return savedText == nil || !open || currentContent == *savedText
 }
 
 func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTextDocumentParams) error {

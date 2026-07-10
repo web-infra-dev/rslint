@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
-import { executeCodeActionProviderWithRetry } from './fixall-helpers';
+import { executeCodeActionProvider } from './fixall-helpers';
 
 suite('rslint extension', function () {
   this.timeout(90000);
@@ -179,7 +179,7 @@ suite('rslint extension', function () {
 
     if (typeAssertionDiag) {
       // Request code actions for the diagnostic range
-      const codeActions = await executeCodeActionProviderWithRetry(
+      const codeActions = await executeCodeActionProvider(
         doc.uri,
         typeAssertionDiag.range,
       );
@@ -221,7 +221,7 @@ suite('rslint extension', function () {
 
     if (unsafeDiag) {
       // Request code actions for the diagnostic range
-      const codeActions = await executeCodeActionProviderWithRetry(
+      const codeActions = await executeCodeActionProvider(
         doc.uri,
         unsafeDiag.range,
       );
@@ -274,7 +274,7 @@ suite('rslint extension', function () {
 
     if (unsafeDiag) {
       // Request code actions for the diagnostic range
-      const codeActions = await executeCodeActionProviderWithRetry(
+      const codeActions = await executeCodeActionProvider(
         doc.uri,
         unsafeDiag.range,
       );
@@ -321,7 +321,7 @@ suite('rslint extension', function () {
     await waitForDiagnostics(doc);
 
     // Test that code actions are only provided for ranges that overlap with diagnostics
-    const codeActionsEmptyRange = await executeCodeActionProviderWithRetry(
+    const codeActionsEmptyRange = await executeCodeActionProvider(
       doc.uri,
       new vscode.Range(100, 0, 100, 0), // Range with no diagnostics
     );
@@ -597,7 +597,7 @@ suite('rslint extension', function () {
     for (const diagnostic of diagnostics) {
       // Filter quick fixes
       const codeActions = (
-        await executeCodeActionProviderWithRetry(doc.uri, diagnostic.range)
+        await executeCodeActionProvider(doc.uri, diagnostic.range)
       ).filter(
         (action) => action.kind?.value === vscode.CodeActionKind.QuickFix.value,
       );
