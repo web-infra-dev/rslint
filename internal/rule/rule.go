@@ -60,13 +60,13 @@ func ParseSeverity(level string) DiagnosticSeverity {
 }
 
 // NormalizeOptions returns a rule's options in ESLint context.options form
-// ([]any). Rules receive the value of the resolved config's `rules` entry minus
-// the severity level; config.rules unwraps a single configured option to a bare
-// value (see config.parseArrayRuleConfig), so a rule that expects the
-// eslint-format array (e.g. reads optArray[0]) would silently miss a
-// single-option config. Re-wrapping a bare value lets every rule read
-// options[0] uniformly, whether the option arrived wrapped (multi-option or an
-// explicit array) or unwrapped (a single option).
+// ([]any). config.parseArrayRuleConfig never collapses RuleConfig.Options, but
+// LegacyUnwrapOptions (the compatibility shim for pre-migration `parseOptions
+// any` bodies) does — a rule that round-trips through it and then wants the
+// eslint-format array back (e.g. reads optArray[0]) would silently miss a
+// single-option config otherwise. Re-wrapping a bare value lets every caller
+// read options[0] uniformly, whether the option arrived wrapped (multi-option
+// or an explicit array) or unwrapped (a single option).
 //
 // It returns an empty (non-nil) slice when no options were configured, so both
 // native rules (which key on `len == 0 → defaults`) and the eslint-plugin host
@@ -80,6 +80,24 @@ func NormalizeOptions(raw any) []any {
 		return arr
 	}
 	return []any{raw}
+}
+
+// LegacyUnwrapOptions is NormalizeOptions' inverse: it collapses a rule's options
+// array (Run's []any parameter — ESLint's context.options, the config array
+// after the severity level) back to the single bare value most existing rule
+// implementations parse. Empty → nil; a single element → that element;
+// otherwise the slice itself. This is the compatibility shim old
+// `parseOptions(options any)` bodies call so they don't need to change beyond
+// their Run signature.
+func LegacyUnwrapOptions(options []any) any {
+	switch len(options) {
+	case 0:
+		return nil
+	case 1:
+		return options[0]
+	default:
+		return options
+	}
 }
 
 const (
@@ -113,7 +131,7 @@ type Rule struct {
 	// config's object-form `plugins`. Its Run is a no-op in Go; the linter
 	// splits these out and dispatches them to the plugin-lint host.
 	IsEslintPluginRule bool
-	Run                func(ctx RuleContext, options any) RuleListeners
+	Run                func(ctx RuleContext, options []any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {

@@ -20,7 +20,7 @@ func buildNoDuplicateHookMessage(hook string) rule.RuleMessage {
 
 var NoDuplicateHooksRule = rule.Rule{
 	Name: "jest/no-duplicate-hooks",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		hookContexts := []map[string]int{{}}
 
 		return rule.RuleListeners{

@@ -49,7 +49,7 @@ type unnecessaryAssignment struct {
 	node *ast.Node
 }
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	var stack []*reportInfo
 	// fileBuffer accumulates unsuppressed unnecessary assignments across all
 	// classes visited so far. The linter doesn't sort diagnostics, and visit

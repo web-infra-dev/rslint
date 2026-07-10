@@ -12,7 +12,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-depth
 var MaxDepthRule = rule.Rule{
 	Name: "max-depth",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		maxDepth := parseMaxDepth(options)
 
 		// Stack of depth counters, one per scope-bearing container. The

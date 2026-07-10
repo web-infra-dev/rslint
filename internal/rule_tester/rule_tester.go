@@ -157,7 +157,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 						Globals:  globals,
 						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
-							return r.Run(ctx, options)
+							return r.Run(ctx, rule.NormalizeOptions(options))
 						},
 					},
 				}

@@ -31,7 +31,7 @@ var NoUnnecessaryQualifierRule = rule.CreateRule(rule.Rule{
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, options []any) rule.RuleListeners {
 	// namespacesInScope tracks the enum / namespace declaration nodes whose
 	// bodies enclose the current traversal point. The qualifier check
 	// resolves a symbol and verifies one of its declarations is on this
@@ -209,4 +209,3 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		rule.ListenerOnExit(ast.KindQualifiedName): resetIfMatchingCursor,
 	}
 }
-

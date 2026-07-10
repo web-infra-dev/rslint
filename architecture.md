@@ -242,7 +242,7 @@ Rules are defined in `internal/rule/rule.go`:
 type Rule struct {
     Name             string
     RequiresTypeInfo bool
-    Run              func(ctx RuleContext, options any) RuleListeners
+    Run              func(ctx RuleContext, options []any) RuleListeners
 }
 
 type RuleListeners map[ast.Kind]func(node *ast.Node)

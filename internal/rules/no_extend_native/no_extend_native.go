@@ -19,14 +19,14 @@ var nativeBuiltins = map[string]bool{
 	"FinalizationRegistry": true, "Float16Array": true, "Float32Array": true, "Float64Array": true, "Function": true,
 	"Infinity": true, "Int16Array": true, "Int32Array": true, "Int8Array": true, "Intl": true, "Iterator": true,
 	"JSON": true,
-	"Map": true, "Math": true,
+	"Map":  true, "Math": true,
 	"NaN": true, "Number": true,
-	"Object": true,
+	"Object":  true,
 	"Promise": true, "Proxy": true,
 	"RangeError": true, "ReferenceError": true, "Reflect": true, "RegExp": true,
 	"Set": true, "SharedArrayBuffer": true, "String": true, "Symbol": true, "SyntaxError": true,
 	"TypeError": true,
-	"URIError": true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
+	"URIError":  true, "Uint16Array": true, "Uint32Array": true, "Uint8Array": true, "Uint8ClampedArray": true,
 	"WeakMap": true, "WeakRef": true, "WeakSet": true,
 }
 
@@ -112,7 +112,8 @@ func skipParensUp(node *ast.Node) *ast.Node {
 // https://eslint.org/docs/latest/rules/no-extend-native
 var NoExtendNativeRule = rule.Rule{
 	Name: "no-extend-native",
-	Run: func(ctx rule.RuleContext, opts any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
+		opts := rule.LegacyUnwrapOptions(_opts)
 		o := parseOptions(opts)
 
 		return rule.RuleListeners{

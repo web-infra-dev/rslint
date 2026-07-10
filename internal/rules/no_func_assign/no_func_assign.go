@@ -98,7 +98,7 @@ func checkReassignments(searchRoot *ast.Node, name string, declNode *ast.Node, c
 // NoFuncAssignRule disallows reassigning function declarations.
 var NoFuncAssignRule = rule.Rule{
 	Name: "no-func-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				nameNode := node.Name()

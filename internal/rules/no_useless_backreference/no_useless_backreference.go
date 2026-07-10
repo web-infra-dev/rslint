@@ -11,7 +11,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-useless-backreference
 var NoUselessBackreferenceRule = rule.Rule{
 	Name: "no-useless-backreference",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
 		return rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {

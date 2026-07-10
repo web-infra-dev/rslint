@@ -325,7 +325,7 @@ How you handle TypeChecker availability depends on the rule type:
 var MyTSRule = rule.CreateRule(rule.Rule{
     Name:             "my-ts-rule",
     RequiresTypeInfo: true,
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindCallExpression: func(node *ast.Node) {
                 // ctx.TypeChecker is guaranteed non-nil
@@ -342,7 +342,7 @@ var MyTSRule = rule.CreateRule(rule.Rule{
 ```go
 var MyCoreRule = rule.Rule{
     Name: "my-core-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindCallExpression: func(node *ast.Node) {
                 if ctx.TypeChecker == nil {

@@ -350,7 +350,10 @@ func TestGetConfigForFile_ArrayRuleConfig(t *testing.T) {
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn', got %q", rc.Level)
 	}
-	optsMap, _ := rc.Options.(map[string]interface{})
+	if len(rc.Options) != 1 {
+		t.Fatalf("Expected 1 option, got %d", len(rc.Options))
+	}
+	optsMap, _ := rc.Options[0].(map[string]interface{})
 	if optsMap == nil || optsMap["default"] != "array-simple" {
 		t.Error("Expected options to contain default: array-simple")
 	}
@@ -652,7 +655,10 @@ func TestGetConfigForFile_MultipleEntries_ArrayRuleOverridesString(t *testing.T)
 	if rc.Level != "warn" {
 		t.Errorf("Expected level 'warn' from array override, got %q", rc.Level)
 	}
-	optsMap2, _ := rc.Options.(map[string]interface{})
+	if len(rc.Options) != 1 {
+		t.Fatalf("Expected 1 option, got %d", len(rc.Options))
+	}
+	optsMap2, _ := rc.Options[0].(map[string]interface{})
 	if optsMap2 == nil {
 		t.Fatal("Expected options from array config")
 		return

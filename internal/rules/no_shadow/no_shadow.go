@@ -1319,12 +1319,13 @@ var NoShadowRule = rule.Rule{
 // copies the captured `allow` map per invocation, so this is safe.
 var runTSESLint = runWithDefaults(defaultOptionsTSESLint())
 
-func RunTSESLint(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
-	return runTSESLint(ctx, rawOptions)
+func RunTSESLint(ctx rule.RuleContext, options []any) rule.RuleListeners {
+	return runTSESLint(ctx, options)
 }
 
-func runWithDefaults(defaults options) func(rule.RuleContext, any) rule.RuleListeners {
-	return func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleListeners {
+	return func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptionsWith(rawOptions, defaults)
 		if ctx.SourceFile == nil {
 			return rule.RuleListeners{}

@@ -39,7 +39,7 @@ const errorMessage = "Visible, non-interactive elements with click handlers must
 
 var ClickEventsHaveKeyEventsRule = rule.Rule{
 	Name: "jsx-a11y/click-events-have-key-events",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		getElementType := func(node *ast.Node) string {
 			return jsxa11yutil.GetElementType(node, ctx.Settings)
 		}

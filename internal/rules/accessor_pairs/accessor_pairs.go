@@ -84,7 +84,7 @@ type accessorGroup struct {
 //   - Static-resolvable names (identifier, string / numeric / bigint literal,
 //     or a computed expression whose value is one of those literals) collapse
 //     into `keyStatic` and are compared by their normalized text — so
-//     `a`, `'a'`, `['a']`, and `` [`a`] `` all group together, and `1e2`
+//     `a`, `'a'`, `['a']`, and “ [`a`] “ all group together, and `1e2`
 //     matches `100` / `'100'` / `['100']`.
 //   - `PrivateIdentifier` keys (`#a`) form their own `keyPrivate` class,
 //     separate from a string key `'#a'`.
@@ -388,7 +388,8 @@ func checkTypeMembers(ctx rule.RuleContext, members []*ast.Node, opts Options) {
 // https://eslint.org/docs/latest/rules/accessor-pairs
 var AccessorPairsRule = rule.Rule{
 	Name: "accessor-pairs",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		if !opts.SetWithoutGet && !opts.GetWithoutSet {
 			return rule.RuleListeners{}

@@ -17,7 +17,7 @@ var wrapperObjects = map[string]bool{
 
 var NoNewWrappersRule = rule.Rule{
 	Name: "no-new-wrappers",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				newExpr := node.AsNewExpression()

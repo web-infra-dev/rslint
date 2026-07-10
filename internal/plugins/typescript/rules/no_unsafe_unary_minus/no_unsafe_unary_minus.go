@@ -19,7 +19,7 @@ func buildUnaryMinusMessage(t string) rule.RuleMessage {
 var NoUnsafeUnaryMinusRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-unary-minus",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
 				expr := node.AsPrefixUnaryExpression()

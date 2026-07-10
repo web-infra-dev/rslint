@@ -22,7 +22,7 @@ var BanTslintCommentRule = rule.CreateRule(rule.Rule{
 	Run:  run,
 })
 
-func run(ctx rule.RuleContext, _ any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 	text := ctx.SourceFile.Text()
 
 	utils.ForEachComment(&ctx.SourceFile.Node, func(comment *ast.CommentRange) {

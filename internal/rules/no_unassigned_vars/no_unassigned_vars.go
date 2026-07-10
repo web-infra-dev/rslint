@@ -108,7 +108,7 @@ func isReadReference(node *ast.Node) bool {
 var NoUnassignedVarsRule = rule.Rule{
 	Name:             "no-unassigned-vars",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

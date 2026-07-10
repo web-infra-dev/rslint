@@ -29,7 +29,8 @@ import (
 // https://eslint.org/docs/latest/rules/no-misleading-character-class
 var NoMisleadingCharacterClassRule = rule.Rule{
 	Name: "no-misleading-character-class",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		eval := utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile)
 		return rule.RuleListeners{

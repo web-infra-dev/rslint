@@ -106,9 +106,9 @@ type analyzer struct {
 	//   escapedSymbols : subset referenced inside a nested function/arrow/
 	//                    class-static-block — they can be observed by a
 	//                    concurrent context, so writes to them are race-prone.
-	declaredInFunc map[*ast.Symbol]bool
-	parameterSymbols  map[*ast.Symbol]bool
-	escapedSymbols map[*ast.Symbol]bool
+	declaredInFunc   map[*ast.Symbol]bool
+	parameterSymbols map[*ast.Symbol]bool
+	escapedSymbols   map[*ast.Symbol]bool
 
 	// breakTargets is the stack of currently-enclosing loops/switches that
 	// can receive a `break` (optionally labeled). Innermost at the end.
@@ -117,12 +117,12 @@ type analyzer struct {
 
 func newAnalyzer(ctx rule.RuleContext, funcNode *ast.Node, allowProperties bool) *analyzer {
 	a := &analyzer{
-		ctx:             ctx,
-		funcNode:        funcNode,
-		allowProperties: allowProperties,
-		declaredInFunc:  make(map[*ast.Symbol]bool),
-		parameterSymbols:   make(map[*ast.Symbol]bool),
-		escapedSymbols:  make(map[*ast.Symbol]bool),
+		ctx:              ctx,
+		funcNode:         funcNode,
+		allowProperties:  allowProperties,
+		declaredInFunc:   make(map[*ast.Symbol]bool),
+		parameterSymbols: make(map[*ast.Symbol]bool),
+		escapedSymbols:   make(map[*ast.Symbol]bool),
 	}
 	a.collectDeclarations()
 	a.collectEscapes()
@@ -1134,7 +1134,8 @@ func (a *analyzer) walkForStatement(node *ast.Node, state *analysisState) {
 var RequireAtomicUpdatesRule = rule.Rule{
 	Name:             "require-atomic-updates",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		allowProperties := false
 		optsMap := utils.GetOptionsMap(options)
 		if optsMap != nil {

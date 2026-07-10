@@ -145,7 +145,8 @@ func buildErrorStringGenericSimpleMessage(readonlyPrefix, typeStr, className str
 
 var ArrayTypeRule = rule.CreateRule(rule.Rule{
 	Name: "array-type",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := ArrayTypeOptions{
 			Default: "array",
 		}

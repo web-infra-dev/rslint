@@ -25,7 +25,7 @@ func isFunctionLikeExpression(node *ast.Node) bool {
 // Mirrors eslint-plugin-react's astUtil.getPropertyName, which reads only
 // `nameNode.name`. Consequently, non-Identifier keys — string literals
 // (`"render": fn`), numeric keys, computed keys (`['render']()`,
-// `` [`render`]() ``, `[tag`render`]()`), etc. — all map to "" and never
+// “ [`render`]() “, `[tag`render`]()`), etc. — all map to "" and never
 // match `render`. Only a bare Identifier key `render` qualifies.
 func memberName(member *ast.Node) string {
 	if member == nil {
@@ -182,7 +182,7 @@ func renderReturns(fn *ast.Node) bool {
 
 var RequireRenderReturnRule = rule.Rule{
 	Name: "react/require-render-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 

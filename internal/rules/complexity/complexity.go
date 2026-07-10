@@ -15,7 +15,8 @@ const defaultThreshold = 20
 // https://eslint.org/docs/latest/rules/complexity
 var ComplexityRule = rule.Rule{
 	Name: "complexity",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		threshold, isModified := parseOptions(options)
 
 		// counters maps a "code path owner" node to its complexity counter.

@@ -425,7 +425,7 @@ func getClassName(classNode *ast.Node) string {
 
 var NoUnusedClassComponentMethodsRule = rule.Rule{
 	Name: "react/no-unused-class-component-methods",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 

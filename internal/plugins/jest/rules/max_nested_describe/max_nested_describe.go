@@ -62,7 +62,8 @@ func buildErrorExceededMaxDepthMessage(depth, maxAllowed int) rule.RuleMessage {
 
 var MaxNestedDescribeRule = rule.Rule{
 	Name: "jest/max-nested-describe",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		describes := make([]*ast.Node, 0, 8)
 

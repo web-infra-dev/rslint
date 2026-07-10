@@ -90,8 +90,8 @@ func isNestedJestFnCall(node *ast.Node) bool {
 
 var NoRestrictedJestMethodsRule = rule.Rule{
 	Name: "jest/no-restricted-jest-methods",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		restrictedMethods := parseOptions(options)
+	Run: func(ctx rule.RuleContext, newOptions []any) rule.RuleListeners {
+		restrictedMethods := parseOptions(rule.LegacyUnwrapOptions(newOptions))
 		if len(restrictedMethods) == 0 {
 			return rule.RuleListeners{}
 		}

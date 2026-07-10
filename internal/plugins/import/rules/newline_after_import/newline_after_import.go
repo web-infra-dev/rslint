@@ -59,7 +59,8 @@ func makeMessage(typ string, count int) rule.RuleMessage {
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/newline-after-import.md
 var NewlineAfterImportRule = rule.Rule{
 	Name: "import/newline-after-import",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		// The linter visits SourceFile's children (not the SourceFile node itself),

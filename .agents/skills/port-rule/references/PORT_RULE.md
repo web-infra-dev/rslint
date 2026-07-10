@@ -338,7 +338,7 @@ See [UTILS_REFERENCE.md](UTILS_REFERENCE.md) for the full inventory. **If you fi
 var MyRuleRule = rule.CreateRule(rule.Rule{
     Name:             "my-rule",
     RequiresTypeInfo: true,
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindSomeNode: func(node *ast.Node) {
                 // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
@@ -350,7 +350,7 @@ var MyRuleRule = rule.CreateRule(rule.Rule{
 // For typescript-eslint rules that do NOT use TypeChecker:
 var MyOtherRule = rule.CreateRule(rule.Rule{
     Name: "my-other-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 })
@@ -358,7 +358,7 @@ var MyOtherRule = rule.CreateRule(rule.Rule{
 // For ESLint Core rules:
 var MyCoreRule = rule.Rule{
     Name: "my-core-rule",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+    Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
         // ...
     },
 }
@@ -394,10 +394,15 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Write `parseOptions` to take that slice directly and extract the first element's map with `utils.GetOptionsMap()`:
 
 ```go
-func parseOptions(options any) Options {
+Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
+    opts := parseOptions(options)
+    // ...
+}
+
+func parseOptions(options []any) Options {
     opts := Options{/* defaults */}
     optsMap := utils.GetOptionsMap(options)
     if optsMap != nil {
@@ -407,19 +412,9 @@ func parseOptions(options any) Options {
 }
 ```
 
-**Why this matters — the shape the CLI sends is different from Go tests.** `parseArrayRuleConfig` in `internal/config/config.go` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+`GetOptionsMap` is the only safe extractor — do not reimplement it with a hand-rolled `options[0].(map[string]interface{})` type assertion.
 
-**Anti-pattern — do not write this:**
-
-```go
-// ❌ WRONG — only matches when len(remaining) > 1 in config.go;
-//    misses every single-option config and every CLI invocation.
-if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-    if optsJSON, err := json.Marshal(arr[0]); err == nil {
-        _ = json.Unmarshal(optsJSON, &opts)
-    }
-}
-```
+For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
 
 ### Alignment Audit
 

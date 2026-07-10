@@ -29,7 +29,8 @@ type NoMeaninglessVoidOperatorOptions struct {
 var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 	Name:             "no-meaningless-void-operator",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(NoMeaninglessVoidOperatorOptions)
 		if !ok {
 			opts = NoMeaninglessVoidOperatorOptions{}

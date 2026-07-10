@@ -27,7 +27,7 @@ func buildDefineInitializerSuggestionMessage(name, suggested string) rule.RuleMe
 
 var PreferEnumInitializersRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-enum-initializers",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				enumDecl := node.AsEnumDeclaration()

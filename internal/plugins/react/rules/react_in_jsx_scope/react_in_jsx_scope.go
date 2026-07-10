@@ -11,7 +11,7 @@ import (
 // via ts(2304) "Cannot find name 'React'", making this rule redundant.
 var ReactInJsxScopeRule = rule.Rule{
 	Name: "react/react-in-jsx-scope",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	},
 }
