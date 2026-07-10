@@ -94,7 +94,7 @@ describe('normalizeConfig', () => {
     );
   });
 
-  test('strips unknown fields', () => {
+  test('preserves name and strips unknown fields', () => {
     const result = normalizeConfig([
       {
         name: 'my-config',
@@ -103,7 +103,7 @@ describe('normalizeConfig', () => {
         unknownField: 123,
       },
     ]);
-    expect(result[0]).not.toHaveProperty('name');
+    expect(result[0].name).toBe('my-config');
     expect(result[0]).not.toHaveProperty('unknownField');
   });
 
@@ -132,16 +132,17 @@ describe('normalizeConfig', () => {
     expect(normalizeConfig([])).toEqual([]);
   });
 
-  test('skips null and non-object entries', () => {
-    const result = normalizeConfig([
-      { files: ['**/*.ts'], rules: { 'no-console': 'error' } },
-      null,
-      undefined,
-      42,
-      'string',
-    ]);
-    expect(result).toHaveLength(1);
-    expect(result[0].rules).toEqual({ 'no-console': 'error' });
+  test.each([null, undefined, 42, 'string'])(
+    'rejects non-object config entry %p',
+    (entry) => {
+      expect(() => normalizeConfig([entry])).toThrow(/must be an object|null/);
+    },
+  );
+
+  test('rejects nested config arrays', () => {
+    expect(() => normalizeConfig([[{ rules: {} }]])).toThrow(
+      /unexpected array/,
+    );
   });
 
   test('throws when files is a string instead of array', () => {
@@ -162,10 +163,20 @@ describe('normalizeConfig', () => {
     );
   });
 
-  test('throws when files contains non-string values', () => {
+  test('throws when files contains invalid selector values', () => {
     expect(() => normalizeConfig([{ files: [123], rules: {} }])).toThrow(
-      '"files" must contain only strings',
+      '"files" must contain only strings or arrays of strings',
     );
+  });
+
+  test('preserves ESLint AND selector groups, including an empty group', () => {
+    const [entry] = normalizeConfig([
+      {
+        files: ['**/*.ts', ['**/*.js', '!**/*.test.js'], []],
+        rules: {},
+      },
+    ]);
+    expect(entry.files).toEqual(['**/*.ts', ['**/*.js', '!**/*.test.js'], []]);
   });
 
   test('throws when ignores is a string instead of array', () => {
@@ -189,13 +200,31 @@ describe('normalizeConfig', () => {
     expect(Object.hasOwn(result[0], 'ignores')).toBe(false);
   });
 
-  test('allows files set to undefined', () => {
-    const result = normalizeConfig([
-      { files: undefined, rules: { 'no-console': 'error' } },
+  test('throws when files is explicitly undefined', () => {
+    expect(() =>
+      normalizeConfig([{ files: undefined, rules: { 'no-console': 'error' } }]),
+    ).toThrow('"files" must be an array');
+  });
+
+  test('preserves non-global shape when unsupported fields are stripped', () => {
+    const [entry] = normalizeConfig([
+      { ignores: ['dist/**'], processor: 'example-processor' },
     ]);
-    expect(result).toHaveLength(1);
-    expect(result[0].files).toBeUndefined();
-    expect(Object.hasOwn(result[0], 'files')).toBe(false);
+    expect(entry).toEqual({ ignores: ['dist/**'], settings: {} });
+  });
+
+  test('rejects authored undefined known fields like ESLint v10', () => {
+    for (const authoredField of [
+      { rules: undefined },
+      { languageOptions: undefined },
+      { settings: undefined },
+      { plugins: undefined },
+      { ignores: undefined },
+    ]) {
+      expect(() =>
+        normalizeConfig([{ ignores: ['dist/**'], ...authoredField }]),
+      ).toThrow(/must be/);
+    }
   });
 });
 
@@ -325,15 +354,25 @@ describe('normalizeConfig — community plugins (object-form)', () => {
       { files: ['**/*.ts'], rules: {} },
     ]) as NormalizedPluginEntry[];
     expect(entry.eslintPlugins).toBeUndefined();
-    expect(entry.plugins).toEqual([]);
+    expect(entry.plugins).toBeUndefined();
+    expect(Object.hasOwn(entry, 'plugins')).toBe(false);
   });
 
-  test('empty object-form plugins {} is a no-op (no carrier, empty gate)', () => {
+  test('explicit empty object-form plugins {} is preserved as an empty gate', () => {
     const [entry] = normalizeConfig([
       { files: ['**/*.ts'], plugins: {}, rules: {} },
     ]) as NormalizedPluginEntry[];
     expect(entry.eslintPlugins).toBeUndefined();
     expect(entry.plugins).toEqual([]);
+  });
+
+  test('explicit empty array-form plugins [] is preserved on the wire', () => {
+    const [entry] = normalizeConfig([
+      { files: ['**/*.ts'], plugins: [], rules: {} },
+    ]) as NormalizedPluginEntry[];
+    expect(entry.eslintPlugins).toBeUndefined();
+    expect(entry.plugins).toEqual([]);
+    expect(Object.hasOwn(entry, 'plugins')).toBe(true);
   });
 });
 

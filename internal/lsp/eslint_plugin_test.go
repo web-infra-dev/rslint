@@ -98,6 +98,23 @@ func TestMergePluginDiagnostics_MergesAndPublishes(t *testing.T) {
 	}
 }
 
+func TestPluginDispatchForGeneration_StampsRequest(t *testing.T) {
+	s := newTestServer()
+	var received string
+	s.eslintPluginDispatch = func(_ context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		received = req.Generation
+		return &linter.EslintPluginLintResult{}, nil
+	}
+
+	_, err := s.pluginDispatchForGeneration("config-12")(context.Background(), linter.EslintPluginLintRequest{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if received != "config-12" {
+		t.Fatalf("request generation = %q, want config-12", received)
+	}
+}
+
 func TestMergePluginDiagnostics_DropsStaleGeneration(t *testing.T) {
 	s, queue := newTestServerWithQueue()
 	uri := lsproto.DocumentUri("file:///project/a.ts")
@@ -439,19 +456,19 @@ func TestComputeFixAllContent_FoldsPluginFixes(t *testing.T) {
 	// Injected native lint: fix the first "1" → "2" wherever it appears. Returns
 	// no fix once the digit is gone (so the loop converges).
 	var nativePasses int
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) ([]rule.RuleDiagnostic, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
 		nativePasses++
 		idx := strings.Index(content, "1")
 		if idx < 0 {
-			return nil, nil
+			return lintPassResult{}, nil
 		}
-		return []rule.RuleDiagnostic{{
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
 			RuleName:   "native/prefer-2",
 			Range:      core.NewTextRange(idx, idx+1),
 			Message:    rule.RuleMessage{Description: "use 2"},
 			SourceFile: textOnlySourceFile{text: content},
 			FixesPtr:   &[]rule.RuleFix{{Text: "2", Range: core.NewTextRange(idx, idx+1)}},
-		}}, nil
+		}}}, nil
 	}
 
 	got := s.computeFixAllContent(context.Background(), uri, original, config.RslintConfig{}, "", true, nil)
@@ -495,18 +512,18 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 		return nil, ctx.Err()
 	}
 	// Injected native lint: fix the first "1" → "2", nothing once it is gone.
-	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) ([]rule.RuleDiagnostic, error) {
+	s.fixAllNativeLint = func(_ context.Context, _ lsproto.DocumentUri, _ int, content string, _ config.RslintConfig, _ string, _ bool, _ []string) (lintPassResult, error) {
 		idx := strings.Index(content, "1")
 		if idx < 0 {
-			return nil, nil
+			return lintPassResult{}, nil
 		}
-		return []rule.RuleDiagnostic{{
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{{
 			RuleName:   "native/prefer-2",
 			Range:      core.NewTextRange(idx, idx+1),
 			Message:    rule.RuleMessage{Description: "use 2"},
 			SourceFile: textOnlySourceFile{text: content},
 			FixesPtr:   &[]rule.RuleFix{{Text: "2", Range: core.NewTextRange(idx, idx+1)}},
-		}}, nil
+		}}}, nil
 	}
 
 	start := time.Now()
@@ -529,6 +546,30 @@ func TestComputeFixAllContent_PluginTimeoutFallsBackNativeOnly(t *testing.T) {
 	// reverse request to the client per remaining pass.
 	if dispatchCalls != 1 {
 		t.Errorf("expected exactly 1 plugin dispatch (pass 0; later passes skip on expiry), got %d", dispatchCalls)
+	}
+}
+
+func TestComputeFixAllContent_SyntaxErrorSkipsPluginPass(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///proj/a.ts")
+	const malformed = "const value = ;"
+	s.documents[uri] = malformed
+
+	pluginCalls := 0
+	s.eslintPluginDispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		pluginCalls++
+		return &linter.EslintPluginLintResult{}, nil
+	}
+	s.fixAllNativeLint = func(context.Context, lsproto.DocumentUri, int, string, config.RslintConfig, string, bool, []string) (lintPassResult, error) {
+		return lintPassResult{Diagnostics: []rule.RuleDiagnostic{}, HasSyntaxErrors: true}, nil
+	}
+
+	got := s.computeFixAllContent(context.Background(), uri, malformed, config.RslintConfig{}, "", true, nil)
+	if got != malformed {
+		t.Fatalf("syntax-error fixAll changed content to %q", got)
+	}
+	if pluginCalls != 0 {
+		t.Fatalf("syntax-error fixAll dispatched %d plugin passes, want 0", pluginCalls)
 	}
 }
 

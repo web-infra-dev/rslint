@@ -3,6 +3,7 @@ package lsp
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -757,14 +758,15 @@ func TestHandleDidChange_UsesDebounce(t *testing.T) {
 
 // ======== handleConfigUpdate tests ========
 
-func TestHandleConfigUpdate_ClearsConfigPath(t *testing.T) {
+func TestHandleConfigUpdate_PreservesJSONFallbackPath(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()
 
 	// Simulate a previously loaded JSON config
 	s.rslintConfigPath = "/project/rslint.json"
 
-	// Send a JS config update — should clear the JSON config path
+	// A JS config takes priority for its subtree, but the JSON config remains the
+	// fallback for files outside every JS config directory.
 	err := s.handleConfigUpdate(ctx, map[string]any{
 		"configs": []any{
 			map[string]any{
@@ -782,8 +784,8 @@ func TestHandleConfigUpdate_ClearsConfigPath(t *testing.T) {
 		t.Fatalf("handleConfigUpdate failed: %v", err)
 	}
 
-	if s.rslintConfigPath != "" {
-		t.Errorf("rslintConfigPath should be cleared after JS config update, got %q", s.rslintConfigPath)
+	if s.rslintConfigPath != "/project/rslint.json" {
+		t.Errorf("rslintConfigPath should be preserved as the fallback, got %q", s.rslintConfigPath)
 	}
 
 	cfg, ok := s.jsConfigs["file:///project"]
@@ -836,6 +838,39 @@ func TestHandleConfigUpdate_MultipleConfigs(t *testing.T) {
 	fooCfg := s.jsConfigs["file:///project/packages/foo"]
 	if len(fooCfg) != 1 {
 		t.Errorf("foo config should have 1 entry, got %d", len(fooCfg))
+	}
+}
+
+func TestHandleConfigUpdate_CommitsGenerationAndInvalidatesPluginWork(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/src/index.ts")
+	s.documents[uri] = "const value = 1"
+	s.docGeneration[uri] = 7
+	dispatchCtx, cancel := context.WithCancel(context.Background())
+	s.inflightPluginDispatch[uri] = &pluginDispatchHandle{cancel: cancel}
+
+	err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "config-8",
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries":         []any{map[string]any{"rules": map[string]any{"no-console": "error"}}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+	if s.eslintPluginConfigGeneration != "config-8" {
+		t.Fatalf("generation = %q, want config-8", s.eslintPluginConfigGeneration)
+	}
+	if s.docGeneration[uri] != 8 {
+		t.Fatalf("document generation = %d, want 8", s.docGeneration[uri])
+	}
+	select {
+	case <-dispatchCtx.Done():
+	default:
+		t.Fatal("previous plugin dispatch was not canceled")
 	}
 }
 
@@ -999,11 +1034,11 @@ func TestHandleConfigUpdate_MalformedPayload(t *testing.T) {
 	}
 }
 
-func TestHandleConfigUpdate_MissingConfigDirectory(t *testing.T) {
+func TestHandleConfigUpdate_RejectsMissingConfigDirectory(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()
+	s.jsConfigs["file:///old"] = config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
 
-	// Entry with empty configDirectory — should still be stored (keyed by "")
 	err := s.handleConfigUpdate(ctx, map[string]any{
 		"configs": []any{
 			map[string]any{
@@ -1013,13 +1048,30 @@ func TestHandleConfigUpdate_MissingConfigDirectory(t *testing.T) {
 			},
 		},
 	})
-	if err != nil {
-		t.Fatalf("handleConfigUpdate failed: %v", err)
+	if err == nil || !strings.Contains(err.Error(), "empty configDirectory") {
+		t.Fatalf("expected empty configDirectory error, got %v", err)
 	}
+	if _, ok := s.jsConfigs["file:///old"]; !ok {
+		t.Fatal("invalid update replaced the previous config")
+	}
+}
 
-	// Empty key should exist
-	if _, ok := s.jsConfigs[""]; !ok {
-		t.Error("config with empty configDirectory should still be stored")
+func TestHandleConfigUpdate_RejectsDuplicateConfigDirectories(t *testing.T) {
+	s := newTestServer()
+	s.fs = &caseInsensitiveLSPTestFS{mockFS: mockFS{files: map[string]bool{}}}
+	s.jsConfigs["file:///old"] = config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}}
+
+	err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"configs": []any{
+			map[string]any{"configDirectory": "file:///C:/Repo", "entries": []any{}},
+			map[string]any{"configDirectory": "file:///c:/repo", "entries": []any{}},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "duplicate directories") {
+		t.Fatalf("expected duplicate config directory error, got %v", err)
+	}
+	if _, ok := s.jsConfigs["file:///old"]; !ok {
+		t.Fatal("invalid update replaced the previous config")
 	}
 }
 
@@ -1076,8 +1128,8 @@ func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
 		t.Fatalf("expected JS config, got %v", cfg)
 	}
-	if s.rslintConfigPath != "" {
-		t.Fatalf("rslintConfigPath should be cleared, got %q", s.rslintConfigPath)
+	if s.rslintConfigPath != "/project/rslint.json" {
+		t.Fatalf("rslintConfigPath should remain available as fallback, got %q", s.rslintConfigPath)
 	}
 
 	// 3. All JS configs deleted — send explicitly empty configs array.
@@ -1096,7 +1148,132 @@ func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
 	}
 }
 
+func TestHandleConfigUpdate_EmptyConfigsReloadsJSONTsConfigPaths(t *testing.T) {
+	dir := t.TempDir()
+	tsConfigPath := filepath.Join(dir, "tsconfig.json")
+	if err := os.WriteFile(tsConfigPath, []byte(`{"include":["src"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	jsonConfigPath := filepath.Join(dir, "rslint.json")
+	jsonConfig := `[{"languageOptions":{"parserOptions":{"project":["./tsconfig.json"]}},"rules":{"no-debugger":"error"}}]`
+	if err := os.WriteFile(jsonConfigPath, []byte(jsonConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.fs = osvfs.FS()
+	s.cwd = dir
+	s.jsConfigs["file:///project"] = config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
+
+	if err := s.handleConfigUpdate(context.Background(), map[string]any{"configs": []any{}}); err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if s.rslintConfigPath != jsonConfigPath {
+		t.Fatalf("expected JSON config path %q, got %q", jsonConfigPath, s.rslintConfigPath)
+	}
+	if len(s.jsonConfig) != 1 || s.jsonConfig[0].Rules["no-debugger"] != "error" {
+		t.Fatalf("expected reloaded JSON fallback, got %v", s.jsonConfig)
+	}
+	expectedTsConfig := tspath.NormalizePath(s.fs.Realpath(tsConfigPath))
+	if len(s.tsConfigPaths) != 1 || s.tsConfigPaths[0] != expectedTsConfig {
+		t.Fatalf("expected JSON tsconfig paths [%q], got %v", expectedTsConfig, s.tsConfigPaths)
+	}
+}
+
+func TestHandleConfigUpdate_InvalidTsConfigPreservesPreviousGeneration(t *testing.T) {
+	dir := t.TempDir()
+	s := newTestServer()
+	s.fs = osvfs.FS()
+	s.cwd = dir
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///old": {{Rules: config.Rules{"no-debugger": "error"}}},
+	}
+	s.eslintPluginConfigGeneration = "old-generation"
+	uri := lsproto.DocumentUri("file:///old/index.ts")
+	s.diagnostics[uri] = []rule.RuleDiagnostic{{RuleName: "no-debugger"}}
+
+	err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "rejected-generation",
+		"configs": []any{map[string]any{
+			"configDirectory": lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}).String()),
+			"entries": []any{map[string]any{
+				"languageOptions": map[string]any{
+					"parserOptions": map[string]any{"project": []any{"./missing-tsconfig.json"}},
+				},
+			}},
+		}},
+	})
+	if err == nil {
+		t.Fatal("expected a missing declared tsconfig to reject the config generation")
+	}
+	if s.eslintPluginConfigGeneration != "old-generation" {
+		t.Fatalf("generation changed after rejected update: %q", s.eslintPluginConfigGeneration)
+	}
+	if _, ok := s.jsConfigs["file:///old"]; !ok || len(s.jsConfigs) != 1 {
+		t.Fatalf("JS config state changed after rejected update: %+v", s.jsConfigs)
+	}
+	if len(s.diagnostics[uri]) != 1 {
+		t.Fatalf("diagnostic cache changed before config commit: %+v", s.diagnostics[uri])
+	}
+}
+
+func TestHandleConfigUpdate_CommitClearsOldDiagnostics(t *testing.T) {
+	s := newTestServer()
+	uri := lsproto.DocumentUri("file:///project/index.ts")
+	s.documents[uri] = "debugger;"
+	s.diagnostics[uri] = []rule.RuleDiagnostic{{RuleName: "old-rule"}}
+
+	err := s.handleConfigUpdate(context.Background(), map[string]any{
+		"generation": "new-generation",
+		"configs": []any{map[string]any{
+			"configDirectory": "file:///project",
+			"entries":         []any{map[string]any{"rules": map[string]any{"no-debugger": "error"}}},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+	if _, ok := s.diagnostics[uri]; ok {
+		t.Fatal("committed config generation retained diagnostics and quick fixes from the old generation")
+	}
+}
+
 // ======== getConfigForURI tests ========
+
+func TestNearestJSConfigKey_UsesFilesystemCaseSensitivity(t *testing.T) {
+	s := newTestServer()
+	s.fs = &caseInsensitiveLSPTestFS{mockFS: mockFS{files: map[string]bool{}}}
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///C:/Repo":              {{Rules: config.Rules{"root": "error"}}},
+		"file:///C:/Repo/Packages/App": {{Rules: config.Rules{"nested": "error"}}},
+	}
+
+	key, ok := s.nearestJSConfigKey("file:///c:/repo/packages/app/src/index.ts")
+	if !ok || key != "file:///C:/Repo/Packages/App" {
+		t.Fatalf("nearest key = %q, %v; want nested config", key, ok)
+	}
+	cfg, _, isJS := s.getConfigForURI("file:///c:/repo/packages/app/src/index.ts")
+	if !isJS || cfg[0].Rules["nested"] != "error" {
+		t.Fatalf("getConfigForURI selected %v, isJS=%v", cfg, isJS)
+	}
+}
+
+func TestNearestJSConfigKey_HandlesUNCAndFilesystemRoot(t *testing.T) {
+	s := newTestServer()
+	s.fs = &caseInsensitiveLSPTestFS{mockFS: mockFS{files: map[string]bool{}}}
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///":                       {{Rules: config.Rules{"root": "error"}}},
+		"file://Server/Share/Repository": {{Rules: config.Rules{"unc": "error"}}},
+	}
+
+	if key, ok := s.nearestJSConfigKey("file://server/share/repository/src/a.ts"); !ok || key != "file://Server/Share/Repository" {
+		t.Fatalf("UNC nearest key = %q, %v", key, ok)
+	}
+	if key, ok := s.nearestJSConfigKey("file:///outside.ts"); !ok || key != "file:///" {
+		t.Fatalf("filesystem-root nearest key = %q, %v", key, ok)
+	}
+}
 
 func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 	s := newTestServer()
@@ -1379,7 +1556,8 @@ func TestUriToPath(t *testing.T) {
 		{"file:///Users/John%20Doe/my%20project/src/index.ts", "/Users/John Doe/my project/src/index.ts"},
 		// Edge cases
 		{"file:///", "/"},
-		{"file://host/share", "/share"}, // UNC: authority is host, path is /share
+		{"file://host/share", "//host/share"},
+		{"file://server/share/project/src/index.ts", "//server/share/project/src/index.ts"},
 		{"not-a-uri", "not-a-uri"},
 		{"", ""},
 	}
@@ -1596,12 +1774,12 @@ func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
 }
 
 // Regression test: a nested config without any resolvable tsconfig must not
-// cascade its "allow-all" fallback onto files under OTHER configs.
+// affect type-info decisions for files under other configs.
 // See https://github.com/web-infra-dev/rslint/issues/671 — the create-rstack
 // workspace ships a `template-rslint/` starter directory with its own
 // rslint.config.ts but no tsconfig.json, which used to flip the whole
-// workspace into allow-all and incorrectly run type-aware rules on files
-// under the root config.
+// workspace's type-aware rules without checking the governing config's
+// resolved tsconfigs.
 func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{"/project/tsconfig.json": true}}
@@ -1631,11 +1809,68 @@ func TestTsConfigPathsForURI_NestedConfigWithoutTsconfigDoesNotLeak(t *testing.T
 		t.Errorf("expected root-config file to see [/project/tsconfig.json], got %v", rootPaths)
 	}
 
-	// File under nested template config → nil (allow-all) but scoped to this
+	// File under nested template config -> nil (no type info), scoped to this
 	// config only; the root config's list above must remain unaffected.
 	nestedPaths := s.tsConfigPathsForURI("file:///project/template-rslint/foo.ts")
 	if nestedPaths != nil {
-		t.Errorf("expected nested-config file to see nil tsconfig paths (allow-all), got %v", nestedPaths)
+		t.Errorf("expected nested-config file to see nil tsconfig paths (no type info), got %v", nestedPaths)
+	}
+}
+
+func TestTsConfigPathsForURI_JSONFallbackRemainsTypedWithNestedJSConfig(t *testing.T) {
+	s := newTestServer()
+	s.cwd = "/workspace"
+	s.rslintConfigPath = "/workspace/rslint.json"
+	s.fs = &mockFS{files: map[string]bool{
+		"/workspace/tsconfig.json":              true,
+		"/workspace/packages/app/tsconfig.json": true,
+	}}
+	s.jsonConfig = config.RslintConfig{{
+		LanguageOptions: &config.LanguageOptions{
+			ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
+		},
+	}}
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///workspace/packages/app": {{
+			LanguageOptions: &config.LanguageOptions{
+				ParserOptions: &config.ParserOptions{Project: []string{"./tsconfig.json"}},
+			},
+		}},
+	}
+
+	s.rebuildTsConfigPaths()
+
+	jsonPaths := s.tsConfigPathsForURI("file:///workspace/packages/lib/src/index.ts")
+	if len(jsonPaths) != 1 || jsonPaths[0] != "/workspace/tsconfig.json" {
+		t.Fatalf("expected JSON fallback tsconfig, got %v", jsonPaths)
+	}
+	jsPaths := s.tsConfigPathsForURI("file:///workspace/packages/app/src/index.ts")
+	if len(jsPaths) != 1 || jsPaths[0] != "/workspace/packages/app/tsconfig.json" {
+		t.Fatalf("expected nested JS config tsconfig, got %v", jsPaths)
+	}
+}
+
+func TestReloadJSONFallbackWhileJSConfigIsActive(t *testing.T) {
+	dir := t.TempDir()
+	jsonConfigPath := filepath.Join(dir, "rslint.json")
+	if err := os.WriteFile(jsonConfigPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = osvfs.FS()
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///other": {{Rules: config.Rules{"no-console": "error"}}},
+	}
+	s.reloadConfigAndRelint()
+
+	if s.rslintConfigPath != jsonConfigPath {
+		t.Fatalf("expected JSON fallback path %q, got %q", jsonConfigPath, s.rslintConfigPath)
+	}
+	cfg, _, isJS := s.getConfigForURI("file:///workspace/src/index.ts")
+	if isJS || len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
+		t.Fatalf("expected refreshed JSON fallback while JS config remains active, got isJS=%v config=%v", isJS, cfg)
 	}
 }
 
@@ -1735,6 +1970,238 @@ func TestLSPActiveRulesForFile_RespectsFiles(t *testing.T) {
 	}
 	if got := collect(jsFile); len(got) != 0 {
 		t.Fatalf("files-scope miss must not run LSP native rules, got %+v", got)
+	}
+}
+
+func TestLSPFilesystemPathID_UsesFilesystemCaseSensitivity(t *testing.T) {
+	caseInsensitiveFS := &caseInsensitiveLSPTestFS{mockFS: mockFS{files: map[string]bool{}}}
+	if lspFilesystemPathID("C:/Repo/TSConfig.json", caseInsensitiveFS) != lspFilesystemPathID("c:/repo/tsconfig.json", caseInsensitiveFS) {
+		t.Fatal("case-insensitive filesystem path IDs must ignore casing")
+	}
+}
+
+func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "src", "index.ts")
+	gapPath := filepath.Join(dir, "gap.ts")
+	if err := os.MkdirAll(filepath.Dir(sourcePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range []string{sourcePath, gapPath} {
+		if err := os.WriteFile(file, []byte("export const value = 1;\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstConfig := filepath.Join(dir, "tsconfig.lint-first.json")
+	secondConfig := filepath.Join(dir, "tsconfig.lint-second.json")
+	for _, configPath := range []string{firstConfig, secondConfig} {
+		if err := os.WriteFile(configPath, []byte(`{"files":["src/index.ts"]}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ctx := context.Background()
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	s := NewServer(&ServerOptions{
+		Cwd:                dir,
+		FS:                 fsys,
+		DefaultLibraryPath: bundled.LibPath(),
+	})
+	s.backgroundCtx = ctx
+	s.initializeParams = &lsproto.InitializeParams{}
+	if err := s.handleInitialized(ctx, &lsproto.InitializedParams{}); err != nil {
+		t.Fatalf("initialize test session: %v", err)
+	}
+	defer s.session.Close()
+
+	toURI := func(filePath string) lsproto.DocumentUri {
+		return lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	}
+	for _, file := range []string{sourcePath, gapPath} {
+		uri := toURI(file)
+		if err := s.handleDidOpen(ctx, &lsproto.DidOpenTextDocumentParams{
+			TextDocument: &lsproto.TextDocumentItem{
+				Uri:     uri,
+				Version: 1,
+				Text:    "export const value = 1;\n",
+			},
+		}); err != nil {
+			t.Fatalf("open %s: %v", file, err)
+		}
+	}
+
+	program, hasTypeInfo, err := selectLintProgram(
+		toURI(sourcePath),
+		s.session,
+		ctx,
+		[]string{secondConfig, firstConfig},
+		fsys,
+		s.newStandaloneLintProgramLoader(),
+	)
+	if err != nil {
+		t.Fatalf("select typed program: %v", err)
+	}
+	if !hasTypeInfo {
+		t.Fatal("expected source to have type information")
+	}
+	if got := lspFilesystemPathID(program.Options().ConfigFilePath, fsys); got != lspFilesystemPathID(secondConfig, fsys) {
+		t.Fatalf("expected first declared containing project %q, got %q", secondConfig, program.Options().ConfigFilePath)
+	}
+	secondConfigID := tspath.ToPath(fsys.Realpath(secondConfig), "", fsys.UseCaseSensitiveFileNames())
+	if opened := s.session.Snapshot().ProjectCollection.ConfiguredProject(secondConfigID); opened != nil {
+		t.Fatal("lint-only custom tsconfig must not be added to the Session's permanent API-open project set")
+	}
+	if _, err := s.defaultFixAllNativeLint(
+		ctx,
+		toURI(sourcePath),
+		1,
+		"export const value = 2;\n",
+		config.RslintConfig{{}},
+		dir,
+		false,
+		[]string{secondConfig},
+	); err != nil {
+		t.Fatalf("isolated fix pass: %v", err)
+	}
+	languageService, err := s.session.GetLanguageService(ctx, toURI(sourcePath))
+	if err != nil {
+		t.Fatalf("get language service after speculative fix: %v", err)
+	}
+	if got := languageService.GetProgram().GetSourceFile(tspath.NormalizePath(sourcePath)).Text(); got != "export const value = 1;\n" {
+		t.Fatalf("speculative fix polluted Session overlay: got %q", got)
+	}
+
+	gapProgram, gapHasTypeInfo, err := selectLintProgram(
+		toURI(gapPath),
+		s.session,
+		ctx,
+		[]string{secondConfig, firstConfig},
+		fsys,
+		s.newStandaloneLintProgramLoader(),
+	)
+	if err != nil {
+		t.Fatalf("select gap program: %v", err)
+	}
+	if gapHasTypeInfo {
+		t.Fatal("file outside every declared project must not have type information")
+	}
+	if gapProgram.GetSourceFile(tspath.NormalizePath(gapPath)) == nil {
+		t.Fatal("gap fallback program must contain the open file")
+	}
+}
+
+func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "malformed.ts")
+	const malformed = "debugger; const value = ;\n"
+	if err := os.WriteFile(filePath, []byte(malformed), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := newTestServer()
+	s.cwd = dir
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	s.documents[uri] = malformed
+
+	result, err := s.runConfiguredLintForContent(
+		uri,
+		context.Background(),
+		malformed,
+		config.RslintConfig{{Rules: config.Rules{"no-debugger": "error"}}},
+		dir,
+		false,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("run lint: %v", err)
+	}
+	if !result.HasSyntaxErrors {
+		t.Fatal("malformed file was not marked as having syntax errors")
+	}
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("rules ran for malformed file: %+v", result.Diagnostics)
+	}
+}
+
+func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *testing.T) {
+	parent := t.TempDir()
+	realRoot := filepath.Join(parent, "real-root")
+	aliasRoot := filepath.Join(parent, "alias-root")
+	realFile := filepath.Join(realRoot, "src", "index.ts")
+	if err := os.MkdirAll(filepath.Dir(realFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	const source = "debugger;\n"
+	if err := os.WriteFile(realFile, []byte(source), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(realRoot, "tsconfig.json"), []byte(`{"include":["src"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realRoot, aliasRoot); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	config.RegisterAllRules()
+	s := newTestServer()
+	s.cwd = aliasRoot
+	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
+	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(aliasFile)}).String())
+	s.documents[uri] = source
+	result, err := s.runConfiguredLintForContent(
+		uri,
+		context.Background(),
+		source,
+		config.RslintConfig{{
+			Files: []string{"src/**/*.ts"},
+			Rules: config.Rules{"no-debugger": "error"},
+		}},
+		aliasRoot,
+		false,
+		[]string{filepath.Join(aliasRoot, "tsconfig.json")},
+	)
+	if err != nil {
+		t.Fatalf("run lint through symlinked root: %v", err)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("symlinked config path lost scoped rules: %+v", result.Diagnostics)
+	}
+}
+
+type caseInsensitiveLSPTestFS struct {
+	mockFS
+}
+
+func (f *caseInsensitiveLSPTestFS) UseCaseSensitiveFileNames() bool { return false }
+
+func TestLSPActiveRulesForFile_NoTsconfigFiltersTypeAwareNativeRules(t *testing.T) {
+	config.RegisterAllRules()
+	cfg := config.RslintConfig{{
+		Rules: config.Rules{
+			"no-debugger": "error",
+			"@typescript-eslint/no-unsafe-member-access": "error",
+		},
+		Plugins: []string{"@typescript-eslint"},
+	}}
+
+	withoutTypeInfo := lspActiveRulesForFile(cfg, "/project/index.ts", "/project", true, false)
+	if len(withoutTypeInfo) != 1 || withoutTypeInfo[0].Name != "no-debugger" {
+		t.Fatalf("expected only non-type-aware native rule without tsconfig, got %+v", withoutTypeInfo)
+	}
+
+	withTypeInfo := lspActiveRulesForFile(cfg, "/project/index.ts", "/project", true, true)
+	if len(withTypeInfo) != 2 {
+		t.Fatalf("expected both native rules with type info, got %+v", withTypeInfo)
+	}
+	foundTypeAware := false
+	for _, configuredRule := range withTypeInfo {
+		if configuredRule.Name == "@typescript-eslint/no-unsafe-member-access" && configuredRule.RequiresTypeInfo {
+			foundTypeAware = true
+		}
+	}
+	if !foundTypeAware {
+		t.Fatalf("expected configured type-aware rule, got %+v", withTypeInfo)
 	}
 }
 

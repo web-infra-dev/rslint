@@ -21,19 +21,21 @@ import type { Extension } from './Extension';
 import { fileExists, getPlatformBinRequests, RslintBinPath } from './utils';
 import path from 'node:path';
 import fs from 'node:fs';
+import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import {
   loadConfigFile,
   normalizeConfig,
   collectPluginMeta,
+  JS_CONFIG_FILES,
 } from '@rslint/core/config-loader';
 import { PluginLintPool } from './PluginLintPool';
 import type { EslintPluginLintRequest } from '@rslint/core/eslint-plugin';
 
 /**
- * Workspace-relative lockfiles whose mtime feeds the plugin-host
- * fingerprint: a dependency install can swap a plugin's implementation
- * without touching the config file, so the host must rebuild on it too.
+ * Workspace-relative lockfiles whose individual metadata feeds the
+ * plugin-host fingerprint. A dependency install can swap a plugin's
+ * implementation without touching the config file, so the host must rebuild.
  */
 const LOCKFILE_NAMES = [
   'package-lock.json',
@@ -46,6 +48,28 @@ interface LoadedConfig {
   configPath: string;
   configDirectory: string;
   entries: Record<string, unknown>[];
+  sourceFingerprint: string;
+}
+
+function selectEffectiveConfigFiles(configFiles: readonly Uri[]): Uri[] {
+  const selectedByDirectory = new Map<string, { uri: Uri; priority: number }>();
+
+  for (const uri of configFiles) {
+    const priority = JS_CONFIG_FILES.indexOf(
+      path.basename(uri.fsPath) as (typeof JS_CONFIG_FILES)[number],
+    );
+    if (priority < 0) continue;
+
+    const directory = path.normalize(path.dirname(uri.fsPath));
+    const selected = selectedByDirectory.get(directory);
+    if (!selected || priority < selected.priority) {
+      selectedByDirectory.set(directory, { uri, priority });
+    }
+  }
+
+  return [...selectedByDirectory.values()]
+    .map(({ uri }) => uri)
+    .sort((a, b) => a.fsPath.localeCompare(b.fsPath));
 }
 
 export class Rslint implements Disposable {
@@ -56,14 +80,22 @@ export class Rslint implements Disposable {
   private readonly lspOutputChannel: OutputChannel | undefined;
   private readonly outputChannel: OutputChannel | undefined;
   private configWatcher: FileSystemWatcher | undefined;
+  private dependencyWatcher: FileSystemWatcher | undefined;
   private configReloadTimer: ReturnType<typeof setTimeout> | undefined;
+  private configReloadChain: Promise<void> = Promise.resolve();
+  private lastGoodConfigs = new Map<string, LoadedConfig>();
+  private hasSentJSConfig = false;
+  private lifecycleEpoch = 0;
+  private configGeneration = 0;
+  private pluginLintPoolDisposed = false;
+  private configTransactionVersion = 0;
   /**
    * Hosts the in-process WorkerPool that answers Go's reverse
    * `rslint/pluginLint` requests for rules mounted via a config's
-   * object-form `plugins`. Lazily spins workers — stays a no-op no-worker
-   * host until a config actually mounts plugins.
+   * object-form `plugins`. It stays uninitialized until a config actually
+   * mounts plugins.
    */
-  private readonly pluginLintPool: PluginLintPool;
+  private pluginLintPool: PluginLintPool;
 
   constructor(
     extension: Extension,
@@ -84,6 +116,16 @@ export class Rslint implements Disposable {
       this.logger.warn('Rslint client is already running');
       return;
     }
+
+    if (this.pluginLintPoolDisposed) {
+      this.pluginLintPool = new PluginLintPool(this.logger);
+      this.pluginLintPoolDisposed = false;
+    }
+    this.configReloadChain = Promise.resolve();
+    this.lifecycleEpoch++;
+    const pluginLintPool = this.pluginLintPool;
+    this.hasSentJSConfig = false;
+    this.lastGoodConfigs.clear();
 
     const binPath = await this.getBinaryPath();
     this.logger.info('Rslint binary path:', binPath);
@@ -138,6 +180,10 @@ export class Rslint implements Disposable {
     try {
       await this.client.start();
 
+      this.configTransactionVersion = await this.detectConfigTransactionVersion(
+        this.client,
+      );
+
       // Answer Go's reverse `rslint/pluginLint` requests: Go lints
       // natively but dispatches rules mounted via a config's object-form
       // `plugins` back to us, where the JS WorkerPool runs them. The generic
@@ -149,7 +195,7 @@ export class Rslint implements Disposable {
       this.client.onRequest(
         'rslint/pluginLint',
         async (params: EslintPluginLintRequest, token: CancellationToken) =>
-          this.pluginLintPool.lint(params, token),
+          pluginLintPool.lint(params, token),
       );
 
       if (traceEnabled) {
@@ -159,18 +205,17 @@ export class Rslint implements Disposable {
         this.logger.info(`LSP trace level set to: ${traceServer}`);
       }
 
-      // Load JS config and send to LSP server
-      await this.loadAndSendConfig();
-
-      // Watch for JS config file changes anywhere in the workspace
+      // Install the watchers before the initial load. A file changed while the
+      // first import is running then queues a second, serialized reload instead
+      // of being missed between initial load and watcher registration.
       this.configWatcher = workspace.createFileSystemWatcher(
         new RelativePattern(
           this.workspaceFolder,
           '**/rslint.config.{ts,mts,js,mjs}',
         ),
       );
-      const reloadConfig = (uri: Uri) => {
-        this.logger.debug(`JS config file changed: ${uri.fsPath}`);
+      const reloadConfig = (kind: string) => (uri: Uri) => {
+        this.logger.debug(`${kind} changed: ${uri.fsPath}`);
         clearTimeout(this.configReloadTimer);
         this.configReloadTimer = setTimeout(() => {
           this.configReloadTimer = undefined;
@@ -179,42 +224,176 @@ export class Rslint implements Disposable {
           });
         }, 300);
       };
-      this.configWatcher.onDidChange(reloadConfig);
-      this.configWatcher.onDidCreate(reloadConfig);
-      this.configWatcher.onDidDelete(reloadConfig);
+      const reloadJSConfig = reloadConfig('JS config file');
+      this.configWatcher.onDidChange(reloadJSConfig);
+      this.configWatcher.onDidCreate(reloadJSConfig);
+      this.configWatcher.onDidDelete(reloadJSConfig);
+
+      // computeFingerprint includes workspace-root dependency lockfiles because
+      // an install can replace a mounted plugin without changing its config.
+      // The language client's watcher only informs Go; this watcher is what
+      // rebuilds the Node plugin host.
+      this.dependencyWatcher = workspace.createFileSystemWatcher(
+        new RelativePattern(
+          this.workspaceFolder,
+          '{package-lock.json,pnpm-lock.yaml,yarn.lock}',
+        ),
+      );
+      const reloadDependencies = reloadConfig('Dependency lockfile');
+      this.dependencyWatcher.onDidChange(reloadDependencies);
+      this.dependencyWatcher.onDidCreate(reloadDependencies);
+      this.dependencyWatcher.onDidDelete(reloadDependencies);
+
+      // Load JS config and send it to the LSP server. Reloads queued by either
+      // watcher above run after this call through configReloadChain.
+      await this.loadAndSendConfig();
 
       this.logger.info('Rslint language client started successfully');
     } catch (err: unknown) {
       this.logger.error('Failed to start Rslint language client', err);
+      try {
+        await this.stop();
+      } catch (cleanupError: unknown) {
+        this.logger.error(
+          'Failed to clean up a partial Rslint start',
+          cleanupError,
+        );
+      }
       throw err;
     }
   }
 
-  private async loadAndSendConfig(): Promise<void> {
-    const configFiles = await workspace.findFiles(
+  private loadAndSendConfig(): Promise<void> {
+    const epoch = this.lifecycleEpoch;
+    const client = this.client;
+    const pluginLintPool = this.pluginLintPool;
+    if (!client || this.pluginLintPoolDisposed) return Promise.resolve();
+    const reload = this.configReloadChain.then(() =>
+      this.performLoadAndSendConfig(epoch, client, pluginLintPool),
+    );
+    // Keep future reloads usable after a failed import while still returning
+    // this reload's rejection to the caller for logging.
+    this.configReloadChain = reload.catch(() => undefined);
+    return reload;
+  }
+
+  private isLifecycleCurrent(
+    epoch: number,
+    client: LanguageClient,
+    pluginLintPool: PluginLintPool,
+  ): boolean {
+    return (
+      epoch === this.lifecycleEpoch &&
+      client === this.client &&
+      pluginLintPool === this.pluginLintPool &&
+      !this.pluginLintPoolDisposed
+    );
+  }
+
+  private nextConfigGeneration(): string {
+    this.configGeneration++;
+    return String(this.configGeneration);
+  }
+
+  private async detectConfigTransactionVersion(
+    client: LanguageClient,
+  ): Promise<number> {
+    try {
+      const capabilities = await client.sendRequest<{
+        transactionVersion?: number;
+      }>('rslint/configCapabilities');
+      return capabilities.transactionVersion === 1 ? 1 : 0;
+    } catch {
+      // An older custom binary does not implement the capability request. Keep
+      // its historical notification/single-host protocol instead of hanging on
+      // a configUpdate request that never acknowledges.
+      return 0;
+    }
+  }
+
+  private async sendConfigUpdate(
+    client: LanguageClient,
+    pluginLintPool: PluginLintPool,
+    generation: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    if (this.configTransactionVersion === 1) {
+      const ack = await client.sendRequest<{ generation: string }>(
+        'rslint/configUpdate',
+        { generation, ...payload },
+      );
+      if (ack.generation !== generation) {
+        throw new Error(
+          `config update acknowledged generation ${ack.generation}, expected ${generation}`,
+        );
+      }
+      if (!(await pluginLintPool.commit(generation))) {
+        throw new Error(
+          `failed to commit plugin-host generation ${generation}`,
+        );
+      }
+      return;
+    }
+
+    // Compatibility mode for an older Go binary: it sends reverse requests
+    // without generation and accepts only the historical notification. This is
+    // necessarily best-effort rather than transactional: commit the host first
+    // so requests after the notification use the new plugins, accepting the
+    // brief pre-notification window where old config may reach the new host.
+    if (!(await pluginLintPool.commit(generation))) {
+      throw new Error(`failed to commit plugin-host generation ${generation}`);
+    }
+    await client.sendNotification('rslint/configUpdate', payload);
+  }
+
+  private async performLoadAndSendConfig(
+    epoch: number,
+    client: LanguageClient,
+    pluginLintPool: PluginLintPool,
+  ): Promise<void> {
+    if (!this.isLifecycleCurrent(epoch, client, pluginLintPool)) return;
+    const discoveredConfigFiles = await workspace.findFiles(
       new RelativePattern(
         this.workspaceFolder,
         '**/rslint.config.{js,mjs,ts,mts}',
       ),
       '**/node_modules/**',
     );
-    this.logger.debug(`Found ${configFiles.length} JS config file(s)`);
+    if (!this.isLifecycleCurrent(epoch, client, pluginLintPool)) return;
+    const configFiles = selectEffectiveConfigFiles(discoveredConfigFiles);
+    this.logger.debug(
+      `Found ${discoveredConfigFiles.length} JS config file(s); selected ${configFiles.length}`,
+    );
 
     if (configFiles.length === 0) {
-      // No JS configs found — send empty configs to clear any previous state,
-      // and tear down any plugin workers a prior config left running.
-      await this.pluginLintPool.ensure([], this.computeFingerprint([]));
-      if (!this.client) return;
-      await this.client.sendNotification('rslint/configUpdate', {
-        configs: [],
-      });
+      const generation = this.nextConfigGeneration();
+      await pluginLintPool.prepare([], this.computeFingerprint([]), generation);
+      if (!this.isLifecycleCurrent(epoch, client, pluginLintPool)) {
+        await pluginLintPool.abort(generation);
+        return;
+      }
+      try {
+        await this.sendConfigUpdate(client, pluginLintPool, generation, {
+          configs: [],
+        });
+      } catch (error) {
+        await pluginLintPool.abort(generation);
+        throw error;
+      }
+      this.lastGoodConfigs.clear();
+      this.hasSentJSConfig = false;
       return;
     }
 
     const results = await Promise.allSettled(
       configFiles.map(async (uri) => {
+        const fingerprintBeforeLoad = this.computeFileFingerprint(uri.fsPath);
         const rawConfig = await this.loadConfigFresh(uri.fsPath);
         const entries = normalizeConfig(rawConfig);
+        const sourceFingerprint = this.computeFileFingerprint(uri.fsPath);
+        if (sourceFingerprint !== fingerprintBeforeLoad) {
+          throw new Error('config changed while it was being loaded');
+        }
         return {
           configPath: uri.fsPath,
           // URI form, kept byte-identical to the per-file `configKey` Go
@@ -222,22 +401,79 @@ export class Rslint implements Disposable {
           // dispatch keys match. Also the key Go uses in `s.jsConfigs`.
           configDirectory: Uri.file(path.dirname(uri.fsPath)).toString(),
           entries,
+          sourceFingerprint,
         };
       }),
     );
 
-    const configs: LoadedConfig[] = [];
+    const loadedConfigs = new Map<string, LoadedConfig>();
+    const failedConfigs: Uri[] = [];
     for (let i = 0; i < results.length; i++) {
       const result = results[i];
       if (result.status === 'fulfilled') {
-        configs.push(result.value);
+        loadedConfigs.set(
+          path.normalize(result.value.configPath),
+          result.value,
+        );
       } else {
+        failedConfigs.push(configFiles[i]);
         this.logger.error(
           `Failed to load JS config: ${configFiles[i].fsPath}`,
           result.reason,
         );
       }
     }
+
+    const configs: LoadedConfig[] = [];
+    const nextLastGoodConfigs = new Map<string, LoadedConfig>();
+    let usableConfigCount = 0;
+    for (const uri of configFiles) {
+      const configPath = path.normalize(uri.fsPath);
+      const loaded = loadedConfigs.get(configPath);
+      if (loaded) {
+        configs.push(loaded);
+        nextLastGoodConfigs.set(configPath, loaded);
+        usableConfigCount++;
+        continue;
+      }
+
+      const lastGood = this.lastGoodConfigs.get(configPath);
+      if (lastGood) {
+        configs.push(lastGood);
+        nextLastGoodConfigs.set(configPath, lastGood);
+        usableConfigCount++;
+        this.logger.error(
+          `Preserving the last good JS config for ${uri.fsPath}`,
+        );
+        continue;
+      }
+
+      // Preserve the CLI's established partial-failure behavior: log and skip
+      // a newly discovered config that has never loaded successfully. Other
+      // valid configs continue to apply, including normal ancestor fallback.
+    }
+    if (failedConfigs.length > 0 && usableConfigCount === 0) {
+      // No selected JS config has ever loaded successfully. A workspace-level
+      // empty boundary represents an explicit no-lint state; otherwise a lone
+      // broken nested config would incorrectly expose the JSON fallback in the
+      // rest of the workspace.
+      configs.length = 0;
+      configs.push({
+        configPath: failedConfigs[0].fsPath,
+        configDirectory: this.workspaceFolder.uri.toString(),
+        entries: [],
+        sourceFingerprint: 'unavailable',
+      });
+      this.logger.error(
+        'No selected JS config could be loaded; linting is disabled until one loads successfully',
+      );
+    } else if (failedConfigs.length > 0) {
+      this.logger.error(
+        'JS configs without a last-good value were skipped; remaining configs stay active',
+      );
+    }
+
+    configs.sort((a, b) => a.configPath.localeCompare(b.configPath));
 
     // Collect the ESLint-plugin metadata once: the worker-pool descriptors
     // (one per config that actually mounts plugins — others stay zero-overhead)
@@ -249,23 +485,68 @@ export class Rslint implements Disposable {
 
     // Spin up / refresh the host. Fingerprint over the config files + lockfiles
     // so an edit or dependency install rebuilds the workers.
-    await this.pluginLintPool.ensure(
+    const generation = this.nextConfigGeneration();
+    const pluginHostReady = await pluginLintPool.prepare(
       descriptors,
-      this.computeFingerprint(configs.map((c) => c.configPath)),
+      this.computeFingerprint(
+        descriptors.map((c) => c.configPath),
+        configs,
+      ),
+      generation,
     );
 
-    if (!this.client) return;
+    if (!this.isLifecycleCurrent(epoch, client, pluginLintPool)) {
+      await pluginLintPool.abort(generation);
+      return;
+    }
+
+    // Workers re-import plugin-bearing configs. Validate every freshly-loaded
+    // source again after prepare so Go's normalized entries and the staged
+    // workers cannot commit across a concurrent config rewrite.
+    for (const loaded of loadedConfigs.values()) {
+      if (
+        this.computeFileFingerprint(loaded.configPath) !==
+        loaded.sourceFingerprint
+      ) {
+        await pluginLintPool.abort(generation);
+        throw new Error(
+          `config changed while staging workers: ${loaded.configPath}`,
+        );
+      }
+    }
+
+    // A cached config can remain usable while its file is temporarily broken,
+    // but a changed community-plugin topology cannot be reconstructed from the
+    // normalized wire entries alone. If the transactional host rebuild fails,
+    // keep the previous Go payload and previous host together. The payload is
+    // retained as a unit because plugin metadata and ordinary config entries
+    // share one configUpdate notification.
+    if (!pluginHostReady && this.hasSentJSConfig) {
+      await pluginLintPool.abort(generation);
+      this.logger.error(
+        'Failed to refresh the ESLint-plugin host; preserving the previous config payload',
+      );
+      return;
+    }
+
     // Wire shape Go's handleConfigUpdate parses: per-config {configDirectory,
     // entries} plus the top-level `eslintPlugins` aggregate (same shape the CLI
     // sends in its init payload). `configPath` is a host-local detail for the
     // worker descriptors, not the wire.
-    await this.client.sendNotification('rslint/configUpdate', {
-      configs: configs.map((c) => ({
-        configDirectory: c.configDirectory,
-        entries: c.entries,
-      })),
-      eslintPlugins: eslintPluginEntries,
-    });
+    try {
+      await this.sendConfigUpdate(client, pluginLintPool, generation, {
+        configs: configs.map((c) => ({
+          configDirectory: c.configDirectory,
+          entries: c.entries,
+        })),
+        eslintPlugins: eslintPluginEntries,
+      });
+    } catch (error) {
+      await pluginLintPool.abort(generation);
+      throw error;
+    }
+    this.lastGoodConfigs = nextLastGoodConfigs;
+    this.hasSentJSConfig = true;
   }
 
   /**
@@ -295,55 +576,87 @@ export class Rslint implements Disposable {
 
   /**
    * Fingerprint the inputs that decide whether the plugin host must rebuild:
-   * each config file's {mtime,size} plus the newest workspace lockfile mtime.
-   * A change in either can swap a mounted plugin's behavior (edit) or its code
-   * (install) without otherwise signaling us, so both feed the key. Missing
-   * files contribute a stable marker (so deletion still moves the fingerprint).
+   * each loaded config snapshot's content plus each workspace-root lockfile's
+   * existence, mtime, and size. A last-good config retains its successful snapshot while
+   * the current file is broken, keeping the worker and Go payload on the same
+   * generation. A dependency install can replace plugin code without changing
+   * config, so the lockfile also feeds the key.
    */
-  private computeFingerprint(configPaths: string[]): string {
+  private computeFileFingerprint(configPath: string): string {
+    try {
+      const content = fs.readFileSync(configPath);
+      return `${content.byteLength}:${createHash('sha256').update(content).digest('hex')}`;
+    } catch {
+      return 'absent';
+    }
+  }
+
+  private computeMetadataFingerprint(filePath: string): string {
+    try {
+      const stat = fs.statSync(filePath);
+      return `${stat.mtimeMs}:${stat.size}`;
+    } catch {
+      return 'absent';
+    }
+  }
+
+  private computeFingerprint(
+    configPaths: string[],
+    configs: readonly LoadedConfig[] = [],
+  ): string {
     const parts: string[] = [];
+    const sourceFingerprintByPath = new Map(
+      configs.map((config) => [
+        path.normalize(config.configPath),
+        config.sourceFingerprint,
+      ]),
+    );
     for (const p of [...configPaths].sort()) {
-      try {
-        const st = fs.statSync(p);
-        parts.push(`${p}:${st.mtimeMs}:${st.size}`);
-      } catch {
-        parts.push(`${p}:absent`);
-      }
+      const sourceFingerprint =
+        sourceFingerprintByPath.get(path.normalize(p)) ??
+        this.computeFileFingerprint(p);
+      parts.push(`${p}:${sourceFingerprint}`);
     }
-    let newestLock = 0;
     for (const name of LOCKFILE_NAMES) {
-      try {
-        const st = fs.statSync(
-          path.join(this.workspaceFolder.uri.fsPath, name),
-        );
-        if (st.mtimeMs > newestLock) newestLock = st.mtimeMs;
-      } catch {
-        // lockfile absent for this manager — ignore.
-      }
+      const lockPath = path.join(this.workspaceFolder.uri.fsPath, name);
+      parts.push(`lock:${name}:${this.computeMetadataFingerprint(lockPath)}`);
     }
-    parts.push(`lock:${newestLock}`);
     return parts.join('|');
   }
 
   public async stop(): Promise<void> {
-    // Tear down the plugin worker pool regardless of client state so its
-    // threads never outlive the instance.
-    await this.pluginLintPool.dispose();
+    this.lifecycleEpoch++;
+    clearTimeout(this.configReloadTimer);
+    this.configWatcher?.dispose();
+    this.configWatcher = undefined;
+    this.dependencyWatcher?.dispose();
+    this.dependencyWatcher = undefined;
+    // Do not await configReloadChain: user config evaluation can contain a
+    // non-settling top-level await. The epoch above makes any late completion
+    // side-effect free, while resetting the chain keeps a future start usable.
+    this.configReloadChain = Promise.resolve();
 
-    if (!this.client) {
+    const client = this.client;
+    this.client = undefined;
+    const pluginLintPool = this.pluginLintPool;
+    this.pluginLintPoolDisposed = true;
+
+    const [poolResult, clientResult] = await Promise.allSettled([
+      pluginLintPool.dispose(),
+      client ? client.stop() : Promise.resolve(),
+    ]);
+    if (!client) {
+      this.lastGoodConfigs.clear();
+      this.hasSentJSConfig = false;
       this.logger.debug('Rslint client is not running');
-      return;
-    }
-
-    try {
-      await this.client.stop();
+    } else if (clientResult.status === 'fulfilled') {
       this.logger.info('Rslint language client stopped');
-    } catch (err: unknown) {
-      this.logger.error('Error stopping Rslint language client', err);
-      throw err;
-    } finally {
-      this.client = undefined;
     }
+    this.lastGoodConfigs.clear();
+    this.hasSentJSConfig = false;
+    this.configTransactionVersion = 0;
+    if (poolResult.status === 'rejected') throw poolResult.reason;
+    if (clientResult.status === 'rejected') throw clientResult.reason;
   }
 
   public isRunning(): boolean {
@@ -362,14 +675,20 @@ export class Rslint implements Disposable {
   }
 
   public dispose(): void {
+    this.lifecycleEpoch++;
     clearTimeout(this.configReloadTimer);
+    this.configReloadChain = Promise.resolve();
+    this.pluginLintPoolDisposed = true;
     void this.pluginLintPool.dispose();
-    if (this.client) {
-      this.client.stop().catch((err: unknown) => {
+    const client = this.client;
+    this.client = undefined;
+    if (client) {
+      client.stop().catch((err: unknown) => {
         this.logger.error('Error disposing Rslint client', err);
       });
     }
     this.configWatcher?.dispose();
+    this.dependencyWatcher?.dispose();
     this.lspOutputChannel?.dispose();
   }
 

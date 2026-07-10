@@ -31,6 +31,22 @@ func TestContainsGlobPattern(t *testing.T) {
 	}
 }
 
+func TestRelativeGlobPatternPreservesFilesystemRoots(t *testing.T) {
+	tests := []struct {
+		root     string
+		pattern  string
+		expected string
+	}{
+		{root: "/", pattern: "/*/tsconfig.json", expected: "*/tsconfig.json"},
+		{root: "/repo", pattern: "/repo/packages/*/tsconfig.json", expected: "packages/*/tsconfig.json"},
+		{root: "C:/", pattern: "C:/*/tsconfig.json", expected: "*/tsconfig.json"},
+		{root: "//server/share/", pattern: "//server/share/*/tsconfig.json", expected: "*/tsconfig.json"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, relativeGlobPattern(tt.root, tt.pattern), tt.expected)
+	}
+}
+
 func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "rslint.jsonc")

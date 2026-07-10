@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	api "github.com/web-infra-dev/rslint/internal/api"
+	"github.com/web-infra-dev/rslint/internal/ipc"
+	"github.com/web-infra-dev/rslint/internal/linter"
 )
 
 func TestHandleLint_DefaultsToLintAllFiles(t *testing.T) {
@@ -151,10 +156,9 @@ func TestHandleLint_AllIgnored_EmptyLintedFiles(t *testing.T) {
 	}
 }
 
-// A file rooted by two tsconfig programs is linted (and diagnosed) by both, so
-// RunLinter's per-program LintedFileCount counts it twice; FileCount must mirror
-// len(LintedFiles) (deduped by canonical path) and report it once.
-func TestHandleLint_FileCountDeduplicatesAcrossPrograms(t *testing.T) {
+// When multiple declared projects contain a target, the first project owns the
+// lint pass and the API reports one caller-visible result.
+func TestHandleLint_FirstContainingProgramReportsFileOnce(t *testing.T) {
 	dir := t.TempDir()
 
 	write := func(name, content string) {
@@ -267,7 +271,7 @@ func TestHandleLint_ExplicitFileOutsideFilesIsCountedWithNoRules(t *testing.T) {
 	}
 }
 
-func TestHandleLint_ExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(t *testing.T) {
+func TestHandleLint_ExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "explicit.js")
 	if err := os.WriteFile(target, []byte("const = ;\n"), 0o644); err != nil {
@@ -292,11 +296,116 @@ func TestHandleLint_ExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(
 	if response.FileCount != 1 {
 		t.Fatalf("explicit files-scope miss should still count as one lint result, got %d", response.FileCount)
 	}
-	if len(response.Diagnostics) != 0 {
-		t.Fatalf("expected no syntax or rule diagnostics because no config entry matches the file, got %+v", response.Diagnostics)
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "TypeScript(TS1134)" {
+		t.Fatalf("expected the selected zero-rule target to report TS1134, got %+v", response.Diagnostics)
 	}
 	if response.RuleCount != 0 {
 		t.Fatalf("expected no executed rules, got %d", response.RuleCount)
+	}
+}
+
+func TestHandleLint_MalformedFileDoesNotRunRules(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "explicit.js")
+	if err := os.WriteFile(target, []byte("debugger;\nconst = ;\n"), 0o644); err != nil {
+		t.Fatalf("write target: %v", err)
+	}
+
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`),
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 1 {
+		t.Fatalf("malformed target should still count as one linted file, got %d", response.FileCount)
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].RuleName != "TypeScript(TS1134)" {
+		t.Fatalf("expected only TS1134 and no rule diagnostics, got %+v", response.Diagnostics)
+	}
+	if response.RuleCount != 0 {
+		t.Fatalf("malformed target must not execute rules, got %d", response.RuleCount)
+	}
+}
+
+func TestHandleLint_FileContentsDependenciesDoNotWidenExplicitTargets(t *testing.T) {
+	dir := t.TempDir()
+	writeProgramTestFiles(t, dir, map[string]string{
+		"target.ts":     "import './dependency';\ndebugger;\n",
+		"dependency.ts": "export const clean = true;\n",
+		"tsconfig.json": `{"include":["*.ts"]}`,
+	})
+	target := filepath.Join(dir, "target.ts")
+	dependency := filepath.Join(dir, "dependency.ts")
+	config := json.RawMessage(`[{
+		"languageOptions": { "parserOptions": { "project": ["./tsconfig.json"] } },
+		"rules": { "no-debugger": "error" }
+	}]`)
+
+	response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+		FileContents: map[string]string{
+			dependency: "debugger;\n",
+		},
+	})
+	if err != nil {
+		t.Fatalf("HandleLint returned error: %v", err)
+	}
+	if response.FileCount != 1 || len(response.LintedFiles) != 1 || response.LintedFiles[0] != "target.ts" {
+		t.Fatalf("overlay dependency must not widen explicit targets: count=%d files=%v", response.FileCount, response.LintedFiles)
+	}
+	if len(response.Diagnostics) != 1 || response.Diagnostics[0].FilePath != "target.ts" || response.Diagnostics[0].RuleName != "no-debugger" {
+		t.Fatalf("expected only target.ts no-debugger diagnostic, got %+v", response.Diagnostics)
+	}
+}
+
+func TestHandleLint_FilesPresenceControlsWhetherFileContentsAreTargets(t *testing.T) {
+	dir := t.TempDir()
+	virtualFile := filepath.Join(dir, "virtual.ts")
+	config := json.RawMessage(`[{"rules":{"no-debugger":"error"}}]`)
+
+	tests := []struct {
+		name            string
+		files           []string
+		wantFileCount   int
+		wantDiagnostics int
+	}{
+		{
+			name:            "files omitted",
+			files:           nil,
+			wantFileCount:   1,
+			wantDiagnostics: 1,
+		},
+		{
+			name:            "files explicitly empty",
+			files:           []string{},
+			wantFileCount:   0,
+			wantDiagnostics: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := (&IPCHandler{}).HandleLint(api.LintRequest{
+				Config:           config,
+				ConfigDirectory:  dir,
+				WorkingDirectory: dir,
+				Files:            tt.files,
+				FileContents:     map[string]string{virtualFile: "debugger;\n"},
+			})
+			if err != nil {
+				t.Fatalf("HandleLint returned error: %v", err)
+			}
+			if response.FileCount != tt.wantFileCount || len(response.Diagnostics) != tt.wantDiagnostics {
+				t.Fatalf("got fileCount=%d diagnostics=%d, want fileCount=%d diagnostics=%d", response.FileCount, len(response.Diagnostics), tt.wantFileCount, tt.wantDiagnostics)
+			}
+		})
 	}
 }
 
@@ -663,11 +772,12 @@ func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *test
 
 	handler := &IPCHandler{}
 	response, err := handler.HandleLint(api.LintRequest{
-		Config:           config,
-		ConfigDirectory:  linkDir,
-		WorkingDirectory: linkDir,
-		Files:            []string{realTarget},
-		FileContents:     map[string]string{realTarget: "let b: any = 10;\nb.c = 20;\n"},
+		Config:                    config,
+		ConfigDirectory:           linkDir,
+		WorkingDirectory:          linkDir,
+		Files:                     []string{realTarget},
+		FileContents:              map[string]string{realTarget: "let b: any = 10;\nb.c = 20;\n"},
+		IncludeEncodedSourceFiles: true,
 	})
 	if err != nil {
 		t.Fatalf("HandleLint returned error: %v", err)
@@ -678,11 +788,24 @@ func TestHandleLint_FileContentsKeepTypeInfoWhenProgramUsesSymlinkSource(t *test
 	if got := response.Diagnostics[0].RuleName; got != "@typescript-eslint/no-unsafe-member-access" {
 		t.Fatalf("expected no-unsafe-member-access diagnostic from typed overlay content, got %q", got)
 	}
+	expectedPath, err := filepath.Rel(linkDir, realTarget)
+	if err != nil {
+		t.Fatalf("relative target path: %v", err)
+	}
+	expectedPath = filepath.ToSlash(expectedPath)
+	if len(response.LintedFiles) != 1 || response.LintedFiles[0] != expectedPath {
+		t.Fatalf("expected requested target path %q in LintedFiles, got %v", expectedPath, response.LintedFiles)
+	}
+	if response.Diagnostics[0].FilePath != expectedPath {
+		t.Fatalf("expected requested target path %q in diagnostic, got %q", expectedPath, response.Diagnostics[0].FilePath)
+	}
+	if _, ok := response.EncodedSourceFiles[expectedPath]; !ok {
+		t.Fatalf("expected requested target path %q in encoded source files, got keys %v", expectedPath, response.EncodedSourceFiles)
+	}
 }
 
-// scenario b (in-memory file命门): a requested file outside every tsconfig
-// Program (a "gap" file) must still be linted by non-type-aware rules via the
-// fallback Program — it must NOT be silently skipped with 0 diagnostics.
+// An in-memory target outside every tsconfig Program must still run
+// non-type-aware rules through the fallback Program.
 func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
@@ -724,10 +847,8 @@ func TestHandleLint_GapFile_NonTypeAwareRuleRuns(t *testing.T) {
 	}
 }
 
-// scenario a (the唯一防线): a type-aware rule on a gap file (no type info) must
-// be filtered out by the gate, NOT run against a nil TypeChecker (which would
-// SIGSEGV the whole process). Reaching the assertions means no crash; the rule
-// must have produced no diagnostic.
+// A type-aware rule on a gap file must be filtered before execution. Running
+// it with a nil TypeChecker would crash the process.
 func TestHandleLint_GapFile_TypeAwareRuleGatedOff(t *testing.T) {
 	fixturesDir, err := filepath.Abs(filepath.Join("..", "..", "packages", "rslint", "fixtures"))
 	if err != nil {
@@ -1058,5 +1179,178 @@ func TestHandleLint_FixRangeIsUTF16(t *testing.T) {
 	}
 	if got := resp.Diagnostics[0].Fixes[0].StartPos; got != 9 {
 		t.Fatalf("expected fix StartPos 9 (UTF-16 offset, not byte 11), got %d", got)
+	}
+}
+
+type apiRequesterFunc func(context.Context, ipc.MessageKind, any) (*ipc.Message, error)
+
+func (f apiRequesterFunc) SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+	return f(ctx, kind, payload)
+}
+
+func TestHandleLint_EslintPluginDiagnosticAndFix(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "input.js")
+	const source = "const bad = 1;\n"
+	config := json.RawMessage(`[{
+		"plugins": ["community"],
+		"rules": { "community/rename": ["error", { "replacement": "good" }] }
+	}]`)
+
+	var calls atomic.Int32
+	requester := apiRequesterFunc(func(_ context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error) {
+		calls.Add(1)
+		if kind != api.KindPluginLint {
+			t.Fatalf("expected pluginLint reverse request, got %q", kind)
+		}
+		req, ok := payload.(linter.EslintPluginLintRequest)
+		if !ok {
+			t.Fatalf("unexpected pluginLint payload type %T", payload)
+		}
+		if !req.Fix || req.SuggestionsMode != linter.SuggestionsModeEager {
+			t.Fatalf("unexpected fix settings: fix=%v suggestions=%q", req.Fix, req.SuggestionsMode)
+		}
+		if len(req.Files) != 1 || req.Files[0].Text == nil || *req.Files[0].Text != source {
+			t.Fatalf("plugin request must carry the exact overlay text, got %+v", req.Files)
+		}
+		if req.Files[0].ConfigKey != dir {
+			t.Fatalf("expected configKey %q, got %q", dir, req.Files[0].ConfigKey)
+		}
+		ruleConfig, ok := req.Rules["community/rename"]
+		if !ok || len(ruleConfig.Options) != 1 {
+			t.Fatalf("missing normalized plugin rule options: %+v", req.Rules)
+		}
+
+		result := linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+			FilePath: req.Files[0].Path,
+			Diagnostics: []linter.EslintPluginDiagnostic{{
+				RuleName:  "community/rename",
+				MessageId: "rename",
+				Message:   "rename bad",
+				StartPos:  6,
+				EndPos:    9,
+				Fixes: []linter.EslintPluginFix{{
+					Range: [2]int{6, 9},
+					Text:  "good",
+				}},
+			}},
+		}}}
+		return ipc.NewMessage(ipc.KindResponse, 1, result)
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+		FileContents:     map[string]string{target: source},
+		EslintPlugins: []api.EslintPluginEntry{{
+			Prefix:    "community",
+			RuleNames: []string{"rename"},
+		}},
+		Fix: true,
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext returned error: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("expected one pluginLint request, got %d", calls.Load())
+	}
+	if len(response.Diagnostics) != 1 {
+		t.Fatalf("expected one plugin diagnostic, got %+v", response.Diagnostics)
+	}
+	diagnostic := response.Diagnostics[0]
+	if diagnostic.RuleName != "community/rename" || diagnostic.MessageId != "rename" || diagnostic.FilePath != "input.js" {
+		t.Fatalf("unexpected plugin diagnostic: %+v", diagnostic)
+	}
+	if diagnostic.Range.Start.Line != 1 || diagnostic.Range.Start.Column != 7 ||
+		diagnostic.Range.End.Line != 1 || diagnostic.Range.End.Column != 10 {
+		t.Fatalf("unexpected plugin diagnostic range: %+v", diagnostic.Range)
+	}
+	if len(diagnostic.Fixes) != 1 || diagnostic.Fixes[0].StartPos != 6 || diagnostic.Fixes[0].EndPos != 9 {
+		t.Fatalf("unexpected plugin fix: %+v", diagnostic.Fixes)
+	}
+	if response.ErrorCount != 1 || response.FixableErrorCount != 1 || response.RuleCount != 1 {
+		t.Fatalf("unexpected plugin counts: errors=%d fixable=%d rules=%d", response.ErrorCount, response.FixableErrorCount, response.RuleCount)
+	}
+	if got := response.Output["input.js"]; got != "const good = 1;\n" {
+		t.Fatalf("expected plugin fix in Output, got %q", got)
+	}
+}
+
+func TestHandleLint_EslintPluginSyntaxErrorSkipsDispatch(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "broken.js")
+	var calls atomic.Int32
+	requester := apiRequesterFunc(func(context.Context, ipc.MessageKind, any) (*ipc.Message, error) {
+		calls.Add(1)
+		return nil, errors.New("plugin dispatcher must not be called for a syntax error")
+	})
+
+	response, err := (&IPCHandler{}).HandleLintWithContext(context.Background(), api.LintRequest{
+		Config:           json.RawMessage(`[{"plugins":["syntax-plugin"],"rules":{"syntax-plugin/rule":"error"}}]`),
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+		FileContents:     map[string]string{target: "const = ;\n"},
+		EslintPlugins: []api.EslintPluginEntry{{
+			Prefix:    "syntax-plugin",
+			RuleNames: []string{"rule"},
+		}},
+	}, requester)
+	if err != nil {
+		t.Fatalf("HandleLintWithContext returned error: %v", err)
+	}
+	if calls.Load() != 0 {
+		t.Fatalf("syntax-error file issued %d pluginLint requests", calls.Load())
+	}
+	if len(response.Diagnostics) != 1 || !strings.HasPrefix(response.Diagnostics[0].RuleName, "TypeScript(TS") {
+		t.Fatalf("expected only the syntax diagnostic, got %+v", response.Diagnostics)
+	}
+	if response.RuleCount != 0 {
+		t.Fatalf("syntax-error file must execute no rules, got %d", response.RuleCount)
+	}
+}
+
+func TestHandleLint_NoEslintPluginMetadataDoesNotDispatchStalePlaceholder(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "input.js")
+	const source = "const value = 1;\n"
+	config := json.RawMessage(`[{"plugins":["request-plugin"],"rules":{"request-plugin/rule":"error"}}]`)
+	var calls atomic.Int32
+	requester := apiRequesterFunc(func(_ context.Context, _ ipc.MessageKind, payload any) (*ipc.Message, error) {
+		calls.Add(1)
+		req := payload.(linter.EslintPluginLintRequest)
+		return ipc.NewMessage(ipc.KindResponse, 1, linter.EslintPluginLintResult{Results: []linter.EslintPluginFileResult{{
+			FilePath: req.Files[0].Path,
+		}}})
+	})
+	handler := &IPCHandler{}
+	baseRequest := api.LintRequest{
+		Config:           config,
+		ConfigDirectory:  dir,
+		WorkingDirectory: dir,
+		Files:            []string{target},
+		FileContents:     map[string]string{target: source},
+	}
+
+	withMetadata := baseRequest
+	withMetadata.EslintPlugins = []api.EslintPluginEntry{{Prefix: "request-plugin", RuleNames: []string{"rule"}}}
+	if _, err := handler.HandleLintWithContext(context.Background(), withMetadata, requester); err != nil {
+		t.Fatalf("register plugin placeholder: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("expected initial plugin dispatch, got %d", calls.Load())
+	}
+
+	response, err := handler.HandleLintWithContext(context.Background(), baseRequest, requester)
+	if err != nil {
+		t.Fatalf("lint without metadata: %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("request without metadata unexpectedly dispatched pluginLint; calls=%d", calls.Load())
+	}
+	if response.RuleCount != 0 || len(response.Diagnostics) != 0 {
+		t.Fatalf("stale placeholder leaked into metadata-free request: rules=%d diagnostics=%+v", response.RuleCount, response.Diagnostics)
 	}
 }

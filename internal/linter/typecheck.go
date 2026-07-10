@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -18,13 +18,7 @@ type typeCheckRequest struct {
 	Programs       []*compiler.Program
 	Skip           []bool // parallel to Programs; nil → check all
 	SingleThreaded bool
-	// TypeInfoFiles, when non-nil, restricts diagnostic output to files in
-	// the set. This honors the gap-file commitment in type-checking.md:
-	// files matched by config `files` but not covered by any tsconfig
-	// (e.g. root scripts, config files) do not receive semantic errors.
-	// nil = no gap-file distinction.
-	TypeInfoFiles map[string]struct{}
-	OnDiagnostic  DiagnosticHandler
+	OnDiagnostic   DiagnosticHandler
 }
 
 // runTypeCheckAcrossPrograms runs program-scoped semantic diagnostics
@@ -40,27 +34,53 @@ type typeCheckRequest struct {
 //
 // Cross-program dedupe: shared declaration files (typical with project
 // references and pulled-in node_modules .d.ts) appear in multiple programs.
-// We dedupe on (filePath, code, pos, end, message).
+// We dedupe on canonical (filePath, code, pos, end, final message), including
+// message chains and related information.
 //
 // req.OnDiagnostic must be non-nil and safe to call from multiple
 // goroutines concurrently — RunLinter is responsible for that contract.
 func runTypeCheckAcrossPrograms(req typeCheckRequest) {
-	var seen sync.Map
+	collected := make([][]collectedTypeCheckDiagnostic, len(req.Programs))
 	wg := core.NewWorkGroup(req.SingleThreaded)
 	for i, prog := range req.Programs {
 		if i < len(req.Skip) && req.Skip[i] {
 			continue
 		}
+		programIndex := i
+		program := prog
 		wg.Queue(func() {
-			runTypeCheckForProgram(prog, &seen, req.TypeInfoFiles, req.OnDiagnostic)
+			collected[programIndex] = runTypeCheckForProgram(program)
 		})
 	}
 	wg.RunAndWait()
+
+	// Program diagnostics are computed in parallel above, but survivor choice
+	// follows stable Program input order rather than goroutine completion order.
+	emitDeduplicatedTypeCheckDiagnostics(collected, req.OnDiagnostic)
 }
 
-func runTypeCheckForProgram(prog *compiler.Program, seen *sync.Map, typeInfoFiles map[string]struct{}, onDiagnostic DiagnosticHandler) {
+func emitDeduplicatedTypeCheckDiagnostics(collected [][]collectedTypeCheckDiagnostic, onDiagnostic DiagnosticHandler) {
+	seen := make(map[typeCheckDedupeKey]struct{})
+	for _, programDiagnostics := range collected {
+		for _, diagnostic := range programDiagnostics {
+			if _, duplicate := seen[diagnostic.key]; duplicate {
+				continue
+			}
+			seen[diagnostic.key] = struct{}{}
+			onDiagnostic(diagnostic.ruleDiagnostic)
+		}
+	}
+}
+
+type collectedTypeCheckDiagnostic struct {
+	key            typeCheckDedupeKey
+	ruleDiagnostic rule.RuleDiagnostic
+}
+
+func runTypeCheckForProgram(prog *compiler.Program) []collectedTypeCheckDiagnostic {
 	ctx := context.Background()
-	diags := collectNoEmitDiagnostics(ctx, prog, typeInfoFiles)
+	diags := collectNoEmitDiagnostics(ctx, prog)
+	collected := make([]collectedTypeCheckDiagnostic, 0, len(diags))
 
 	for _, d := range diags {
 		file := d.File()
@@ -78,35 +98,28 @@ func runTypeCheckForProgram(prog *compiler.Program, seen *sync.Map, typeInfoFile
 			continue
 		}
 
-		// Gap-file gate: when TypeInfoFiles is supplied, drop diagnostics
-		// for files outside it (matches the commitment in
-		// type-checking.md).
-		if typeInfoFiles != nil {
-			if _, ok := typeInfoFiles[file.FileName()]; !ok {
-				continue
-			}
-		}
-
-		if !markSeen(seen, file, d) {
-			continue
-		}
-
 		// Suppression for @ts-ignore / @ts-expect-error / @ts-nocheck and
 		// the corresponding TS2578 unused-directive errors is already
 		// handled inside typescript-go (GetDiagnosticsOfAnyProgram). We do
 		// not add an rslint-specific disable channel here on purpose:
 		// type-check is meant to be a transparent passthrough of tsc.
 
-		onDiagnostic(rule.RuleDiagnostic{
-			RuleName:     fmt.Sprintf("TypeScript(TS%d)", d.Code()),
-			Range:        d.Loc(),
-			Message:      rule.RuleMessage{Description: flattenDiagnosticMessage(d)},
-			SourceFile:   file,
-			FilePath:     file.FileName(),
-			Severity:     rule.SeverityError,
-			PreFormatted: true,
+		message := flattenDiagnosticMessage(d)
+		loc := d.Loc()
+		collected = append(collected, collectedTypeCheckDiagnostic{
+			key: typeCheckDedupeKeyForDiagnostic(prog, d),
+			ruleDiagnostic: rule.RuleDiagnostic{
+				RuleName:     fmt.Sprintf("TypeScript(TS%d)", d.Code()),
+				Range:        loc,
+				Message:      rule.RuleMessage{Description: message},
+				SourceFile:   file,
+				FilePath:     file.FileName(),
+				Severity:     rule.SeverityError,
+				PreFormatted: true,
+			},
 		})
 	}
+	return collected
 }
 
 type typeCheckDedupeKey struct {
@@ -117,27 +130,47 @@ type typeCheckDedupeKey struct {
 	message string
 }
 
-// markSeen records (filePath, code, pos, end, message) and reports whether
-// this exact tuple has been seen before. Callers must pass a non-nil
-// `file` — runTypeCheckForProgram has already filtered out file=nil
-// diagnostics before reaching here.
-func markSeen(seen *sync.Map, file *ast.SourceFile, d *ast.Diagnostic) bool {
+func typeCheckDedupeKeyForDiagnostic(prog *compiler.Program, d *ast.Diagnostic) typeCheckDedupeKey {
 	loc := d.Loc()
-	key := typeCheckDedupeKey{
-		path:    file.FileName(),
+	return typeCheckDedupeKey{
+		path:    typeCheckFilesystemPathID(prog, d.File().FileName()),
 		code:    d.Code(),
 		pos:     loc.Pos(),
 		end:     loc.End(),
-		message: d.String(),
+		message: flattenDiagnosticMessageForIdentity(prog, d),
 	}
-	_, dup := seen.LoadOrStore(key, struct{}{})
-	return !dup
+}
+
+func typeCheckFilesystemPathID(prog *compiler.Program, filePath string) string {
+	filePath = tspath.NormalizePath(filePath)
+	if prog == nil {
+		return filePath
+	}
+	fsys := prog.Host().FS()
+	if fsys != nil {
+		if realPath := fsys.Realpath(filePath); realPath != "" {
+			filePath = tspath.NormalizePath(realPath)
+		}
+	}
+	return string(tspath.ToPath(filePath, prog.GetCurrentDirectory(), prog.UseCaseSensitiveFileNames()))
 }
 
 // flattenDiagnosticMessage builds a human-readable message from a
 // TypeScript diagnostic, including its MessageChain and
 // RelatedInformation. Format mirrors tsc's output.
 func flattenDiagnosticMessage(d *ast.Diagnostic) string {
+	return flattenDiagnosticMessageWithRelatedPath(d, func(file *ast.SourceFile) string {
+		return file.FileName()
+	})
+}
+
+func flattenDiagnosticMessageForIdentity(prog *compiler.Program, d *ast.Diagnostic) string {
+	return flattenDiagnosticMessageWithRelatedPath(d, func(file *ast.SourceFile) string {
+		return typeCheckFilesystemPathID(prog, file.FileName())
+	})
+}
+
+func flattenDiagnosticMessageWithRelatedPath(d *ast.Diagnostic, relatedPath func(*ast.SourceFile) string) string {
 	var b strings.Builder
 	b.WriteString(d.String())
 	for _, chain := range d.MessageChain() {
@@ -146,7 +179,7 @@ func flattenDiagnosticMessage(d *ast.Diagnostic) string {
 	for _, related := range d.RelatedInformation() {
 		if related.File() != nil {
 			line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(related.File(), related.Pos())
-			fmt.Fprintf(&b, "\n  %s:%d: %s", related.File().FileName(), line+1, related.String())
+			fmt.Fprintf(&b, "\n  %s:%d: %s", relatedPath(related.File()), line+1, related.String())
 		}
 	}
 	return b.String()
@@ -187,28 +220,24 @@ func flattenMessageChain(b *strings.Builder, chain *ast.Diagnostic, level int) {
 // This function reproduces the GetDiagnosticsOfAnyProgram contract but:
 //
 //  1. Strips diagnostics that would not survive runTypeCheckForProgram's
-//     downstream filters (nil file, or file outside typeInfoFiles when the
-//     gap-file gate is in effect) before applying the short-circuit.
-//     This keeps invisible option errors from masking real semantic work.
-//     File-anchored syntactic / program errors that DO reach the user
-//     still short-circuit semantic collection — matching tsc's behaviour
-//     for real pre-semantic errors.
+//     downstream filters (nil-file and tsconfig-anchored option diagnostics)
+//     before applying the short-circuit. This keeps invisible option errors
+//     from masking real semantic work. File-anchored syntactic / program
+//     errors that do reach the user still short-circuit semantic collection,
+//     matching tsc's behaviour for real pre-semantic errors.
 //  2. Re-applies compiler.FilterNoEmitSemanticDiagnostics over the
 //     semantic diagnostics with NoEmit=true, so emit-only checks
 //     (SkippedOnNoEmit, e.g. __esModule reservation errors) drop out
 //     even when the user's tsconfig leaves NoEmit unset.
 //  3. Collects declaration diagnostics under the noEmit branch, matching
 //     tsc --noEmit's behaviour when GetEmitDeclarations() is set.
-//
-// typeInfoFiles is the set of files for which type errors should reach
-// the user; nil means no gap-file restriction.
-func collectNoEmitDiagnostics(ctx context.Context, prog *compiler.Program, typeInfoFiles map[string]struct{}) []*ast.Diagnostic {
+func collectNoEmitDiagnostics(ctx context.Context, prog *compiler.Program) []*ast.Diagnostic {
 	noEmitOpts := prog.Options().Clone()
 	noEmitOpts.NoEmit = core.TSTrue
 	configFilePath := prog.Options().ConfigFilePath
 
 	keep := func(in []*ast.Diagnostic) []*ast.Diagnostic {
-		return filterShortCircuitDiagnostics(in, typeInfoFiles, configFilePath)
+		return filterShortCircuitDiagnostics(in, configFilePath)
 	}
 
 	configDiags := keep(prog.GetConfigFileParsingDiagnostics())
@@ -252,12 +281,10 @@ func collectNoEmitDiagnostics(ctx context.Context, prog *compiler.Program, typeI
 //     itself, not with the user's source code, and rslint --type-check is
 //     defined to mirror tsc --noEmit, which silently suppresses noEmit-gated
 //     option errors when --noEmit is on the command line),
-//   - diagnostics anchored to a file outside typeInfoFiles when the gap-file
-//     gate is active (those will be dropped downstream too).
 //
 // Diagnostics anchored to user source files (real syntactic / program errors)
 // flow through unchanged, so they still trip the short-circuit — matching tsc.
-func filterShortCircuitDiagnostics(in []*ast.Diagnostic, typeInfoFiles map[string]struct{}, configFilePath string) []*ast.Diagnostic {
+func filterShortCircuitDiagnostics(in []*ast.Diagnostic, configFilePath string) []*ast.Diagnostic {
 	out := make([]*ast.Diagnostic, 0, len(in))
 	for _, d := range in {
 		f := d.File()
@@ -266,11 +293,6 @@ func filterShortCircuitDiagnostics(in []*ast.Diagnostic, typeInfoFiles map[strin
 		}
 		if configFilePath != "" && f.FileName() == configFilePath {
 			continue
-		}
-		if typeInfoFiles != nil {
-			if _, ok := typeInfoFiles[f.FileName()]; !ok {
-				continue
-			}
 		}
 		out = append(out, d)
 	}

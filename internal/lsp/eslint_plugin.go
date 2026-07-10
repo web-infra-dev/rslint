@@ -111,18 +111,8 @@ func (s *Server) buildPluginFileInput(uri lsproto.DocumentUri, textOverride *str
 // configs cannot mount object-form plugins), and a file with no plugin rules never
 // reaches dispatch.
 func (s *Server) pluginConfigKeyForURI(uri lsproto.DocumentUri) string {
-	if len(s.jsConfigs) > 0 {
-		dir := uriDirname(string(uri))
-		for {
-			if _, ok := s.jsConfigs[dir]; ok {
-				return dir
-			}
-			parent := uriDirname(dir)
-			if parent == dir {
-				break
-			}
-			dir = parent
-		}
+	if configKey, ok := s.nearestJSConfigKey(uri); ok {
+		return configKey
 	}
 	return ""
 }
@@ -153,7 +143,7 @@ func (s *Server) dispatchPluginLint(uri lsproto.DocumentUri, generation uint64) 
 	if !ok {
 		return
 	}
-	dispatch := s.installEslintPluginDispatch()
+	dispatch := s.pluginDispatchForGeneration(s.eslintPluginConfigGeneration)
 
 	// Bound the reverse request as a backstop: even with supersede-cancel, a
 	// client that neither answers nor is ever superseded (the user stops typing)
@@ -325,7 +315,7 @@ func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUr
 	if !ok {
 		return nil
 	}
-	dispatch := s.installEslintPluginDispatch()
+	dispatch := s.pluginDispatchForGeneration(s.eslintPluginConfigGeneration)
 
 	var diags []rule.RuleDiagnostic
 	err := linter.DispatchEslintPluginRules(
@@ -353,4 +343,12 @@ func (s *Server) lintPluginRulesSync(ctx context.Context, uri lsproto.DocumentUr
 		return nil
 	}
 	return diags
+}
+
+func (s *Server) pluginDispatchForGeneration(generation string) linter.EslintPluginDispatcher {
+	dispatch := s.installEslintPluginDispatch()
+	return func(ctx context.Context, req linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+		req.Generation = generation
+		return dispatch(ctx, req)
+	}
 }

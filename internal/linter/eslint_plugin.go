@@ -39,6 +39,7 @@ type EslintPluginLintFile struct {
 }
 
 type EslintPluginLintRequest struct {
+	Generation      string                            `json:"generation,omitempty"`
 	Files           []EslintPluginLintFile            `json:"files"`
 	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
 	Fix             bool                              `json:"fix"`

@@ -1,10 +1,17 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
 // TestParseConfigPayload_MultiConfig_OriginalConfigDirPreservesRaw pins the
@@ -213,28 +220,66 @@ func TestParseConfigPayload_ConfigDirNormalized(t *testing.T) {
 }
 
 func TestParseConfigPayload_DuplicateConfigDirs(t *testing.T) {
-	// Same configDirectory twice → last one wins (map semantics)
 	data := []byte(`{
 		"configs": [
 			{"configDirectory": "/project", "entries": [{"rules": {"rule-a": "error"}}]},
-			{"configDirectory": "/project", "entries": [{"rules": {"rule-b": "error"}}]}
+			{"configDirectory": "/project/./", "entries": [{"rules": {"rule-b": "error"}}]}
 		]
 	}`)
 
-	result, err := parseConfigPayload(data)
+	_, err := parseConfigPayload(data)
+	if err == nil || !strings.Contains(err.Error(), "duplicate config directories") {
+		t.Fatalf("expected duplicate normalized directories to be rejected, got %v", err)
+	}
+}
+
+type caseInsensitivePayloadFS struct {
+	vfs.FS
+}
+
+func (f *caseInsensitivePayloadFS) UseCaseSensitiveFileNames() bool { return false }
+func (f *caseInsensitivePayloadFS) Realpath(filePath string) string {
+	return tspath.NormalizePath(filePath)
+}
+
+func TestParseConfigPayload_RejectsCaseEquivalentConfigDirs(t *testing.T) {
+	data := []byte(`{
+		"configs": [
+			{"configDirectory": "C:/Repo", "entries": [{"rules": {"rule-a": "error"}}]},
+			{"configDirectory": "c:/repo", "entries": [{"rules": {"rule-b": "error"}}]}
+		]
+	}`)
+
+	_, err := parseConfigPayload(data, &caseInsensitivePayloadFS{FS: osvfs.FS()})
+	if err == nil || !strings.Contains(err.Error(), "equivalent on this filesystem") {
+		t.Fatalf("expected case-equivalent config roots to be rejected, got %v", err)
+	}
+}
+
+func TestParseConfigPayload_RejectsSymlinkEquivalentConfigDirs(t *testing.T) {
+	parent := t.TempDir()
+	realDir := filepath.Join(parent, "real")
+	aliasDir := filepath.Join(parent, "alias")
+	if err := os.Mkdir(realDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realDir, aliasDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	payload, err := json.Marshal(map[string]any{
+		"configs": []any{
+			map[string]any{"configDirectory": realDir, "entries": []any{}},
+			map[string]any{"configDirectory": aliasDir, "entries": []any{}},
+		},
+	})
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatal(err)
 	}
-	if len(result.ConfigMap) != 1 {
-		t.Errorf("Expected 1 config (deduped), got %d", len(result.ConfigMap))
-	}
-	// Last entry should win
-	cfg := result.ConfigMap["/project"]
-	if cfg == nil {
-		t.Fatal("Expected config for /project")
-	}
-	if _, ok := cfg[0].Rules["rule-b"]; !ok {
-		t.Error("Expected last entry (rule-b) to win")
+
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	_, err = parseConfigPayload(payload, fsys)
+	if err == nil || !strings.Contains(err.Error(), "same filesystem location") {
+		t.Fatalf("expected symlink-equivalent config roots to be rejected, got %v", err)
 	}
 }
 

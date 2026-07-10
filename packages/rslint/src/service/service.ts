@@ -4,6 +4,8 @@ import type {
   LintResponse,
   GetAstInfoRequest,
   GetAstInfoResponse,
+  IpcMessage,
+  LintInboundHandlers,
 } from '../types.js';
 
 /**
@@ -13,18 +15,50 @@ import type {
  */
 export class RSLintService {
   private readonly service: RslintServiceBackend;
+  private activeLintHandlers: LintInboundHandlers | null = null;
+  private requestQueue: Promise<void> = Promise.resolve();
+  private closeRequested = false;
+  private closePromise: Promise<void> | null = null;
 
   constructor(service: RslintServiceBackend) {
     this.service = service;
+    this.service.setInboundHandler?.((message) =>
+      this.handleInboundRequest(message),
+    );
   }
 
   /**
    * Run the linter on specified files
    */
-  async lint(options: LintOptions = {}): Promise<LintResponse> {
+  async lint(
+    options: LintOptions = {},
+    handlers: LintInboundHandlers = {},
+  ): Promise<LintResponse> {
+    if (this.closeRequested) {
+      throw new Error('rslint service is closing');
+    }
+
+    return this.enqueue(async () => {
+      if (handlers.pluginLint && !this.service.setInboundHandler) {
+        throw new Error(
+          'rslint backend does not support reverse pluginLint requests',
+        );
+      }
+
+      this.activeLintHandlers = handlers;
+      try {
+        return await this.lintExclusive(options);
+      } finally {
+        this.activeLintHandlers = null;
+      }
+    });
+  }
+
+  private async lintExclusive(options: LintOptions): Promise<LintResponse> {
     const {
       files,
       config,
+      eslintPlugins,
       configDirectory,
       workingDirectory,
       fileContents,
@@ -39,6 +73,7 @@ export class RSLintService {
     return this.service.sendMessage('lint', {
       files,
       config,
+      eslintPlugins,
       configDirectory,
       workingDirectory,
       fileContents,
@@ -52,6 +87,16 @@ export class RSLintService {
    * Returns Node, Type, Symbol, Signature, and Flow information
    */
   async getAstInfo(options: GetAstInfoRequest): Promise<GetAstInfoResponse> {
+    if (this.closeRequested) {
+      throw new Error('rslint service is closing');
+    }
+
+    return this.enqueue(() => this.getAstInfoExclusive(options));
+  }
+
+  private async getAstInfoExclusive(
+    options: GetAstInfoRequest,
+  ): Promise<GetAstInfoResponse> {
     const {
       fileContent,
       position,
@@ -80,18 +125,47 @@ export class RSLintService {
   /**
    * Close the service
    */
-  async close(): Promise<void> {
-    // Ask the peer to exit, then tear down regardless. The peer may exit before
-    // its ack frame is read; the exit handler resolves the pending on that
-    // expected path, but swallow any rejection too (defensive — e.g. the
-    // process was already dead) so a floating promise can't become an
-    // unhandledRejection.
-    try {
-      await this.service.sendMessage('exit', {});
-    } catch {
-      // peer already gone — expected during close
+  close(): Promise<void> {
+    if (this.closePromise) return this.closePromise;
+    this.closeRequested = true;
+
+    this.closePromise = this.enqueue(async () => {
+      // Ask the peer to exit, then tear down regardless. The peer may exit
+      // before its ack frame is read; swallow rejection on that expected path.
+      try {
+        await this.service.sendMessage('exit', {});
+      } catch {
+        // peer already gone — expected during close
+      }
+      this.service.terminate();
+    });
+    return this.closePromise;
+  }
+
+  private enqueue<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.requestQueue.then(operation, operation);
+    this.requestQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  }
+
+  private handleInboundRequest(
+    message: IpcMessage,
+  ): Promise<unknown> | unknown {
+    if (message.kind !== 'pluginLint') {
+      throw new Error(
+        `rslint service received unexpected inbound request '${message.kind}'`,
+      );
     }
-    this.service.terminate();
+    const handler = this.activeLintHandlers?.pluginLint;
+    if (!handler) {
+      throw new Error(
+        'rslint service received pluginLint without an active plugin host',
+      );
+    }
+    return handler(message.data);
   }
 }
 
@@ -104,6 +178,8 @@ export type {
   RslintServiceInterface,
   PendingMessage,
   IpcMessage,
+  InboundRequestHandler,
+  LintInboundHandlers,
   // AST Info types
   GetAstInfoRequest,
   GetAstInfoResponse,

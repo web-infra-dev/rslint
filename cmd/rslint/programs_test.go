@@ -4,13 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -170,73 +168,5 @@ func TestBuildProgramFileSet_RealpathKeyForSymlinks(t *testing.T) {
 			}
 		}
 		t.Errorf("Expected fileSet to contain resolved path %s", resolvedFilePath)
-	}
-}
-
-type realpathCountingFS struct {
-	vfs.FS
-
-	mu      sync.Mutex
-	aliases map[string]string
-	calls   map[string]int
-}
-
-func (fsys *realpathCountingFS) Realpath(path string) string {
-	fsys.mu.Lock()
-	fsys.calls[path]++
-	alias, ok := fsys.aliases[path]
-	fsys.mu.Unlock()
-	if ok {
-		return alias
-	}
-	return fsys.FS.Realpath(path)
-}
-
-func (fsys *realpathCountingFS) callCount(path string) int {
-	fsys.mu.Lock()
-	defer fsys.mu.Unlock()
-	return fsys.calls[path]
-}
-
-func TestBuildProgramFileIndex_DedupesRealpathAcrossPrograms(t *testing.T) {
-	program := createTestProgram(t, map[string]string{
-		"a.ts": "const a = 1;",
-	})
-
-	var target string
-	for _, sf := range program.GetSourceFiles() {
-		if strings.HasSuffix(sf.FileName(), "/a.ts") {
-			target = sf.FileName()
-			break
-		}
-	}
-	if target == "" {
-		t.Fatal("expected program to include a.ts")
-	}
-
-	realTarget := target + ".real"
-	fsys := &realpathCountingFS{
-		FS:      bundled.WrapFS(cachedvfs.From(osvfs.FS())),
-		aliases: map[string]string{target: realTarget},
-		calls:   make(map[string]int),
-	}
-
-	index := buildProgramFileIndex([]*compiler.Program{program, program}, fsys, true)
-
-	if got := fsys.callCount(target); got != 1 {
-		t.Fatalf("expected one realpath lookup for duplicate source path, got %d", got)
-	}
-	if _, ok := index.files[target]; !ok {
-		t.Fatalf("expected original path %q in program index", target)
-	}
-	if _, ok := index.files[realTarget]; !ok {
-		t.Fatalf("expected realpath alias %q in program index", realTarget)
-	}
-	candidates := index.byPath[realTarget]
-	if len(candidates) != 2 {
-		t.Fatalf("expected both program candidates for realpath alias, got %d", len(candidates))
-	}
-	if candidates[0].programIndex != 0 || candidates[1].programIndex != 1 {
-		t.Fatalf("expected candidates to preserve program order, got %#v", candidates)
 	}
 }

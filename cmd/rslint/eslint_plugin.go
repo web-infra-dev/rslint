@@ -12,17 +12,17 @@ import (
 )
 
 // pluginConfigResolver resolves the eslint-plugin wire configKey plus the
-// cached merged config for a file. lintResolver owns nearest-config selection;
-// originalConfigDir maps a normalized config dir back to the raw key the JS host
-// registered its worker pool under.
+// cached merged config for a file. lintResolver uses the target binding's
+// owning config when available; originalConfigDir maps a normalized config dir
+// back to the raw key the JS host registered its worker pool under.
 type pluginConfigResolver struct {
 	lintResolver      *lintConfigResolver
 	originalConfigDir map[string]string
 }
 
 // resolve returns the worker wire configKey + merged config for filePath. Go
-// matches the file against its NORMALIZED owning-config key (FindNearestConfig),
-// then echoes the RAW configDirectory the JS host sent as the wire configKey —
+// resolves the file against its normalized owning-config key, then echoes the
+// RAW configDirectory the JS host sent as the wire configKey —
 // that is what the Node worker keys its plugin map on. POSIX / single-config
 // fall back to the normalized key, where raw == normalized.
 func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *rslintconfig.MergedConfig) {
@@ -30,7 +30,7 @@ func (r pluginConfigResolver) resolve(filePath string) (wireKey string, merged *
 		return "", nil
 	}
 	configPath := r.lintResolver.configPathFor(filePath)
-	cfgDir, resolver, ok := r.lintResolver.resolverForFile(configPath)
+	cfgDir, resolver, ok := r.lintResolver.resolverForFile(filePath, configPath)
 	if !ok {
 		return "", nil
 	}

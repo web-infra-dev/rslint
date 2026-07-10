@@ -7,6 +7,7 @@ import type {
   RSlintOptions,
   PendingMessage,
   IpcMessage,
+  InboundRequestHandler,
   LintOptions,
   LintResponse,
 } from '../types.js';
@@ -31,6 +32,8 @@ export class NodeRslintService implements RslintServiceInterface {
   // requests instead of rejecting them — otherwise close()'s pending 'exit'
   // request could reject and surface as an unhandledRejection.
   private closing: boolean;
+  private inboundHandler: InboundRequestHandler | null;
+  private activeInboundRequests: number;
 
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
@@ -38,6 +41,8 @@ export class NodeRslintService implements RslintServiceInterface {
     this.rslintPath = options.rslintPath || resolveRslintBinary();
     this.dead = false;
     this.closing = false;
+    this.inboundHandler = null;
+    this.activeInboundRequests = 0;
 
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
@@ -116,6 +121,18 @@ export class NodeRslintService implements RslintServiceInterface {
     }
   }
 
+  private updateLoopActivity(): void {
+    this.setLoopActive(
+      !this.dead &&
+        (this.pendingMessages.size > 0 || this.activeInboundRequests > 0),
+    );
+  }
+
+  /** Install the handler for positive-id requests sent by the Go peer. */
+  setInboundHandler(handler: InboundRequestHandler | null): void {
+    this.inboundHandler = handler;
+  }
+
   /**
    * Send a message to the rslint process
    */
@@ -138,19 +155,25 @@ export class NodeRslintService implements RslintServiceInterface {
 
       // Register promise callbacks
       this.pendingMessages.set(id, { resolve, reject });
-      // First in-flight request: ref the child + pipes so the loop stays alive
-      // until its response arrives (a pending promise alone would not).
-      if (this.pendingMessages.size === 1) this.setLoopActive(true);
-
-      // Write message length as 4 bytes in little endian
-      const json = JSON.stringify(message);
-      const jsonBuffer = Buffer.from(json, 'utf8');
-      const length = Buffer.alloc(4);
-      length.writeUInt32LE(jsonBuffer.length, 0);
-
-      // Send message
-      this.process.stdin!.write(Buffer.concat([length, jsonBuffer]));
+      // Keep the child + pipes referenced until the response arrives (a
+      // pending promise alone does not keep Node's event loop alive).
+      this.updateLoopActivity();
+      try {
+        this.writeMessage(message);
+      } catch (error) {
+        this.pendingMessages.delete(id);
+        this.updateLoopActivity();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
     });
+  }
+
+  private writeMessage(message: IpcMessage): void {
+    if (this.dead) return;
+    const jsonBuffer = Buffer.from(JSON.stringify(message), 'utf8');
+    const length = Buffer.alloc(4);
+    length.writeUInt32LE(jsonBuffer.length, 0);
+    this.process.stdin!.write(Buffer.concat([length, jsonBuffer]));
   }
 
   /**
@@ -202,23 +225,68 @@ export class NodeRslintService implements RslintServiceInterface {
    */
   private handleMessage(message: IpcMessage): void {
     const { id, kind, data } = message;
-    const pending = this.pendingMessages.get(id);
-    if (!pending) return;
+    // IDs are allocated independently in each direction and can collide. Only
+    // response/error frames settle an outbound request; every other positive-id
+    // frame is a request from Go that must be answered independently.
+    if (kind === 'response' || kind === 'error') {
+      const pending = this.pendingMessages.get(id);
+      if (!pending) return;
 
-    this.pendingMessages.delete(id);
-
-    if (kind === 'error') {
-      pending.reject(new Error(data.message));
-    } else {
-      pending.resolve(data);
+      this.pendingMessages.delete(id);
+      if (kind === 'error') {
+        pending.reject(new Error(data?.message ?? 'rslint request failed'));
+      } else {
+        pending.resolve(data);
+      }
+      this.updateLoopActivity();
+      return;
     }
 
-    // Back to idle once the last in-flight request settles: unref so the loop
-    // can exit without an explicit close(). A continuation that immediately
-    // sends another request re-refs via sendMessage before the loop drains
-    // (the resolve continuation runs as a microtask, ahead of the loop's exit
-    // check).
-    if (this.pendingMessages.size === 0) this.setLoopActive(false);
+    if (id <= 0) return;
+
+    this.activeInboundRequests++;
+    this.updateLoopActivity();
+    void Promise.resolve()
+      .then(async () => {
+        if (!this.inboundHandler) {
+          throw new Error(
+            `no inbound handler registered (kind=${message.kind})`,
+          );
+        }
+        return this.inboundHandler(message);
+      })
+      .then(
+        (result) => {
+          try {
+            this.writeMessage({ id, kind: 'response', data: result });
+          } catch (error) {
+            const detail =
+              error instanceof Error ? error.message : String(error);
+            this.writeMessage({
+              id,
+              kind: 'error',
+              data: { message: `failed to encode inbound response: ${detail}` },
+            });
+          }
+        },
+        (error: unknown) => {
+          const detail = error instanceof Error ? error.message : String(error);
+          this.writeMessage({
+            id,
+            kind: 'error',
+            data: { message: detail },
+          });
+        },
+      )
+      .finally(() => {
+        this.activeInboundRequests--;
+        this.updateLoopActivity();
+      })
+      .catch(() => {
+        // A terminal stdin write failure is reported by the stream/process
+        // handlers, which also settle the outer request. Avoid a detached
+        // reverse-response chain becoming an unhandled rejection meanwhile.
+      });
   }
 
   /**
@@ -232,6 +300,7 @@ export class NodeRslintService implements RslintServiceInterface {
       pending.reject(err);
     }
     this.pendingMessages.clear();
+    this.updateLoopActivity();
   }
 
   /**
@@ -245,6 +314,7 @@ export class NodeRslintService implements RslintServiceInterface {
       pending.resolve(null);
     }
     this.pendingMessages.clear();
+    this.updateLoopActivity();
   }
 
   /**

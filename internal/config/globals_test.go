@@ -45,3 +45,40 @@ func TestExtractGlobals_NoLanguageOptions(t *testing.T) {
 		t.Errorf("ExtractGlobals(empty) = %v, want nil", got)
 	}
 }
+
+func TestMergeLanguageOptions_MergesGlobalsByName(t *testing.T) {
+	base := &LanguageOptions{Raw: map[string]any{
+		"globals": map[string]any{
+			"baseOnly": "readonly",
+			"shared":   "writable",
+		},
+	}}
+	override := &LanguageOptions{Raw: map[string]any{
+		"globals": map[string]any{
+			"overrideOnly": "readonly",
+			"shared":       "off",
+		},
+	}}
+
+	merged := mergeLanguageOptions(base, override)
+	merged = mergeLanguageOptions(merged, &LanguageOptions{Raw: map[string]any{
+		"globals": map[string]any{},
+	}})
+
+	rawGlobals, ok := merged.Raw["globals"].(map[string]any)
+	if !ok {
+		t.Fatalf("merged globals has type %T, want map[string]any", merged.Raw["globals"])
+	}
+	if got := rawGlobals["baseOnly"]; got != "readonly" {
+		t.Errorf("baseOnly = %v, want readonly", got)
+	}
+	if got := rawGlobals["overrideOnly"]; got != "readonly" {
+		t.Errorf("overrideOnly = %v, want readonly", got)
+	}
+	if got := rawGlobals["shared"]; got != "off" {
+		t.Errorf("shared = %v, want off", got)
+	}
+	if got := ExtractGlobals(merged)["shared"]; got {
+		t.Error("later off value should undeclare shared")
+	}
+}

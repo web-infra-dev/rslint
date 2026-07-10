@@ -43,6 +43,31 @@ var astInfoProgramCache = &programCache{}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
+	return h.handleLint(context.Background(), req, nil)
+}
+
+// HandleLintWithContext enables reverse pluginLint requests when IPCHandler is
+// hosted by the bidirectional API service. HandleLint remains available for
+// direct/legacy callers that do not need community plugin execution.
+func (h *IPCHandler) HandleLintWithContext(ctx context.Context, req api.LintRequest, requester api.Requester) (*api.LintResponse, error) {
+	var dispatch linter.EslintPluginDispatcher
+	if requester != nil {
+		dispatch = func(reqCtx context.Context, pluginReq linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+			msg, err := requester.SendRequest(reqCtx, api.KindPluginLint, pluginReq)
+			if err != nil {
+				return nil, err
+			}
+			var result linter.EslintPluginLintResult
+			if err := msg.Decode(&result); err != nil {
+				return nil, fmt.Errorf("decode pluginLint result: %w", err)
+			}
+			return &result, nil
+		}
+	}
+	return h.handleLint(ctx, req, dispatch)
+}
+
+func (h *IPCHandler) handleLint(ctx context.Context, req api.LintRequest, dispatch linter.EslintPluginDispatcher) (*api.LintResponse, error) {
 
 	// Resolve the working directory WITHOUT os.Chdir: this is a long-lived,
 	// reused --api process, so mutating the process-global cwd would leak
@@ -95,13 +120,35 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 		fileContents = make(map[string]string, len(req.FileContents))
 		for k, v := range req.FileContents {
-			normalizedPath := addAllowedFile(k)
+			normalizedPath := resolveRequestPath(k)
+			// Preserve the low-level IPC contract: when Files is omitted,
+			// FileContents supplies the in-memory target set. When Files is
+			// present, FileContents is overlay-only dependency/config data and
+			// must not widen the explicit lint target set.
+			if req.Files == nil {
+				addAllowedFile(normalizedPath)
+			}
 			fileContents[normalizedPath] = v
 		}
 	}
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
+	var requestPluginRules map[string]struct{}
+	if len(req.EslintPlugins) > 0 {
+		entries := make([]rslintconfig.EslintPluginEntry, 0, len(req.EslintPlugins))
+		requestPluginRules = make(map[string]struct{})
+		for _, plugin := range req.EslintPlugins {
+			entries = append(entries, rslintconfig.EslintPluginEntry{
+				Prefix:    plugin.Prefix,
+				RuleNames: plugin.RuleNames,
+			})
+			for _, ruleName := range plugin.RuleNames {
+				requestPluginRules[plugin.Prefix+"/"+ruleName] = struct{}{}
+			}
+		}
+		rslintconfig.RegisterEslintPluginRules(entries)
+	}
 
 	// Config is the JS-resolved final config object (serialized RslintConfig).
 	// --api never reads config from disk or auto-discovers — the JS side does
@@ -126,7 +173,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		fs = utils.NewOverlayVFS(fs, fileContents)
 	}
 	var gitignoreGlobs []string
-	if len(allowedFiles) > 0 {
+	if allowedFiles != nil {
 		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobsForFiles(configDirectory, fs, allowedFiles)
 	} else {
 		gitignoreGlobs = rslintconfig.ReadGitignoreAsGlobs(configDirectory, fs, rslintconfig.ExtractConfigIgnores(rslintConfig))
@@ -134,32 +181,17 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if len(gitignoreGlobs) > 0 {
 		rslintConfig = append(rslintconfig.RslintConfig{{Ignores: gitignoreGlobs}}, rslintConfig...)
 	}
-	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(rslintConfig, configDirectory, fs)
-	if err != nil {
-		return nil, fmt.Errorf("error resolving tsconfig: %w", err)
-	}
-
-	// Create compiler host with a request-scoped parse cache: the tsconfig
-	// loop below builds one Program per tsconfig on this host, and shared
-	// dependencies (lib/node_modules d.ts, cross-package sources) parse once.
+	// Build unique tsconfig Programs with a request-scoped parse cache.
 	// The cache dies with this request — no RetainOnly sweep here, and none
-	// may be added inside the tsConfigs loop (a mid-build eviction boundary
-	// buys nothing per I7 and complicates reasoning).
+	// may be added during Program construction.
 	parseCache := utils.NewParseCache()
-	host := utils.WithParseCache(utils.CreateCompilerHost(configDirectory, fs), parseCache)
-	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          host.GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
+	programSet, err := createProgramSetForConfig(configDirectory, rslintConfig, false, fs, parseCache)
+	if err != nil {
+		return nil, err
 	}
-
-	// Create programs from all tsconfig files found in rslint config
-	programs := []*compiler.Program{}
-	for _, configFileName := range tsConfigs {
-		program, err := utils.CreateProgramLenient(false, fs, configDirectory, configFileName, host)
-		if err != nil {
-			return nil, fmt.Errorf("error creating TS program for %s: %w", configFileName, err)
-		}
-		programs = append(programs, program)
+	comparePathOptions := tspath.ComparePathsOptions{
+		CurrentDirectory:          configDirectory,
+		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
 	}
 
 	// Resolve the exact lint target set, bind targets to existing Programs, and
@@ -170,10 +202,37 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// list).
 	// The --api path never runs the type-check phase (RunLinterOptions.TypeCheck
 	// stays false), so there is no per-program type-check skip mask to build.
-	programs, typeInfoFiles, _, _, targetsByProgram, configPathBySourcePath := buildProgramsWithLintTargets(
-		programs, nil, rslintConfig, configDirectory, nil, nil, fs, allowedFiles, nil, parseCache, false,
-	)
-	fileConfigResolver := newLintConfigResolver(nil, rslintConfig, configDirectory, true, typeInfoFiles, configPathBySourcePath)
+	targetPlan, err := resolveLintTargetPlan(nil, rslintConfig, configDirectory, nil, fs, allowedFiles, nil, false)
+	if err != nil {
+		return nil, fmt.Errorf("resolve lint targets: %w", err)
+	}
+	binding, err := bindLintTargetPlan(programSet, targetPlan, configDirectory, fs, parseCache, false)
+	if err != nil {
+		return nil, err
+	}
+	programs := binding.Programs
+	typeInfoFiles := binding.TypeInfoFiles
+	targetsByProgram := binding.TargetsByProgram
+	targetPathBySourcePath := binding.TargetPathBySourcePath
+	fileConfigResolver := newLintConfigResolver(lintConfigResolverOptions{
+		Config:                     rslintConfig,
+		CurrentDirectory:           configDirectory,
+		EnforcePlugins:             true,
+		TypeInfoFiles:              typeInfoFiles,
+		TargetPathBySourcePath:     targetPathBySourcePath,
+		ConfigPathBySourcePath:     binding.ConfigPathBySourcePath,
+		OwnerConfigDirBySourcePath: binding.OwnerConfigDirBySourcePath,
+		FS:                         fs,
+	})
+	targetPathForSourcePath := func(sourcePath string) string {
+		if targetPath := targetPathBySourcePath[sourcePath]; targetPath != "" {
+			return targetPath
+		}
+		return sourcePath
+	}
+	responsePathForSourcePath := func(sourcePath string) string {
+		return tspath.ConvertToRelativePath(targetPathForSourcePath(sourcePath), comparePathOptions)
+	}
 
 	// Collect diagnostics and source files
 	var diagnostics []api.Diagnostic
@@ -199,7 +258,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		defer diagnosticsLock.Unlock()
 		if d.SourceFile != nil {
 			sourceFilesLock.Lock()
-			filePath := tspath.ConvertToRelativePath(d.FilePath, comparePathOptions)
+			filePath := responsePathForSourcePath(d.FilePath)
 			if sf, ok := d.SourceFile.(*ast.SourceFile); ok {
 				sourceFiles[filePath] = sf
 			}
@@ -216,7 +275,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			RuleName:  d.RuleName,
 			MessageId: d.Message.Id,
 			Message:   d.Message.Description,
-			FilePath:  tspath.ConvertToRelativePath(d.FilePath, comparePathOptions),
+			FilePath:  responsePathForSourcePath(d.FilePath),
 			Range: api.Range{
 				Start: api.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
@@ -291,25 +350,23 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 
 		// Retain the original diagnostic (byte-offset fixes + SourceFile) for the
-		// in-band fix pass, grouped by absolute file path.
+		// in-band fix pass, grouped by the caller-visible target path.
 		if req.Fix && hasFix {
-			diagnosticsByFile[d.FilePath] = append(diagnosticsByFile[d.FilePath], d)
+			targetPath := targetPathForSourcePath(d.FilePath)
+			diagnosticsByFile[targetPath] = append(diagnosticsByFile[targetPath], d)
 		}
 	}
 
-	// Target discovery already excluded default paths, global ignores, and
-	// .gitignore entries. Entry-level ignores are not target exclusions: an
-	// explicit file excluded by the only matching entry is still a lint result,
-	// but runs zero rules through GetActiveRulesForFile.
-	shouldReportLintSyntax := func(filePath string) bool {
-		return fileConfigResolver.ConfigForFile(filePath) != nil
-	}
-	for _, diagnostic := range collectTargetSyntacticDiagnostics(programs, targetsByProgram, nil, false, false, shouldReportLintSyntax) {
+	// Every selected target is parsed even when no config entry contributes
+	// rules. Global ignores were already removed during target discovery.
+	syntaxDiagnostics, syntaxErrorFiles := collectTargetSyntacticDiagnostics(programs, targetsByProgram, nil, false, false)
+	for _, diagnostic := range syntaxDiagnostics {
 		diagnosticCollector(diagnostic)
 	}
 
-	// Run linter
-	lintResult, err := linter.RunLinter(linter.RunLinterOptions{
+	// Build one run descriptor shared by native lint and plugin target
+	// collection, keeping both paths on the exact same file/rule selection.
+	runOpts := linter.RunLinterOptions{
 		Programs:       programs,
 		SingleThreaded: false, // Don't use single-threaded mode for IPC
 		Scope:          linter.FileScope{Files: allowedFiles},
@@ -318,11 +375,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		// a nil TypeChecker to rules running on files outside this set (gap /
 		// fallback files), so a non-type-aware rule with optional TypeChecker
 		// usage degrades gracefully. nil ⇒ no fallback ⇒ no gap distinction.
-		TypeInfoFiles: typeInfoFiles,
+		TypeInfoFiles:    typeInfoFiles,
+		SyntaxErrorFiles: syntaxErrorFiles,
 		GetRulesForFile: func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
-			filePath := tspath.ConvertToRelativePath(sourceFile.FileName(), comparePathOptions)
+			filePath := responsePathForSourcePath(sourceFile.FileName())
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
 
@@ -341,12 +399,83 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			// so a rule carrying a plugin prefix runs only when its plugin is
 			// declared in the config's `plugins` — matching CLI and ESLint
 			// semantics (a rule whose plugin is not declared is skipped).
-			return fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
+			activeRules := fileConfigResolver.ActiveRulesForFile(sourceFile.FileName())
+			// Plugin placeholders live in the process-global registry. Restrict
+			// them to this request's metadata so a long-lived API process cannot
+			// leak a plugin registered by an earlier lint into a later request.
+			for i, configuredRule := range activeRules {
+				if !configuredRule.IsEslintPluginRule {
+					continue
+				}
+				if _, ok := requestPluginRules[configuredRule.Name]; ok {
+					continue
+				}
+				filtered := make([]linter.ConfiguredRule, 0, len(activeRules)-1)
+				filtered = append(filtered, activeRules[:i]...)
+				for _, remainingRule := range activeRules[i+1:] {
+					if !remainingRule.IsEslintPluginRule {
+						filtered = append(filtered, remainingRule)
+						continue
+					}
+					if _, ok := requestPluginRules[remainingRule.Name]; ok {
+						filtered = append(filtered, remainingRule)
+					}
+				}
+				return filtered
+			}
+			return activeRules
 		},
 		OnDiagnostic: diagnosticCollector,
-	})
+	}
+
+	// Metadata is the feature gate: without it there is no plugin target walk,
+	// goroutine, or reverse request. With metadata, dispatch starts before the
+	// native pass and runs in parallel, matching the CLI pipeline.
+	var pluginCh <-chan []rule.RuleDiagnostic
+	var cancelPlugin context.CancelFunc
+	if len(req.EslintPlugins) > 0 {
+		wireConfigDirectory := req.ConfigDirectory
+		if wireConfigDirectory == "" {
+			wireConfigDirectory = configDirectory
+		}
+		pluginInputs := buildPluginFileInputs(runOpts, pluginConfigResolver{
+			lintResolver: fileConfigResolver,
+			originalConfigDir: map[string]string{
+				configDirectory: wireConfigDirectory,
+			},
+		})
+		for i := range pluginInputs {
+			// Programmatic lint supports in-memory overlays. Always send the exact
+			// parsed source frame instead of asking the host to re-read disk.
+			if pluginInputs[i].SourceFile != nil {
+				text := pluginInputs[i].SourceFile.Text()
+				pluginInputs[i].Text = &text
+			}
+		}
+		if len(pluginInputs) > 0 {
+			pluginCtx := ctx
+			pluginCtx, cancelPlugin = context.WithCancel(pluginCtx)
+			if dispatch == nil {
+				dispatch = func(context.Context, linter.EslintPluginLintRequest) (*linter.EslintPluginLintResult, error) {
+					return nil, errors.New("bidirectional pluginLint transport is unavailable")
+				}
+			}
+			pluginCh = dispatchPluginLintAsync(pluginCtx, dispatch, pluginInputs, req.Fix, pluginSuggestionsMode(req.Fix))
+		}
+	}
+	if cancelPlugin != nil {
+		defer cancelPlugin()
+	}
+
+	// Run native rules while community plugin batches execute in the host.
+	lintResult, err := linter.RunLinter(runOpts)
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %w", err)
+	}
+	if pluginCh != nil {
+		for _, diagnostic := range <-pluginCh {
+			diagnosticCollector(diagnostic)
+		}
 	}
 
 	if diagnostics == nil {
@@ -359,10 +488,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// worker, so under a STABLE sort this key is already fully
 	// deterministic. Keep this comparator in sync with the CLI one in
 	// cmd.go (same policy over rule.RuleDiagnostic).
-	// Known pre-existing exception: a file rooted by two tsconfigs at once
-	// is linted by both programs (duplicate diagnostics with
-	// scheduling-dependent interleaving) — neither introduced nor fixed
-	// here.
 	sort.SliceStable(diagnostics, func(i, j int) bool {
 		a, b := diagnostics[i], diagnostics[j]
 		if a.FilePath != b.FilePath {
@@ -396,9 +521,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// The files actually linted (target discovery already excluded global
 	// ignores and gitignore entries). sourceFiles was populated by
-	// GetRulesForFile for every linted file under its program-canonical
-	// relative path — the same path space as Diagnostic.FilePath — so the JS
-	// side can seed one result per entry. Sorted for a deterministic response.
+	// GetRulesForFile for every linted file under its caller-visible target
+	// path, relative to configDirectory. This keeps
+	// Diagnostic.FilePath, LintedFiles, Output, and EncodedSourceFiles in one path
+	// space even when a Program represents a requested symlink target by a
+	// different source-file path. Sorted for a deterministic response.
 	lintedFiles := make([]string, 0, len(sourceFiles))
 	for filePath := range sourceFiles {
 		lintedFiles = append(lintedFiles, filePath)
@@ -412,10 +539,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		WarningCount:        warningsCount,
 		FixableErrorCount:   fixableErrorsCount,
 		FixableWarningCount: fixableWarningsCount,
-		// FileCount mirrors len(LintedFiles) (unique linted files), not
-		// RunLinter's per-program visit count which double-counts a file rooted
-		// by two tsconfig programs — keeping it consistent with LintedFiles and
-		// the ESLint per-file result shape.
+		// FileCount mirrors the unique caller-visible LintedFiles result set.
 		FileCount:   len(lintedFiles),
 		RuleCount:   len(lintResult.ExecutedRules),
 		LintedFiles: lintedFiles,

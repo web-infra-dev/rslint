@@ -65,13 +65,14 @@ func isDirAllowed(fileName string, allowDirs []string) bool {
 
 // runProgramOptions is the internal per-program input to runLintRulesInProgram.
 type runProgramOptions struct {
-	Program         *compiler.Program
-	Scope           FileScope
-	ExcludePaths    []string
-	FileFilter      FileFilter
-	TargetFiles     []string
-	HasTargetFiles  bool
-	GetRulesForFile RuleHandler
+	Program          *compiler.Program
+	Scope            FileScope
+	ExcludePaths     []string
+	FileFilter       FileFilter
+	TargetFiles      []string
+	HasTargetFiles   bool
+	SyntaxErrorFiles map[string]struct{}
+	GetRulesForFile  RuleHandler
 	// SingleThreaded, when true, lints this program's file shards
 	// sequentially on the calling goroutine instead of in parallel workers.
 	SingleThreaded bool
@@ -119,18 +120,13 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 		return 0
 	}
 
-	// lintFile lints one file with the given checker. All per-file state
+	// lintFile lints one file with its already-resolved rules and checker. All per-file state
 	// (listener map, comments, DisableManager, rule contexts) lives inside
 	// this function, so concurrent calls for different files are independent;
 	// the checker is the only shared resource and is owned exclusively by the
 	// calling worker (see the sharding below).
-	lintFile := func(file *ast.SourceFile, chk *checker.Checker) {
+	lintFile := func(file *ast.SourceFile, rules []ConfiguredRule, chk *checker.Checker) {
 		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
-
-		rules := getRulesForFile(file)
-		if len(rules) == 0 {
-			return
-		}
 
 		comments := make([]*ast.CommentRange, 0)
 		utils.ForEachComment(&file.Node, func(comment *ast.CommentRange) { comments = append(comments, comment) }, file)
@@ -389,26 +385,52 @@ func runLintRulesInProgram(opts runProgramOptions) int32 {
 	// Correctness never depends on the grouping: each worker only uses the
 	// checker it acquired exclusively for its own shard.
 	ctx := context.Background()
+	rulesByFile := make(map[*ast.SourceFile][]ConfiguredRule, len(filesToLint))
 	checkerGroups := make(map[*checker.Checker][]*ast.SourceFile)
 	for _, file := range filesToLint {
+		if shouldSkipRulesForSyntax(opts, file, ctx) {
+			continue
+		}
+		rules := getRulesForFile(file)
+		if len(rules) == 0 {
+			continue
+		}
+		rulesByFile[file] = rules
+		if opts.TypeInfoFiles != nil {
+			if _, hasTypeInfo := opts.TypeInfoFiles[file.FileName()]; !hasTypeInfo {
+				checkerGroups[nil] = append(checkerGroups[nil], file)
+				continue
+			}
+		}
 		chk, release := opts.Program.GetTypeCheckerForFile(ctx, file)
 		release()
 		checkerGroups[chk] = append(checkerGroups[chk], file)
 	}
 
 	wg := core.NewWorkGroup(opts.SingleThreaded)
-	for _, files := range checkerGroups {
+	for chk, files := range checkerGroups {
 		wg.Queue(func() {
-			chk, done := opts.Program.GetTypeCheckerForFileExclusive(ctx, files[0])
-			defer done()
+			if chk != nil {
+				var done func()
+				chk, done = opts.Program.GetTypeCheckerForFileExclusive(ctx, files[0])
+				defer done()
+			}
 			for _, file := range files {
-				lintFile(file, chk)
+				lintFile(file, rulesByFile[file], chk)
 			}
 		})
 	}
 	wg.RunAndWait()
 
 	return lintedFileCount
+}
+
+func shouldSkipRulesForSyntax(opts runProgramOptions, file *ast.SourceFile, ctx context.Context) bool {
+	if opts.SyntaxErrorFiles != nil {
+		_, invalid := opts.SyntaxErrorFiles[file.FileName()]
+		return invalid
+	}
+	return len(opts.Program.GetSyntacticDiagnostics(ctx, file)) > 0
 }
 
 // RunLinter runs all configured lint rules across the given programs in
@@ -477,16 +499,17 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			}
 
 			programOpts := runProgramOptions{
-				Program:         program,
-				Scope:           opts.Scope,
-				ExcludePaths:    opts.ExcludePaths,
-				FileFilter:      filter,
-				TargetFiles:     targetFiles,
-				HasTargetFiles:  opts.TargetFiles != nil,
-				GetRulesForFile: trackedGetRules,
-				SingleThreaded:  opts.SingleThreaded,
-				TypeInfoFiles:   opts.TypeInfoFiles,
-				OnDiagnostic:    opts.OnDiagnostic,
+				Program:          program,
+				Scope:            opts.Scope,
+				ExcludePaths:     opts.ExcludePaths,
+				FileFilter:       filter,
+				TargetFiles:      targetFiles,
+				HasTargetFiles:   opts.TargetFiles != nil,
+				GetRulesForFile:  trackedGetRules,
+				SyntaxErrorFiles: opts.SyntaxErrorFiles,
+				SingleThreaded:   opts.SingleThreaded,
+				TypeInfoFiles:    opts.TypeInfoFiles,
+				OnDiagnostic:     opts.OnDiagnostic,
 			}
 			wg.Queue(func() {
 				n := runLintRulesInProgram(programOpts)
@@ -502,7 +525,6 @@ func RunLinter(opts RunLinterOptions) (*LintResult, error) {
 			Programs:       opts.Programs,
 			Skip:           opts.SkipTypeCheckPrograms,
 			SingleThreaded: opts.SingleThreaded,
-			TypeInfoFiles:  opts.TypeInfoFiles,
 			OnDiagnostic:   opts.OnDiagnostic,
 		})
 	}
@@ -625,14 +647,21 @@ func CollectLintTargets(opts RunLinterOptions) []LintTarget {
 			filter = composeOwnedFilter(perProgramFilter, buildOwnedFileSet(program))
 		}
 		files := collectFilesToLint(runProgramOptions{
-			Program:        program,
-			Scope:          opts.Scope,
-			ExcludePaths:   excludePaths,
-			FileFilter:     filter,
-			TargetFiles:    targetFiles,
-			HasTargetFiles: opts.TargetFiles != nil,
+			Program:          program,
+			Scope:            opts.Scope,
+			ExcludePaths:     excludePaths,
+			FileFilter:       filter,
+			TargetFiles:      targetFiles,
+			HasTargetFiles:   opts.TargetFiles != nil,
+			SyntaxErrorFiles: opts.SyntaxErrorFiles,
 		})
 		for _, file := range files {
+			if shouldSkipRulesForSyntax(runProgramOptions{
+				Program:          program,
+				SyntaxErrorFiles: opts.SyntaxErrorFiles,
+			}, file, context.Background()) {
+				continue
+			}
 			rules := opts.GetRulesForFile(file)
 			if len(rules) == 0 {
 				continue
@@ -652,11 +681,16 @@ func LintSingleFile(opts LintSingleFileOptions) {
 	if opts.OnDiagnostic == nil {
 		opts.OnDiagnostic = func(rule.RuleDiagnostic) {}
 	}
+	var typeInfoFiles map[string]struct{}
+	if !opts.HasTypeInfo {
+		typeInfoFiles = map[string]struct{}{}
+	}
 	runLintRulesInProgram(runProgramOptions{
 		Program:         opts.Program,
 		Scope:           FileScope{Files: []string{opts.File}},
 		ExcludePaths:    opts.ExcludePaths,
 		GetRulesForFile: opts.GetRulesForFile,
+		TypeInfoFiles:   typeInfoFiles,
 		// A single file is a single shard — run it on the calling goroutine
 		// instead of spawning a worker.
 		SingleThreaded: true,

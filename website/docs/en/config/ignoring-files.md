@@ -4,7 +4,7 @@
 
 - **Type:** `string[]`
 
-Glob patterns for files to exclude. An entry with **only** `ignores` (no other fields) acts as a global ignore — matching files are excluded from all rules.
+Glob patterns for files to exclude. An entry containing **only** `ignores` and an optional `name` acts as a global ignore: matching files are removed from the lint target set. An entry-level ignore only prevents that entry from contributing rules and options; it does not prevent another entry or the zero-rule syntax pass from processing the target.
 
 ```ts
 // Global ignore entry

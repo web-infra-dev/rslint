@@ -1,13 +1,13 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import path from 'node:path';
+import { findFixAllAction, requestFixAll } from '../suite/fixall-helpers';
 
 // Type-aware rule scope when parserOptions uses `projectService: true`
 // (the shape `ts.configs.recommended` exports) without an explicit
 // `project`. The LSP and CLI must agree: only files covered by the
 // fallback tsconfig's `include` get type-aware rules, AND a nested
-// config that has no tsconfig must not leak allow-all onto sibling
-// configs' files.
+// config that has no tsconfig must not enable type-aware rules.
 //
 // Fixture: fixtures-project-service-scope
 //   - rslint.config.js            — parserOptions.projectService: true (no explicit project).
@@ -20,11 +20,9 @@ import path from 'node:path';
 //                                    Contains a `console.log` so the marker rule triggers.
 //   - template-nested/rslint.config.js — nested config, also projectService: true,
 //                                    but the dir has NO tsconfig.json.
-//   - template-nested/orphan.ts   — under the nested config. Both CLI and LSP
-//                                    treat this as "has type info" (CLI via the
-//                                    scan-directory fallback Program, LSP via
-//                                    allow-all for the nested config's scope),
-//                                    so no-unused-vars SHOULD fire.
+//   - template-nested/orphan.ts   — under the nested config. no-unused-vars
+//                                    should NOT fire, while native no-var should
+//                                    diagnose and participate in fixAll.
 suite('rslint projectService type-aware scope', function () {
   this.timeout(60000);
 
@@ -108,31 +106,42 @@ suite('rslint projectService type-aware scope', function () {
     );
   });
 
-  test('template-nested/orphan.ts (nested config without tsconfig) — no-unused-vars SHOULD fire, matching CLI', async () => {
-    // Alignment check with CLI: when the nearest rslint config has no
-    // resolvable tsconfig, the CLI builds a scan-directory AllowJs Program
-    // and runs type-aware rules; the LSP falls through to allow-all scoped
-    // to that config. Both engines must produce the same no-unused-vars
-    // diagnostics on this file.
+  test('template-nested/orphan.ts (nested config without tsconfig) filters type-aware rules', async () => {
     const doc = await vscode.workspace.openTextDocument(
       path.join(workspaceRoot(), 'template-nested/orphan.ts'),
     );
     await vscode.window.showTextDocument(doc);
 
     const diagnostics = await waitForDiagnostics(doc, (diags) =>
-      rslintDiagnostics(diags).some((d) =>
-        d.message.includes('no-unused-vars'),
-      ),
+      rslintDiagnostics(diags).some((d) => d.message.includes('no-var')),
     );
 
     const rslintDiags = rslintDiagnostics(diagnostics);
-    const unusedVarDiags = rslintDiags.filter((d) =>
-      d.message.includes('no-unused-vars'),
+    assert.ok(
+      rslintDiags.some((d) => d.message.includes('no-var')),
+      `Expected native no-var marker. Got: ${rslintDiags.map((d) => d.message).join(' | ')}`,
     );
-    assert.strictEqual(
-      unusedVarDiags.length,
-      3,
-      `Expected 3 no-unused-vars diagnostics (command/args/options) to match CLI output. Got ${unusedVarDiags.length}: ${unusedVarDiags.map((d) => d.message).join(' | ')}`,
+    assert.ok(
+      !rslintDiags.some((d) => d.message.includes('no-unused-vars')),
+      `no-unused-vars should not run without a resolved tsconfig. Got: ${rslintDiags.map((d) => d.message).join(' | ')}`,
+    );
+  });
+
+  test('native fixAll remains available without a resolved tsconfig', async () => {
+    const doc = await vscode.workspace.openTextDocument(
+      path.join(workspaceRoot(), 'template-nested/orphan.ts'),
+    );
+    await vscode.window.showTextDocument(doc);
+    await waitForDiagnostics(doc, (diags) =>
+      rslintDiagnostics(diags).some((d) => d.message.includes('no-var')),
+    );
+
+    const fixAll = findFixAllAction(await requestFixAll(doc));
+    const edits = fixAll?.edit?.get(doc.uri);
+    assert.ok(edits && edits.length > 0, 'Expected a native fixAll edit');
+    assert.ok(
+      edits.some((edit) => edit.newText.includes('let output = command;')),
+      `Expected no-var fix in fixAll edit. Got: ${edits.map((edit) => edit.newText).join(' | ')}`,
     );
   });
 });

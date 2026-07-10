@@ -266,16 +266,18 @@ describe('filterConfigsByParentIgnores', () => {
     expect(dirs(result)).toEqual([P()]);
   });
 
-  test('empty array-form or object-form plugins still counts as a global ignore', () => {
-    // An ignores-only entry stays "global" even with an empty `plugins`. Since
-    // `plugins` is a union (string[] XOR object), isGlobalIgnoreEntry must treat
-    // both an empty array AND an empty object as "no plugins" — otherwise the
-    // entry would lose global-ignore status and stop blocking nested discovery.
-    for (const emptyPlugins of [{ plugins: [] }, { plugins: {} }]) {
+  test('explicit empty config fields make ignores entry-level', () => {
+    for (const emptyField of [
+      { rules: {} },
+      { plugins: [] },
+      { plugins: {} },
+      { settings: {} },
+      { languageOptions: {} },
+    ]) {
       const result = filterConfigsByParentIgnores([
         cfg(
           P(),
-          { ignores: ['__tests__/**'], ...emptyPlugins },
+          { ignores: ['__tests__/**'], ...emptyField },
           ruleEntry(['**/*.ts'], {}),
         ),
         cfg(
@@ -283,8 +285,8 @@ describe('filterConfigsByParentIgnores', () => {
           ruleEntry(['**/*.ts'], { 'no-console': 'error' }),
         ),
       ]);
-      expect(result).toHaveLength(1);
-      expect(dirs(result)).toEqual([P()]);
+      expect(result).toHaveLength(2);
+      expect(dirs(result)).toContain(P('__tests__', 'fixtures'));
     }
   });
 
@@ -1058,7 +1060,7 @@ describe('findJSConfigsInDir', () => {
     }
   });
 
-  test('follows symlinked directories like tinyglobby', async () => {
+  test('does not follow symlinked directories', async () => {
     const tmp = createTempDir();
     const realDir = path.join(tmp, 'real');
     const linkDir = path.join(tmp, 'link');
@@ -1071,12 +1073,7 @@ describe('findJSConfigsInDir', () => {
       fs.symlinkSync(realDir, linkDir, 'dir');
 
       const result = await findJSConfigsInDir(tmp);
-      expect(new Set(result)).toEqual(
-        new Set([
-          path.join(realDir, 'rslint.config.js'),
-          path.join(linkDir, 'rslint.config.js'),
-        ]),
-      );
+      expect(result).toEqual([path.join(realDir, 'rslint.config.js')]);
     } finally {
       cleanup(tmp);
     }

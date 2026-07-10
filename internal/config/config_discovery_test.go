@@ -143,6 +143,23 @@ func TestFindNearestConfig_SimilarPrefixNoFalseMatch(t *testing.T) {
 	}
 }
 
+func TestFindNearestConfigWithCaseSensitivity_CaseInsensitiveFilesystem(t *testing.T) {
+	configMap := map[string]RslintConfig{
+		"C:/Repo":              {{Rules: Rules{"root": "error"}}},
+		"C:/Repo/Packages/App": {{Rules: Rules{"app": "error"}}},
+	}
+
+	dir, cfg := FindNearestConfigWithCaseSensitivity("c:/repo/packages/app/src/a.ts", configMap, false)
+	if dir != "C:/Repo/Packages/App" || cfg == nil {
+		t.Fatalf("expected case-insensitive nearest config, got dir=%q cfg=%v", dir, cfg)
+	}
+
+	dir, cfg = FindNearestConfigWithCaseSensitivity("c:/repo/packages/app/src/a.ts", configMap, true)
+	if dir != "" || cfg != nil {
+		t.Fatalf("case-sensitive lookup should not match different casing, got dir=%q cfg=%v", dir, cfg)
+	}
+}
+
 func TestFindNearestConfig_NestedConfigDirs(t *testing.T) {
 	// /project/src and /project/src/components both have configs.
 	// File in components should pick the deeper config.

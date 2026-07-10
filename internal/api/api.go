@@ -1,8 +1,6 @@
-// Package api is the single-direction programmatic IPC service used by
-// `--api` mode (consumed by packages/rslint-wasm and packages/rslint-api).
-// The peer (a Node parent or a wasm host) sends lint/getAstInfo
-// requests; this service answers them. It does NOT dispatch tasks back to
-// the peer — that bidirectional path is internal/ipc.Channel.
+// Package api is the programmatic IPC service used by `--api` mode (consumed
+// by packages/rslint-wasm and packages/rslint-api). Most requests flow from
+// the host to Go; lint may also dispatch plugin work back to a capable host.
 //
 // Framing is shared with internal/ipc (the single source of the
 // length-prefixed-JSON wire format); this package only owns the
@@ -10,13 +8,15 @@
 package api
 
 import (
-	"bufio"
+	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/api/encoder"
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -54,6 +54,8 @@ const (
 	KindLint ipc.MessageKind = "lint"
 	// KindGetAstInfo is sent from JS to Go to request AST info at a position.
 	KindGetAstInfo ipc.MessageKind = "getAstInfo"
+	// KindPluginLint is sent from Go to JS to run community ESLint plugin rules.
+	KindPluginLint ipc.MessageKind = "pluginLint"
 )
 
 // Version is the IPC protocol version.
@@ -85,12 +87,23 @@ type LintRequest struct {
 	ConfigDirectory  string            `json:"configDirectory,omitempty"`
 	WorkingDirectory string            `json:"workingDirectory,omitempty"`
 	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	// EslintPlugins carries the names Go must register as Node-dispatched rule
+	// placeholders. The live plugin implementations remain in the JS host.
+	EslintPlugins []EslintPluginEntry `json:"eslintPlugins,omitempty"`
 	// Fix, when true, applies rule auto-fixes in-band and returns the fixed
 	// source per file in LintResponse.Output (ESLint's `fix: true`). The fix is
 	// computed but NOT written to disk — the JS side (Rslint.outputFixes) writes
-	// it. Remaining (unfixed) diagnostics are still reported.
+	// it. Diagnostics describe the original input; callers can lint Output again
+	// when they need post-fix diagnostics.
 	Fix                       bool `json:"fix,omitempty"`
 	IncludeEncodedSourceFiles bool `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
+}
+
+// EslintPluginEntry is the wire metadata for one object-form ESLint plugin.
+// Prefix is the config mount name; RuleNames are names relative to the prefix.
+type EslintPluginEntry struct {
+	Prefix    string   `json:"prefix"`
+	RuleNames []string `json:"ruleNames"`
 }
 type ByteArray []byte
 
@@ -108,11 +121,10 @@ type LintResponse struct {
 	FileCount           int `json:"fileCount"`
 	RuleCount           int `json:"ruleCount"`
 	// LintedFiles lists the files actually linted (config `ignores` excluded),
-	// each the program's canonical path relative to the config directory — the
-	// same path space as Diagnostic.FilePath. The JS side seeds one LintResult
-	// per entry, so a glob match the config ignores yields no phantom result,
-	// and a symlinked glob path can't duplicate a result. Present for lintFiles;
-	// lintText seeds from its own explicit path instead.
+	// using each caller-visible target path relative to the config directory.
+	// This is the same path space as Diagnostic.FilePath and Output. The JS side
+	// seeds one LintResult per entry, so ignored glob matches yield no phantom
+	// results. Present for lintFiles; lintText seeds its own explicit path.
 	//
 	// MUST NOT be omitempty: an all-ignored lint produces an empty (non-nil)
 	// slice that has to serialize as `[]`, distinct from an old binary that
@@ -175,125 +187,285 @@ type Handler interface {
 	HandleGetAstInfo(req GetAstInfoRequest) (*GetAstInfoResponse, error)
 }
 
-// Service manages the single-direction IPC communication for `--api` mode.
-// Framing is delegated to internal/ipc (the shared wire format).
+// Requester is the reverse-RPC capability exposed to a bidirectional lint
+// handler. ipc.Channel implements it directly.
+type Requester interface {
+	SendRequest(ctx context.Context, kind ipc.MessageKind, payload any) (*ipc.Message, error)
+}
+
+// BidirectionalHandler is an optional extension to Handler. Existing handlers
+// continue to receive HandleLint; handlers that implement this interface also
+// receive the request context and reverse-RPC transport.
+type BidirectionalHandler interface {
+	HandleLintWithContext(ctx context.Context, req LintRequest, requester Requester) (*LintResponse, error)
+}
+
+// Service manages bidirectional IPC communication for `--api` mode. Framing,
+// request multiplexing, and the continuously running read loop are delegated
+// to internal/ipc.Channel.
 type Service struct {
-	reader  *bufio.Reader
-	writer  io.Writer
 	handler Handler
-	writeMu sync.Mutex
+	channel *ipc.Channel
+	reader  *observedReader
+
+	// Preserve the old service's one-at-a-time inbound handling. Channel keeps
+	// reading while this lock is held, so reverse responses are still routed and
+	// a lint handler can synchronously await pluginLint without deadlocking.
+	handlerMu sync.Mutex
+
+	exitMu        sync.Mutex
+	exitRequestID int
+	exitRequested bool
+	exitAck       chan struct{}
+	exitAckOnce   sync.Once
 }
 
 // NewService creates a new IPC service
 func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
-	return &Service{
-		reader:  bufio.NewReader(reader),
-		writer:  writer,
+	s := &Service{
 		handler: handler,
+		reader:  &observedReader{reader: reader},
+		exitAck: make(chan struct{}),
 	}
+	observedWriter := &frameObserverWriter{
+		writer:        writer,
+		remaining:     -1,
+		shouldCapture: s.exitHasBeenRequested,
+		onFrame:       s.observeOutboundFrame,
+	}
+	s.channel = ipc.NewChannel(s.reader, observedWriter)
+	s.channel.SetInboundHandler(s.handleInbound)
+	return s
 }
 
 // Start starts the IPC service
 func (s *Service) Start() error {
-	for {
-		msg, err := ipc.ReadFrame(s.reader)
+	s.channel.Start()
+	select {
+	case <-s.exitAck:
+		// The complete exit response frame has reached the underlying writer.
+		// Closing earlier can race Channel's asynchronous inbound handler and
+		// suppress the ack that legacy Node/browser clients await.
+		_ = s.channel.Close()
+		return nil
+	case <-s.channel.Done():
+		err := s.reader.Err()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
 		if err != nil {
-			if errors.Is(err, io.EOF) {
-				return nil
-			}
 			return err
 		}
+		return errors.New("api: IPC transport closed unexpectedly")
+	}
+}
 
-		switch msg.Kind {
-		case ipc.KindHandshake:
-			s.handleHandshake(msg)
-		case KindLint:
-			s.handleLint(msg)
-		case KindGetAstInfo:
-			s.handleGetAstInfo(msg)
-		case ipc.KindExit:
-			s.handleExit(msg)
-			return nil
-		default:
-			s.sendError(msg.ID, fmt.Sprintf("unknown message kind: %s", msg.Kind))
+func (s *Service) handleInbound(ctx context.Context, msg *ipc.Message) (any, error) {
+	s.handlerMu.Lock()
+	defer s.handlerMu.Unlock()
+
+	switch msg.Kind {
+	case ipc.KindHandshake:
+		var req HandshakeRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to parse handshake request: %v", err)
+		}
+		return HandshakeResponse{Version: Version, OK: true}, nil
+
+	case KindLint:
+		var req LintRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to parse lint request: %v", err)
+		}
+		if handler, ok := s.handler.(BidirectionalHandler); ok {
+			return handler.HandleLintWithContext(ctx, req, s.channel)
+		}
+		return s.handler.HandleLint(req)
+
+	case KindGetAstInfo:
+		var req GetAstInfoRequest
+		if err := msg.Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to parse get ast info request: %v", err)
+		}
+		return s.handler.HandleGetAstInfo(req)
+
+	case ipc.KindExit:
+		s.exitMu.Lock()
+		if !s.exitRequested {
+			s.exitRequested = true
+			s.exitRequestID = msg.ID
+		}
+		s.exitMu.Unlock()
+		return nil, nil
+
+	default:
+		return nil, fmt.Errorf("unknown message kind: %s", msg.Kind)
+	}
+}
+
+func (s *Service) observeOutboundFrame(msg *ipc.Message) {
+	if msg.Kind != ipc.KindResponse && msg.Kind != ipc.KindError {
+		return
+	}
+	s.exitMu.Lock()
+	isExitAck := s.exitRequested && msg.ID == s.exitRequestID
+	s.exitMu.Unlock()
+	if isExitAck {
+		s.exitAckOnce.Do(func() { close(s.exitAck) })
+	}
+}
+
+func (s *Service) exitHasBeenRequested() bool {
+	s.exitMu.Lock()
+	defer s.exitMu.Unlock()
+	return s.exitRequested
+}
+
+// observedReader records the terminal read error so Service.Start can retain
+// the legacy clean-EOF behavior while Channel owns frame decoding. It tracks
+// only frame byte counts (never payload copies), allowing it to distinguish a
+// clean frame-boundary EOF from a truncated frame.
+type observedReader struct {
+	reader    io.Reader
+	mu        sync.Mutex
+	err       error
+	header    [4]byte
+	headerLen int
+	remaining uint32
+	inBody    bool
+}
+
+func (r *observedReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	r.mu.Lock()
+	r.observe(p[:n])
+	if err != nil {
+		if errors.Is(err, io.EOF) && (r.headerLen != 0 || r.inBody) {
+			r.err = io.ErrUnexpectedEOF
+		} else {
+			r.err = err
+		}
+	}
+	r.mu.Unlock()
+	return n, err
+}
+
+func (r *observedReader) observe(data []byte) {
+	for len(data) > 0 {
+		if !r.inBody {
+			n := min(4-r.headerLen, len(data))
+			copy(r.header[r.headerLen:], data[:n])
+			r.headerLen += n
+			data = data[n:]
+			if r.headerLen < 4 {
+				continue
+			}
+			r.remaining = binary.LittleEndian.Uint32(r.header[:])
+			r.headerLen = 0
+			if r.remaining == 0 {
+				continue
+			}
+			r.inBody = true
+		}
+
+		n := len(data)
+		if uint64(n) > uint64(r.remaining) {
+			n = int(r.remaining)
+		}
+		r.remaining -= uint32(n)
+		data = data[n:]
+		if r.remaining == 0 {
+			r.inBody = false
 		}
 	}
 }
 
-// handleHandshake handles handshake messages
-func (s *Service) handleHandshake(msg *ipc.Message) {
-	var req HandshakeRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse handshake request: %v", err))
-		return
-	}
-
-	s.sendResponse(msg.ID, HandshakeResponse{
-		Version: Version,
-		OK:      true,
-	})
+func (r *observedReader) Err() error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.err
 }
 
-// Handle exit message
-func (s *Service) handleExit(msg *ipc.Message) {
-	s.sendResponse(msg.ID, nil)
+// frameObserverWriter observes complete outbound frames after their bytes have
+// been accepted by the real writer. It normally tracks lengths only; after an
+// exit request arrives it captures response bodies until the matching ack is
+// seen. Channel serializes all calls into it.
+type frameObserverWriter struct {
+	writer        io.Writer
+	shouldCapture func() bool
+	onFrame       func(*ipc.Message)
+	mu            sync.Mutex
+	header        [4]byte
+	headerLen     int
+	remaining     int
+	capture       bool
+	body          []byte
 }
 
-// handleLint handles lint messages
-func (s *Service) handleLint(msg *ipc.Message) {
-	var req LintRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse lint request: %v", err))
-		return
+func (w *frameObserverWriter) Write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	if n != len(p) && err == nil {
+		err = io.ErrShortWrite
 	}
-	resp, err := s.handler.HandleLint(req)
-	if err != nil {
-		s.sendError(msg.ID, err.Error())
-		return
+	if n <= 0 {
+		return n, err
 	}
 
-	s.sendResponse(msg.ID, resp)
+	w.mu.Lock()
+	var completed []*ipc.Message
+	data := p[:n]
+	for len(data) > 0 {
+		if w.remaining < 0 {
+			headerBytes := min(4-w.headerLen, len(data))
+			copy(w.header[w.headerLen:], data[:headerBytes])
+			w.headerLen += headerBytes
+			data = data[headerBytes:]
+			if w.headerLen < 4 {
+				continue
+			}
+			w.remaining = int(binary.LittleEndian.Uint32(w.header[:]))
+			w.headerLen = 0
+			w.capture = w.shouldCapture()
+			if w.capture {
+				w.body = make([]byte, 0, w.remaining)
+			}
+		}
+
+		bodyBytes := min(w.remaining, len(data))
+		if w.capture {
+			w.body = append(w.body, data[:bodyBytes]...)
+		}
+		w.remaining -= bodyBytes
+		data = data[bodyBytes:]
+		if w.remaining == 0 {
+			if w.capture {
+				var msg ipc.Message
+				if json.Unmarshal(w.body, &msg) == nil {
+					completed = append(completed, &msg)
+				}
+			}
+			w.remaining = -1
+			w.capture = false
+			w.body = nil
+		}
+	}
+	w.mu.Unlock()
+
+	if err == nil {
+		for _, msg := range completed {
+			w.onFrame(msg)
+		}
+	}
+	return n, err
 }
 
-// handleGetAstInfo handles get AST info messages
-func (s *Service) handleGetAstInfo(msg *ipc.Message) {
-	var req GetAstInfoRequest
-	if err := msg.Decode(&req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse get ast info request: %v", err))
-		return
+// Preserve Channel's write-deadline support when the underlying writer is an
+// *os.File or net.Conn. Channel intentionally ignores unsupported deadlines.
+func (w *frameObserverWriter) SetWriteDeadline(deadline time.Time) error {
+	if writer, ok := w.writer.(interface{ SetWriteDeadline(time.Time) error }); ok {
+		return writer.SetWriteDeadline(deadline)
 	}
-
-	resp, err := s.handler.HandleGetAstInfo(req)
-	if err != nil {
-		s.sendError(msg.ID, err.Error())
-		return
-	}
-
-	s.sendResponse(msg.ID, resp)
-}
-
-// sendResponse sends a response message
-func (s *Service) sendResponse(id int, data interface{}) {
-	msg, err := ipc.NewMessage(ipc.KindResponse, id, data)
-	if err != nil {
-		s.sendError(id, fmt.Sprintf("failed to marshal response: %v", err))
-		return
-	}
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	if err := ipc.WriteFrame(s.writer, msg); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to send response: %v\n", err)
-	}
-}
-
-// sendError sends an error message
-func (s *Service) sendError(id int, message string) {
-	msg, _ := ipc.NewMessage(ipc.KindError, id, ipc.ErrorResponseData{Message: message})
-	s.writeMu.Lock()
-	defer s.writeMu.Unlock()
-	if err := ipc.WriteFrame(s.writer, msg); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to send error: %v\n", err)
-	}
+	return nil
 }
 
 // IsIPCMode returns true if the process is in IPC mode

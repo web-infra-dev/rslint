@@ -173,8 +173,9 @@ type Server struct {
 	// For the JS-config path (multi-config monorepo) use tsConfigPathsByConfig
 	// which keys per-config-directory so a nested config with no tsconfig
 	// does not disable filtering for files under other configs.
-	tsConfigPaths         []string
-	tsConfigPathsByConfig map[string][]string                           // configDirectory URI -> resolved tsconfig paths (nil value = allow-all for that config's files)
+	tsConfigPaths []string
+	// A nil map value means the corresponding config has no type information.
+	tsConfigPathsByConfig map[string][]string
 	documents             map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics           map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
@@ -194,12 +195,17 @@ type Server struct {
 	// nil until the first config update installs it. Safe to call from a
 	// goroutine (it only touches sendRequest, which is goroutine-safe).
 	eslintPluginDispatch linter.EslintPluginDispatcher
+	// eslintPluginConfigGeneration identifies the JS config and Node worker
+	// generation that must serve reverse plugin-lint requests. It changes only
+	// on the serialized configUpdate path and is captured before dispatching
+	// work to a goroutine.
+	eslintPluginConfigGeneration string
 
 	// fixAllNativeLint, when non-nil, overrides the per-pass native lint used by
 	// computeFixAllContent. Production leaves it nil (defaultFixAllNativeLint is
-	// used, driving the real TS session); tests inject a mock to exercise the
+	// used, driving an isolated overlay Program); tests inject a mock to exercise the
 	// plugin-fix fold loop without spinning up a language service.
-	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) ([]rule.RuleDiagnostic, error)
+	fixAllNativeLint func(ctx context.Context, uri lsproto.DocumentUri, pass int, content string, rslintConfig config.RslintConfig, configCwd string, isJSConfig bool, tsConfigPaths []string) (lintPassResult, error)
 
 	// pluginReverseTimeout bounds each eslint-plugin reverse request to the
 	// client (rslint/pluginLint) on BOTH paths: source.fixAll (summed across
@@ -556,11 +562,6 @@ func (s *Server) writeLoop(ctx context.Context) error {
 
 func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params any) (any, error) {
 	id := jsonrpc.NewIDString(fmt.Sprintf("ts%d", s.clientSeq.Add(1)))
-	// Hand the minted id to a caller that registered a sink (dispatchPluginLint),
-	// so a later supersede can $/cancelRequest this exact reverse request.
-	if sink, ok := ctx.Value(pluginReqIDSinkKey{}).(func(*jsonrpc.ID)); ok {
-		sink(id)
-	}
 	req := &lsproto.RequestMessage{
 		ID:     id,
 		Method: method,
@@ -572,7 +573,19 @@ func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params 
 	s.pendingServerRequests[*id] = responseChan
 	s.pendingServerRequestsMu.Unlock()
 
-	s.outgoingQueue <- req.Message()
+	select {
+	case s.outgoingQueue <- req.Message():
+		// Expose the id only after the request is registered and queued. Any
+		// subsequent $/cancelRequest is therefore ordered after the request.
+		if sink, ok := ctx.Value(pluginReqIDSinkKey{}).(func(*jsonrpc.ID)); ok {
+			sink(id)
+		}
+	case <-ctx.Done():
+		s.pendingServerRequestsMu.Lock()
+		delete(s.pendingServerRequests, *id)
+		s.pendingServerRequestsMu.Unlock()
+		return nil, ctx.Err()
+	}
 
 	select {
 	case <-ctx.Done():
@@ -673,10 +686,29 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
 
-	// Custom rslint notification
+	// Custom rslint config update. New clients send a request so the Node side
+	// can commit its staged plugin host only after Go accepts the same config
+	// generation. Notifications remain supported for older clients.
 	handlers[lsproto.Method("rslint/configUpdate")] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
 		if err := s.handleConfigUpdate(ctx, req.Params); err != nil {
-			log.Printf("[rslint] Error handling config update: %v", err)
+			if req.ID == nil {
+				log.Printf("[rslint] Error handling config update: %v", err)
+				return nil
+			}
+			return err
+		}
+		if req.ID != nil {
+			s.sendResult(req.ID, struct {
+				Generation string `json:"generation"`
+			}{Generation: s.eslintPluginConfigGeneration})
+		}
+		return nil
+	}
+	handlers[lsproto.Method("rslint/configCapabilities")] = func(s *Server, _ context.Context, req *lsproto.RequestMessage) error {
+		if req.ID != nil {
+			s.sendResult(req.ID, struct {
+				TransactionVersion int `json:"transactionVersion"`
+			}{TransactionVersion: 1})
 		}
 		return nil
 	}

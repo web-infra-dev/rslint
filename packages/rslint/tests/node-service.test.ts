@@ -20,6 +20,41 @@ function childOf(svc: NodeRslintService): { kill: (sig?: string) => void } {
 }
 
 suite('NodeRslintService reject-all-pending on crash/terminate', () => {
+  test('answers an inbound request without confusing a colliding outbound id', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    svc.setInboundHandler(async (message) => ({
+      kind: message.kind,
+      file: message.data.files[0].path,
+    }));
+    await expect(svc.sendMessage('reverse', {})).resolves.toEqual({
+      reverseKind: 'response',
+      reverseData: { kind: 'pluginLint', file: 'probe.ts' },
+    });
+    svc.terminate();
+  });
+
+  test('returns an error frame when an inbound handler throws', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    svc.setInboundHandler(() => {
+      throw new Error('plugin host failed');
+    });
+    await expect(svc.sendMessage('reverse', {})).resolves.toEqual({
+      reverseKind: 'error',
+      reverseData: { message: 'plugin host failed' },
+    });
+    svc.terminate();
+  });
+
+  test('returns a clear error frame when no inbound handler is installed', async () => {
+    const svc = new NodeRslintService({ rslintPath: FAKE });
+    const result = await svc.sendMessage('reverse', {});
+    expect(result.reverseKind).toBe('error');
+    expect(result.reverseData.message).toMatch(
+      /no inbound handler.*pluginLint/,
+    );
+    svc.terminate();
+  });
+
   test('rejects in-flight requests when the process crashes', async () => {
     const svc = new NodeRslintService({ rslintPath: FAKE });
     const inflight = svc.sendMessage('lint', {}); // never answered → in-flight

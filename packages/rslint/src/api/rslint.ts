@@ -13,13 +13,27 @@
  * service; `close()` tears it down (mirrors RSLintService.close()).
  */
 import path from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
-import { glob } from 'tinyglobby';
+import { lstat, readFile, stat, writeFile } from 'node:fs/promises';
+import { glob, isDynamicPattern } from 'tinyglobby';
 
 import { RSLintService } from '../service/service.js';
 import { NodeRslintService } from '../internal/node.js';
-import { loadConfigFile, normalizeConfig } from '../config/config-loader.js';
-import { findJSConfigUp } from '../utils/config-discovery.js';
+import {
+  collectPluginMeta,
+  loadConfigFile,
+  normalizeConfig,
+} from '../config/config-loader.js';
+import {
+  discoverConfigs,
+  filterConfigsByParentIgnores,
+  findJSConfig,
+  type ConfigEntry,
+} from '../utils/config-discovery.js';
+import {
+  AncestorPathIndex,
+  createCachedAncestorFinder,
+  nativePathIdentity,
+} from './path-identity.js';
 import type { RslintConfigEntry } from '../config/define-config.js';
 import type { Diagnostic, Fix, LintResponse } from '../types.js';
 
@@ -89,6 +103,238 @@ export interface LintResult {
   output?: string; // present only when fix:true changed the file
 }
 
+interface ResolvedConfig {
+  config: Record<string, unknown>[];
+  configPath?: string;
+  configDirectory: string;
+  routingKey: string;
+}
+
+interface PluginLintHost {
+  lint(request: unknown): Promise<unknown>;
+  shutdown(): Promise<void>;
+}
+
+interface PluginLintSession {
+  host: PluginLintHost;
+  eslintPlugins: Array<{ prefix: string; ruleNames: string[] }>;
+}
+
+type CreatePluginLintHost = (
+  configs: Array<{ configPath: string; configDirectory: string }>,
+  onLog?: (record: { level: string; source: string; text: string }) => void,
+) => Promise<PluginLintHost>;
+
+let pluginHostFactoryPromise: Promise<CreatePluginLintHost> | undefined;
+
+function loadPluginHostFactory(): Promise<CreatePluginLintHost> {
+  pluginHostFactoryPromise ??= (async () => {
+    // A package self-reference resolves to src under the test condition and to
+    // dist/eslint-plugin in published builds. Keep it runtime-only: the library
+    // declaration build deliberately excludes the worker implementation.
+    const pluginEntry: string = '@rslint/core/eslint-plugin';
+    const module: { createPluginLintHost: CreatePluginLintHost } = await import(
+      /* webpackIgnore: true */ pluginEntry
+    );
+    return module.createPluginLintHost;
+  })();
+  return pluginHostFactoryPromise;
+}
+
+interface LoadedConfigCandidate {
+  status: 'loaded';
+  configPath: string;
+  configDirectory: string;
+  baseConfig: Record<string, unknown>[];
+  resolved: ResolvedConfig;
+}
+
+interface FailedConfigCandidate {
+  status: 'failed';
+  configPath: string;
+  configDirectory: string;
+  error: Error;
+}
+
+type ConfigCandidate = LoadedConfigCandidate | FailedConfigCandidate;
+
+interface ClassifiedLintPatterns {
+  literalFilePatterns: string[];
+  scanDirectories: string[];
+}
+
+function rebaseRelativePath(
+  value: string,
+  fromDirectory: string,
+  toDirectory: string,
+  allowNegation: boolean,
+): string {
+  const negated = allowNegation && value.startsWith('!');
+  const relativePath = negated ? value.slice(1) : value;
+  if (!relativePath || path.isAbsolute(relativePath)) return value;
+
+  const prefix = path
+    .relative(toDirectory, fromDirectory)
+    .split(path.sep)
+    .join('/');
+  if (!prefix) return value;
+
+  const normalizedPath = relativePath.split(path.sep).join('/');
+  const rebased = path.posix.normalize(path.posix.join(prefix, normalizedPath));
+  return negated ? `!${rebased}` : rebased;
+}
+
+function rebaseConfigPaths(
+  config: Record<string, unknown>[],
+  fromDirectory: string,
+  toDirectory: string,
+): Record<string, unknown>[] {
+  if (nativePathIdentity.equals(fromDirectory, toDirectory)) return config;
+
+  return config.map((entry) => {
+    const rebased: Record<string, unknown> = { ...entry };
+
+    if (Array.isArray(entry.files)) {
+      rebased.files = entry.files.map((selector) => {
+        if (Array.isArray(selector)) {
+          return selector.map((pattern) =>
+            rebaseRelativePath(
+              pattern as string,
+              fromDirectory,
+              toDirectory,
+              true,
+            ),
+          );
+        }
+        return rebaseRelativePath(
+          selector as string,
+          fromDirectory,
+          toDirectory,
+          true,
+        );
+      });
+    }
+    if (Array.isArray(entry.ignores)) {
+      rebased.ignores = entry.ignores.map((pattern) =>
+        rebaseRelativePath(pattern as string, fromDirectory, toDirectory, true),
+      );
+    }
+
+    const languageOptions = entry.languageOptions;
+    if (languageOptions == null || typeof languageOptions !== 'object') {
+      return rebased;
+    }
+    const parserOptions = (languageOptions as Record<string, unknown>)
+      .parserOptions;
+    if (parserOptions == null || typeof parserOptions !== 'object') {
+      return rebased;
+    }
+    const project = (parserOptions as Record<string, unknown>).project;
+    if (typeof project !== 'string' && !Array.isArray(project)) return rebased;
+
+    const rebaseProject = (projectPath: string): string =>
+      rebaseRelativePath(projectPath, fromDirectory, toDirectory, false);
+    rebased.languageOptions = {
+      ...(languageOptions as Record<string, unknown>),
+      parserOptions: {
+        ...(parserOptions as Record<string, unknown>),
+        project:
+          typeof project === 'string'
+            ? rebaseProject(project)
+            : project.map((projectPath) =>
+                rebaseProject(projectPath as string),
+              ),
+      },
+    };
+    return rebased;
+  });
+}
+
+function staticGlobRoot(pattern: string, cwd: string): string {
+  const absolutePattern = path.resolve(cwd, pattern);
+  const root = path.parse(absolutePattern).root;
+  const segments = absolutePattern.slice(root.length).split(path.sep);
+  let current = root;
+  for (const segment of segments) {
+    if (!segment || isDynamicPattern(segment)) break;
+    current = path.join(current, segment);
+  }
+  return current || cwd;
+}
+
+function compactScanDirectories(directories: Iterable<string>): string[] {
+  const byIdentity = new Map<string, string>();
+  for (const directory of directories) {
+    const normalized = path.normalize(directory);
+    const key = nativePathIdentity.key(normalized);
+    if (!byIdentity.has(key)) byIdentity.set(key, normalized);
+  }
+  const sorted = [...byIdentity.values()].sort(
+    (a, b) => a.length - b.length || nativePathIdentity.compare(a, b),
+  );
+  const compact: string[] = [];
+  for (const directory of sorted) {
+    if (
+      !compact.some((parent) =>
+        nativePathIdentity.isSameOrChild(parent, directory),
+      )
+    ) {
+      compact.push(directory);
+    }
+  }
+  return compact;
+}
+
+async function classifyLintPatterns(
+  patterns: string[],
+  cwd: string,
+): Promise<ClassifiedLintPatterns> {
+  const literalFilePatterns: string[] = [];
+  const scanDirectories = new Set<string>();
+
+  for (const pattern of patterns) {
+    if (pattern.startsWith('!')) continue;
+    if (isDynamicPattern(pattern)) {
+      const scanRoot = staticGlobRoot(pattern, cwd);
+      try {
+        if (!(await lstat(scanRoot)).isSymbolicLink()) {
+          scanDirectories.add(scanRoot);
+        }
+      } catch {
+        // A missing static root cannot contribute a matched target.
+      }
+      continue;
+    }
+
+    const absolute = path.resolve(cwd, pattern);
+    try {
+      const info = await stat(absolute);
+      if (info.isDirectory()) {
+        if (!(await lstat(absolute)).isSymbolicLink()) {
+          scanDirectories.add(absolute);
+        }
+      } else if (info.isFile()) {
+        literalFilePatterns.push(pattern);
+      }
+    } catch {
+      // tinyglobby will omit a missing literal from the match set.
+    }
+  }
+
+  return {
+    literalFilePatterns,
+    scanDirectories: compactScanDirectories(scanDirectories),
+  };
+}
+
+function createCachedConfigFinder(): (startDirectory: string) => string | null {
+  const find = createCachedAncestorFinder((directory) => {
+    const configPath = findJSConfig(directory);
+    return configPath ? path.normalize(configPath) : undefined;
+  });
+  return (startDirectory) => find(path.resolve(startDirectory)) ?? null;
+}
+
 export class Rslint {
   readonly #service: RSLintService;
   readonly #cwd: string;
@@ -96,6 +342,10 @@ export class Rslint {
   readonly #overrideConfigFile?: string | true | null;
   readonly #fix: boolean;
   readonly #virtualFiles?: Record<string, string>;
+  readonly #activePluginHosts = new Set<PluginLintHost>();
+  #normalizedOverrideConfig?: Record<string, unknown>[];
+  #closeRequested = false;
+  #closePromise?: Promise<void>;
 
   constructor(options: RslintOptions = {}) {
     this.#cwd = options.cwd ? path.resolve(options.cwd) : process.cwd();
@@ -124,37 +374,53 @@ export class Rslint {
     options: { filePath?: string } = {},
   ): Promise<LintResult[]> {
     const filePath = path.resolve(this.#cwd, options.filePath ?? '__text__.ts');
-    const { config, configDirectory } = await this.#resolveConfig(
-      path.dirname(filePath),
-    );
-    const response = await this.#service.lint({
-      config,
-      configDirectory,
-      workingDirectory: this.#cwd,
-      files: [filePath],
-      // Overlay (in-memory tsconfig + deps) underlays the code buffer; a
-      // same-path code entry wins so `lintText` always lints `code`.
-      fileContents: { ...this.#resolveOverlay(), [filePath]: code },
-      fix: this.#fix,
-    });
-    const results = this.#toLintResults(response, configDirectory, [filePath], {
-      [filePath]: code,
-    });
-    // ESLint's lintText returns exactly one result — for the linted buffer. An
-    // in-memory overlay dependency file (pulled into the program and matching
-    // the config) can carry its own diagnostics; keep only the linted file so
-    // they neither leak a second result nor get written back by outputFixes.
-    const primary = results.filter((r) => r.filePath === filePath);
-    // ESLint: with no filePath, the result's path is the non-absolute "<text>"
-    // sentinel, so outputFixes skips it (we lint at a synthetic absolute path
-    // so Go can build a program, then relabel). A user-supplied filePath stays
-    // absolute — outputFixes writing it back is then the caller's intent.
-    if (options.filePath == null) {
-      for (const r of primary) {
-        if (r.filePath === filePath) r.filePath = '<text>';
+    const resolved = await this.#resolveConfig(path.dirname(filePath));
+    const { config, configDirectory } = resolved;
+    const pluginSession = await this.#createPluginLintSession([resolved]);
+    try {
+      const response = await this.#service.lint(
+        {
+          config,
+          eslintPlugins: pluginSession?.eslintPlugins,
+          configDirectory,
+          workingDirectory: this.#cwd,
+          files: [filePath],
+          // Overlay (in-memory tsconfig + deps) underlays the code buffer; a
+          // same-path code entry wins so `lintText` always lints `code`.
+          fileContents: { ...this.#resolveOverlay(), [filePath]: code },
+          fix: this.#fix,
+        },
+        pluginSession
+          ? { pluginLint: (request) => pluginSession.host.lint(request) }
+          : {},
+      );
+      const results = this.#toLintResults(
+        response,
+        configDirectory,
+        [filePath],
+        { [filePath]: code },
+      );
+      // ESLint's lintText returns exactly one result — for the linted buffer. An
+      // in-memory overlay dependency file (pulled into the program and matching
+      // the config) can carry its own diagnostics; keep only the linted file so
+      // they neither leak a second result nor get written back by outputFixes.
+      const primary = results.filter((r) =>
+        nativePathIdentity.equals(r.filePath, filePath),
+      );
+      // ESLint: with no filePath, the result's path is the non-absolute "<text>"
+      // sentinel, so outputFixes skips it. A user-supplied filePath stays
+      // absolute, making outputFixes writing it back the caller's intent.
+      if (options.filePath == null) {
+        for (const r of primary) {
+          if (nativePathIdentity.equals(r.filePath, filePath)) {
+            r.filePath = '<text>';
+          }
+        }
       }
+      return primary;
+    } finally {
+      await this.#shutdownPluginSession(pluginSession);
     }
-    return primary;
   }
 
   /**
@@ -163,83 +429,144 @@ export class Rslint {
    */
   async lintFiles(patterns: string | string[]): Promise<LintResult[]> {
     const globs = Array.isArray(patterns) ? patterns : [patterns];
-    const matched = await glob(globs, {
+    const { literalFilePatterns, scanDirectories } = await classifyLintPatterns(
+      globs,
+      this.#cwd,
+    );
+    const globOptions = {
       cwd: this.#cwd,
       absolute: true,
       onlyFiles: true,
+      dot: true,
+      ignore: ['**/node_modules/**', '**/.git/**'],
+    } as const;
+    const matched = await glob(globs, {
+      ...globOptions,
+      followSymbolicLinks: false,
     });
-    const files = matched.map((f) => path.normalize(f));
+    const literalMatches =
+      literalFilePatterns.length === 0
+        ? []
+        : await glob(
+            [
+              ...literalFilePatterns,
+              ...globs.filter((pattern) => pattern.startsWith('!')),
+            ],
+            {
+              ...globOptions,
+              // This glob contains only literal file positives. Following them
+              // includes a file symlink without allowing a directory walk.
+              followSymbolicLinks: true,
+            },
+          );
+
+    const filesByIdentity = new Map<string, string>();
+    for (const file of matched) {
+      const normalized = path.normalize(file);
+      const key = nativePathIdentity.key(normalized);
+      if (!filesByIdentity.has(key)) filesByIdentity.set(key, normalized);
+    }
+    const explicitFiles = new Set<string>();
+    for (const file of literalMatches) {
+      const normalized = path.normalize(file);
+      const key = nativePathIdentity.key(normalized);
+      explicitFiles.add(key);
+      // Preserve the spelling of a literal target over an overlapping glob.
+      filesByIdentity.set(key, normalized);
+    }
+
+    const files = [...filesByIdentity.values()];
     if (files.length === 0) return [];
 
+    const configByFile = await this.#resolveLintFileConfigs(
+      files,
+      explicitFiles,
+      scanDirectories,
+    );
     const groups = new Map<
       string,
       {
         config: Record<string, unknown>[];
+        configPath?: string;
         configDirectory: string;
+        routingKey: string;
         files: string[];
       }
     >();
-    const configCache = new Map<
-      string,
-      Promise<{ config: Record<string, unknown>[]; configDirectory: string }>
-    >();
 
-    for (const file of [...files].sort()) {
-      const fromDir = path.dirname(file);
-      let resolved = configCache.get(fromDir);
-      if (!resolved) {
-        resolved = this.#resolveConfig(fromDir);
-        configCache.set(fromDir, resolved);
-      }
-      const { config, configDirectory } = await resolved;
-      let group = groups.get(configDirectory);
+    for (const file of [...files].sort(nativePathIdentity.compare)) {
+      const resolved = configByFile.get(file);
+      if (!resolved) continue;
+      const { config, configPath, configDirectory, routingKey } = resolved;
+      let group = groups.get(routingKey);
       if (!group) {
-        group = { config, configDirectory, files: [] };
-        groups.set(configDirectory, group);
+        group = {
+          config,
+          configPath,
+          configDirectory,
+          routingKey,
+          files: [],
+        };
+        groups.set(routingKey, group);
       }
       group.files.push(file);
     }
 
-    const results: LintResult[] = [];
-    for (const group of [...groups.values()].sort((a, b) =>
-      a.configDirectory.localeCompare(b.configDirectory),
-    )) {
-      const response = await this.#service.lint({
-        config: group.config,
-        configDirectory: group.configDirectory,
-        workingDirectory: this.#cwd,
-        files: group.files,
-        // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
-        fileContents: this.#resolveOverlay(),
-        fix: this.#fix,
-      });
-      const { contents, bomFiles } = await this.#readDiagnosticContents(
-        response,
-        group.configDirectory,
-      );
-      // Seed results from the files Go actually linted (config `ignores`
-      // already excluded, paths program-canonical) rather than the glob matches:
-      // an ignored match produces no phantom empty result, and a symlinked glob
-      // path can't duplicate a result whose diagnostic is keyed to the program
-      // path. Fall back to the glob matches if an older binary omits lintedFiles.
-      const linted = response.lintedFiles
-        ? response.lintedFiles.map((f) =>
-            path.isAbsolute(f)
-              ? path.normalize(f)
-              : path.resolve(group.configDirectory, f),
-          )
-        : group.files;
-      results.push(
-        ...this.#toLintResults(
+    const pluginSession = await this.#createPluginLintSession([
+      ...groups.values(),
+    ]);
+    try {
+      const results: LintResult[] = [];
+      // Files are inserted in deterministic path order above. Keep that group
+      // order instead of imposing a parent-first config execution dependency.
+      for (const group of groups.values()) {
+        const response = await this.#service.lint(
+          {
+            config: group.config,
+            eslintPlugins: pluginSession?.eslintPlugins,
+            configDirectory: group.configDirectory,
+            workingDirectory: this.#cwd,
+            files: group.files,
+            // Overlay (e.g. an in-memory tsconfig) for the program over disk files.
+            fileContents: this.#resolveOverlay(),
+            fix: this.#fix,
+          },
+          pluginSession
+            ? { pluginLint: (request) => pluginSession.host.lint(request) }
+            : {},
+        );
+        const { contents, bomFiles } = await this.#readDiagnosticContents(
           response,
           group.configDirectory,
-          linted,
-          contents,
-          bomFiles,
-        ),
+        );
+        // Seed results from the files Go actually linted (config `ignores`
+        // already excluded) rather than the glob matches. Go preserves each
+        // selected target's path identity even when its Program uses a canonical
+        // or symlinked source path. Fall back to the glob matches if an older
+        // binary omits lintedFiles.
+        const linted = response.lintedFiles
+          ? response.lintedFiles.map((f) =>
+              path.isAbsolute(f)
+                ? path.normalize(f)
+                : path.resolve(group.configDirectory, f),
+            )
+          : group.files;
+        results.push(
+          ...this.#toLintResults(
+            response,
+            group.configDirectory,
+            linted,
+            contents,
+            bomFiles,
+          ),
+        );
+      }
+      return results.sort((a, b) =>
+        nativePathIdentity.compare(a.filePath, b.filePath),
       );
+    } finally {
+      await this.#shutdownPluginSession(pluginSession);
     }
-    return results.sort((a, b) => a.filePath.localeCompare(b.filePath));
   }
 
   /**
@@ -258,8 +585,30 @@ export class Rslint {
   }
 
   /** Tear down the long-lived Go `--api` process. */
-  async close(): Promise<void> {
-    await this.#service.close();
+  close(): Promise<void> {
+    this.#closePromise ??= this.#closeResources();
+    return this.#closePromise;
+  }
+
+  async #closeResources(): Promise<void> {
+    this.#closeRequested = true;
+    const shutdownActiveHosts = async (): Promise<void> => {
+      await Promise.allSettled(
+        [...this.#activePluginHosts].map((host) => host.shutdown()),
+      );
+      this.#activePluginHosts.clear();
+    };
+
+    // Unblock any Go lint request currently awaiting pluginLint before queuing
+    // the service's exit request behind it. A second sweep catches a host whose
+    // initialization raced the first snapshot; such a host also observes
+    // #closeRequested and shuts itself down before becoming active.
+    await shutdownActiveHosts();
+    try {
+      await this.#service.close();
+    } finally {
+      await shutdownActiveHosts();
+    }
   }
 
   async [Symbol.asyncDispose](): Promise<void> {
@@ -280,49 +629,416 @@ export class Rslint {
     return resolved;
   }
 
-  async #resolveConfig(fromDir: string): Promise<{
-    config: Record<string, unknown>[];
-    configDirectory: string;
-  }> {
+  async #createPluginLintSession(
+    resolvedConfigs: ReadonlyArray<ResolvedConfig>,
+  ): Promise<PluginLintSession | null> {
+    const configsByDescriptor = new Map<
+      string,
+      {
+        configPath: string;
+        configDirectory: string;
+        entries: ReadonlyArray<unknown>;
+      }
+    >();
+    for (const resolved of resolvedConfigs) {
+      if (!resolved.configPath) continue;
+      const key = `${nativePathIdentity.key(resolved.configPath)}\0${resolved.configDirectory}`;
+      if (!configsByDescriptor.has(key)) {
+        configsByDescriptor.set(key, {
+          configPath: resolved.configPath,
+          configDirectory: resolved.configDirectory,
+          entries: resolved.config,
+        });
+      }
+    }
+
+    const { eslintPluginEntries, pluginConfigs } = collectPluginMeta([
+      ...configsByDescriptor.values(),
+    ]);
+    if (pluginConfigs.length === 0) return null;
+
+    const createPluginLintHost = await loadPluginHostFactory();
+    const host = await createPluginLintHost(pluginConfigs, (record) => {
+      process.stderr.write(`[rslint:plugin] ${record.text}\n`);
+    });
+    if (this.#closeRequested) {
+      await host.shutdown();
+      throw new Error('rslint service is closing');
+    }
+    this.#activePluginHosts.add(host);
+    return { host, eslintPlugins: eslintPluginEntries };
+  }
+
+  async #shutdownPluginSession(
+    session: PluginLintSession | null,
+  ): Promise<void> {
+    if (!session) return;
+    try {
+      await session.host.shutdown();
+    } finally {
+      this.#activePluginHosts.delete(session.host);
+    }
+  }
+
+  async #loadConfigCandidate(
+    configPath: string,
+    configDirectory: string,
+    candidatesByPath: Map<string, ConfigCandidate>,
+  ): Promise<ConfigCandidate> {
+    const normalizedPath = path.normalize(configPath);
+    const key = nativePathIdentity.key(normalizedPath);
+    const existing = candidatesByPath.get(key);
+    if (existing) return existing;
+
+    const normalizedDirectory = path.normalize(configDirectory);
+    let baseConfig: Record<string, unknown>[];
+    try {
+      baseConfig = normalizeConfig(await loadConfigFile(normalizedPath));
+    } catch (error) {
+      const candidate: FailedConfigCandidate = {
+        status: 'failed',
+        configPath: normalizedPath,
+        configDirectory: normalizedDirectory,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+      candidatesByPath.set(key, candidate);
+      return candidate;
+    }
+
+    const candidate: LoadedConfigCandidate = {
+      status: 'loaded',
+      configPath: normalizedPath,
+      configDirectory: normalizedDirectory,
+      baseConfig,
+      resolved: this.#composeConfig(
+        baseConfig,
+        normalizedDirectory,
+        `config:${key}`,
+        normalizedPath,
+      ),
+    };
+    candidatesByPath.set(key, candidate);
+    return candidate;
+  }
+
+  async #resolveLintFileConfigs(
+    files: string[],
+    explicitFiles: Set<string>,
+    scanDirectories: string[],
+  ): Promise<Map<string, ResolvedConfig | null>> {
+    const result = new Map<string, ResolvedConfig | null>();
+
+    // Explicit config modes use one config for every target. Go remains the
+    // source of truth for that config's own files/ignores matching.
+    if (this.#overrideConfigFile != null) {
+      const resolved = await this.#resolveConfig(this.#cwd);
+      for (const file of files) result.set(file, resolved);
+      return result;
+    }
+
+    const findConfigUp = createCachedConfigFinder();
+    const discovered = new Map<
+      string,
+      { configPath: string; configDirectory: string }
+    >();
+    const addDiscovered = (
+      configPath: string,
+      configDirectory = path.dirname(configPath),
+    ): void => {
+      const normalizedPath = path.normalize(configPath);
+      const key = nativePathIdentity.key(normalizedPath);
+      if (!discovered.has(key)) {
+        discovered.set(key, {
+          configPath: normalizedPath,
+          configDirectory: path.normalize(configDirectory),
+        });
+      }
+    };
+
+    if (scanDirectories.length > 0) {
+      const scanned = await discoverConfigs(
+        [],
+        scanDirectories,
+        this.#cwd,
+        null,
+      );
+      for (const [configPath, configDirectory] of scanned) {
+        addDiscovered(configPath, configDirectory);
+      }
+    }
+    for (const file of files) {
+      if (!explicitFiles.has(nativePathIdentity.key(file))) continue;
+      const configPath = findConfigUp(path.dirname(file));
+      if (configPath) addDiscovered(configPath);
+    }
+
+    if (discovered.size === 0) {
+      const emptyConfig = this.#composeConfig(
+        [],
+        this.#cwd,
+        `empty:${nativePathIdentity.key(this.#cwd)}`,
+      );
+      for (const file of files) result.set(file, emptyConfig);
+      return result;
+    }
+
+    const candidatesByPath = new Map<string, ConfigCandidate>();
+    const loadCandidate = async (
+      configPath: string,
+      configDirectory: string,
+    ): Promise<ConfigCandidate> =>
+      this.#loadConfigCandidate(configPath, configDirectory, candidatesByPath);
+
+    const failedQueue: FailedConfigCandidate[] = [];
+    for (const { configPath, configDirectory } of discovered.values()) {
+      const candidate = await loadCandidate(configPath, configDirectory);
+      if (candidate.status === 'failed') failedQueue.push(candidate);
+    }
+
+    // Only failed configs need their undiscovered ancestors. This keeps an
+    // explicit file target local while still providing normal ancestor
+    // fallback, and config discovery remains proportional to unique dirs.
+    for (let i = 0; i < failedQueue.length; i++) {
+      const failed = failedQueue[i];
+      const ancestorPath = findConfigUp(path.dirname(failed.configDirectory));
+      if (!ancestorPath) continue;
+
+      const key = nativePathIdentity.key(ancestorPath);
+      if (candidatesByPath.has(key)) continue;
+      const ancestor = await loadCandidate(
+        ancestorPath,
+        path.dirname(ancestorPath),
+      );
+      if (ancestor.status === 'failed') failedQueue.push(ancestor);
+    }
+
+    const candidates = [...candidatesByPath.values()];
+    const loadedCandidates = candidates.filter(
+      (candidate): candidate is LoadedConfigCandidate =>
+        candidate.status === 'loaded',
+    );
+    const failedCandidates = candidates.filter(
+      (candidate): candidate is FailedConfigCandidate =>
+        candidate.status === 'failed',
+    );
+    if (loadedCandidates.length === 0) {
+      const first = failedCandidates[0];
+      throw new Error(
+        first
+          ? `Failed to load config ${first.configPath}: ${first.error.message}`
+          : 'No discovered rslint config could be loaded',
+      );
+    }
+    for (const failed of failedCandidates) {
+      console.warn(
+        `[rslint] Skipping config ${failed.configPath}: ${failed.error.message}`,
+      );
+    }
+
+    const candidateIndex = new AncestorPathIndex(
+      candidates.map(
+        (candidate) => [candidate.configDirectory, candidate] as const,
+      ),
+    );
+    const nearestLoadedCandidate = (
+      candidate: ConfigCandidate | undefined,
+    ): LoadedConfigCandidate | undefined => {
+      let current = candidate;
+      while (current) {
+        if (current.status === 'loaded') return current;
+        current = candidateIndex.findParent(current.configDirectory);
+      }
+      return undefined;
+    };
+
+    const configEntries: ConfigEntry[] = loadedCandidates.map((candidate) => ({
+      configDirectory: candidate.configDirectory,
+      // Parent-ignore discovery belongs to the authored file config. The API
+      // override is evaluated later from cwd and must not move this boundary.
+      entries: candidate.baseConfig as RslintConfigEntry[],
+    }));
+
+    const explicitConfigDirs = new Set<string>();
+    for (const file of files) {
+      if (!explicitFiles.has(nativePathIdentity.key(file))) continue;
+      const loaded = nearestLoadedCandidate(
+        candidateIndex.find(path.dirname(file)),
+      );
+      if (loaded) explicitConfigDirs.add(loaded.configDirectory);
+    }
+
+    const directoryEntries = filterConfigsByParentIgnores(configEntries);
+    const directoryConfigDirs = new Set(
+      directoryEntries.map((entry) =>
+        nativePathIdentity.key(entry.configDirectory),
+      ),
+    );
+    const effectiveEntries = filterConfigsByParentIgnores(
+      configEntries,
+      explicitConfigDirs,
+    );
+    const effectiveConfigDirs = new Set(
+      effectiveEntries.map((entry) =>
+        nativePathIdentity.key(entry.configDirectory),
+      ),
+    );
+
+    const emptyConfig = this.#composeConfig(
+      [],
+      this.#cwd,
+      `empty:${nativePathIdentity.key(this.#cwd)}`,
+    );
+    for (const file of files) {
+      let candidate = candidateIndex.find(path.dirname(file));
+      if (!candidate) {
+        result.set(file, emptyConfig);
+        continue;
+      }
+
+      const allowedDirs = explicitFiles.has(nativePathIdentity.key(file))
+        ? effectiveConfigDirs
+        : directoryConfigDirs;
+      let firstFailure: FailedConfigCandidate | undefined;
+      while (candidate.status === 'failed') {
+        firstFailure ??= candidate;
+        candidate = candidateIndex.findParent(candidate.configDirectory);
+        if (!candidate) break;
+      }
+
+      if (!candidate) {
+        if (explicitFiles.has(nativePathIdentity.key(file)) && firstFailure) {
+          throw new Error(
+            `Failed to load config ${firstFailure.configPath}: ${firstFailure.error.message}`,
+          );
+        }
+        result.set(file, null);
+        continue;
+      }
+
+      result.set(
+        file,
+        allowedDirs.has(nativePathIdentity.key(candidate.configDirectory))
+          ? candidate.resolved
+          : null,
+      );
+    }
+    return result;
+  }
+
+  #getNormalizedOverrideConfig(): Record<string, unknown>[] | null {
+    if (this.#overrideConfig == null) return null;
+    if (this.#normalizedOverrideConfig) return this.#normalizedOverrideConfig;
+    const override = Array.isArray(this.#overrideConfig)
+      ? this.#overrideConfig
+      : [this.#overrideConfig];
+    for (const [index, entry] of override.entries()) {
+      if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) {
+        continue;
+      }
+      const plugins = (entry as Record<string, unknown>).plugins;
+      if (
+        plugins !== null &&
+        typeof plugins === 'object' &&
+        !Array.isArray(plugins)
+      ) {
+        throw new Error(
+          `[rslint] overrideConfig entry at index ${index} uses object-form "plugins". ` +
+            'Community ESLint plugins in overrideConfig are not supported because ' +
+            'the plugin worker cannot re-import an in-memory plugin object. Move ' +
+            'the plugin declaration to rslint.config.js (or .mjs/.ts/.mts), or use ' +
+            'array-form built-in plugins.',
+        );
+      }
+    }
+    this.#normalizedOverrideConfig = normalizeConfig(override);
+    return this.#normalizedOverrideConfig;
+  }
+
+  #composeConfig(
+    base: Record<string, unknown>[],
+    configDirectory: string,
+    routingKey: string,
+    configPath?: string,
+  ): ResolvedConfig {
+    const override = this.#getNormalizedOverrideConfig();
+    if (!override) {
+      return { config: base, configPath, configDirectory, routingKey };
+    }
+
+    // One IPC config has one path base. Move the authored nested config's
+    // relative fields to cwd, then append the override unchanged so all three
+    // override path-bearing fields use Rslint's cwd as documented.
+    return {
+      config: [
+        ...rebaseConfigPaths(base, configDirectory, this.#cwd),
+        ...override,
+      ],
+      configPath,
+      configDirectory: this.#cwd,
+      routingKey,
+    };
+  }
+
+  async #resolveConfig(fromDir: string): Promise<ResolvedConfig> {
     let base: Record<string, unknown>[] = [];
+    let configPath: string | undefined;
     let configDirectory = this.#cwd;
+    let routingKey = `empty:${nativePathIdentity.key(this.#cwd)}`;
 
     if (this.#overrideConfigFile === true) {
       // Only overrideConfig — no file, no discovery.
+      routingKey = `override:${nativePathIdentity.key(this.#cwd)}`;
     } else if (typeof this.#overrideConfigFile === 'string') {
-      const configPath = path.resolve(this.#cwd, this.#overrideConfigFile);
+      configPath = path.resolve(this.#cwd, this.#overrideConfigFile);
       base = normalizeConfig(await loadConfigFile(configPath));
       // Explicit overrideConfigFile follows CLI --config semantics: files,
       // ignores, and parserOptions.project resolve from invocation cwd.
       configDirectory = this.#cwd;
+      routingKey = `config:${nativePathIdentity.key(configPath)}`;
     } else {
-      ({ config: base, configDirectory } =
-        await this.#resolveAutoConfig(fromDir));
+      return this.#resolveAutoConfig(fromDir);
     }
 
-    if (this.#overrideConfig != null) {
-      const override = Array.isArray(this.#overrideConfig)
-        ? this.#overrideConfig
-        : [this.#overrideConfig];
-      base = [...base, ...normalizeConfig(override)];
-    }
-
-    return { config: base, configDirectory };
+    return this.#composeConfig(base, configDirectory, routingKey, configPath);
   }
 
-  async #resolveAutoConfig(fromDir: string): Promise<{
-    config: Record<string, unknown>[];
-    configDirectory: string;
-  }> {
-    const nearestConfig = findJSConfigUp(fromDir);
-    if (!nearestConfig) {
-      return { config: [], configDirectory: this.#cwd };
+  async #resolveAutoConfig(fromDir: string): Promise<ResolvedConfig> {
+    const findConfigUp = createCachedConfigFinder();
+    let configPath = findConfigUp(fromDir);
+    if (!configPath) {
+      return this.#composeConfig(
+        [],
+        this.#cwd,
+        `empty:${nativePathIdentity.key(this.#cwd)}`,
+      );
     }
 
-    return {
-      config: normalizeConfig(await loadConfigFile(nearestConfig)),
-      configDirectory: path.dirname(nearestConfig),
-    };
+    const candidatesByPath = new Map<string, ConfigCandidate>();
+    let nearestFailure: FailedConfigCandidate | undefined;
+    const failures: FailedConfigCandidate[] = [];
+    while (configPath) {
+      const candidate = await this.#loadConfigCandidate(
+        configPath,
+        path.dirname(configPath),
+        candidatesByPath,
+      );
+      if (candidate.status === 'loaded') {
+        for (const failed of failures) {
+          console.warn(
+            `[rslint] Skipping config ${failed.configPath}: ${failed.error.message}`,
+          );
+        }
+        return candidate.resolved;
+      }
+
+      nearestFailure ??= candidate;
+      failures.push(candidate);
+      configPath = findConfigUp(path.dirname(candidate.configDirectory));
+    }
+
+    throw new Error(
+      `Failed to load config ${nearestFailure!.configPath}: ${nearestFailure!.error.message}`,
+    );
   }
 
   async #readDiagnosticContents(
@@ -351,7 +1067,7 @@ export class Rslint {
         try {
           const raw = await readFile(abs, 'utf8');
           if (raw.charCodeAt(0) === 0xfeff) {
-            bomFiles.add(abs);
+            bomFiles.add(nativePathIdentity.key(abs));
             contents[abs] = raw.slice(1); // BOM-stripped, matching Go's offsets
           } else {
             contents[abs] = raw;
@@ -374,28 +1090,42 @@ export class Rslint {
     const toAbs = (p: string): string =>
       path.isAbsolute(p) ? path.normalize(p) : path.resolve(configDirectory, p);
 
+    const contentByPath = new Map<string, string>();
+    for (const [filePath, source] of Object.entries(contents ?? {})) {
+      contentByPath.set(nativePathIdentity.key(filePath), source);
+    }
+
     // Every linted file gets a result, even with zero messages (ESLint shape).
-    const byFile = new Map<string, LintMessage[]>();
-    for (const f of files) byFile.set(path.normalize(f), []);
+    // Identity keys coalesce path-casing variants on case-insensitive hosts.
+    const byFile = new Map<
+      string,
+      { filePath: string; messages: LintMessage[] }
+    >();
+    for (const file of files) {
+      const filePath = path.normalize(file);
+      const key = nativePathIdentity.key(filePath);
+      if (!byFile.has(key)) byFile.set(key, { filePath, messages: [] });
+    }
 
     for (const d of response.diagnostics ?? []) {
       const abs = toAbs(d.filePath);
-      let messages = byFile.get(abs);
-      if (!messages) {
-        messages = [];
-        byFile.set(abs, messages);
+      const key = nativePathIdentity.key(abs);
+      let bucket = byFile.get(key);
+      if (!bucket) {
+        bucket = { filePath: abs, messages: [] };
+        byFile.set(key, bucket);
       }
-      messages.push(toLintMessage(d, contents?.[abs]));
+      bucket.messages.push(toLintMessage(d, contentByPath.get(key)));
     }
 
     // Wire `output` is keyed by relative path; remap to absolute.
-    const outputByAbs = new Map<string, string>();
+    const outputByPath = new Map<string, string>();
     for (const [rel, fixed] of Object.entries(response.output ?? {})) {
-      outputByAbs.set(toAbs(rel), fixed);
+      outputByPath.set(nativePathIdentity.key(toAbs(rel)), fixed);
     }
 
     const results: LintResult[] = [];
-    for (const [filePath, messages] of byFile) {
+    for (const [key, { filePath, messages }] of byFile) {
       let errorCount = 0;
       let warningCount = 0;
       let fixableErrorCount = 0;
@@ -417,13 +1147,13 @@ export class Rslint {
         fixableErrorCount,
         fixableWarningCount,
       };
-      const output = outputByAbs.get(filePath);
+      const output = outputByPath.get(key);
       if (output !== undefined) {
         // Go's Output is BOM-stripped (ApplyRuleFixes runs over the decoded
         // SourceFile text); re-prepend the BOM for a disk file that had one so
         // outputFixes writes back a file identical to the original but for the
         // fix.
-        result.output = bomFiles?.has(filePath) ? '\uFEFF' + output : output;
+        result.output = bomFiles?.has(key) ? '\uFEFF' + output : output;
       }
       results.push(result);
     }

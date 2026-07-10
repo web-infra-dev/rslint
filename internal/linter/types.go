@@ -83,8 +83,12 @@ type LintResult struct {
 //     (for example config global ignores). Entries within the slice
 //     may be nil individually.
 //   - GetRulesForFile=nil                 → no lint rules executed
-//   - TypeInfoFiles=nil                   → no gap-file distinction
-//     (all files may run type-aware rules)
+//   - SyntaxErrorFiles=nil                → RunLinter checks each lint target
+//     for syntax errors before resolving or running rules. A non-nil set means
+//     the caller already performed that check and names the invalid files.
+//   - TypeInfoFiles=nil                   → no gap-file distinction in the
+//     lint-rule phase (all lint targets may receive a TypeChecker). This field
+//     never restricts the program-wide type-check phase.
 //   - TypeCheck=false                     → skip the type-check phase
 //   - SkipTypeCheckPrograms=nil           → every program participates in
 //     type-check. When non-nil, must be parallel to Programs; entries set
@@ -111,8 +115,9 @@ type RunLinterOptions struct {
 	// Program membership. nil preserves the legacy Program scan.
 	TargetFiles [][]string
 
-	GetRulesForFile RuleHandler
-	TypeInfoFiles   map[string]struct{}
+	GetRulesForFile  RuleHandler
+	TypeInfoFiles    map[string]struct{}
+	SyntaxErrorFiles map[string]struct{}
 
 	TypeCheck             bool
 	SkipTypeCheckPrograms []bool
@@ -123,8 +128,11 @@ type RunLinterOptions struct {
 // LintSingleFileOptions configures a single-file, single-program lint pass.
 // Designed for IDE/LSP per-keystroke usage. Does not run type-check.
 type LintSingleFileOptions struct {
-	Program         *compiler.Program
-	File            string
+	Program *compiler.Program
+	File    string
+	// HasTypeInfo controls whether rule execution may acquire and expose a
+	// TypeChecker. False keeps plain-LSP linting AST-only.
+	HasTypeInfo     bool
 	GetRulesForFile RuleHandler
 	ExcludePaths    []string
 	OnDiagnostic    DiagnosticHandler

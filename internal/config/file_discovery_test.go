@@ -12,8 +12,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"gotest.tools/v3/assert"
 )
@@ -107,7 +109,7 @@ func TestDiscoverGapFiles_ProgramFilesSkipped(t *testing.T) {
 	assert.Equal(t, len(gapFiles), 0)
 }
 
-func TestDiscoverGapFiles_GetConfigForFilePreFilter(t *testing.T) {
+func TestDiscoverGapFiles_EntryIgnoreDoesNotRemoveTarget(t *testing.T) {
 	configDir, paths := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"test/b.ts",
@@ -128,10 +130,158 @@ func TestDiscoverGapFiles_GetConfigForFilePreFilter(t *testing.T) {
 
 	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
-	// test/b.ts matches **/*.ts but is excluded by entry-level ignores →
-	// GetConfigForFile returns nil → not a gap file
+	// Entry-level ignores only control whether this entry contributes rules.
+	// Both files remain lint targets; test/b.ts runs with zero rules.
 	assert.Assert(t, gapFiles != nil)
-	assert.Equal(t, len(gapFiles), 0)
+	assert.DeepEqual(t, gapFiles, []string{paths["test/b.ts"]})
+}
+
+func TestDiscoverLintFiles_DefaultBaselineIsIndependentOfConfigEntries(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"src/a.js",
+		"src/b.mjs",
+		"src/c.cjs",
+		"src/d.jsx",
+		"src/e.ts",
+		"src/f.tsx",
+		"src/g.mts",
+		"src/h.cts",
+		"src/G.JS",
+		"src/styles.css",
+	})
+
+	tests := []struct {
+		name   string
+		config RslintConfig
+	}{
+		{name: "empty config"},
+		{
+			name: "global ignore only",
+			config: RslintConfig{
+				{Ignores: []string{"generated/**"}},
+			},
+		},
+		{
+			name: "explicit TS entry does not remove defaults",
+			config: RslintConfig{
+				{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+			},
+		},
+	}
+
+	expected := []string{
+		paths["src/a.js"],
+		paths["src/b.mjs"],
+		paths["src/c.cjs"],
+		paths["src/d.jsx"],
+		paths["src/e.ts"],
+		paths["src/f.tsx"],
+		paths["src/g.mts"],
+		paths["src/h.cts"],
+	}
+	sort.Strings(expected)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			targets := DiscoverLintFiles(tt.config, configDir, osvfs.FS(), nil, nil, true)
+			assert.DeepEqual(t, targets, expected)
+		})
+	}
+}
+
+func TestDiscoverLintFiles_PreservesUNCRoot(t *testing.T) {
+	const configDir = "//server/share/repo"
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			configDir: {
+				Directories: []string{"src"},
+				Symlinks:    map[string]struct{}{},
+			},
+			configDir + "/src": {
+				Files:    []string{"a.ts"},
+				Symlinks: map[string]struct{}{},
+			},
+		},
+		files:     map[string]string{},
+		realpaths: map[string]string{},
+	}
+
+	targets := DiscoverLintFiles(nil, configDir, mock, nil, nil, true)
+	assert.DeepEqual(t, targets, []string{"//server/share/repo/src/a.ts"})
+}
+
+type caseInsensitiveDiscoveryFS struct {
+	vfs.FS
+	files map[string]bool
+}
+
+func (f *caseInsensitiveDiscoveryFS) UseCaseSensitiveFileNames() bool { return false }
+func (f *caseInsensitiveDiscoveryFS) FileExists(filePath string) bool {
+	return f.files[strings.ToLower(tspath.NormalizePath(filePath))]
+}
+func (f *caseInsensitiveDiscoveryFS) Realpath(filePath string) string {
+	return tspath.NormalizePath(filePath)
+}
+
+type fileExistsCountingFS struct {
+	vfs.FS
+	calls atomic.Int32
+}
+
+func (f *fileExistsCountingFS) FileExists(filePath string) bool {
+	f.calls.Add(1)
+	return f.FS.FileExists(filePath)
+}
+
+func TestDiscoverLintFiles_DeduplicatesExplicitPathCasing(t *testing.T) {
+	fsys := &caseInsensitiveDiscoveryFS{
+		FS: osvfs.FS(),
+		files: map[string]bool{
+			"c:/repo/src/a.ts": true,
+		},
+	}
+	targets := DiscoverLintFiles(
+		nil,
+		"C:/Repo",
+		fsys,
+		[]string{"C:/Repo/Src/A.ts", "c:/repo/src/a.ts"},
+		nil,
+		true,
+	)
+	assert.DeepEqual(t, targets, []string{"C:/Repo/Src/A.ts"})
+}
+
+func TestDiscoverLintFiles_ExplicitPatternCanExtendCaseSensitiveBaseline(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{"src/A.JS", "src/b.js"})
+
+	withoutExplicitPattern := DiscoverLintFiles(nil, configDir, osvfs.FS(), nil, nil, true)
+	assert.DeepEqual(t, withoutExplicitPattern, []string{paths["src/b.js"]})
+
+	config := RslintConfig{{Files: []string{"**/*.JS"}}}
+	withExplicitPattern := DiscoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
+	expected := []string{paths["src/A.JS"], paths["src/b.js"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, withExplicitPattern, expected)
+}
+
+func TestDiscoverLintFiles_FilesAndGroupAppliesCandidatePostFilter(t *testing.T) {
+	configDir, paths := setupDiscoveryFixture(t, []string{
+		"src/A.JS",
+		"src/A.test.JS",
+		"other/B.JS",
+		"src/default.ts",
+	})
+	config := RslintConfig{{
+		FilePatternGroups: [][]string{
+			{"src/**", "**/*.JS", "!**/*.test.JS"},
+		},
+	}}
+
+	targets := DiscoverLintFiles(config, configDir, osvfs.FS(), nil, nil, true)
+	expected := []string{paths["src/A.JS"], paths["src/default.ts"]}
+	sort.Strings(expected)
+	assert.DeepEqual(t, targets, expected)
 }
 
 func TestDiscoverGapFiles_NoFilesField_UsesDefaultExtensions(t *testing.T) {
@@ -356,7 +506,7 @@ func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"rule-a": "error"}},
 		{Files: []string{"**/*.tsx"}, Rules: Rules{"rule-b": "error"}},
-		// .js files have no matching entry
+		// .js remains in the default target baseline with zero matching rules.
 	}
 
 	programFiles := map[string]struct{}{}
@@ -366,7 +516,7 @@ func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 	assert.Assert(t, gapFiles != nil)
 	sort.Strings(gapFiles)
 
-	expected := []string{paths["src/a.ts"], paths["src/b.tsx"]}
+	expected := []string{paths["src/a.ts"], paths["src/b.tsx"], paths["src/c.js"]}
 	sort.Strings(expected)
 
 	assert.Equal(t, len(gapFiles), len(expected))
@@ -375,13 +525,13 @@ func TestDiscoverGapFiles_MultipleFilesPatterns(t *testing.T) {
 	}
 }
 
-func TestDiscoverGapFiles_JsFilesNotDiscoveredWithoutPattern(t *testing.T) {
+func TestDiscoverGapFiles_DefaultJsDiscoveredWithoutExplicitPattern(t *testing.T) {
 	configDir, _ := setupDiscoveryFixture(t, []string{
 		"src/a.ts",
 		"src/b.js",
 	})
 
-	// Only **/*.ts in files, no **/*.js
+	// An explicit TypeScript selector does not remove the default JS target.
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
 	}
@@ -391,8 +541,7 @@ func TestDiscoverGapFiles_JsFilesNotDiscoveredWithoutPattern(t *testing.T) {
 	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), programFiles, nil, nil, false)
 
 	assert.Assert(t, gapFiles != nil)
-	// b.js should NOT be discovered because no entry has files: ['**/*.js']
-	assert.Equal(t, len(gapFiles), 1)
+	assert.Equal(t, len(gapFiles), 2)
 }
 
 func TestDiscoverGapFiles_AllowFilesScope(t *testing.T) {
@@ -522,7 +671,17 @@ func TestDiscoverLintFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 	targets := DiscoverLintFilesMultiConfig(configMap, osvfs.FS(), nil, []string{rootDir}, false)
 
 	expected := []string{rootPaths["root.ts"]}
+	expected = append(expected, rootPaths["pkg/child.ts"])
+	sort.Strings(expected)
 	assert.DeepEqual(t, targets, expected)
+
+	ownedTargets := DiscoverLintTargetsMultiConfig(configMap, nil, osvfs.FS(), nil, []string{rootDir}, false)
+	owners := make(map[string]string, len(ownedTargets))
+	for _, target := range ownedTargets {
+		owners[target.Path] = target.ConfigDirectory
+	}
+	assert.Equal(t, owners[rootPaths["root.ts"]], rootDir)
+	assert.Equal(t, owners[rootPaths["pkg/child.ts"]], childDir)
 }
 
 func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testing.T) {
@@ -557,6 +716,114 @@ func TestDiscoverLintFilesMultiConfig_DoesNotWalkChildConfigFromParent(t *testin
 	assert.Equal(t, childAccesses, 1, "child config directory should be entered only by its owning config")
 }
 
+func TestConfigDirectoryIndex_UsesImmediateBoundariesAndNearestOwner(t *testing.T) {
+	configMap := map[string]RslintConfig{
+		"/repo":          nil,
+		"/repo/pkg":      nil,
+		"/repo/pkg/deep": nil,
+		"/other":         nil,
+	}
+	index := newConfigDirectoryIndex(configMap, nil)
+
+	assert.DeepEqual(t, index.childConfigDirs("/repo"), []string{"/repo/pkg"})
+	assert.DeepEqual(t, index.childConfigDirs("/repo/pkg"), []string{"/repo/pkg/deep"})
+	owner, ok := index.nearestConfig("/repo/pkg/deep/src/index.ts")
+	assert.Assert(t, ok)
+	assert.Equal(t, owner, "/repo/pkg/deep")
+}
+
+func TestConfigDirectoryIndex_UsesFilesystemCaseSensitivity(t *testing.T) {
+	fsys := &caseInsensitiveDiscoveryFS{FS: osvfs.FS()}
+	configMap := map[string]RslintConfig{
+		"C:/Repo":         nil,
+		"C:/Repo/Package": nil,
+	}
+	index := newConfigDirectoryIndex(configMap, fsys)
+
+	owner, ok := index.nearestConfig("c:/repo/package/src/index.ts")
+	assert.Assert(t, ok)
+	assert.Equal(t, owner, "C:/Repo/Package")
+}
+
+func TestConfigDirectoryIndex_UsesPhysicalConfigRootForAliasedTarget(t *testing.T) {
+	realDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(realDir, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(realDir, "src/index.ts"), []byte("export {};\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	linkDir := filepath.Join(filepath.Dir(realDir), filepath.Base(realDir)+"-config-link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	defer os.Remove(linkDir)
+
+	linkDir = tspath.NormalizePath(linkDir)
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	index := newConfigDirectoryIndex(map[string]RslintConfig{linkDir: nil}, fsys)
+	owner, ok := index.nearestConfig(filepath.Join(realDir, "src/index.ts"))
+	assert.Assert(t, ok)
+	assert.Equal(t, owner, linkDir)
+}
+
+func TestDiscoverLintTargetsMultiConfig_MatchesIgnoresInPhysicalConfigSpace(t *testing.T) {
+	realDir, paths := setupDiscoveryFixture(t, []string{"src/keep.ts", "src/ignored.ts"})
+	linkDir := filepath.Join(filepath.Dir(realDir), filepath.Base(realDir)+"-config-link")
+	if err := os.Symlink(realDir, linkDir); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	defer os.Remove(linkDir)
+	linkDir = tspath.NormalizePath(linkDir)
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	configMap := map[string]RslintConfig{
+		linkDir: {
+			{Ignores: []string{"src/ignored.ts"}},
+			{Files: []string{"src/**/*.ts"}, Rules: Rules{"rule": "error"}},
+		},
+	}
+
+	targets := DiscoverLintTargetsMultiConfig(
+		configMap,
+		nil,
+		fsys,
+		[]string{paths["src/ignored.ts"], paths["src/keep.ts"]},
+		nil,
+		true,
+	)
+	assert.DeepEqual(t, targets, []DiscoveredLintTarget{{
+		Path:            paths["src/keep.ts"],
+		ConfigDirectory: linkDir,
+	}})
+}
+
+func TestDiscoverLintTargetsMultiConfig_AssignsExplicitFilesBeforeConfigProcessing(t *testing.T) {
+	rootDir, paths := setupDiscoveryFixture(t, []string{"root.ts", "pkg/child.ts"})
+	childDir := tspath.NormalizePath(filepath.Join(rootDir, "pkg"))
+	fsys := &fileExistsCountingFS{FS: osvfs.FS()}
+	configMap := map[string]RslintConfig{
+		rootDir:  {{Files: []string{"**/*.jsx"}, Rules: Rules{"root": "error"}}},
+		childDir: {{Files: []string{"**/*.jsx"}, Rules: Rules{"child": "error"}}},
+	}
+
+	targets := DiscoverLintTargetsMultiConfig(
+		configMap,
+		nil,
+		fsys,
+		[]string{paths["pkg/child.ts"], paths["root.ts"]},
+		nil,
+		true,
+	)
+	assert.Equal(t, len(targets), 2)
+	owners := map[string]string{}
+	for _, target := range targets {
+		owners[target.Path] = target.ConfigDirectory
+	}
+	assert.Equal(t, owners[paths["root.ts"]], rootDir)
+	assert.Equal(t, owners[paths["pkg/child.ts"]], childDir)
+	assert.Equal(t, fsys.calls.Load(), int32(2), "each explicit file should be checked only by its owner")
+}
+
 func TestDiscoverGapFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 	rootDir, rootPaths := setupDiscoveryFixture(t, []string{
 		"root.ts",
@@ -576,7 +843,7 @@ func TestDiscoverGapFilesMultiConfig_UsesNearestConfigOwner(t *testing.T) {
 
 	gapFiles := DiscoverGapFilesMultiConfig(configMap, osvfs.FS(), map[string]struct{}{}, nil, []string{rootDir}, false)
 
-	expected := []string{rootPaths["pkg/child.jsx"], rootPaths["root.ts"]}
+	expected := []string{rootPaths["pkg/child.jsx"], rootPaths["pkg/child.ts"], rootPaths["root.ts"]}
 	sort.Strings(expected)
 	assert.DeepEqual(t, gapFiles, expected)
 }
@@ -586,18 +853,15 @@ func TestDiscoverGapFiles_FilesButNoRules(t *testing.T) {
 		"src/a.ts",
 	})
 
-	// Entry has files but no rules → GetConfigForFile returns MergedConfig
-	// with empty rules → but entryMatched is true → not nil
-	// However, linter will skip (len(rules) == 0)
+	// The selector contributes a target even though the entry has no rules.
 	config := RslintConfig{
 		{Files: []string{"**/*.ts"}},
 	}
 
 	gapFiles := DiscoverGapFiles(config, configDir, osvfs.FS(), map[string]struct{}{}, nil, nil, false)
 
-	// GetConfigForFile returns non-nil (entry matched), so the file IS a gap file.
-	// The linter will subsequently skip it because it has no rules, but that's
-	// the linter's concern, not discovery's.
+	// Discovery retains the gap target; the linter counts and parses it but does
+	// not execute a rule traversal when the merged rule set is empty.
 	assert.Assert(t, gapFiles != nil)
 }
 

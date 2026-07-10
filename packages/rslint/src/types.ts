@@ -49,7 +49,7 @@ export interface LintResponse {
   fixableWarningCount: number;
   fileCount: number;
   ruleCount: number;
-  // Files actually linted (config `ignores` excluded), each a program-canonical
+  // Files actually linted (config `ignores` excluded), each a requested target
   // path relative to configDirectory — same path space as Diagnostic.filePath.
   // Present for lintFiles so the Rslint class seeds one result per linted file.
   lintedFiles?: string[];
@@ -68,6 +68,10 @@ export interface LintOptions {
   // explicitly under an entry's `rules` (or pulled in via a preset that does
   // so), matching ESLint flat-config semantics.
   config?: Record<string, unknown>[];
+  // Community ESLint-plugin rules available to this request. Go registers
+  // request-scoped placeholder rules from this metadata, then asks the Node
+  // peer to execute them through a reverse `pluginLint` request.
+  eslintPlugins?: Array<{ prefix: string; ruleNames: string[] }>;
   // Anchor dir for resolving the config's relative files/ignores/project.
   configDirectory?: string;
   workingDirectory?: string;
@@ -96,9 +100,21 @@ export interface IpcMessage {
   data: any;
 }
 
+/** Handler for a positive-id request frame sent by the Go peer. */
+export type InboundRequestHandler = (
+  message: IpcMessage,
+) => Promise<unknown> | unknown;
+
+/** Reverse-request handlers that are scoped to one outer lint request. */
+export interface LintInboundHandlers {
+  pluginLint?: (request: unknown) => Promise<unknown> | unknown;
+}
+
 // Service interface that all implementations must follow
 export interface RslintServiceInterface {
   sendMessage(kind: string, data: any): Promise<any>;
+  /** Optional for one-way backends such as the current browser worker. */
+  setInboundHandler?(handler: InboundRequestHandler | null): void;
   terminate(): void;
 }
 

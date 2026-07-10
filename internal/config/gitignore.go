@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
@@ -83,18 +84,18 @@ func ReadGitignoreAsGlobsForFiles(configDir string, fsys vfs.FS, files []string)
 	var allGlobs []string
 	var pruneRules []gitignorePruneRule
 	for _, dir := range dirs {
-		if isDirIgnoredByPruneRules(dir, pruneRules) {
+		if isDirIgnoredByPruneRules(dir, pruneRules, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
 
-		content, ok := fsys.ReadFile(dir + "/.gitignore")
+		content, ok := fsys.ReadFile(tspath.CombinePaths(dir, ".gitignore"))
 		if !ok {
 			continue
 		}
-		if rel, ok := relativeDir(normalizedConfigDir, dir); ok {
+		if rel, ok := relativeDir(normalizedConfigDir, dir, fsys.UseCaseSensitiveFileNames()); ok {
 			allGlobs = append(allGlobs, convertGitignoreToGlobs(content, rel)...)
 		} else {
-			allGlobs = append(allGlobs, convertAncestorGitignoreToGlobs(content, dir, normalizedConfigDir)...)
+			allGlobs = append(allGlobs, convertAncestorGitignoreToGlobs(content, dir, normalizedConfigDir, fsys.UseCaseSensitiveFileNames())...)
 		}
 		if rule, ok := newGitignorePruneRule(dir, content); ok {
 			pruneRules = append(pruneRules, rule)
@@ -148,17 +149,17 @@ func collectAncestorGitignoreGlobs(configDir string, fsys vfs.FS) ([]string, boo
 	var pruneRules []gitignorePruneRule
 	configRootIgnored := false
 	for _, ancestor := range ancestors {
-		if isDirIgnoredByPruneRules(ancestor, pruneRules) {
+		if isDirIgnoredByPruneRules(ancestor, pruneRules, fsys.UseCaseSensitiveFileNames()) {
 			configRootIgnored = true
 			break
 		}
-		gitignorePath := ancestor + "/.gitignore"
+		gitignorePath := tspath.CombinePaths(ancestor, ".gitignore")
 		if content, ok := fsys.ReadFile(gitignorePath); ok {
-			converted := convertAncestorGitignoreToGlobs(content, ancestor, configDir)
+			converted := convertAncestorGitignoreToGlobs(content, ancestor, configDir, fsys.UseCaseSensitiveFileNames())
 			globs = append(globs, converted...)
 			if rule, ok := newGitignorePruneRule(ancestor, content); ok {
 				pruneRules = append(pruneRules, rule)
-				configRootIgnored = isDirIgnoredByPruneRules(configDir, pruneRules)
+				configRootIgnored = isDirIgnoredByPruneRules(configDir, pruneRules, fsys.UseCaseSensitiveFileNames())
 			}
 		}
 	}
@@ -216,10 +217,10 @@ func parseGitignorePrunePatterns(content string) []gitignorePrunePattern {
 	return patterns
 }
 
-func isDirIgnoredByPruneRules(dir string, rules []gitignorePruneRule) bool {
+func isDirIgnoredByPruneRules(dir string, rules []gitignorePruneRule, useCaseSensitive bool) bool {
 	ignored := false
 	for _, rule := range rules {
-		rel, ok := relativeDir(rule.baseDir, dir)
+		rel, ok := relativeDir(rule.baseDir, dir, useCaseSensitive)
 		if !ok || rel == "" {
 			continue
 		}
@@ -253,49 +254,150 @@ func gitignorePrunePatternMatchesPath(pattern gitignorePrunePattern, relPath str
 	return false
 }
 
-// parentDir returns the parent directory of dir, or "" if at root.
+type filesystemPath struct {
+	root            string
+	rest            string
+	caseInsensitive bool
+}
+
+// splitFilesystemPath treats a UNC server/share pair as the volume root.
+// tspath's generic root parser stops at the server, which is appropriate for
+// URLs but would let filesystem traversal escape above a Windows share.
+func splitFilesystemPath(path string) filesystemPath {
+	path = tspath.NormalizePath(path)
+	if strings.HasPrefix(path, "//") {
+		serverAndRest := path[2:]
+		serverEnd := strings.Index(serverAndRest, "/")
+		if serverEnd < 0 {
+			return filesystemPath{root: path, caseInsensitive: true}
+		}
+
+		shareStart := 2 + serverEnd + 1
+		shareAndRest := path[shareStart:]
+		shareEnd := strings.Index(shareAndRest, "/")
+		if shareAndRest == "" {
+			return filesystemPath{root: path, caseInsensitive: true}
+		}
+
+		rootEnd := len(path)
+		if shareEnd >= 0 {
+			rootEnd = shareStart + shareEnd
+		}
+		root := strings.TrimSuffix(path[:rootEnd], "/") + "/"
+		rest := strings.Trim(path[rootEnd:], "/")
+		return filesystemPath{root: root, rest: rest, caseInsensitive: true}
+	}
+
+	rootLength := tspath.GetRootLength(path)
+	if rootLength == 0 {
+		return filesystemPath{rest: strings.Trim(path, "/")}
+	}
+
+	root := path[:rootLength]
+	caseInsensitive := len(root) >= 2 && root[1] == ':'
+	if caseInsensitive && strings.HasSuffix(root, ":") {
+		root += "/"
+	}
+	return filesystemPath{
+		root:            root,
+		rest:            strings.Trim(path[rootLength:], "/"),
+		caseInsensitive: caseInsensitive,
+	}
+}
+
+func joinFilesystemPath(path filesystemPath, rest string) string {
+	if rest == "" {
+		return path.root
+	}
+	if path.root == "" {
+		return rest
+	}
+	return tspath.CombinePaths(path.root, rest)
+}
+
+func sameFilesystemRoot(left filesystemPath, right filesystemPath, useCaseSensitive bool) bool {
+	if left.caseInsensitive != right.caseInsensitive {
+		return false
+	}
+	if left.caseInsensitive || !useCaseSensitive {
+		return strings.EqualFold(left.root, right.root)
+	}
+	return left.root == right.root
+}
+
+func equalFilesystemPath(left string, right string, caseInsensitive bool) bool {
+	if caseInsensitive {
+		return strings.EqualFold(left, right)
+	}
+	return left == right
+}
+
+// parentDir returns the parent directory of dir. Filesystem roots are returned
+// as the parent of their direct children and "" as their own parent.
 func parentDir(dir string) string {
-	idx := strings.LastIndex(dir, "/")
-	if idx <= 0 {
+	path := splitFilesystemPath(dir)
+	if path.rest == "" {
 		return ""
 	}
-	return dir[:idx]
+
+	idx := strings.LastIndex(path.rest, "/")
+	if idx < 0 {
+		return path.root
+	}
+	return joinFilesystemPath(path, path.rest[:idx])
 }
 
 func dirOfPath(filePath string) string {
-	idx := strings.LastIndex(filePath, "/")
+	path := splitFilesystemPath(filePath)
+	if path.rest == "" {
+		return path.root
+	}
+
+	idx := strings.LastIndex(path.rest, "/")
 	if idx < 0 {
-		return ""
+		return path.root
 	}
-	if idx == 0 {
-		return "/"
-	}
-	return filePath[:idx]
+	return joinFilesystemPath(path, path.rest[:idx])
 }
 
-func relativeDir(root string, dir string) (string, bool) {
-	if root == dir {
+func relativeDir(root string, dir string, useCaseSensitive bool) (string, bool) {
+	rootPath := splitFilesystemPath(root)
+	dirPath := splitFilesystemPath(dir)
+	if !sameFilesystemRoot(rootPath, dirPath, useCaseSensitive) {
+		return "", false
+	}
+	caseInsensitive := rootPath.caseInsensitive || !useCaseSensitive
+	if equalFilesystemPath(rootPath.rest, dirPath.rest, caseInsensitive) {
 		return "", true
 	}
-	prefix := root
-	if prefix != "/" {
-		prefix += "/"
+	if rootPath.rest == "" {
+		return dirPath.rest, true
 	}
-	if strings.HasPrefix(dir, prefix) {
-		return strings.TrimPrefix(dir, prefix), true
+
+	prefix := rootPath.rest + "/"
+	if len(dirPath.rest) > len(prefix) && equalFilesystemPath(prefix, dirPath.rest[:len(prefix)], caseInsensitive) {
+		return dirPath.rest[len(prefix):], true
 	}
 	return "", false
 }
 
 func sortByPathDepth(paths []string) {
 	sort.Slice(paths, func(i, j int) bool {
-		depthI := strings.Count(paths[i], "/")
-		depthJ := strings.Count(paths[j], "/")
+		depthI := filesystemPathDepth(paths[i])
+		depthJ := filesystemPathDepth(paths[j])
 		if depthI != depthJ {
 			return depthI < depthJ
 		}
 		return paths[i] < paths[j]
 	})
+}
+
+func filesystemPathDepth(path string) int {
+	rest := splitFilesystemPath(path).rest
+	if rest == "" {
+		return 0
+	}
+	return strings.Count(rest, "/") + 1
 }
 
 // collectGitignoreGlobs recursively scans for .gitignore files and converts
@@ -312,11 +414,28 @@ func sortByPathDepth(paths []string) {
 // here, its files will never be linted, so collecting its .gitignore is
 // unnecessary.
 func collectGitignoreGlobs(absDir string, relDir string, fsys vfs.FS, result *[]string, configIgnores []IgnorePattern) {
-	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, configIgnores, nil)
+	collectGitignoreGlobsRecursive(absDir, relDir, fsys, result, configIgnores, nil, &gitignoreWalkState{
+		realpaths: make(map[string]string),
+		visited:   make(map[string]struct{}),
+	})
 }
 
-func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, configIgnores []IgnorePattern, pruneRules []gitignorePruneRule) {
-	gitignorePath := absDir + "/.gitignore"
+type gitignoreWalkState struct {
+	realpaths map[string]string
+	visited   map[string]struct{}
+}
+
+func (s *gitignoreWalkState) realpath(path string, fsys vfs.FS) string {
+	if realpath, ok := s.realpaths[path]; ok {
+		return realpath
+	}
+	realpath := fsys.Realpath(path)
+	s.realpaths[path] = realpath
+	return realpath
+}
+
+func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, result *[]string, configIgnores []IgnorePattern, pruneRules []gitignorePruneRule, state *gitignoreWalkState) {
+	gitignorePath := tspath.CombinePaths(absDir, ".gitignore")
 	if content, ok := fsys.ReadFile(gitignorePath); ok {
 		localGlobs := convertGitignoreToGlobs(content, relDir)
 		*result = append(*result, localGlobs...)
@@ -326,9 +445,30 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 	}
 
 	entries := fsys.GetAccessibleEntries(absDir)
+	parentRealPath := ""
+	if entries.Symlinks == nil && len(entries.Directories) > 0 {
+		parentRealPath = state.realpath(absDir, fsys)
+		state.visited[parentRealPath] = struct{}{}
+	}
 	for _, dir := range entries.Directories {
-		if _, excluded := defaultExcludeDirs[dir]; excluded {
+		if isDefaultExcludedDirName(dir, fsys.UseCaseSensitiveFileNames()) {
 			continue
+		}
+
+		childAbs := tspath.CombinePaths(absDir, dir)
+		childRealPath := ""
+		if entries.Symlinks != nil {
+			if _, isSymlink := entries.Symlinks[dir]; isSymlink {
+				continue
+			}
+		} else {
+			childRealPath = state.realpath(childAbs, fsys)
+			expectedRealPath := tspath.CombinePaths(parentRealPath, dir)
+			if tspath.ComparePaths(childRealPath, expectedRealPath, tspath.ComparePathsOptions{
+				UseCaseSensitiveFileNames: fsys.UseCaseSensitiveFileNames(),
+			}) != 0 {
+				continue
+			}
 		}
 
 		childRel := dir
@@ -350,15 +490,21 @@ func collectGitignoreGlobsRecursive(absDir string, relDir string, fsys vfs.FS, r
 			continue
 		}
 
-		childAbs := absDir + "/" + dir
 		// Prune directories already ignored as directories by collected
 		// gitignore patterns. Critical for performance: without it, scanning
 		// rspack enters target/ (6,277 Rust build dirs, 0 .ts files).
-		if isDirIgnoredByPruneRules(childAbs, pruneRules) {
+		if isDirIgnoredByPruneRules(childAbs, pruneRules, fsys.UseCaseSensitiveFileNames()) {
 			continue
 		}
 
-		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, configIgnores, pruneRules)
+		if childRealPath != "" {
+			if _, visited := state.visited[childRealPath]; visited {
+				continue
+			}
+			state.visited[childRealPath] = struct{}{}
+		}
+
+		collectGitignoreGlobsRecursive(childAbs, childRel, fsys, result, configIgnores, pruneRules, state)
 	}
 }
 
@@ -406,10 +552,10 @@ func normalizeGitignoreLine(line string) (string, bool) {
 	return line, true
 }
 
-func convertAncestorGitignoreToGlobs(content string, ancestorDir string, configDir string) []string {
-	configRel := strings.TrimPrefix(configDir, ancestorDir+"/")
-	if configRel == configDir {
-		configRel = ""
+func convertAncestorGitignoreToGlobs(content string, ancestorDir string, configDir string, useCaseSensitive bool) []string {
+	configRel, ok := relativeDir(ancestorDir, configDir, useCaseSensitive)
+	if !ok {
+		return nil
 	}
 
 	var globs []string

@@ -151,13 +151,17 @@ export interface ESLintPlugin {
  * different file globs and are merged at lint time.
  */
 export interface RslintConfigEntry {
+  /** Optional human-readable name for this config entry. */
+  name?: string;
   /**
-   * Glob patterns for files this entry applies to.
+   * Glob selectors for files this entry applies to. Top-level selectors are
+   * ORed; strings inside one nested array are ANDed, matching ESLint flat
+   * config semantics.
    *
    * @example
    * files: ['src/**', 'tests/**']
    */
-  files?: string[];
+  files?: Array<string | string[]>;
   /**
    * Glob patterns excluded from this entry.
    *

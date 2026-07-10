@@ -25,12 +25,63 @@ type RslintConfig []ConfigEntry
 
 // ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
-	Files           []string         `json:"files,omitempty"`
-	Ignores         []string         `json:"ignores,omitempty"`
-	LanguageOptions *LanguageOptions `json:"languageOptions,omitempty"`
-	Rules           Rules            `json:"rules"`
-	Plugins         []string         `json:"plugins,omitempty"`
-	Settings        Settings         `json:"settings,omitempty"`
+	Name string `json:"name,omitempty"`
+	// Files retains the established Go construction API for top-level OR
+	// patterns. FilePatternGroups stores nested arrays, each of which is an AND
+	// group. JSON encoding combines both fields back into one mixed `files`
+	// array.
+	Files             []string         `json:"files,omitempty"`
+	FilePatternGroups [][]string       `json:"-"`
+	Ignores           []string         `json:"ignores,omitempty"`
+	LanguageOptions   *LanguageOptions `json:"languageOptions,omitempty"`
+	Rules             Rules            `json:"rules"`
+	Plugins           []string         `json:"plugins,omitempty"`
+	Settings          Settings         `json:"settings,omitempty"`
+}
+
+func (entry ConfigEntry) MarshalJSON() ([]byte, error) {
+	type configEntryAlias ConfigEntry
+	if len(entry.FilePatternGroups) == 0 {
+		return json.Marshal(configEntryAlias(entry))
+	}
+
+	encoded, err := json.Marshal(configEntryAlias(entry))
+	if err != nil {
+		return nil, err
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(encoded, &object); err != nil {
+		return nil, err
+	}
+	selectors := make([]any, 0, len(entry.Files)+len(entry.FilePatternGroups))
+	for _, pattern := range entry.Files {
+		selectors = append(selectors, pattern)
+	}
+	for _, group := range entry.FilePatternGroups {
+		selectors = append(selectors, group)
+	}
+	filesJSON, err := json.Marshal(selectors)
+	if err != nil {
+		return nil, err
+	}
+	object["files"] = filesJSON
+	return json.Marshal(object)
+}
+
+func (entry *ConfigEntry) UnmarshalJSON(data []byte) error {
+	wrapped := make([]byte, 0, len(data)+2)
+	wrapped = append(wrapped, '[')
+	wrapped = append(wrapped, data...)
+	wrapped = append(wrapped, ']')
+	var config RslintConfig
+	if err := config.UnmarshalJSON(wrapped); err != nil {
+		return err
+	}
+	if len(config) != 1 {
+		return fmt.Errorf("expected one config entry")
+	}
+	*entry = config[0]
+	return nil
 }
 
 // Settings represents shared settings accessible to rules
@@ -58,19 +109,43 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 			return err
 		}
 
+		var decoded configEntryAlias
+		entryForDecode := rawEntry
 		if rawFiles, ok := raw["files"]; ok {
-			var files []string
-			if err := json.Unmarshal(rawFiles, &files); err != nil {
-				return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array: %w", index, err)
+			files, groups, err := decodeFilesSelectors(rawFiles, index)
+			if err != nil {
+				return err
 			}
-			if len(files) == 0 {
-				return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
+			decoded.Files = files
+			decoded.FilePatternGroups = groups
+			withoutFiles := make(map[string]json.RawMessage, len(raw)-1)
+			for key, value := range raw {
+				if key != "files" {
+					withoutFiles[key] = value
+				}
+			}
+			entryForDecode, err = json.Marshal(withoutFiles)
+			if err != nil {
+				return err
 			}
 		}
-
-		var decoded configEntryAlias
-		if err := json.Unmarshal(rawEntry, &decoded); err != nil {
+		if err := json.Unmarshal(entryForDecode, &decoded); err != nil {
 			return err
+		}
+		// Global-ignore semantics depend on object shape, not on whether a
+		// present field decodes to a non-nil Go value. Preserve the non-global
+		// shape of entries such as {ignores, rules: null} or entries carrying a
+		// currently unsupported field. An empty Settings map is behaviorally
+		// neutral but remains non-nil for isGlobalIgnoreEntry.
+		hasNonGlobalKey := false
+		for key := range raw {
+			if key != "ignores" && key != "name" {
+				hasNonGlobalKey = true
+				break
+			}
+		}
+		if hasNonGlobalKey && decoded.Files == nil && decoded.FilePatternGroups == nil && decoded.Rules == nil && decoded.Plugins == nil && decoded.Settings == nil && decoded.LanguageOptions == nil {
+			decoded.Settings = Settings{}
 		}
 		entries = append(entries, ConfigEntry(decoded))
 	}
@@ -79,12 +154,47 @@ func (config *RslintConfig) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func decodeFilesSelectors(raw json.RawMessage, entryIndex int) ([]string, [][]string, error) {
+	var selectors []json.RawMessage
+	if err := json.Unmarshal(raw, &selectors); err != nil || len(selectors) == 0 {
+		if err != nil {
+			return nil, nil, fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array: %w", entryIndex, err)
+		}
+		return nil, nil, fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", entryIndex)
+	}
+
+	files := make([]string, 0, len(selectors))
+	var groups [][]string
+	for selectorIndex, selector := range selectors {
+		var pattern string
+		if err := json.Unmarshal(selector, &pattern); err == nil {
+			files = append(files, pattern)
+			continue
+		}
+		var group []string
+		if err := json.Unmarshal(selector, &group); err != nil || len(group) == 0 {
+			return nil, nil, fmt.Errorf(
+				"config entry at index %d: key \"files\": item at index %d must be a string or a non-empty array of strings",
+				entryIndex,
+				selectorIndex,
+			)
+		}
+		groups = append(groups, group)
+	}
+	return files, groups, nil
+}
+
 // ValidateConfig checks config invariants for configs constructed in Go. JSON
 // config ingress rejects explicit null/empty `files` during unmarshaling.
 func ValidateConfig(config RslintConfig) error {
 	for index, entry := range config {
-		if entry.Files != nil && len(entry.Files) == 0 {
+		if (entry.Files != nil || entry.FilePatternGroups != nil) && len(entry.Files) == 0 && len(entry.FilePatternGroups) == 0 {
 			return fmt.Errorf("config entry at index %d: key \"files\": expected value to be a non-empty array", index)
+		}
+		for groupIndex, group := range entry.FilePatternGroups {
+			if len(group) == 0 {
+				return fmt.Errorf("config entry at index %d: key \"files\": AND group at index %d must be non-empty", index, groupIndex)
+			}
 		}
 	}
 	return nil
@@ -427,8 +537,9 @@ type MergedConfig struct {
 // IsFileIgnored reports whether filePath is excluded by the config's global
 // `ignores` patterns. It is distinct from GetConfigForFile returning nil,
 // which also covers "no entry matched this file" — callers that need ESLint's
-// "ignores hides the file from the linter entirely" semantics (including
-// type-check diagnostics and file counts) should use this method.
+// "ignores removes the file from lint target discovery" semantics should use
+// this method. Program-wide type-check diagnostics are intentionally governed
+// by tsconfig membership instead.
 func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
 	patterns := ExtractConfigIgnores(config)
 	if len(patterns) == 0 {
@@ -438,8 +549,10 @@ func (config RslintConfig) IsFileIgnored(filePath string, cwd string) bool {
 		isFileIgnored(filePath, patterns, cwd)
 }
 
-// GetConfigForFile computes the merged configuration for a file following ESLint flat config semantics.
-// Returns nil if the file is globally ignored or no entry matches (should not be linted).
+// GetConfigForFile computes the merged configuration for a selected file
+// following ESLint flat config semantics. It returns nil when the file is
+// globally ignored, outside the config's implicit/explicit selector union, or
+// no entry contributes configuration.
 //
 // Global ignore evaluation happens in two phases:
 //  1. Directory-level (isDirBlockedByIgnores): patterns like dir/** block entire directories.
@@ -471,6 +584,14 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 		}
 	}
 
+	// A CLI/API explicit target can bypass config `files` for parsing, but it
+	// must not make unscoped entries apply to a path the config itself never
+	// selected. Conversely, an explicit selector makes unscoped entries apply
+	// to that file, as in ESLint flat config cascading.
+	if !isFileSelectedByConfig(config, filePath, cwd) {
+		return nil
+	}
+
 	// Track whether any non-global entry matched this file
 	entryMatched := false
 
@@ -480,7 +601,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 		}
 
 		// 2. files matching
-		if len(entry.Files) > 0 && !isFileMatched(filePath, entry.Files, cwd) {
+		if hasFileSelectors(entry) && !isFileMatchedByConfigEntry(filePath, entry, cwd) {
 			continue
 		}
 
@@ -532,19 +653,66 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 	return merged
 }
 
-// isGlobalIgnoreEntry returns true if the entry is a global ignore entry
-// (has only ignores, no other fields).
+// isGlobalIgnoreEntry returns true if the entry has only ignores and an
+// optional name. Empty config objects are still present and make ignores local
+// to the entry, matching ESLint flat config semantics.
 func isGlobalIgnoreEntry(entry ConfigEntry) bool {
 	return entry.Files == nil &&
-		len(entry.Rules) == 0 &&
-		len(entry.Plugins) == 0 &&
+		entry.FilePatternGroups == nil &&
+		entry.Rules == nil &&
+		entry.Plugins == nil &&
 		entry.Settings == nil &&
 		entry.LanguageOptions == nil &&
 		len(entry.Ignores) > 0
 }
 
+func hasFileSelectors(entry ConfigEntry) bool {
+	return len(entry.Files) > 0 || len(entry.FilePatternGroups) > 0
+}
+
+func isFileMatchedByConfigEntry(filePath string, entry ConfigEntry, cwd string) bool {
+	if isFileMatched(filePath, entry.Files, cwd) {
+		return true
+	}
+	for _, group := range entry.FilePatternGroups {
+		matched := len(group) > 0
+		for _, pattern := range group {
+			if !isSingleFilePatternMatched(filePath, pattern, cwd) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
 // isFileMatched checks if a file matches any of the given glob patterns
 func isFileMatched(filePath string, patterns []string, cwd string) bool {
+	for _, pattern := range patterns {
+		if isSingleFilePatternMatched(filePath, pattern, cwd) {
+			return true
+		}
+	}
+	return false
+}
+
+func isSingleFilePatternMatched(filePath string, pattern string, cwd string) bool {
+	negated := false
+	for strings.HasPrefix(pattern, "!") {
+		negated = !negated
+		pattern = strings.TrimPrefix(pattern, "!")
+	}
+	matched := isPositiveFilePatternMatched(filePath, pattern, cwd)
+	if negated {
+		return !matched
+	}
+	return matched
+}
+
+func isPositiveFilePatternMatched(filePath string, pattern string, cwd string) bool {
 	var normalizedPath string
 	if cwd != "" {
 		normalizedPath = normalizePath(filePath, cwd)
@@ -552,22 +720,20 @@ func isFileMatched(filePath string, patterns []string, cwd string) bool {
 		normalizedPath = filePath
 	}
 
-	for _, pattern := range patterns {
-		normalizedPattern := normalizePattern(pattern)
+	normalizedPattern := normalizePattern(pattern)
 
-		if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
+	if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
+		return true
+	}
+	if normalizedPath != filePath {
+		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 			return true
 		}
-		if normalizedPath != filePath {
-			if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
-				return true
-			}
-		}
-		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-		if unixPath != normalizedPath {
-			if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
-				return true
-			}
+	}
+	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
+	if unixPath != normalizedPath {
+		if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
+			return true
 		}
 	}
 	return false
@@ -596,11 +762,9 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 			merged.ParserOptions = &po
 		}
 	}
-	// Shallow-merge the raw languageOptions map (override wins per key). This is
-	// intentionally shallow, NOT ESLint's recursive flat-config deepMerge of
-	// nested parserOptions/globals — matching that merge fidelity is a separate
-	// concern from wiring eslintPlugins and is out of scope here. merged is a
-	// shallow copy of base, so build a fresh map rather than mutating base.Raw.
+	// Shallow-merge the raw languageOptions map (override wins per key), except
+	// globals, which ESLint merges by global name. merged is a shallow copy of
+	// base, so build fresh maps rather than mutating either input.
 	if len(override.Raw) > 0 {
 		mergedRaw := make(map[string]any, len(base.Raw)+len(override.Raw))
 		for k, v := range base.Raw {
@@ -609,14 +773,25 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 		for k, v := range override.Raw {
 			mergedRaw[k] = v
 		}
+		if overrideGlobals, ok := override.Raw["globals"].(map[string]any); ok {
+			mergedGlobals := make(map[string]any, len(overrideGlobals))
+			if baseGlobals, ok := base.Raw["globals"].(map[string]any); ok {
+				for name, value := range baseGlobals {
+					mergedGlobals[name] = value
+				}
+			}
+			for name, value := range overrideGlobals {
+				mergedGlobals[name] = value
+			}
+			mergedRaw["globals"] = mergedGlobals
+		}
 		merged.Raw = mergedRaw
 	}
 	return &merged
 }
 
 // ExtractGlobals reads the effective `languageOptions.globals` for a merged
-// config (the buggy shallow-merged Raw map — see mergeLanguageOptions) and
-// normalizes it to a simple "is this name declared" set.
+// config and normalizes it to a simple "is this name declared" set.
 //
 // Matches ESLint's own normalizeConfigGlobal (lib/languages/js/source-code/
 // source-code.js): only the string `"off"` un-declares a global. Every other

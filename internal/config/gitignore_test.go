@@ -23,6 +23,40 @@ func (s *gitignoreSpyFS) GetAccessibleEntries(path string) vfs.Entries {
 	return s.FS.GetAccessibleEntries(path)
 }
 
+type gitignoreMockFS struct {
+	vfs.FS
+	entries         map[string]vfs.Entries
+	files           map[string]string
+	realpaths       map[string]string
+	readFileCalls   []string
+	accessedDirs    []string
+	realpathCalls   []string
+	caseSensitiveFS bool
+}
+
+func (m *gitignoreMockFS) ReadFile(path string) (string, bool) {
+	m.readFileCalls = append(m.readFileCalls, path)
+	content, ok := m.files[path]
+	return content, ok
+}
+
+func (m *gitignoreMockFS) GetAccessibleEntries(path string) vfs.Entries {
+	m.accessedDirs = append(m.accessedDirs, path)
+	return m.entries[path]
+}
+
+func (m *gitignoreMockFS) Realpath(path string) string {
+	m.realpathCalls = append(m.realpathCalls, path)
+	if realpath, ok := m.realpaths[path]; ok {
+		return realpath
+	}
+	return path
+}
+
+func (m *gitignoreMockFS) UseCaseSensitiveFileNames() bool {
+	return m.caseSensitiveFS
+}
+
 func setupGitignoreFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -235,6 +269,27 @@ func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
 	assert.Equal(t, globs[0], "**/dist/**/*")
 }
 
+func TestReadGitignoreAsGlobs_SkipsDefaultDirsCaseInsensitively(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			"/repo": {
+				Directories: []string{"NODE_MODULES"},
+				Symlinks:    map[string]struct{}{},
+			},
+		},
+		files:           map[string]string{},
+		caseSensitiveFS: false,
+	}
+
+	ReadGitignoreAsGlobs("/repo", mock, nil)
+	for _, accessed := range mock.accessedDirs {
+		if strings.EqualFold(accessed, "/repo/node_modules") {
+			t.Fatalf("case-insensitive filesystem must not scan default excluded directory %q", accessed)
+		}
+	}
+}
+
 // --- Scope isolation tests ---
 
 func TestConvertGitignoreToGlobs_ScopeIsolation(t *testing.T) {
@@ -271,6 +326,64 @@ func TestReadGitignoreAsGlobs_ThreeLevelNested(t *testing.T) {
 	assert.Assert(t, hasRoot, "root dist")
 	assert.Assert(t, hasApp, "app tmp")
 	assert.Assert(t, hasSub, "sub cache")
+}
+
+func TestReadGitignoreAsGlobs_SkipsDescendantSymlinkCycle(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			"/repo/.gitignore":        "root-cache/\n",
+			"/repo/a/.gitignore":      "nested-cache/\n",
+			"/repo/a/loop/.gitignore": "cycle-cache/\n",
+		},
+		entries: map[string]vfs.Entries{
+			"/repo": {
+				Directories: []string{"a"},
+				Symlinks:    map[string]struct{}{},
+			},
+			"/repo/a": {
+				Directories: []string{"loop"},
+				Symlinks:    map[string]struct{}{"loop": {}},
+			},
+			"/repo/a/loop": {
+				Directories: []string{"a"},
+				Symlinks:    map[string]struct{}{},
+			},
+		},
+		realpaths: map[string]string{"/repo/a/loop": "/repo"},
+	}
+
+	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
+
+	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
+	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
+	assert.Equal(t, len(mock.realpathCalls), 0, "symlink metadata should avoid Realpath fallback")
+}
+
+func TestReadGitignoreAsGlobs_LegacySymlinkCycleUsesCachedRealpaths(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			"/repo/.gitignore":        "root-cache/\n",
+			"/repo/a/.gitignore":      "nested-cache/\n",
+			"/repo/a/loop/.gitignore": "cycle-cache/\n",
+		},
+		entries: map[string]vfs.Entries{
+			"/repo":   {Directories: []string{"a"}},
+			"/repo/a": {Directories: []string{"loop"}},
+		},
+		realpaths: map[string]string{
+			"/repo":        "/repo",
+			"/repo/a":      "/repo/a",
+			"/repo/a/loop": "/repo",
+		},
+	}
+
+	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
+
+	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
+	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
+	assert.DeepEqual(t, mock.realpathCalls, []string{"/repo", "/repo/a", "/repo/a/loop"})
 }
 
 // --- Additional edge case tests ---
@@ -328,6 +441,150 @@ func TestConvertGitignoreToGlobs_DirOnlySuffixDedup(t *testing.T) {
 }
 
 // --- Ancestor inheritance tests ---
+
+func TestParentDirStopsAtFilesystemRoot(t *testing.T) {
+	tests := []struct {
+		path   string
+		parent string
+	}{
+		{path: "/repo/pkg", parent: "/repo"},
+		{path: "/repo", parent: "/"},
+		{path: "/", parent: ""},
+		{path: "C:/repo", parent: "C:/"},
+		{path: "C:/", parent: ""},
+		{path: "//server/share/repo", parent: "//server/share/"},
+		{path: "//server/share/", parent: ""},
+		{path: "pkg/src", parent: "pkg"},
+		{path: "pkg", parent: ""},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, parentDir(test.path), test.parent, "parentDir(%q)", test.path)
+	}
+}
+
+func TestRelativeDirIsVolumeAndShareAware(t *testing.T) {
+	tests := []struct {
+		name string
+		root string
+		dir  string
+		rel  string
+		ok   bool
+	}{
+		{name: "posix", root: "/repo", dir: "/repo/pkg", rel: "pkg", ok: true},
+		{name: "posix sibling", root: "/repo", dir: "/repository/pkg", ok: false},
+		{name: "drive", root: "C:/repo", dir: "c:/repo/pkg", rel: "pkg", ok: true},
+		{name: "other drive", root: "C:/repo", dir: "D:/repo/pkg", ok: false},
+		{name: "unc", root: "//server/share/repo", dir: "//SERVER/SHARE/repo/pkg", rel: "pkg", ok: true},
+		{name: "other share", root: "//server/share/repo", dir: "//server/other/repo/pkg", ok: false},
+		{name: "share prefix", root: "//server/share/repo", dir: "//server/share-other/repo/pkg", ok: false},
+		{name: "other server", root: "//server/share/repo", dir: "//other/share/repo/pkg", ok: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rel, ok := relativeDir(test.root, test.dir, true)
+			assert.Equal(t, ok, test.ok)
+			assert.Equal(t, rel, test.rel)
+		})
+	}
+
+	rel, ok := relativeDir("/Repo", "/repo/pkg", false)
+	assert.Assert(t, ok)
+	assert.Equal(t, rel, "pkg")
+}
+
+func TestSortByPathDepthTreatsUNCShareAsRoot(t *testing.T) {
+	paths := []string{
+		"//server/share/repo/pkg",
+		"//server/share/repo",
+		"//server/share/",
+	}
+
+	sortByPathDepth(paths)
+
+	assert.DeepEqual(t, paths, []string{
+		"//server/share/",
+		"//server/share/repo",
+		"//server/share/repo/pkg",
+	})
+}
+
+func TestReadGitignoreAsGlobs_JoinsFilesystemRoots(t *testing.T) {
+	tests := []struct {
+		name         string
+		configDir    string
+		rootIgnore   string
+		configIgnore string
+	}{
+		{name: "posix", configDir: "/repo", rootIgnore: "/.gitignore", configIgnore: "/repo/.gitignore"},
+		{name: "drive", configDir: "C:/repo", rootIgnore: "C:/.gitignore", configIgnore: "C:/repo/.gitignore"},
+		{name: "unc", configDir: "//server/share/repo", rootIgnore: "//server/share/.gitignore", configIgnore: "//server/share/repo/.gitignore"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := &gitignoreMockFS{
+				FS: osvfs.FS(),
+				files: map[string]string{
+					test.rootIgnore: "root-cache/\n",
+				},
+				entries: map[string]vfs.Entries{
+					test.configDir: {Symlinks: map[string]struct{}{}},
+				},
+			}
+
+			globs := ReadGitignoreAsGlobs(test.configDir, mock, nil)
+
+			assert.DeepEqual(t, globs, []string{"**/root-cache/**/*"})
+			assert.DeepEqual(t, mock.readFileCalls, []string{test.rootIgnore, test.configIgnore})
+		})
+	}
+}
+
+func TestConvertAncestorGitignoreToGlobs_IsVolumeAndShareAware(t *testing.T) {
+	tests := []struct {
+		name      string
+		ancestor  string
+		configDir string
+		content   string
+		expected  []string
+	}{
+		{
+			name:      "same drive preserves config base",
+			ancestor:  "C:/repo",
+			configDir: "C:/repo/packages/app",
+			content:   "/packages/app/dist/\n",
+			expected:  []string{"dist/**/*"},
+		},
+		{
+			name:      "same share preserves config base",
+			ancestor:  "//server/share/repo",
+			configDir: "//server/share/repo/packages/app",
+			content:   "/packages/app/dist/\n",
+			expected:  []string{"dist/**/*"},
+		},
+		{
+			name:      "other drive is not ancestor",
+			ancestor:  "D:/repo",
+			configDir: "C:/repo/packages/app",
+			content:   "dist/\n",
+		},
+		{
+			name:      "other share is not ancestor",
+			ancestor:  "//server/other/repo",
+			configDir: "//server/share/repo/packages/app",
+			content:   "dist/\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := convertAncestorGitignoreToGlobs(test.content, test.ancestor, test.configDir, true)
+			assert.DeepEqual(t, actual, test.expected)
+		})
+	}
+}
 
 func TestReadGitignoreAsGlobs_AncestorInheritance(t *testing.T) {
 	// Root has .gitignore with dist/. configDir is packages/app (child).

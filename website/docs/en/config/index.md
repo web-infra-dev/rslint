@@ -36,22 +36,22 @@ When linting from the monorepo root, rslint automatically discovers all nested c
 
 #### Global Ignores and Nested Configs
 
-Global ignores in a parent config prevent nested configs in ignored directories from being discovered. This aligns with ESLint v10 behavior.
+For directory or no-argument lint runs, global ignores in a parent config prevent nested configs in ignored directories from contributing lint targets.
 
 ```ts
 // monorepo/rslint.config.ts
 export default defineConfig([
-  // Global ignore — blocks config discovery in these directories
+  // Global ignore — blocks directory target discovery in these directories
   { ignores: ['**/fixtures/**', 'e2e/**'] },
   ts.configs.recommended,
   // ...
 ]);
 ```
 
-With this config, a `rslint.config.ts` inside `e2e/` or any `fixtures/` directory will **not** be used when linting from the monorepo root. This prevents test fixture configs from interfering with the main lint run.
+With this config, a `rslint.config.ts` inside `e2e/` or any `fixtures/` directory is not used by a root directory traversal. An explicitly named file is still resolved from its nearest config, matching the explicit-target behavior described below.
 
 :::tip
-Only **global ignore entries** (entries with only `ignores` and no other fields) block nested config discovery. Entry-level ignores (entries with both `files` and `ignores`) do not affect config discovery.
+Only **global ignore entries** (entries with only `ignores` and an optional `name`) block directory target discovery. Entry-level ignores do not affect config discovery.
 :::
 
 You can also specify a config file explicitly (overrides automatic discovery):
@@ -98,15 +98,15 @@ For available presets, rule severity, and plugin configuration, see [Rules & Pre
 
 ### files
 
-- **Type:** `string[]`
+- **Type:** `(string | string[])[]`
 
-Glob patterns specifying which files this config entry applies to. If omitted, the entry applies to rslint's default lintable file set.
+Glob selectors specifying which files this config entry applies to. Top-level selectors are ORed. Patterns in a nested array are ANDed, so `files: [['**/*.js', '!**/*.test.js']]` selects JavaScript files except test files. If omitted, the entry cascades across files selected by the config's implicit or explicit selectors.
 
 If `files` is present, it must contain at least one pattern. Use an omitted `files` field for shared/default entries; `files: []` is invalid.
 
-Lint targets are selected from the CLI/API target range, then filtered by `files`, global ignores, and `.gitignore`. Explicit file arguments are the exception: an explicit file can still appear as a lint result even when it does not match any `files` pattern, but no rules run unless at least one config entry applies to that file. Global ignores and `.gitignore` still remove explicit files from the result set.
+Lint targets are selected from the CLI/API target range. Rslint always includes its default extension baseline, unions every explicit `files` pattern, and then removes global ignores and `.gitignore` matches. Entry-level ignores skip that entry during config merging but do not remove the file from the target set. Explicit file arguments can also appear as 0-rule results outside the selector union. Every selected target is parsed, so syntax diagnostics can still be reported when no rules apply.
 
-Each non-global entry that omits `files` contributes this default set:
+The implicit default baseline is:
 
 - `.js`
 - `.mjs`
@@ -117,7 +117,7 @@ Each non-global entry that omits `files` contributes this default set:
 - `.mts`
 - `.cts`
 
-This is independent of tsconfig's `include`: a file in tsconfig but not selected by rslint's lint scope will not be linted, while a selected file that is not in any tsconfig will still be linted with syntax-only rules (type-aware rules require tsconfig coverage).
+This is independent of tsconfig's `include`: a file in tsconfig but outside rslint's lint target set will not run lint rules, while a selected file not covered by a tsconfig declared by its governing config still runs syntax-only rules.
 
 ```ts
 {
@@ -127,7 +127,7 @@ This is independent of tsconfig's `include`: a file in tsconfig but not selected
 ```
 
 :::tip
-Files that match `files` but are not included in any tsconfig automatically receive a reduced rule set — only rules that don't require type information will run. To enable type-aware rules for these files, add them to your tsconfig's `include`.
+Selected files not covered by a tsconfig declared by their governing config automatically receive a reduced rule set: only rules that do not require type information run. To enable type-aware rules, add the file to one of that config's tsconfigs.
 :::
 
 ### ignores
@@ -224,13 +224,14 @@ Shared settings accessible to all rules. Later entries override earlier ones.
 
 When multiple config entries match a file, they are merged in array order:
 
-1. **Global ignores** — entries with only `ignores` exclude files from all rules
-2. **Files matching** — entries whose `files` patterns don't match are skipped
-3. **Entry-level ignores** — entries whose `ignores` match are skipped
-4. **Rules** — shallow merge, later entries override earlier ones
-5. **Plugins** — union from all matching entries
-6. **Settings** — shallow merge
-7. **Language options** — deep merge at field level
+1. **Global ignores** — entries containing only `ignores` and an optional `name` remove files from the target set
+2. **Selector union** — the implicit default baseline and explicit `files` patterns decide whether the config selects the file
+3. **Files matching** — entries whose explicit `files` patterns don't match are skipped; entries without `files` cascade across the selector union
+4. **Entry-level ignores** — matching entries are skipped without removing the target
+5. **Rules** — shallow merge, later entries override earlier ones
+6. **Plugins** — union from all matching entries
+7. **Settings** — shallow merge
+8. **Language options** — parser options merge by field and globals merge by name
 
 If no entry matches a file, no rules run for it. Explicit file arguments may still be reported as 0-rule results unless global ignores or `.gitignore` exclude them.
 

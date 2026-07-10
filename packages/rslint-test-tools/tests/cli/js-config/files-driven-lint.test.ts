@@ -32,8 +32,8 @@ function rules(diagnostics: Diagnostic[]): string[] {
 }
 
 /**
- * Tests for files-driven lint: config `files` controls what gets linted,
- * tsconfig `include` controls which files get type-aware rules.
+ * Tests for files-driven lint: the default extension baseline plus config
+ * `files` select targets; tsconfig membership controls type-aware rules.
  */
 describe('Files-driven lint: gap file auto-degrade', () => {
   test('file matching config files but NOT in tsconfig include should only get syntax rules', async () => {
@@ -96,7 +96,7 @@ describe('Files-driven lint: gap file auto-degrade', () => {
     }
   });
 
-  test('file in tsconfig include but NOT matching config files should NOT be linted', async () => {
+  test('file outside an entry files selector should not run that entry rules', async () => {
     const tempDir = await createTempDir({
       // tsconfig includes both src/ and test/
       'tsconfig.json': JSON.stringify({
@@ -137,7 +137,8 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       );
       expect(srcDiags.length).toBeGreaterThan(0);
 
-      // test/test.ts should NOT be linted (not matching config files)
+      // test/test.ts is a baseline target, but this scoped entry contributes no
+      // rules because its files selector does not match.
       const testDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('test/test.ts'),
       );
@@ -1163,7 +1164,7 @@ describe('Files-driven lint: recommended + user override cascade', () => {
 });
 
 describe('Files-driven lint: edge cases', () => {
-  test('syntax error outside config files should not fail tsconfig-backed lint', async () => {
+  test('default-baseline target outside entry files reports syntax in tsconfig-backed lint', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': JSON.stringify({
         compilerOptions: { target: 'ES2020', module: 'ESNext', strict: true },
@@ -1195,9 +1196,14 @@ describe('Files-driven lint: edge cases', () => {
         .map((l) => JSON.parse(l));
 
       expect(diagnostics.map((d: any) => d.ruleName)).toContain('no-debugger');
+      expect(result.exitCode).toBe(1);
       expect(
-        diagnostics.some((d: any) => d.filePath.includes('test/bad.ts')),
-      ).toBe(false);
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('test/bad.ts') &&
+            d.ruleName === 'TypeScript(TS1134)',
+        ),
+      ).toBe(true);
       expect(result.stderr).not.toContain('test/bad.ts');
       expect(result.stderr).not.toContain('TS1134');
     } finally {
@@ -1341,7 +1347,7 @@ describe('Files-driven lint: edge cases', () => {
     }
   });
 
-  test('syntax error outside config files should not fail no-tsconfig lint', async () => {
+  test('default-baseline target outside entry files reports syntax without tsconfig', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': `export default [
         {
@@ -1363,9 +1369,14 @@ describe('Files-driven lint: edge cases', () => {
         .map((l) => JSON.parse(l));
 
       expect(diagnostics.map((d: any) => d.ruleName)).toContain('no-debugger');
+      expect(result.exitCode).toBe(1);
       expect(
-        diagnostics.some((d: any) => d.filePath.includes('test/bad.ts')),
-      ).toBe(false);
+        diagnostics.some(
+          (d: any) =>
+            d.filePath.includes('test/bad.ts') &&
+            d.ruleName === 'TypeScript(TS1134)',
+        ),
+      ).toBe(true);
       expect(result.stderr).not.toContain('test/bad.ts');
       expect(result.stderr).not.toContain('TS1134');
     } finally {

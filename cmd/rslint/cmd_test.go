@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -960,11 +961,11 @@ func TestFormatAllowFileWarning_UnknownKindIsEmpty(t *testing.T) {
 func TestCollectAllowFileWarnings_EmptyReturnsNil(t *testing.T) {
 	// No allowFiles → no work, no warnings. Important so callers can rely
 	// on a non-nil result implying actual user-specified files.
-	got := collectAllowFileWarnings(nil, nil, nil, nil, "/work", true)
+	got := collectAllowFileWarnings(nil, nil, nil, "/work", true)
 	if got != nil {
 		t.Errorf("empty allowFiles should produce nil, got %+v", got)
 	}
-	got = collectAllowFileWarnings([]string{}, nil, nil, nil, "/work", true)
+	got = collectAllowFileWarnings([]string{}, nil, nil, "/work", true)
 	if got != nil {
 		t.Errorf("empty allowFiles (non-nil slice) should still produce nil, got %+v", got)
 	}
@@ -979,7 +980,6 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		[]*compiler.Program{program},
 		nil,
 		rslintconfig.RslintConfig{
 			{Files: []string{"**/*.js"}, Rules: rslintconfig.Rules{"no-console": "error"}},
@@ -992,10 +992,7 @@ func TestCollectAllowFileWarnings_NoWarningForFilesScopeMiss(t *testing.T) {
 	}
 }
 
-func TestCollectAllowFileWarnings_NoWarningForExistingFileOutsideProgram(t *testing.T) {
-	program := createTestProgram(t, map[string]string{
-		"src/app.ts": "const value = 1;",
-	})
+func TestCollectAllowFileWarnings_NoWarningForExistingFile(t *testing.T) {
 	target := filepath.Join(t.TempDir(), "outside.ts")
 	if err := os.WriteFile(target, []byte("const outside = 1;\n"), 0o644); err != nil {
 		t.Fatalf("write outside target: %v", err)
@@ -1004,7 +1001,6 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFileOutsideProgram(t *test
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		[]*compiler.Program{program},
 		nil,
 		rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
@@ -1013,7 +1009,7 @@ func TestCollectAllowFileWarnings_NoWarningForExistingFileOutsideProgram(t *test
 		true,
 	)
 	if len(warnings) != 0 {
-		t.Fatalf("existing files outside Program should be handled by fallback, got warnings %+v", warnings)
+		t.Fatalf("existing files should not produce warnings, got %+v", warnings)
 	}
 }
 
@@ -1021,7 +1017,6 @@ func TestCollectAllowFileWarnings_MissingFileWarns(t *testing.T) {
 	target := tspath.NormalizePath(filepath.Join(t.TempDir(), "missing.ts"))
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		nil,
 		nil,
 		rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
@@ -1046,7 +1041,6 @@ func TestCollectAllowFileWarnings_GlobalIgnoreStillWarns(t *testing.T) {
 
 	warnings := collectAllowFileWarnings(
 		[]string{target},
-		[]*compiler.Program{program},
 		nil,
 		rslintconfig.RslintConfig{
 			{Ignores: []string{"src/**"}},
@@ -1076,7 +1070,6 @@ func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
 	warnings := collectAllowFileWarnings(
 		[]string{target},
 		nil,
-		nil,
 		rslintconfig.RslintConfig{
 			{Rules: rslintconfig.Rules{"no-console": "error"}},
 		},
@@ -1091,7 +1084,7 @@ func TestCollectAllowFileWarnings_DefaultExcludedFileWarns(t *testing.T) {
 	}
 }
 
-func TestCLIRuleOverlayDoesNotWidenTargetDiscovery(t *testing.T) {
+func TestCLIRuleOverlayDoesNotAlterTargetDiscovery(t *testing.T) {
 	dir := t.TempDir()
 	write := func(name, content string) {
 		t.Helper()
@@ -1115,15 +1108,27 @@ func TestCLIRuleOverlayDoesNotWidenTargetDiscovery(t *testing.T) {
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	parseCache := utils.NewParseCache()
-	programs, exitCode := createProgramsForConfig(dir, activeConfig, true, fs, nil, parseCache)
-	if exitCode != 0 {
-		t.Fatalf("createProgramsForConfig exit code = %d", exitCode)
+	programSet, err := createProgramSetForConfig(dir, activeConfig, true, fs, parseCache)
+	if err != nil {
+		t.Fatalf("createProgramSetForConfig: %v", err)
 	}
-	programs, typeInfoFiles, _, targetFiles, targetsByProgram, _ := buildProgramsWithLintTargets(
-		programs, nil, targetConfig, dir, nil, nil, fs, nil, []string{tspath.NormalizePath(dir)}, parseCache, true,
-	)
-	if len(targetFiles) != 1 || !strings.HasSuffix(targetFiles[0], "/a.ts") {
-		t.Fatalf("target discovery should stay TS-only despite --rule overlay, got %v", targetFiles)
+	targetPlan, err := resolveLintTargetPlan(nil, targetConfig, dir, nil, fs, nil, []string{tspath.NormalizePath(dir)}, true)
+	if err != nil {
+		t.Fatalf("resolveLintTargetPlan: %v", err)
+	}
+	binding, err := bindLintTargetPlan(programSet, targetPlan, dir, fs, parseCache, true)
+	if err != nil {
+		t.Fatalf("bindLintTargetPlan: %v", err)
+	}
+	programs := binding.Programs
+	typeInfoFiles := binding.TypeInfoFiles
+	targetsByProgram := binding.TargetsByProgram
+	targetFiles := make([]string, 0, len(targetPlan.Targets))
+	for _, target := range targetPlan.Targets {
+		targetFiles = append(targetFiles, target.Path)
+	}
+	if len(targetFiles) != 2 || !strings.HasSuffix(targetFiles[0], "/a.ts") || !strings.HasSuffix(targetFiles[1], "/b.js") {
+		t.Fatalf("target discovery should retain the default baseline despite --rule overlay, got %v", targetFiles)
 	}
 
 	rslintconfig.RegisterAllRules()
@@ -1143,11 +1148,13 @@ func TestCLIRuleOverlayDoesNotWidenTargetDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("RunLinter: %v", err)
 	}
-	if len(diagnostics) != 1 {
-		t.Fatalf("expected one no-debugger diagnostic on a.ts only, got %+v", diagnostics)
+	if len(diagnostics) != 2 {
+		t.Fatalf("expected no-debugger diagnostics on both baseline targets, got %+v", diagnostics)
 	}
-	if !strings.HasSuffix(diagnostics[0].FilePath, "/a.ts") {
-		t.Fatalf("expected diagnostic on a.ts, got %+v", diagnostics[0])
+	diagnosticFiles := []string{diagnostics[0].FilePath, diagnostics[1].FilePath}
+	sort.Strings(diagnosticFiles)
+	if !strings.HasSuffix(diagnosticFiles[0], "/a.ts") || !strings.HasSuffix(diagnosticFiles[1], "/b.js") {
+		t.Fatalf("expected diagnostics on a.ts and b.js, got %+v", diagnostics)
 	}
 }
 
@@ -1214,7 +1221,7 @@ func TestCLIExplicitFileOutsideFilesCountsWithNoRules(t *testing.T) {
 	}
 }
 
-func TestCLIExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(t *testing.T) {
+func TestCLIExplicitMalformedFileOutsideFilesReportsSyntaxDiagnostic(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "rslint.jsonc"), []byte(`[
 		{ "files": ["**/*.ts"], "rules": { "no-debugger": "error" } }
@@ -1222,7 +1229,7 @@ func TestCLIExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(t *testi
 		t.Fatalf("write config: %v", err)
 	}
 	explicit := tspath.NormalizePath(filepath.Join(dir, "explicit.js"))
-	if err := os.WriteFile(explicit, []byte("const = ;\n"), 0o644); err != nil {
+	if err := os.WriteFile(explicit, []byte("debugger;\nconst = ;\n"), 0o644); err != nil {
 		t.Fatalf("write explicit file: %v", err)
 	}
 
@@ -1233,14 +1240,14 @@ func TestCLIExplicitMalformedFileOutsideFilesSuppressesSyntaxDiagnostic(t *testi
 		SingleThreaded: true,
 		AllowFiles:     []string{explicit},
 	})
-	if code != 0 {
-		t.Fatalf("expected explicit files-scope miss to exit cleanly, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
+	if code != 1 {
+		t.Fatalf("expected malformed explicit target to exit 1, got code=%d stdout=%q stderr=%q", code, stdout, stderr)
 	}
 	if !strings.Contains(stdout, "linted 1 file with 0 rules") {
 		t.Fatalf("expected the explicit file to be counted with zero matching rules, stdout=%q stderr=%q", stdout, stderr)
 	}
-	if strings.Contains(stdout, "TypeScript(") || strings.Contains(stderr, "TS1134") {
-		t.Fatalf("files-scope miss must not surface syntax diagnostics, stdout=%q stderr=%q", stdout, stderr)
+	if !strings.Contains(stdout, "TypeScript(TS1134)") {
+		t.Fatalf("selected zero-rule target must surface syntax diagnostics, stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
@@ -1269,6 +1276,9 @@ func TestCLIExplicitMalformedFileWithRuleOverlayReportsSyntaxDiagnostic(t *testi
 	}
 	if !strings.Contains(stdout, "TypeScript(TS") || !strings.Contains(stdout, "explicit.js") {
 		t.Fatalf("expected syntax diagnostic for explicit.js, stdout=%q stderr=%q", stdout, stderr)
+	}
+	if strings.Contains(stdout, "no-debugger") {
+		t.Fatalf("rules must not run when parsing fails, stdout=%q stderr=%q", stdout, stderr)
 	}
 }
 
@@ -1391,5 +1401,119 @@ func TestGitlabFingerprint_CollisionsDeterministicallyDistinguished(t *testing.T
 	a2 := gitlabFingerprint(seen2, "f.ts", "rule", "msg", 1, 1, 1, 5)
 	if a != a2 {
 		t.Errorf("fingerprint should be deterministic, got %q then %q", a, a2)
+	}
+}
+
+func TestRemapDiagnosticTargetPaths(t *testing.T) {
+	diagnostics := []rule.RuleDiagnostic{
+		{FilePath: "/program/link.ts"},
+		{FilePath: "/program/unchanged.ts"},
+	}
+	remapDiagnosticTargetPaths(diagnostics, map[string]string{
+		"/program/link.ts": "/requested/real.ts",
+	})
+
+	if diagnostics[0].FilePath != "/requested/real.ts" {
+		t.Fatalf("expected requested target path, got %q", diagnostics[0].FilePath)
+	}
+	if diagnostics[1].FilePath != "/program/unchanged.ts" {
+		t.Fatalf("unexpected remap of unrelated diagnostic: %q", diagnostics[1].FilePath)
+	}
+}
+
+func TestDeduplicateTypeScriptDiagnosticsAcrossPathAliases(t *testing.T) {
+	dir := t.TempDir()
+	realPath := filepath.Join(dir, "real.ts")
+	aliasPath := filepath.Join(dir, "alias.ts")
+	if err := os.WriteFile(realPath, []byte("let value: = 1;\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+
+	base := rule.RuleDiagnostic{
+		RuleName: "TypeScript(TS1110)",
+		Range:    core.NewTextRange(11, 11),
+		Message:  rule.RuleMessage{Description: "Type expected."},
+	}
+	realDiagnostic := base
+	realDiagnostic.FilePath = realPath
+	aliasDiagnostic := base
+	aliasDiagnostic.FilePath = aliasPath
+	nonTypeScriptA := base
+	nonTypeScriptA.RuleName = "some-rule"
+	nonTypeScriptA.FilePath = realPath
+	nonTypeScriptB := nonTypeScriptA
+	nonTypeScriptB.FilePath = aliasPath
+
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	for name, diagnostics := range map[string][]rule.RuleDiagnostic{
+		"real-first":  {realDiagnostic, aliasDiagnostic, nonTypeScriptA, nonTypeScriptB},
+		"alias-first": {aliasDiagnostic, realDiagnostic, nonTypeScriptA, nonTypeScriptB},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := deduplicateTypeScriptDiagnostics(diagnostics, fsys)
+			if len(got) != 3 {
+				t.Fatalf("expected one TypeScript diagnostic and both rule diagnostics, got %d: %+v", len(got), got)
+			}
+			if got[0].FilePath != aliasPath {
+				t.Fatalf("expected deterministic lexical alias survivor %q, got %q", aliasPath, got[0].FilePath)
+			}
+		})
+	}
+}
+
+func TestDeduplicateTypeScriptDiagnosticsPrefersCallerTarget(t *testing.T) {
+	dir := t.TempDir()
+	realPath := filepath.Join(dir, "z-real.ts")
+	aliasPath := filepath.Join(dir, "a-alias.ts")
+	if err := os.WriteFile(realPath, []byte("let value: = 1;\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(realPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	base := rule.RuleDiagnostic{
+		RuleName: "TypeScript(TS1110)",
+		Range:    core.NewTextRange(11, 11),
+		Message:  rule.RuleMessage{Description: "Type expected."},
+	}
+	realDiagnostic := base
+	realDiagnostic.FilePath = realPath
+	aliasDiagnostic := base
+	aliasDiagnostic.FilePath = aliasPath
+	fsys := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	preferred := map[string]string{canonicalFilesystemPathID(realPath, fsys): realPath}
+
+	got := deduplicateTypeScriptDiagnostics([]rule.RuleDiagnostic{aliasDiagnostic, realDiagnostic}, fsys, preferred)
+	if len(got) != 1 || got[0].FilePath != realPath {
+		t.Fatalf("expected caller-selected target %q to win over lexical alias, got %+v", realPath, got)
+	}
+	single := deduplicateTypeScriptDiagnostics([]rule.RuleDiagnostic{aliasDiagnostic}, fsys, preferred)
+	if single[0].FilePath != realPath {
+		t.Fatalf("expected a single aliased diagnostic to use caller target %q, got %+v", realPath, single)
+	}
+}
+
+func TestApplyFixPassReturnsWriteError(t *testing.T) {
+	diagnostic, _ := createTestDiagnostic(t, "a", 0, 1)
+	diagnostic.FixesPtr = &[]rule.RuleFix{{
+		Range: core.NewTextRange(0, 1),
+		Text:  "b",
+	}}
+	unwritablePath := t.TempDir()
+
+	fixed, err := applyFixPass(map[string][]rule.RuleDiagnostic{
+		unwritablePath: {diagnostic},
+	})
+	if err == nil {
+		t.Fatal("expected a write error")
+	}
+	if fixed != 0 {
+		t.Fatalf("failed write must not count as a fix, got %d", fixed)
+	}
+	if !strings.Contains(err.Error(), unwritablePath) {
+		t.Fatalf("write error must identify the target path, got %v", err)
 	}
 }

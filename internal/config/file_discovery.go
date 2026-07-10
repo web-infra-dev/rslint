@@ -40,6 +40,26 @@ func IsSupportedLintFile(filePath string) bool {
 	return ok
 }
 
+func isDefaultLintFile(filePath string) bool {
+	_, ok := defaultLintFileExtensionSet[path.Ext(filePath)]
+	return ok
+}
+
+// isFileSelectedByConfig reports whether the config itself selects filePath.
+// The implicit default baseline is always present; explicit `files` patterns
+// extend it. Entry-level ignores do not remove a target from this selector.
+func isFileSelectedByConfig(config RslintConfig, filePath string, configDir string) bool {
+	if isDefaultLintFile(filePath) {
+		return true
+	}
+	for _, entry := range config {
+		if !isGlobalIgnoreEntry(entry) && hasFileSelectors(entry) && isFileMatchedByConfigEntry(filePath, entry, configDir) {
+			return true
+		}
+	}
+	return false
+}
+
 // defaultExcludeDirs is a set of directory names always excluded from walking.
 var defaultExcludeDirs = func() map[string]struct{} {
 	m := make(map[string]struct{}, len(utils.DefaultExcludeDirNames))
@@ -53,13 +73,11 @@ var defaultExcludeDirs = func() map[string]struct{} {
 // Target selection is independent from TypeScript Program membership:
 //
 //   - CLI/API files and directories first constrain the search space.
-//   - Non-global config entries then contribute `files` patterns; an omitted
-//     files field contributes rslint's default lintable extensions.
+//   - Rslint's default lintable extensions are always selected. Non-global
+//     config entries contribute additional `files` patterns.
 //   - Global ignores, including injected .gitignore entries, remove files.
-//   - Entry-level ignores are honored through GetConfigForFile for discovered
-//     files. Explicit file targets bypass `files` and entry-level ignores for
-//     target selection, but still use GetConfigForFile later for rule selection
-//     and can therefore be counted as 0-rule lint results.
+//   - Entry-level ignores affect config/rule selection, not target selection.
+//     A selected file excluded by every entry is still parsed with zero rules.
 //   - Explicit file targets are retained even when they do not match any
 //     config entry's files patterns, matching ESLint's empty-result behavior.
 //
@@ -90,31 +108,61 @@ func discoverLintFilesWithStopDirs(
 	if fsys != nil {
 		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
 	}
+	comparisonKey := func(filePath string) string {
+		return string(tspath.ToPath(tspath.NormalizePath(filePath), "", useCaseSensitive))
+	}
+	configDir = tspath.NormalizePath(configDir)
+	configMatchDir := configDir
+	if fsys != nil {
+		if realPath := fsys.Realpath(configDir); realPath != "" {
+			configMatchDir = tspath.NormalizePath(realPath)
+		}
+	}
+	configPathForMatching := func(filePath string) string {
+		filePath = tspath.NormalizePath(filePath)
+		if relative, ok := relativePathWithinConfigRoot(filePath, configDir, useCaseSensitive); ok {
+			return tspath.ResolvePath(configMatchDir, relative)
+		}
+		if fsys != nil {
+			if realPath := fsys.Realpath(filePath); realPath != "" {
+				canonical := tspath.NormalizePath(realPath)
+				if relative, ok := relativePathWithinConfigRoot(canonical, configMatchDir, useCaseSensitive); ok {
+					return tspath.ResolvePath(configMatchDir, relative)
+				}
+			}
+		}
+		return filePath
+	}
 
 	filesPatterns := collectLintFilePatterns(config)
 	filesMatcher := buildFilesMatcher(filesPatterns)
-	needsEntryConfigCheck := hasEntryLevelIgnores(config)
 
-	var allowFileSet map[string]struct{}
+	var allowFileSet map[string]string
 	if allowFiles != nil {
-		allowFileSet = make(map[string]struct{}, len(allowFiles))
+		allowFileSet = make(map[string]string, len(allowFiles))
 		for _, f := range allowFiles {
-			allowFileSet[tspath.NormalizePath(f)] = struct{}{}
+			normalized := tspath.NormalizePath(f)
+			key := comparisonKey(normalized)
+			if _, exists := allowFileSet[key]; !exists {
+				allowFileSet[key] = normalized
+			}
 		}
 	}
 
 	targetFiles := []string{}
 	seenTargets := make(map[string]struct{})
 	addTarget := func(filePath string) {
-		if _, seen := seenTargets[filePath]; seen {
+		key := comparisonKey(filePath)
+		if _, seen := seenTargets[key]; seen {
 			return
 		}
-		seenTargets[filePath] = struct{}{}
+		seenTargets[key] = struct{}{}
 		targetFiles = append(targetFiles, filePath)
 	}
 	isGloballyIgnored := func(filePath string) bool {
-		return isDirBlockedByIgnores(filePath, globalIgnores, configDir) ||
-			isFileIgnored(filePath, globalIgnores, configDir)
+		matchPath := configPathForMatching(filePath)
+		return isDirBlockedByIgnores(matchPath, globalIgnores, configMatchDir) ||
+			isFileIgnored(matchPath, globalIgnores, configMatchDir)
 	}
 
 	includeExplicitFile := func(filePath string) bool {
@@ -124,7 +172,7 @@ func discoverLintFilesWithStopDirs(
 		if fsys != nil && !fsys.FileExists(filePath) {
 			return false
 		}
-		if IsDefaultExcludedPath(filePath, configDir, useCaseSensitive) {
+		if IsDefaultExcludedPath(configPathForMatching(filePath), configMatchDir, useCaseSensitive) {
 			return false
 		}
 		return !isGloballyIgnored(filePath)
@@ -134,20 +182,24 @@ func discoverLintFilesWithStopDirs(
 		if !IsSupportedLintFile(filePath) {
 			return false
 		}
-		if len(filesPatterns) == 0 || !filesMatcher(filePath, configDir) {
+		matchPath := configPathForMatching(filePath)
+		if len(filesPatterns) == 0 || !filesMatcher(matchPath, configMatchDir) {
+			return false
+		}
+		// Candidate patterns for an AND group intentionally form a superset.
+		// Apply the complete selector here so negated and additional group
+		// members cannot leak candidates into the target set.
+		if !isFileSelectedByConfig(config, matchPath, configMatchDir) {
 			return false
 		}
 		if isGloballyIgnored(filePath) {
 			return false
 		}
-		if !needsEntryConfigCheck {
-			return true
-		}
-		return config.GetConfigForFile(filePath, configDir) != nil
+		return true
 	}
 
 	addExplicitTargets := func() {
-		for f := range allowFileSet {
+		for _, f := range allowFileSet {
 			if includeExplicitFile(f) {
 				addTarget(f)
 			}
@@ -181,12 +233,12 @@ func discoverLintFilesWithStopDirs(
 	}
 
 	processFile := func(walkPath string) {
-		fullPath := tspath.NormalizePath(path.Join(normalizedConfigDir, walkPath))
+		fullPath := tspath.NormalizePath(tspath.CombinePaths(normalizedConfigDir, walkPath))
 
 		if allowFileSet != nil || allowDirs != nil {
 			inScope := false
 			if allowFileSet != nil {
-				if _, ok := allowFileSet[fullPath]; ok {
+				if _, ok := allowFileSet[comparisonKey(fullPath)]; ok {
 					inScope = true
 				}
 			}
@@ -265,6 +317,20 @@ func discoverLintFilesWithStopDirs(
 
 	sort.Strings(targetFiles)
 	return targetFiles
+}
+
+func relativePathWithinConfigRoot(filePath string, configDir string, useCaseSensitive bool) (string, bool) {
+	compareOptions := tspath.ComparePathsOptions{
+		CurrentDirectory:          configDir,
+		UseCaseSensitiveFileNames: useCaseSensitive,
+	}
+	if tspath.ComparePaths(filePath, configDir, compareOptions) == 0 {
+		return "", true
+	}
+	if !tspath.StartsWithDirectory(filePath, configDir, useCaseSensitive) {
+		return "", false
+	}
+	return tspath.GetRelativePathFromDirectory(configDir, filePath, compareOptions), true
 }
 
 func normalizeStopWalkDirs(configDir string, stopDirs []string, useCaseSensitive bool) []string {
@@ -468,26 +534,70 @@ func pathsEqual(a, b string, useCaseSensitive bool) bool {
 }
 
 func collectLintFilePatterns(config RslintConfig) []string {
-	var patterns []string
+	patterns := defaultLintFilePatterns()
 	for _, entry := range config {
 		if isGlobalIgnoreEntry(entry) {
 			continue
 		}
-		if len(entry.Files) > 0 {
-			patterns = append(patterns, entry.Files...)
-		} else {
-			patterns = append(patterns, defaultLintFilePatterns()...)
+		for _, pattern := range entry.Files {
+			if candidate, ok := positiveFilesCandidate(pattern); ok {
+				patterns = append(patterns, candidate)
+			} else {
+				patterns = append(patterns, "**/*")
+			}
+		}
+		for _, group := range entry.FilePatternGroups {
+			hasPositiveCandidate := false
+			for _, pattern := range group {
+				if candidate, ok := positiveFilesCandidate(pattern); ok {
+					patterns = append(patterns, candidate)
+					hasPositiveCandidate = true
+				}
+			}
+			if !hasPositiveCandidate {
+				patterns = append(patterns, "**/*")
+			}
 		}
 	}
 	return deduplicate(patterns)
 }
 
-func buildFilesMatcher(patterns []string) func(filePath string, configDir string) bool {
-	if patternsIncludeAllDefaultExtensions(patterns) {
-		return func(string, string) bool { return true }
+func positiveFilesCandidate(pattern string) (string, bool) {
+	negated := false
+	for strings.HasPrefix(pattern, "!") {
+		negated = !negated
+		pattern = strings.TrimPrefix(pattern, "!")
 	}
+	return pattern, !negated && pattern != ""
+}
+
+func buildFilesMatcher(patterns []string) func(filePath string, configDir string) bool {
+	hasDefaultBaseline := patternsIncludeAllDefaultExtensions(patterns)
+	if !hasDefaultBaseline {
+		return func(filePath string, configDir string) bool {
+			return isFileMatched(filePath, patterns, configDir)
+		}
+	}
+
+	defaultPatterns := make(map[string]struct{}, len(DefaultLintFileExtensions))
+	for _, pattern := range defaultLintFilePatterns() {
+		defaultPatterns[tspath.NormalizePath(pattern)] = struct{}{}
+	}
+	additionalPatterns := make([]string, 0, len(patterns)-len(defaultPatterns))
+	for _, pattern := range patterns {
+		if _, isDefault := defaultPatterns[tspath.NormalizePath(pattern)]; !isDefault {
+			additionalPatterns = append(additionalPatterns, pattern)
+		}
+	}
+
 	return func(filePath string, configDir string) bool {
-		return isFileMatched(filePath, patterns, configDir)
+		// ESLint's default extension globs are case-sensitive even on a
+		// case-insensitive filesystem. Keep this fast path exact-case; explicit
+		// user patterns are evaluated normally below.
+		if isDefaultLintFile(filePath) {
+			return true
+		}
+		return len(additionalPatterns) > 0 && isFileMatched(filePath, additionalPatterns, configDir)
 	}
 }
 
@@ -507,19 +617,100 @@ func patternsIncludeAllDefaultExtensions(patterns []string) bool {
 	return true
 }
 
-func hasEntryLevelIgnores(config RslintConfig) bool {
-	for _, entry := range config {
-		if isGlobalIgnoreEntry(entry) {
-			continue
-		}
-		if len(entry.Ignores) > 0 {
-			return true
-		}
-	}
-	return false
+// LintDiscoveryScope overrides the CLI/API scope for one config.
+type LintDiscoveryScope struct {
+	Files []string
+	Dirs  []string
 }
 
-// DiscoverLintFilesMultiConfig resolves lint targets across a config map.
+// DiscoveredLintTarget preserves the config owner established during the
+// directory walk so later stages do not need to infer ownership from paths.
+type DiscoveredLintTarget struct {
+	Path            string
+	ConfigDirectory string
+}
+
+// DiscoverLintTargetsMultiConfig resolves owned lint targets across a config
+// map. Per-config scopes override the default scope when present.
+func DiscoverLintTargetsMultiConfig(
+	configMap map[string]RslintConfig,
+	scopes map[string]LintDiscoveryScope,
+	fsys vfs.FS,
+	allowFiles []string,
+	allowDirs []string,
+	singleThreaded bool,
+) []DiscoveredLintTarget {
+	if len(configMap) == 0 {
+		return nil
+	}
+
+	index := newConfigDirectoryIndex(configMap, fsys)
+	configDirs := make([]string, 0, len(configMap))
+	for configDir := range configMap {
+		configDirs = append(configDirs, configDir)
+	}
+	sort.Strings(configDirs)
+
+	// Explicit files are assigned to their nearest config once. Passing the
+	// complete list to every config makes lint-staged-style invocations
+	// O(configs*files), and also asks every config to evaluate ignores for files
+	// it cannot own. A non-nil empty bucket is preserved below so the explicit
+	// file-only fast path still suppresses directory walking for configs that own
+	// no requested files.
+	filesByConfig := index.assignExplicitFiles(allowFiles)
+	filesSpecifiedByConfig := make(map[string]bool, len(configDirs))
+	if allowFiles != nil {
+		for _, configDir := range configDirs {
+			filesSpecifiedByConfig[configDir] = true
+		}
+	}
+	for configDir, scope := range scopes {
+		delete(filesByConfig, configDir)
+		filesSpecifiedByConfig[configDir] = scope.Files != nil
+	}
+	for _, scope := range scopes {
+		if scope.Files == nil {
+			continue
+		}
+		for owner, files := range index.assignExplicitFiles(scope.Files) {
+			filesByConfig[owner] = append(filesByConfig[owner], files...)
+			filesSpecifiedByConfig[owner] = true
+		}
+	}
+
+	seen := make(map[tspath.Path]struct{})
+	var allTargets []DiscoveredLintTarget
+	for _, configDir := range configDirs {
+		var configAllowFiles []string
+		if filesSpecifiedByConfig[configDir] {
+			configAllowFiles = filesByConfig[configDir]
+			if configAllowFiles == nil {
+				configAllowFiles = []string{}
+			}
+		}
+		configAllowDirs := allowDirs
+		if scope, ok := scopes[configDir]; ok {
+			configAllowDirs = scope.Dirs
+		}
+		targets := discoverLintFilesForConfigInMap(configMap, index, configDir, fsys, configAllowFiles, configAllowDirs, singleThreaded)
+		for _, f := range targets {
+			pathID := tspath.ToPath(tspath.NormalizePath(f), "", index.useCaseSensitive)
+			if _, exists := seen[pathID]; !exists {
+				seen[pathID] = struct{}{}
+				allTargets = append(allTargets, DiscoveredLintTarget{
+					Path:            f,
+					ConfigDirectory: configDir,
+				})
+			}
+		}
+	}
+	sort.Slice(allTargets, func(i, j int) bool {
+		return allTargets[i].Path < allTargets[j].Path
+	})
+	return allTargets
+}
+
+// DiscoverLintFilesMultiConfig resolves lint target paths across a config map.
 func DiscoverLintFilesMultiConfig(
 	configMap map[string]RslintConfig,
 	fsys vfs.FS,
@@ -527,23 +718,12 @@ func DiscoverLintFilesMultiConfig(
 	allowDirs []string,
 	singleThreaded bool,
 ) []string {
-	if len(configMap) == 0 {
-		return nil
+	targets := DiscoverLintTargetsMultiConfig(configMap, nil, fsys, allowFiles, allowDirs, singleThreaded)
+	files := make([]string, 0, len(targets))
+	for _, target := range targets {
+		files = append(files, target.Path)
 	}
-
-	seen := make(map[string]struct{})
-	var allTargets []string
-	for configDir := range configMap {
-		targets := DiscoverLintFilesForConfigInMap(configMap, configDir, fsys, allowFiles, allowDirs, singleThreaded)
-		for _, f := range targets {
-			if _, exists := seen[f]; !exists {
-				seen[f] = struct{}{}
-				allTargets = append(allTargets, f)
-			}
-		}
-	}
-	sort.Strings(allTargets)
-	return allTargets
+	return files
 }
 
 // DiscoverLintFilesForConfigInMap resolves lint targets owned by one config in
@@ -557,12 +737,32 @@ func DiscoverLintFilesForConfigInMap(
 	allowDirs []string,
 	singleThreaded bool,
 ) []string {
+	return discoverLintFilesForConfigInMap(
+		configMap,
+		newConfigDirectoryIndex(configMap, fsys),
+		configDir,
+		fsys,
+		allowFiles,
+		allowDirs,
+		singleThreaded,
+	)
+}
+
+func discoverLintFilesForConfigInMap(
+	configMap map[string]RslintConfig,
+	index *configDirectoryIndex,
+	configDir string,
+	fsys vfs.FS,
+	allowFiles []string,
+	allowDirs []string,
+	singleThreaded bool,
+) []string {
 	cfg, ok := configMap[configDir]
 	if !ok {
 		return nil
 	}
 
-	stopDirs := descendantConfigDirs(configMap, configDir, fsys)
+	stopDirs := index.childConfigDirs(configDir)
 	targets := discoverLintFilesWithStopDirs(cfg, configDir, fsys, allowFiles, allowDirs, stopDirs, singleThreaded)
 	if len(targets) == 0 {
 		return targets
@@ -570,7 +770,7 @@ func DiscoverLintFilesForConfigInMap(
 
 	ownedTargets := make([]string, 0, len(targets))
 	for _, f := range targets {
-		ownerDir, _ := FindNearestConfig(f, configMap)
+		ownerDir, _ := index.nearestConfig(f)
 		if ownerDir == configDir {
 			ownedTargets = append(ownedTargets, f)
 		}
@@ -578,25 +778,136 @@ func DiscoverLintFilesForConfigInMap(
 	return ownedTargets
 }
 
-func descendantConfigDirs(configMap map[string]RslintConfig, configDir string, fsys vfs.FS) []string {
+type configDirectoryIndex struct {
+	fsys                     vfs.FS
+	useCaseSensitive         bool
+	configKeyByPath          map[tspath.Path]string
+	canonicalConfigKeyByPath map[tspath.Path]string
+	ambiguousCanonicalPaths  map[tspath.Path]struct{}
+	normalizedByKey          map[string]string
+	childrenByKey            map[string][]string
+}
+
+func newConfigDirectoryIndex(configMap map[string]RslintConfig, fsys vfs.FS) *configDirectoryIndex {
 	useCaseSensitive := true
 	if fsys != nil {
 		useCaseSensitive = fsys.UseCaseSensitiveFileNames()
 	}
 
-	configDir = tspath.NormalizePath(configDir)
-	descendants := make([]string, 0)
-	for candidate := range configMap {
-		candidate = tspath.NormalizePath(candidate)
-		if pathsEqual(candidate, configDir, useCaseSensitive) {
+	index := &configDirectoryIndex{
+		fsys:                     fsys,
+		useCaseSensitive:         useCaseSensitive,
+		configKeyByPath:          make(map[tspath.Path]string, len(configMap)),
+		canonicalConfigKeyByPath: make(map[tspath.Path]string, len(configMap)),
+		ambiguousCanonicalPaths:  make(map[tspath.Path]struct{}),
+		normalizedByKey:          make(map[string]string, len(configMap)),
+		childrenByKey:            make(map[string][]string, len(configMap)),
+	}
+	configKeys := make([]string, 0, len(configMap))
+	for configKey := range configMap {
+		configKeys = append(configKeys, configKey)
+	}
+	sort.Strings(configKeys)
+	for _, configKey := range configKeys {
+		normalized := tspath.NormalizePath(configKey)
+		index.normalizedByKey[configKey] = normalized
+		pathID := tspath.ToPath(normalized, "", useCaseSensitive)
+		if _, exists := index.configKeyByPath[pathID]; !exists {
+			index.configKeyByPath[pathID] = configKey
+		}
+
+		canonical := normalized
+		if fsys != nil {
+			if realPath := fsys.Realpath(normalized); realPath != "" {
+				canonical = tspath.NormalizePath(realPath)
+			}
+		}
+		canonicalID := tspath.ToPath(canonical, "", useCaseSensitive)
+		if _, ambiguous := index.ambiguousCanonicalPaths[canonicalID]; ambiguous {
 			continue
 		}
-		if tspath.StartsWithDirectory(candidate, configDir, useCaseSensitive) {
-			descendants = append(descendants, candidate)
+		if existing, exists := index.canonicalConfigKeyByPath[canonicalID]; !exists {
+			index.canonicalConfigKeyByPath[canonicalID] = configKey
+		} else if existing != configKey {
+			// Lexical aliases remain independently addressable. A physical-path
+			// fallback cannot choose between them, so leave it unresolved instead
+			// of silently assigning the file to the first map entry.
+			delete(index.canonicalConfigKeyByPath, canonicalID)
+			index.ambiguousCanonicalPaths[canonicalID] = struct{}{}
 		}
 	}
-	sort.Strings(descendants)
-	return descendants
+
+	for _, configKey := range configKeys {
+		normalized := index.normalizedByKey[configKey]
+		for parent := tspath.GetDirectoryPath(normalized); parent != "" && parent != normalized; {
+			if parentKey, ok := index.configKeyByPath[tspath.ToPath(parent, "", useCaseSensitive)]; ok {
+				index.childrenByKey[parentKey] = append(index.childrenByKey[parentKey], normalized)
+				break
+			}
+			next := tspath.GetDirectoryPath(parent)
+			if next == parent {
+				break
+			}
+			parent = next
+		}
+	}
+	for configKey := range index.childrenByKey {
+		sort.Strings(index.childrenByKey[configKey])
+	}
+	return index
+}
+
+func (index *configDirectoryIndex) childConfigDirs(configKey string) []string {
+	if index == nil {
+		return nil
+	}
+	return index.childrenByKey[configKey]
+}
+
+func (index *configDirectoryIndex) nearestConfig(filePath string) (string, bool) {
+	if index == nil {
+		return "", false
+	}
+	filePath = tspath.NormalizePath(filePath)
+	if configKey, ok := index.nearestConfigInPathSpace(filePath, index.configKeyByPath); ok {
+		return configKey, true
+	}
+	if index.fsys == nil {
+		return "", false
+	}
+	realPath := index.fsys.Realpath(filePath)
+	if realPath == "" {
+		return "", false
+	}
+	return index.nearestConfigInPathSpace(tspath.NormalizePath(realPath), index.canonicalConfigKeyByPath)
+}
+
+func (index *configDirectoryIndex) nearestConfigInPathSpace(filePath string, configKeyByPath map[tspath.Path]string) (string, bool) {
+	current := tspath.GetDirectoryPath(filePath)
+	for current != "" {
+		if configKey, ok := configKeyByPath[tspath.ToPath(current, "", index.useCaseSensitive)]; ok {
+			return configKey, true
+		}
+		next := tspath.GetDirectoryPath(current)
+		if next == current {
+			break
+		}
+		current = next
+	}
+	return "", false
+}
+
+func (index *configDirectoryIndex) assignExplicitFiles(files []string) map[string][]string {
+	if index == nil || files == nil {
+		return nil
+	}
+	filesByConfig := make(map[string][]string)
+	for _, filePath := range files {
+		if owner, ok := index.nearestConfig(filePath); ok {
+			filesByConfig[owner] = append(filesByConfig[owner], filePath)
+		}
+	}
+	return filesByConfig
 }
 
 // DiscoverGapFiles returns resolved lint targets that are absent from existing
@@ -668,10 +979,17 @@ func DiscoverGapFilesMultiConfig(
 		return nil
 	}
 
+	index := newConfigDirectoryIndex(configMap, fsys)
+	configDirs := make([]string, 0, len(configMap))
+	for configDir := range configMap {
+		configDirs = append(configDirs, configDir)
+	}
+	sort.Strings(configDirs)
+
 	seen := make(map[string]struct{})
 	var allGapFiles []string
-	for configDir := range configMap {
-		targetFiles := DiscoverLintFilesForConfigInMap(configMap, configDir, fsys, allowFiles, allowDirs, singleThreaded)
+	for _, configDir := range configDirs {
+		targetFiles := discoverLintFilesForConfigInMap(configMap, index, configDir, fsys, allowFiles, allowDirs, singleThreaded)
 		for _, f := range targetFiles {
 			if _, exists := programFiles[f]; exists {
 				continue

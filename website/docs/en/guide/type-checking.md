@@ -28,7 +28,7 @@ rslint --type-check .         # lint + type-check
 rslint --type-check-only .    # type-check only
 ```
 
-Without `parserOptions.project` no TypeScript program is built and type-check produces no diagnostics.
+When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
 
 ## What gets type-checked
 
@@ -44,7 +44,7 @@ parserOptions: {
 }
 ```
 
-Each entry produces one TypeScript program. Type-check runs over every program independently.
+Each canonical tsconfig produces one TypeScript Program, even when multiple rslint configs reference it. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
 
 **The type-check scope is each tsconfig's `include` / `files` minus `exclude` — nothing in your rslint config or on the CLI changes it.** Specifically, the following are **lint-phase concepts** that do **not** affect type-check scope:
 
@@ -57,7 +57,7 @@ If a file is included by tsconfig but matched by rslint `ignores`, lint rules do
 
 ### Gap files
 
-Files that match your rslint config's `files` pattern but are **not** in any tsconfig (root-level scripts, ad-hoc config files, etc.) are called _gap files_. Syntactic lint rules still run on them, but type-check skips them — semantic type information requires tsconfig coverage. To enable type-check for a gap file, add it to an existing tsconfig's `include` or create a dedicated tsconfig that covers it.
+Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive an AST-only fallback Program, so syntax-only rules still run but type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
 
 ## Output
 

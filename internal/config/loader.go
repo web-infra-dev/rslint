@@ -202,7 +202,7 @@ func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern st
 		return nil, nil
 	}
 
-	relativePattern := strings.TrimPrefix(resolvedPattern, searchRoot+"/")
+	relativePattern := relativeGlobPattern(searchRoot, resolvedPattern)
 	// expandProjectGlob historically follows symlinks (e.g. tsconfig
 	// referenced via packages/*/tsconfig.json where packages may be
 	// symlinks in pnpm workspaces). It runs single-threaded under
@@ -221,6 +221,11 @@ func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern st
 
 	sort.Strings(matches)
 	return matches, nil
+}
+
+func relativeGlobPattern(searchRoot string, resolvedPattern string) string {
+	relativePattern := strings.TrimPrefix(resolvedPattern, searchRoot)
+	return strings.TrimPrefix(relativePattern, "/")
 }
 
 func containsGlobPattern(path string) bool {

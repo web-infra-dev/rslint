@@ -3,13 +3,9 @@ import path from 'node:path';
 import picomatch from 'picomatch';
 import { glob } from 'tinyglobby';
 import { type RslintConfigEntry } from '../config/define-config.ts';
+import { JS_CONFIG_FILES } from '../config/config-loader.ts';
 
-export const JS_CONFIG_FILES = [
-  'rslint.config.js',
-  'rslint.config.mjs',
-  'rslint.config.ts',
-  'rslint.config.mts',
-];
+export { JS_CONFIG_FILES };
 
 export function findJSConfig(cwd: string): string | null {
   for (const name of JS_CONFIG_FILES) {
@@ -46,6 +42,7 @@ export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
     cwd: resolved,
     absolute: true,
     dot: true,
+    followSymbolicLinks: false,
     ignore: ['**/node_modules/**', '**/.git/**'],
   });
 
@@ -146,14 +143,16 @@ export async function discoverConfigs(
 }
 
 function getConfigPriority(configPath: string): number {
-  const index = JS_CONFIG_FILES.indexOf(path.basename(configPath));
+  const index = JS_CONFIG_FILES.indexOf(
+    path.basename(configPath) as (typeof JS_CONFIG_FILES)[number],
+  );
   return index === -1 ? Number.POSITIVE_INFINITY : index;
 }
 
 /**
  * Check if a config entry is a "global ignore" entry — an entry with only
- * `ignores` and no other meaningful fields. Aligns with ESLint flat config
- * semantics where such entries prevent directory traversal.
+ * `ignores` and an optional `name`. Aligns with ESLint flat config semantics
+ * where such entries prevent directory traversal.
  */
 function isGlobalIgnoreEntry(
   entry: RslintConfigEntry,
@@ -161,19 +160,7 @@ function isGlobalIgnoreEntry(
   const ignores = entry.ignores;
   if (!Array.isArray(ignores) || ignores.length === 0) return false;
 
-  return (
-    entry.files == null &&
-    entry.rules == null &&
-    // No meaningful plugins: absent, an empty array-form whitelist, or an empty
-    // object-form map. `plugins` is a union (string[] native names XOR a live
-    // community-plugin object), so branch on the shape before measuring length.
-    (entry.plugins == null ||
-      (Array.isArray(entry.plugins)
-        ? entry.plugins.length === 0
-        : Object.keys(entry.plugins).length === 0)) &&
-    entry.languageOptions == null &&
-    entry.settings == null
-  );
+  return Object.keys(entry).every((key) => key === 'ignores' || key === 'name');
 }
 
 /**

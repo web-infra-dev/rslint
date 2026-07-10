@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -47,7 +48,12 @@ type parsedPayload struct {
 // parseConfigPayload parses the serialized JS-config payload.
 // It supports both the new multi-config format ({ configs: [...] })
 // and the legacy single-config format ({ configDirectory, entries }).
-func parseConfigPayload(data []byte) (*parsedPayload, error) {
+func parseConfigPayload(data []byte, filesystems ...vfs.FS) (*parsedPayload, error) {
+	var fsys vfs.FS
+	if len(filesystems) > 0 {
+		fsys = filesystems[0]
+	}
+
 	// Try multi-config format: { configs: [...] }
 	var multiPayload struct {
 		Configs []configPayloadEntry `json:"configs"`
@@ -60,17 +66,45 @@ func parseConfigPayload(data []byte) (*parsedPayload, error) {
 		configMap := make(map[string]rslintconfig.RslintConfig, len(multiPayload.Configs))
 		originalConfigDir := make(map[string]string, len(multiPayload.Configs))
 		configTargetFiles := make(map[string][]string)
+		configDirByPathID := make(map[string]string, len(multiPayload.Configs))
+		configDirByCanonicalID := make(map[string]string, len(multiPayload.Configs))
 		for _, cfg := range multiPayload.Configs {
 			// configMap is keyed by the normalized dir (Go matches normalized
 			// file paths against it); originalConfigDir recovers the raw string
 			// for the eslint-plugin wire configKey. Both are populated in this
 			// one loop from the same NormalizePath call, so they cannot disagree.
 			configDir := tspath.NormalizePath(cfg.ConfigDirectory)
+			if len(configDir) > tspath.GetRootLength(configDir) {
+				configDir = tspath.RemoveTrailingDirectorySeparators(configDir)
+			}
+			pathID := filesystemPathID(configDir, fsys)
+			if previous, exists := configDirByPathID[pathID]; exists {
+				return nil, fmt.Errorf(
+					"duplicate config directories %q and %q are equivalent on this filesystem (normalized as %q)",
+					previous,
+					cfg.ConfigDirectory,
+					configDir,
+				)
+			}
+			// Config roots are ownership boundaries. Two lexical roots for one
+			// physical directory cannot both own the same canonical target without
+			// order-dependent config loss, so reject them at ingress. This is one
+			// realpath per config, not per target.
+			canonicalID := canonicalFilesystemPathID(configDir, fsys)
+			if previous, exists := configDirByCanonicalID[canonicalID]; exists {
+				return nil, fmt.Errorf(
+					"duplicate config directories %q and %q resolve to the same filesystem location",
+					previous,
+					cfg.ConfigDirectory,
+				)
+			}
 			if err := rslintconfig.ValidateConfig(cfg.Entries); err != nil {
 				return nil, fmt.Errorf("invalid config for %q: %w", cfg.ConfigDirectory, err)
 			}
 			configMap[configDir] = cfg.Entries
 			originalConfigDir[configDir] = cfg.ConfigDirectory
+			configDirByPathID[pathID] = cfg.ConfigDirectory
+			configDirByCanonicalID[canonicalID] = cfg.ConfigDirectory
 			if len(cfg.TargetFiles) > 0 {
 				files := make([]string, 0, len(cfg.TargetFiles))
 				for _, file := range cfg.TargetFiles {

@@ -3,9 +3,22 @@ import { lint } from '@rslint/core/internal';
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 import os from 'node:os';
-import { writeFile, rm, mkdtemp, mkdir, readFile, cp } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import {
+  writeFile,
+  rm,
+  mkdtemp,
+  mkdir,
+  readFile,
+  cp,
+  symlink,
+} from 'node:fs/promises';
 
 const fixturesDir = path.resolve(import.meta.dirname, '../fixtures');
+const eslintPluginFixturesDir = path.resolve(
+  import.meta.dirname,
+  'eslint-plugin/fixtures',
+);
 
 // A self-contained config (overrideConfigFile:true → no discovery, only
 // overrideConfig). array-type is non-type-aware so it runs even on a gap file.
@@ -110,6 +123,102 @@ describe('Rslint class', () => {
       expect(m.fix.text).toBe('string[]');
     } finally {
       await rslint.close();
+    }
+  });
+
+  test('lintText runs a local community plugin Program listener and returns its fix output', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-plugin-'));
+    const pluginUrl = pathToFileURL(
+      path.join(eslintPluginFixturesDir, 'local-plugin.mjs'),
+    ).href;
+    await writeFile(
+      path.join(tmp, 'rslint.config.mjs'),
+      [
+        `import local from ${JSON.stringify(pluginUrl)};`,
+        'export default [{',
+        '  plugins: { local },',
+        '  rules: {',
+        "    'local/program-listener': 'error',",
+        "    'local/prefer-array-some': 'error',",
+        '  },',
+        '}];',
+        '',
+      ].join('\n'),
+    );
+
+    const rslint = new Rslint({ cwd: tmp, fix: true });
+    try {
+      const [result] = await rslint.lintText(
+        'const found = [1].filter(Boolean);\n',
+        { filePath: 'probe.ts' },
+      );
+      expect(result.messages.map((message) => message.ruleId).sort()).toEqual([
+        'local/prefer-array-some',
+        'local/program-listener',
+      ]);
+      expect(result.fixableErrorCount).toBe(1);
+      expect(result.output).toBe('const found = [1].some(Boolean);\n');
+    } finally {
+      await rslint.close();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects object-form community plugins in overrideConfig before linting', async () => {
+    const rslint = new Rslint({
+      cwd: '/',
+      overrideConfigFile: true,
+      overrideConfig: [
+        {
+          plugins: { local: { rules: { probe: {} } } },
+          rules: { 'local/probe': 'error' },
+        },
+      ],
+    });
+    try {
+      await expect(
+        rslint.lintText('const value = 1;', { filePath: 'probe.ts' }),
+      ).rejects.toThrow(/overrideConfig.*object-form.*cannot re-import/s);
+    } finally {
+      await rslint.close();
+    }
+  });
+
+  test('lintText preserves the requested path when the Program uses a symlink alias', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-symlink-'));
+    const realDir = path.join(tmp, 'real');
+    const linkDir = path.join(tmp, 'link');
+    const realTarget = path.join(realDir, 'src', 'a.ts');
+    await mkdir(path.dirname(realTarget), { recursive: true });
+    await writeFile(realTarget, 'let a: string[] = [];\n');
+    await writeFile(
+      path.join(realDir, 'tsconfig.json'),
+      JSON.stringify({ include: ['src/a.ts'] }),
+    );
+    try {
+      try {
+        await symlink(realDir, linkDir, 'dir');
+      } catch {
+        return;
+      }
+
+      const rslint = new Rslint({
+        cwd: linkDir,
+        overrideConfigFile: true,
+        overrideConfig: arrayTypeConfig,
+      });
+      try {
+        const results = await rslint.lintText('let a: Array<string> = [];\n', {
+          filePath: realTarget,
+        });
+        expect(results).toHaveLength(1);
+        expect(results[0].filePath).toBe(path.normalize(realTarget));
+        expect(results[0].messages).toHaveLength(1);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
     }
   });
 
@@ -430,6 +539,292 @@ describe('Rslint class', () => {
     }
   });
 
+  test('lintFiles routes community plugins through one multi-config host', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-plugin-routing-'),
+    );
+    const xDir = path.join(tmp, 'packages', 'x');
+    const yDir = path.join(tmp, 'packages', 'y');
+    const pluginXUrl = pathToFileURL(
+      path.join(eslintPluginFixturesDir, 'cfgX', 'plugin-x.mjs'),
+    ).href;
+    const pluginYUrl = pathToFileURL(
+      path.join(eslintPluginFixturesDir, 'cfgY', 'plugin-y.mjs'),
+    ).href;
+    try {
+      await mkdir(xDir, { recursive: true });
+      await mkdir(yDir, { recursive: true });
+      await writeFile(
+        path.join(xDir, 'rslint.config.mjs'),
+        `import plugin from ${JSON.stringify(pluginXUrl)};\n` +
+          "export default [{ plugins: { px: plugin }, rules: { 'px/no-foo': 'error' } }];\n",
+      );
+      await writeFile(
+        path.join(yDir, 'rslint.config.mjs'),
+        `import plugin from ${JSON.stringify(pluginYUrl)};\n` +
+          "export default [{ plugins: { py: plugin }, rules: { 'py/no-bar': 'error' } }];\n",
+      );
+      const source = 'const foo = 1; const bar = 2;\n';
+      await writeFile(path.join(xDir, 'index.ts'), source);
+      await writeFile(path.join(yDir, 'index.ts'), source);
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const results = await rslint.lintFiles('**/*.ts');
+        const byRelativePath = new Map(
+          results.map((result) => [
+            path.relative(tmp, result.filePath),
+            result,
+          ]),
+        );
+        expect(
+          byRelativePath
+            .get(path.join('packages', 'x', 'index.ts'))
+            .messages.map((message) => message.ruleId),
+        ).toEqual(['px/no-foo']);
+        expect(
+          byRelativePath
+            .get(path.join('packages', 'y', 'index.ts'))
+            .messages.map((message) => message.ruleId),
+        ).toEqual(['py/no-bar']);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles falls back from a broken nested config to the nearest loaded ancestor', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-broken-fallback-'),
+    );
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-console': 'error' } }];\n",
+      );
+      await mkdir(path.join(tmp, 'packages', 'app'), { recursive: true });
+      await writeFile(
+        path.join(tmp, 'packages', 'app', 'rslint.config.mjs'),
+        'export default [;\n',
+      );
+      await writeFile(
+        path.join(tmp, 'packages', 'app', 'index.ts'),
+        'debugger;\nconsole.log("fallback");\n',
+      );
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        for (const target of ['**/*.ts', 'packages/app/index.ts']) {
+          const results = await rslint.lintFiles(target);
+          expect(results).toHaveLength(1);
+          const ruleIds = results[0].messages.map((message) => message.ruleId);
+          expect(ruleIds).toContain('no-console');
+          expect(ruleIds).not.toContain('no-debugger');
+        }
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintText falls back from a broken nearest JS config to a loaded ancestor', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-text-broken-fallback-'),
+    );
+    const nested = path.join(tmp, 'packages', 'app');
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-console': 'error' } }];\n",
+      );
+      await mkdir(nested, { recursive: true });
+      await writeFile(
+        path.join(nested, 'rslint.config.mjs'),
+        'export default [;\n',
+      );
+      // JSON configs are not candidates for the JS programmatic API fallback.
+      await writeFile(
+        path.join(nested, 'rslint.json'),
+        JSON.stringify({ rules: { 'no-debugger': 'error' } }),
+      );
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const [result] = await rslint.lintText(
+          'debugger;\nconsole.log("ancestor");\n',
+          { filePath: path.join(nested, 'index.ts') },
+        );
+        const ruleIds = result.messages.map((message) => message.ruleId);
+        expect(ruleIds).toContain('no-console');
+        expect(ruleIds).not.toContain('no-debugger');
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintText throws the nearest JS config error when no ancestor loads', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-text-broken-boundary-'),
+    );
+    const nested = path.join(tmp, 'packages', 'app');
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        'export default [;\n',
+      );
+      await writeFile(
+        path.join(tmp, 'rslint.json'),
+        JSON.stringify({ rules: { 'no-console': 'error' } }),
+      );
+      await mkdir(nested, { recursive: true });
+      const nestedConfig = path.join(nested, 'rslint.config.mjs');
+      await writeFile(nestedConfig, 'export default [;\n');
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        await expect(
+          rslint.lintText('console.log("no fallback");\n', {
+            filePath: path.join(nested, 'index.ts'),
+          }),
+        ).rejects.toThrow(`Failed to load config ${nestedConfig}`);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles keeps glob-skip and explicit-error semantics when every applicable config fails', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-broken-boundary-'),
+    );
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        'export default [;\n',
+      );
+      await mkdir(path.join(tmp, 'broken'), { recursive: true });
+      await writeFile(
+        path.join(tmp, 'broken', 'index.ts'),
+        'console.log("broken");\n',
+      );
+      await mkdir(path.join(tmp, 'healthy'), { recursive: true });
+      await writeFile(
+        path.join(tmp, 'healthy', 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-debugger': 'error' } }];\n",
+      );
+      await writeFile(path.join(tmp, 'healthy', 'index.ts'), 'debugger;\n');
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        const results = await rslint.lintFiles('**/*.ts');
+        expect(results).toHaveLength(1);
+        expect(path.relative(tmp, results[0].filePath)).toBe(
+          path.join('healthy', 'index.ts'),
+        );
+        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
+          'no-debugger',
+        ]);
+
+        await expect(
+          rslint.lintFiles(['broken/index.ts', 'healthy/index.ts']),
+        ).rejects.toThrow(/Failed to load config .*rslint\.config\.mjs/);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('nested configs keep overrideConfig files, ignores, and project relative to cwd', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-nested-override-'),
+    );
+    const appSourceDir = path.join(tmp, 'packages', 'app', 'src');
+    const libSourceDir = path.join(tmp, 'packages', 'lib', 'src');
+    try {
+      await mkdir(appSourceDir, { recursive: true });
+      await mkdir(libSourceDir, { recursive: true });
+      await writeFile(
+        path.join(tmp, 'packages', 'app', 'rslint.config.mjs'),
+        "export default [{ files: ['src/**/*.ts'], rules: { 'no-console': 'error' } }];\n",
+      );
+      await writeFile(
+        path.join(tmp, 'packages', 'lib', 'rslint.config.mjs'),
+        "export default [{ files: ['src/**/*.ts'], rules: { 'no-debugger': 'error' } }];\n",
+      );
+      await writeFile(
+        path.join(tmp, 'tsconfig.json'),
+        JSON.stringify({
+          files: [
+            'packages/app/src/index.ts',
+            'packages/app/src/ignored.ts',
+            'packages/lib/src/index.ts',
+          ],
+        }),
+      );
+      const appSource = 'const values: string[] = [];\nconsole.log(values);\n';
+      await writeFile(path.join(appSourceDir, 'index.ts'), appSource);
+      await writeFile(path.join(appSourceDir, 'ignored.ts'), appSource);
+      await writeFile(
+        path.join(libSourceDir, 'index.ts'),
+        'const values: string[] = [];\ndebugger;\n',
+      );
+
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfig: [
+          { ignores: ['packages/app/src/ignored.ts'] },
+          {
+            files: ['packages/*/src/**/*.ts'],
+            plugins: ['@typescript-eslint'],
+            languageOptions: {
+              parserOptions: { project: ['./tsconfig.json'] },
+            },
+            rules: {
+              '@typescript-eslint/array-type': [
+                'error',
+                { default: 'generic' },
+              ],
+            },
+          },
+        ],
+      });
+      try {
+        const results = await rslint.lintFiles('packages/*/src/*.ts');
+        expect(results).toHaveLength(2);
+        const byPackage = new Map(
+          results.map((result) => [
+            path.relative(path.join(tmp, 'packages'), result.filePath),
+            result.messages.map((message) => message.ruleId),
+          ]),
+        );
+        const appRuleIds = byPackage.get(path.join('app', 'src', 'index.ts'));
+        expect(appRuleIds).toContain('no-console');
+        expect(appRuleIds).toContain('@typescript-eslint/array-type');
+        expect(appRuleIds).not.toContain('no-debugger');
+
+        const libRuleIds = byPackage.get(path.join('lib', 'src', 'index.ts'));
+        expect(libRuleIds).toContain('no-debugger');
+        expect(libRuleIds).toContain('@typescript-eslint/array-type');
+        expect(libRuleIds).not.toContain('no-console');
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
   test('lintFiles explicit file in parent-ignored subtree still uses nearest config', async () => {
     const tmp = await mkdtemp(
       path.join(os.tmpdir(), 'rslint-api-nearest-ignored-'),
@@ -462,6 +857,143 @@ describe('Rslint class', () => {
         const ruleIds = results[0].messages.map((m) => m.ruleId);
         expect(ruleIds).toContain('no-debugger');
         expect(ruleIds).not.toContain('no-console');
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles glob does not enter a parent-ignored nested config', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-glob-parent-ignore-'),
+    );
+    try {
+      await writeFile(
+        path.join(tmp, 'rslint.config.mjs'),
+        [
+          'export default [',
+          "  { ignores: ['packages/app/**'] },",
+          "  { rules: { 'no-console': 'error' } },",
+          '];',
+          '',
+        ].join('\n'),
+      );
+      await mkdir(path.join(tmp, 'packages', 'app'), { recursive: true });
+      await writeFile(
+        path.join(tmp, 'packages', 'app', 'rslint.config.mjs'),
+        "export default [{ rules: { 'no-debugger': 'error' } }];\n",
+      );
+      await writeFile(
+        path.join(tmp, 'packages', 'app', 'index.ts'),
+        'debugger;\n',
+      );
+
+      const rslint = new Rslint({ cwd: tmp });
+      try {
+        expect(await rslint.lintFiles('**/*.ts')).toEqual([]);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles includes dotfiles but skips default excluded directories', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-api-dotfiles-'));
+    try {
+      await mkdir(path.join(tmp, 'node_modules', 'pkg'), { recursive: true });
+      await writeFile(path.join(tmp, '.hidden.ts'), 'debugger;\n');
+      await writeFile(
+        path.join(tmp, 'node_modules', 'pkg', 'index.ts'),
+        'debugger;\n',
+      );
+
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
+      });
+      try {
+        const results = await rslint.lintFiles('**/*.ts');
+        expect(results).toHaveLength(1);
+        expect(path.basename(results[0].filePath)).toBe('.hidden.ts');
+        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
+          'no-debugger',
+        ]);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles includes a literal file symlink without following directory symlinks', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-file-symlink-'),
+    );
+    try {
+      const target = path.join(tmp, 'target.ts');
+      const link = path.join(tmp, 'link.ts');
+      await writeFile(target, 'debugger;\n');
+      try {
+        await symlink(target, link, 'file');
+      } catch {
+        return;
+      }
+
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
+      });
+      try {
+        const results = await rslint.lintFiles('link.ts');
+        expect(results).toHaveLength(1);
+        expect(results[0].filePath).toBe(path.normalize(link));
+        expect(results[0].messages.map((message) => message.ruleId)).toEqual([
+          'no-debugger',
+        ]);
+      } finally {
+        await rslint.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('lintFiles does not recurse through a directory symlink cycle', async () => {
+    const tmp = await mkdtemp(
+      path.join(os.tmpdir(), 'rslint-api-directory-symlink-'),
+    );
+    try {
+      const sourceDir = path.join(tmp, 'src');
+      await mkdir(sourceDir, { recursive: true });
+      await writeFile(path.join(sourceDir, 'index.ts'), 'debugger;\n');
+      try {
+        await symlink(
+          tmp,
+          path.join(sourceDir, 'loop'),
+          process.platform === 'win32' ? 'junction' : 'dir',
+        );
+      } catch {
+        return;
+      }
+
+      const rslint = new Rslint({
+        cwd: tmp,
+        overrideConfigFile: true,
+        overrideConfig: [{ rules: { 'no-debugger': 'error' } }],
+      });
+      try {
+        const results = await rslint.lintFiles('**/*.ts');
+        expect(results).toHaveLength(1);
+        expect(path.relative(tmp, results[0].filePath)).toBe(
+          path.join('src', 'index.ts'),
+        );
       } finally {
         await rslint.close();
       }
@@ -701,6 +1233,78 @@ describe('Rslint class', () => {
     });
     // 0 = the fixture linted (it asserts exactly 1 message) AND the process
     // exited without close(); 'TIMEOUT-HANG' = unref regressed.
+    expect(code).toBe(0);
+  });
+
+  test('community plugin host initializes and shuts down before lintText returns', async () => {
+    const { spawn } = await import('node:child_process');
+    const script = path.resolve(
+      import.meta.dirname,
+      'fixtures',
+      'no-close-plugin-exit.mjs',
+    );
+    const child = spawn(process.execPath, [script], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      stdio: 'inherit',
+    });
+    const code = await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        resolve('TIMEOUT-HANG');
+      }, 30000);
+      child.on('exit', (exitCode) => {
+        clearTimeout(timer);
+        resolve(exitCode);
+      });
+    });
+    expect(code).toBe(0);
+  });
+
+  test('community plugin host shuts down when the Go lint request fails', async () => {
+    const { spawn } = await import('node:child_process');
+    const script = path.resolve(
+      import.meta.dirname,
+      'fixtures',
+      'no-close-plugin-error-exit.mjs',
+    );
+    const child = spawn(process.execPath, [script], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      stdio: 'inherit',
+    });
+    const code = await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        resolve('TIMEOUT-HANG');
+      }, 30000);
+      child.on('exit', (exitCode) => {
+        clearTimeout(timer);
+        resolve(exitCode);
+      });
+    });
+    expect(code).toBe(0);
+  });
+
+  test('close shuts down an active community plugin host', async () => {
+    const { spawn } = await import('node:child_process');
+    const script = path.resolve(
+      import.meta.dirname,
+      'fixtures',
+      'close-active-plugin-exit.mjs',
+    );
+    const child = spawn(process.execPath, [script], {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      stdio: 'inherit',
+    });
+    const code = await new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        child.kill('SIGKILL');
+        resolve('TIMEOUT-HANG');
+      }, 20000);
+      child.on('exit', (exitCode) => {
+        clearTimeout(timer);
+        resolve(exitCode);
+      });
+    });
     expect(code).toBe(0);
   });
 

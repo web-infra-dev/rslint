@@ -180,7 +180,7 @@ The current parsing and linting pipeline is built on top of ts-go `Program` and 
 ### Detailed Pipeline Steps
 
 1. **Source Text Loading**: Files come from the real filesystem, an overlay VFS, or LSP document overlays.
-2. **Program Construction**: CLI/API build `Program` objects directly; LSP uses ts-go `project.Session`.
+2. **Program Construction**: CLI/API build `Program` objects directly. LSP reuses matching projects from ts-go `project.Session`; a declared custom tsconfig that project service has not loaded is built on demand against an isolated editor overlay.
 3. **Lexical + Syntax Parsing**: ts-go tokenizes and parses source files into TypeScript-native AST nodes.
 4. **Semantic Analysis**: When needed, the linter acquires a `TypeChecker` from the `Program`.
 5. **Rule Registration**: Enabled rules register listeners keyed by AST kind.
@@ -195,6 +195,7 @@ The parser and program builder are tolerant enough to support editor and fallbac
 
 - ts-go can continue producing ASTs after syntax errors
 - LSP delays lint on rapid edits to avoid repeated work on broken intermediate text
+- lint rules and community-plugin dispatch are suppressed for malformed lint targets; syntax diagnostics remain authoritative
 - CLI/API create tsconfig-backed Programs leniently so plain lint can decide
   syntax diagnostics from the final lint target set instead of failing during
   broad tsconfig construction
@@ -420,14 +421,14 @@ JSON config files (`rslint.json`, `rslint.jsonc`) are deprecated and will be rem
 
 Each entry in the config array supports:
 
-| Field             | Type                | Description                                                                                     |
-| ----------------- | ------------------- | ----------------------------------------------------------------------------------------------- |
-| `files`           | `string[]`          | Non-empty glob patterns this entry applies to; omit to use rslint's default lintable extensions |
-| `ignores`         | `string[]`          | Glob patterns excluded by this entry                                                            |
-| `languageOptions` | `object`            | Parser options such as `project` and `projectService`                                           |
-| `rules`           | `Record<string, …>` | Rule level or `[level, options]`                                                                |
-| `plugins`         | `string[]`          | Plugin declarations used for plugin gating                                                      |
-| `settings`        | `Record<string, …>` | Shared settings available in `RuleContext`                                                      |
+| Field             | Type                     | Description                                                                          |
+| ----------------- | ------------------------ | ------------------------------------------------------------------------------------ |
+| `files`           | `(string \| string[])[]` | Non-empty selector list; top-level selectors are ORed and nested selectors are ANDed |
+| `ignores`         | `string[]`               | Glob patterns excluded by this entry                                                 |
+| `languageOptions` | `object`                 | Parser options such as `project` and `projectService`                                |
+| `rules`           | `Record<string, …>`      | Rule level or `[level, options]`                                                     |
+| `plugins`         | `string[]`               | Plugin declarations used for plugin gating                                           |
+| `settings`        | `Record<string, …>`      | Shared settings available in `RuleContext`                                           |
 
 ### Configuration Loading
 
@@ -451,12 +452,12 @@ The loading flow differs by config type:
 
 Config merging follows flat-config-style semantics in `GetConfigForFile()`:
 
-1. global-ignore-only entries apply first
-2. `files` patterns decide which entries match; an explicit `files: []` is invalid
-3. `ignores` can remove files from an otherwise matching entry
+1. entries containing only `ignores` and an optional `name` form the global-ignore set
+2. the implicit default extension baseline plus explicit `files` selectors defines the config selector union; top-level selectors are ORed, patterns in a nested selector are ANDed, and an explicit `files: []` is invalid
+3. entries without `files` cascade across that selector union, while entry-level `ignores` prevent only that entry from contributing configuration
 4. later rule values override earlier rule values
 5. later settings override earlier settings by key
-6. `languageOptions.parserOptions` are merged field-by-field
+6. `languageOptions.parserOptions` are merged field-by-field and `languageOptions.globals` are merged by global name
 
 In multi-config mode, `FindNearestConfig()` is used before `GetConfigForFile()` so that each file is merged against the nearest config directory.
 
@@ -464,9 +465,11 @@ Additional current behaviors:
 
 - `.gitignore` is injected into CLI configs as a global-ignore entry
 - plugin rules are gated by declared plugins for JS/TS configs
-- lint target selection is independent from TypeScript `Program` membership: CLI/API targets are filtered by `files`, global ignores, and `.gitignore`; omitted `files` entries contribute rslint's default lintable extensions (`.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, `.cts`)
-- files passed explicitly on the CLI/API can still appear as 0-rule lint results even if they do not match any config `files` pattern
-- selected files outside all tsconfig-backed Programs become gap files and receive an AST-only fallback Program
+- lint target selection is independent from TypeScript `Program` membership: rslint always starts with `.js`, `.mjs`, `.cjs`, `.jsx`, `.ts`, `.tsx`, `.mts`, and `.cts`, then unions explicit config `files`; global ignores and `.gitignore` remove targets, while entry-level ignores do not
+- files passed explicitly on the CLI/API can still appear as 0-rule lint results when no config entry contributes rules; selected files are parsed and can report syntax diagnostics in that state
+- each selected file is governed by its nearest config and can bind only to a tsconfig declared by that config; the first declared project containing the file wins
+- canonical tsconfigs are built once while retaining every config association, and selected files outside the governing config's Programs receive an AST-only fallback Program
+- `--type-check` runs over every real tsconfig Program and is not constrained by lint targets, config `files`/`ignores`, `.gitignore`, or CLI file/directory arguments; synthetic fallback Programs never participate
 
 ### Inline Directives
 
@@ -498,13 +501,13 @@ The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cl
    - `--lsp`: starts the LSP server
    - `--api`: starts the IPC API server
    - default: runs direct CLI linting
-4. **Program Creation**: Go builds one or more tsconfig-backed Programs from configured or auto-detected tsconfigs
-5. **Lint Target Selection**: Go resolves the lint target set from CLI/API targets, config `files`, default lintable extensions, global ignores, and `.gitignore`
-6. **Program Binding**: selected files are bound to existing Programs when possible; selected files outside every tsconfig-backed Program, including projects with no tsconfig, are parsed through an AST-only fallback Program
+4. **Program Registry**: Go builds each canonical configured or auto-detected tsconfig once and records every governing-config association plus declaration order
+5. **Lint Target Plan**: independently, Go resolves a stable target set from CLI/API scope, the implicit default baseline, explicit config `files`, global ignores, and `.gitignore`
+6. **Program Binding**: each target is bound to the first containing Program declared by its governing config; unbound targets, including projects with no tsconfig, are parsed through an AST-only fallback Program
 7. **Rule Resolution**: `getRulesForFile` resolves enabled rules per selected file, filtering type-aware rules off no-type-info gap files
-8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a second program-level pass runs after Phase 1 and aggregates `tsc --noEmit`-aligned diagnostics through the internal `collectNoEmitDiagnostics()` helper
+8. **Rule Execution**: `RunLinter()` schedules per-Program work over the exact target plan; the unexported `runLintRulesInProgram()` does the actual per-file traversal. When `--type-check` is enabled, a separate program-wide pass over real tsconfig Programs aggregates `tsc --noEmit`-aligned diagnostics through `collectNoEmitDiagnostics()`
 9. **Result Aggregation**: diagnostics are sent through one run-scoped diagnostics channel and collected at the CLI layer
-10. **Fix Passes**: when enabled, fixes are applied and Programs can be rebuilt for another pass without changing the original target set
+10. **Fix Passes**: when enabled, fixes are applied, real Programs are rebuilt, and the stable target plan is rebound; target membership stays fixed while a file may move between a real Program and fallback as its import graph changes
 11. **Output Formatting**: default, JSON line, and GitHub workflow formats are supported
 12. **Exit Code**: depends on diagnostics, warnings, and fix outcomes
 
@@ -519,12 +522,12 @@ which is the user-facing escape hatch for serial / reproducible execution.
 
 2. **gitignore reading ‖ Program creation** (in `cmd/rslint/cmd.go`)
    - `ReadGitignoreAsGlobs` walks `.gitignore` for each config; it is independent
-     of `createProgramsForConfig` (which only reads
+     of Program registry construction (which only reads
      `languageOptions.parserOptions.project`, never `Ignores`). The two are
      dispatched as parallel goroutines per config.
    - In multi-config mode, gitignore reads also fan out across configs in
-     parallel; `createProgramsForConfig` invocations run serially across configs
-     (typescript-go's API is invoked one config at a time).
+     parallel; canonical Programs are constructed serially in stable config and
+     project order (typescript-go's API is invoked one Program at a time).
    - `--singleThreaded` runs both stages sequentially — no goroutines spawned.
 
 3. **Lint-target directory walker** (`internal/config/file_discovery.go`)
@@ -542,14 +545,14 @@ true})` reports the dirent type without following symlinks, so
      scheduling-dependent non-determinism that a parallel walker would
      otherwise introduce.
 
-4. **Multi-config target discovery** (`DiscoverLintFilesMultiConfig`)
-   - Iterates `configMap` serially, calling `DiscoverLintFiles` once per config.
+4. **Multi-config target discovery** (`DiscoverLintTargetsMultiConfig`)
+   - Uses a config-directory index to assign explicit files and directory ownership before calling per-config discovery.
    - Each call is itself bounded by its own worker pool, so total live
      goroutines remain bounded by `workers`, not `len(configMap) × workers`.
 
 Other invariants:
 
-- Target discovery and Program binding deduplicate selected files across configs before `RunLinter` runs.
+- Target discovery canonicalizes and deduplicates selected files before binding; aliases governed by different configs are rejected instead of choosing an owner by scan order.
 - LSP uses a different orchestration model and keeps session access on its
   main dispatch loop.
 
@@ -736,13 +739,15 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │            │                                                                 │
 │            ▼                                                                 │
 │  Config Load / Normalize / Merge                                             │
-│            │                                                                 │
-│            ▼                                                                 │
-│  Create tsconfig-backed Programs                                             │
-│            │                                                                 │
-│            ├───────────────► Discover Gap Files ───────► Fallback Program    │
-│            │                                                                 │
-│            ▼                                                                 │
+│            ├──────────────────────────┐                                      │
+│            ▼                          ▼                                      │
+│  Canonical Program Registry      Stable Lint Target Plan                     │
+│  (tsconfig + config/order)       (scope + selectors + ignores)               │
+│            └──────────────┬───────────┘                                      │
+│                           ▼                                                  │
+│  Bind by Governing Config / Project Order ─────► AST-only Fallback Program   │
+│                           │                                                  │
+│                           ▼                                                  │
 │  Resolve Enabled Rules Per File                                              │
 │            │                                                                 │
 │            ▼                                                                 │
@@ -754,6 +759,7 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 │            ▼                                                                 │
 │  RuleDiagnostic / Fix / Suggestion Collection                                │
 │            │                                                                 │
+│            ├───────────────► Program-wide Type Check (real tsconfigs only)    │
 │            ├───────────────► CLI formatter / exit code                       │
 │            └───────────────► API structured response                         │
 │                                                                              │
@@ -805,15 +811,16 @@ If the rule-porting workflow changes, update the material under `.agents/skills/
 - **Config Entry**: One flat-config object whose `files`, `ignores`, `settings`, and `rules` participate in per-file config merging
 - **ConfiguredRule**: Rule implementation plus resolved severity, settings, options, and type-info requirement
 - **Diagnostic**: A lint finding reported by a rule or by TypeScript semantic diagnostics
-- **Fallback Program**: Extra AST-only `Program` created from selected lint targets that are not covered by any tsconfig-backed Program; fallback files are intentionally non-type-aware
+- **Fallback Program**: Extra AST-only `Program` created from selected lint targets that are not covered by a tsconfig Program associated with their governing config; fallback files are intentionally non-type-aware
 - **Flat Config**: ESLint-style array-based configuration model used by rslint to merge rule settings per file
-- **Gap File**: A selected lint target that is not present in any tsconfig-backed Program
+- **Gap File**: A selected lint target that is not present in any tsconfig Program declared by its governing config
 - **Inspector**: Auxiliary backend path that returns node, type, symbol, signature, and flow information for Playground inspection
 - **IPC API**: Length-prefixed JSON message protocol exposed by `cmd/rslint --api` for Node and WASM clients
 - **Listener**: Callback registered by a rule for an AST kind or synthetic listener kind
 - **Nearest Config**: In multi-config mode, the deepest config directory that owns a file
 - **Node Kind**: Enumerated AST kind value used by ts-go and by the listener dispatcher to identify node types
 - **Program**: ts-go compilation context, usually tied to a tsconfig or fallback root-file set
+- **Program Registry**: Run-scoped set of canonical tsconfig Programs plus the governing configs and project declaration order associated with each Program
 - **project.Session**: ts-go project manager used by LSP for inferred/configured projects and overlays
 - **Rule Context**: Runtime environment through which a rule reads file/program/checker state and reports findings
 - **RuleFix**: Text edit represented as a range plus replacement text; fixes are merged and applied after diagnostics are collected
