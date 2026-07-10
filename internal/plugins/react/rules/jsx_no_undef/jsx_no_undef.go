@@ -12,6 +12,20 @@ import (
 var JsxNoUndefRule = rule.Rule{
 	Name: "react/jsx-no-undef",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		allowGlobals := false
+		optsMap := utils.GetOptionsMap(options)
+		if optsMap != nil {
+			if v, ok := optsMap["allowGlobals"].(bool); ok {
+				allowGlobals = v
+			}
+		}
+		// Upstream only consults the outer global scope (config
+		// `languageOptions.globals` / `/* global */` comments) for script
+		// files, or for module files when `allowGlobals: true` is set — by
+		// default a module's top-level scope sits between the file and the
+		// true global scope, so declared globals are invisible to it.
+		checkGlobals := allowGlobals || !ast.IsExternalModule(ctx.SourceFile)
+
 		check := func(element *ast.Node) {
 			tagName := reactutil.GetJsxTagName(element)
 			if tagName == nil {
@@ -44,6 +58,9 @@ var JsxNoUndefRule = rule.Rule{
 				return
 			}
 			if utils.IsShadowed(identNode, name) {
+				return
+			}
+			if checkGlobals && ctx.Globals[name] {
 				return
 			}
 			ctx.ReportNode(identNode, rule.RuleMessage{

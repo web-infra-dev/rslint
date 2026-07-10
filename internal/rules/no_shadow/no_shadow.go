@@ -1351,6 +1351,13 @@ func runWithDefaults(defaults options) func(rule.RuleContext, any) rule.RuleList
 			for name := range ecmaScriptGlobals {
 				builtinGlobals[name] = true
 			}
+			// Config `languageOptions.globals` and `/* global */` comments
+			// declare additional globals beyond the ECMAScript/lib set.
+			for name, declared := range ctx.Globals {
+				if declared {
+					builtinGlobals[name] = true
+				}
+			}
 			if ctx.TypeChecker != nil && ctx.Program != nil {
 				for _, sym := range ctx.TypeChecker.GetSymbolsInScope(ctx.SourceFile.AsNode(), ast.SymbolFlagsValue) {
 					if sym == nil || sym.Name == "" {

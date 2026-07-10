@@ -39,10 +39,9 @@ This rule has no options.
 
 ## Differences from ESLint
 
-- `/* global foo */` directive comments are not recognized — labels colliding
-  with names declared only via these comments are not reported.
-- On files without type information, only declarations written in the file are
-  checked; clashes with built-in globals (`Promise`, `Array`, …) are not
+- On files without type information, only declarations written in the file
+  plus configured globals (`languageOptions.globals` / `/* global foo */`)
+  are checked; clashes with built-in globals (`Promise`, `Array`, …) are not
   reported in that case.
 
 ## Original Documentation
