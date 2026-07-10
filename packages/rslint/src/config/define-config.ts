@@ -63,18 +63,15 @@ export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
 export type RuleOptions = Record<string, any>;
 
 /**
- * Configuration value accepted for a single rule.
+ * Configuration value accepted for a single rule. Aligned with ESLint —
+ * rslint's own `{ level, options }` object form has been removed.
  *
  * - `RuleSeverity` — just toggle the rule.
  * - `[RuleSeverity, ...args]` — ESLint-style array form. Most rules take a
  *   single options object (`[severity, { ... }]`); some accept positional
  *   string/object args (`[severity, "always", { ... }]`).
- * - `{ level, options }` — object form supported by the loader.
  */
-export type RuleEntry =
-  | RuleSeverity
-  | readonly [RuleSeverity, ...any[]]
-  | { level: RuleSeverity; options?: RuleOptions };
+export type RuleEntry = RuleSeverity | readonly [RuleSeverity, ...any[]];
 
 /**
  * Map of rule name → rule configuration. Rule names are `string` (no

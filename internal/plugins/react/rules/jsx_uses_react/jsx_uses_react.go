@@ -20,7 +20,7 @@ import (
 // unused even with this rule enabled.
 var JsxUsesReactRule = rule.Rule{
 	Name: "react/jsx-uses-react",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	},
 }

@@ -24,7 +24,7 @@ func buildUseSpliceMessage() rule.RuleMessage {
 var NoArrayDeleteRule = rule.CreateRule(rule.Rule{
 	Name:             "no-array-delete",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		isUnderlyingTypeArray := func(t *checker.Type) bool {
 			if utils.IsTypeFlagSet(t, checker.TypeFlagsUnion) {
 				for _, t := range t.Types() {

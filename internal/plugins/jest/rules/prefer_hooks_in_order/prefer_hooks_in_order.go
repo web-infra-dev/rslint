@@ -19,7 +19,7 @@ func buildReorderHooksMessage(currentHook, previousHook string) rule.RuleMessage
 
 var PreferHooksInOrderRule = rule.Rule{
 	Name: "jest/prefer-hooks-in-order",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		previousHookIndex := -1
 		inHook := false
 

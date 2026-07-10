@@ -16,7 +16,8 @@ import (
 // https://eslint.org/docs/latest/rules/max-lines-per-function
 var MaxLinesPerFunctionRule = rule.Rule{
 	Name: "max-lines-per-function",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		state := newLineState(ctx.SourceFile)
 

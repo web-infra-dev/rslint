@@ -81,7 +81,8 @@ func parseOptions(options any) bool {
 
 var NoUnsafeRule = rule.Rule{
 	Name: "react/no-unsafe",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		// `testReactVersion(context, '>= 16.3.0')` — at React < 16.3 the
 		// `UNSAFE_` lifecycle aliases didn't exist, so the rule disables
 		// itself entirely. Default version (no `settings.react.version`)

@@ -897,7 +897,7 @@ func findBinaryExpressionConstantOperand(ctx *rule.RuleContext, a, b *ast.Node, 
 // NoConstantBinaryExpressionRule detects constant binary expressions
 var NoConstantBinaryExpressionRule = rule.Rule{
 	Name: "no-constant-binary-expression",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()

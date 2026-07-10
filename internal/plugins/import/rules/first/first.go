@@ -14,7 +14,8 @@ import (
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/first.js
 var FirstRule = rule.Rule{
 	Name: "import/first",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		// The linter visits SourceFile's children but never fires a KindSourceFile
 		// listener, so run the check eagerly before returning listeners.
 		checkFirst(ctx, options)

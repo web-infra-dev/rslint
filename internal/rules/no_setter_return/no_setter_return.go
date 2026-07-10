@@ -164,7 +164,7 @@ func isSetterFunction(node *ast.Node, ctx rule.RuleContext) bool {
 // A bare `return;` (without a value) is allowed for control flow.
 var NoSetterReturnRule = rule.Rule{
 	Name: "no-setter-return",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				ret := node.AsReturnStatement()

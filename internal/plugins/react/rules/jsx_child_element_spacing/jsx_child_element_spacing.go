@@ -111,7 +111,7 @@ func handleJSX(ctx rule.RuleContext, node *ast.Node) {
 
 var JsxChildElementSpacingRule = rule.Rule{
 	Name: "react/jsx-child-element-spacing",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindJsxElement:  func(node *ast.Node) { handleJSX(ctx, node) },
 			ast.KindJsxFragment: func(node *ast.Node) { handleJSX(ctx, node) },

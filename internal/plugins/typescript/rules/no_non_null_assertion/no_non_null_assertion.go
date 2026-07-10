@@ -23,7 +23,7 @@ func isAssignmentTarget(node *ast.Node) bool {
 
 var NoNonNullAssertionRule = rule.CreateRule(rule.Rule{
 	Name: "no-non-null-assertion",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noNonNull",
 			Description: "Forbidden non-null assertion.",

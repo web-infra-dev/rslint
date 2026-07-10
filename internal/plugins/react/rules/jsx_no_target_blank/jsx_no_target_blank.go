@@ -58,7 +58,6 @@ func parseOptions(raw any) options {
 	return opts
 }
 
-
 // jsxExpressionInner unwraps a JsxExpression container and transparently
 // skips ParenthesizedExpression wrappers on its payload. tsgo preserves
 // parentheses as explicit nodes where ESTree flattens them; every downstream
@@ -415,7 +414,8 @@ func reportWithOptionalFix(ctx rule.RuleContext, node *ast.Node, messageId, desc
 
 var JsxNoTargetBlankRule = rule.Rule{
 	Name: "react/jsx-no-target-blank",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 		linkComponents := reactutil.ReadComponentsFromSettings(ctx.Settings, "linkComponents", "linkAttribute", "href", reactutil.DefaultLinkComponents())
 		formComponents := reactutil.ReadComponentsFromSettings(ctx.Settings, "formComponents", "formAttribute", "action", reactutil.DefaultFormComponents())

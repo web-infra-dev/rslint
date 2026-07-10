@@ -193,7 +193,8 @@ var useConstMessage = rule.RuleMessage{
 // NoMagicNumbersRule implements the @typescript-eslint/no-magic-numbers rule.
 var NoMagicNumbersRule = rule.CreateRule(rule.Rule{
 	Name: "no-magic-numbers",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		handleNumericNode := func(node *ast.Node, isBigInt bool) {

@@ -33,7 +33,7 @@ var (
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/main/docs/rules/no-thenable.md
 var NoThenableRule = rule.Rule{
 	Name: "unicorn/no-thenable",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		state := &ruleState{
 			ctx:           ctx,
 			staticStrings: utils.NewStaticStringEvaluatorWithSourceFile(ctx.TypeChecker, ctx.SourceFile),

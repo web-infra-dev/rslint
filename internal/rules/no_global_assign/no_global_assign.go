@@ -72,7 +72,8 @@ func isWriteThroughTypeAssertion(node *ast.Node) bool {
 // NoGlobalAssignRule disallows assignments to native objects or read-only global variables
 var NoGlobalAssignRule = rule.Rule{
 	Name: "no-global-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

@@ -38,7 +38,7 @@ func matchesFindDOMNodeCallee(callee *ast.Node) bool {
 
 var NoFindDomNodeRule = rule.Rule{
 	Name: "react/no-find-dom-node",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callee := ast.SkipParentheses(node.AsCallExpression().Expression)

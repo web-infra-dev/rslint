@@ -17,7 +17,7 @@ import (
 // it match any character).
 var NoEmptyCharacterClassRule = rule.Rule{
 	Name: "no-empty-character-class",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()

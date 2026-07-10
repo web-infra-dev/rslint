@@ -11,7 +11,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-dupe-keys
 var NoDupeKeysRule = rule.Rule{
 	Name: "no-dupe-keys",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindObjectLiteralExpression: func(node *ast.Node) {
 				objLit := node.AsObjectLiteralExpression()

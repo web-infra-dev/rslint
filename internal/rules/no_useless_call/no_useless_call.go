@@ -54,7 +54,7 @@ func isCallOrNonVariadicApply(node *ast.Node) (*ast.Node, string) {
 // https://eslint.org/docs/latest/rules/no-useless-call
 var NoUselessCallRule = rule.Rule{
 	Name: "no-useless-call",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callee, methodName := isCallOrNonVariadicApply(node)

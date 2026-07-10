@@ -39,7 +39,8 @@ type options struct {
 // https://eslint.org/docs/latest/rules/prefer-regex-literals
 var PreferRegexLiteralsRule = rule.Rule{
 	Name: "prefer-regex-literals",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		check := func(node *ast.Node, callee *ast.Node, argsList *ast.NodeList) {

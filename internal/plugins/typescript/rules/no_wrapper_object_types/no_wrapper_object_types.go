@@ -34,7 +34,7 @@ func buildBannedClassTypeMessage(typeName, preferred string) rule.RuleMessage {
 var NoWrapperObjectTypesRule = rule.CreateRule(rule.Rule{
 	Name:             "no-wrapper-object-types",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// checkBannedTypes mirrors upstream's local `checkBannedTypes` —
 		// `node` is the inner Identifier the rule visits (TypeReference's
 		// TypeName, or ExpressionWithTypeArguments's Expression). `includeFix`

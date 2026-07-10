@@ -15,7 +15,7 @@ func useLiteralMessage() rule.RuleMessage {
 
 var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 	Name: "no-array-constructor",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// getArgumentsText extracts the text between opening and closing parentheses
 		// Returns empty string if no parentheses found (e.g., "new Array;")
 		getArgumentsText := func(node *ast.Node) string {

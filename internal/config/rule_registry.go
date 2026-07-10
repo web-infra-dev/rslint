@@ -75,7 +75,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
 					Options:            ruleConfigCopy.Options,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
+						return ruleImpl.Run(ctx, rule.NormalizeOptions(ruleConfigCopy.Options))
 					},
 				})
 			}

@@ -23,7 +23,7 @@ func buildRuleMessage(modulePath string) rule.RuleMessage {
 // See: https://github.com/import-js/eslint-plugin-import/blob/01c9eb04331d2efa8d63f2d7f4bfec3bc44c94f3/src/rules/no-webpack-loader-syntax.js
 var NoWebpackLoaderSyntax = rule.Rule{
 	Name: "import/no-webpack-loader-syntax",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				specifier := node.ModuleSpecifier()

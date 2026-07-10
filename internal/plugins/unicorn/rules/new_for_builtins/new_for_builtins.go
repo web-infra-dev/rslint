@@ -25,7 +25,7 @@ const (
 
 var NewForBuiltinsRule = rule.Rule{
 	Name: "unicorn/new-for-builtins",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		state := newRuleState(ctx)
 
 		return rule.RuleListeners{

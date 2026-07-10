@@ -61,7 +61,7 @@ func isWhitespace(str string) bool {
 var NoUnnecessaryTemplateExpressionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-template-expression",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		reportSingleInterpolation := func(spanExpr *ast.Node, spanLiteral *ast.Node) {
 			ctx.ReportRange(core.NewTextRange(spanExpr.Pos()-2, spanLiteral.Pos()+1), buildNoUnnecessaryTemplateExpressionMessage())
 		}

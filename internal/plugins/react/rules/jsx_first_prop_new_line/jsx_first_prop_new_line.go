@@ -32,7 +32,8 @@ var JsxFirstPropNewLineRule = BuildRule("react/jsx-first-prop-new-line")
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,
-		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+			options := rule.LegacyUnwrapOptions(_options)
 			// Default option
 			option := "multiline-multiprop"
 

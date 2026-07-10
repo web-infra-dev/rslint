@@ -171,7 +171,7 @@ func reportJasmineAssignedProperty(node *ast.Node, ctx rule.RuleContext) {
 
 var NoJasmineGlobalsRule = rule.Rule{
 	Name: "jest/no-jasmine-globals",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callExpr := node.AsCallExpression()

@@ -30,7 +30,8 @@ func getBodyKind(node *ast.Node) string {
 // https://eslint.org/docs/latest/rules/no-labels
 var NoLabelsRule = rule.Rule{
 	Name: "no-labels",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		allowLoop := false
 		allowSwitch := false
 		optsMap := utils.GetOptionsMap(options)

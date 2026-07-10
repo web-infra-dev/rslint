@@ -14,7 +14,8 @@ import (
 // JsxMaxPropsPerLineRule limits the maximum number of props on a single line in JSX.
 var JsxMaxPropsPerLineRule = rule.Rule{
 	Name: "react/jsx-max-props-per-line",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		// Defaults
 		singleLimit := 0 // 0 means "not explicitly set"
 		multiLimit := 0

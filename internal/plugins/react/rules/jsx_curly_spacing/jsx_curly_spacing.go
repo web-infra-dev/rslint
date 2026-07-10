@@ -373,7 +373,8 @@ var JsxCurlySpacingRule = BuildRule("react/jsx-curly-spacing")
 func BuildRule(name string) rule.Rule {
 	return rule.Rule{
 		Name: name,
-		Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+			options := rule.LegacyUnwrapOptions(_options)
 			attrsConfig, childrenConfig := parseOptions(options)
 
 			text := ctx.SourceFile.Text()

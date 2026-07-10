@@ -54,7 +54,7 @@ func isObjectLiteralType(t *checker.Type) bool {
 var NoUnsafeTypeAssertionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-type-assertion",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkExpression := func(node *ast.Node) {
 			expression := node.Expression()
 			typeAnnotation := node.Type()

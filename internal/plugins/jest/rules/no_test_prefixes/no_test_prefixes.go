@@ -20,7 +20,7 @@ func buildErrorUsePreferredNameMessage(preferredName string) rule.RuleMessage {
 
 var NoTestPrefixesRule = rule.Rule{
 	Name: "jest/no-test-prefixes",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := utils.ParseJestFnCall(node, ctx)

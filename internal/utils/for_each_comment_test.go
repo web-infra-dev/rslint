@@ -3,12 +3,14 @@ package utils
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/parser"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
@@ -83,6 +85,42 @@ func TestForEachComment_ReuseFactoryReportsAllCommentsPerToken(t *testing.T) {
 		if seen[text] != 1 {
 			t.Errorf("comment %q expected exactly once, got %d (factory reuse smeared/dropped?)", text, seen[text])
 		}
+	}
+}
+
+func TestForEachComment_CommentOnlySourceFile(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+		want   []string
+	}{
+		{
+			name:   "mixed comments",
+			source: "/* first */\n// second",
+			want:   []string{"/* first */", "// second"},
+		},
+		{
+			name:   "comments after shebang",
+			source: "#!/usr/bin/env node\n/* first */\n// second",
+			want:   []string{"/* first */", "// second"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: "/test.ts",
+				Path:     "/test.ts",
+			}, test.source, core.ScriptKindTS)
+
+			var got []string
+			ForEachComment(sourceFile.AsNode(), func(comment *ast.CommentRange) {
+				got = append(got, test.source[comment.Pos():comment.End()])
+			}, sourceFile)
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("comments = %#v, want %#v", got, test.want)
+			}
+		})
 	}
 }
 

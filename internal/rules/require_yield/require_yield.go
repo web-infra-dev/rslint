@@ -25,7 +25,7 @@ type stackFrame struct {
 // https://eslint.org/docs/latest/rules/require-yield
 var RequireYieldRule = rule.Rule{
 	Name: "require-yield",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		stack := make([]stackFrame, 0, 8)
 
 		enter := func(node *ast.Node) {

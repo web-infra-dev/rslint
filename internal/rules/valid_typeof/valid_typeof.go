@@ -66,7 +66,8 @@ func isEqualityOperator(kind ast.Kind) bool {
 // https://eslint.org/docs/latest/rules/valid-typeof
 var ValidTypeofRule = rule.Rule{
 	Name: "valid-typeof",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

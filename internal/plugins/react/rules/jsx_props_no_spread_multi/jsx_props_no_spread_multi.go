@@ -10,7 +10,7 @@ import (
 // times in one JSX opening element.
 var JsxPropsNoSpreadMultiRule = rule.Rule{
 	Name: "react/jsx-props-no-spread-multi",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			attrs := reactutil.GetJsxElementAttributes(node)
 			if len(attrs) == 0 {

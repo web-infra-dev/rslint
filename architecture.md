@@ -242,7 +242,7 @@ Rules are defined in `internal/rule/rule.go`:
 type Rule struct {
     Name             string
     RequiresTypeInfo bool
-    Run              func(ctx RuleContext, options any) RuleListeners
+    Run              func(ctx RuleContext, options []any) RuleListeners
 }
 
 type RuleListeners map[ast.Kind]func(node *ast.Node)
@@ -258,6 +258,9 @@ type RuleListeners map[ast.Kind]func(node *ast.Node)
 type RuleContext struct {
     SourceFile                 *ast.SourceFile
     Settings                   map[string]interface{}
+    ConfigGlobals              map[string]bool
+    InlineGlobals              []InlineGlobal
+    Globals                    map[string]bool
     Program                    *compiler.Program
     TypeChecker                *checker.Checker
     DisableManager             *DisableManager
@@ -269,6 +272,12 @@ type RuleContext struct {
     ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
 }
 ```
+
+The linter parses `/* global */` comments once per file before rules run.
+`ConfigGlobals` preserves the effective `languageOptions.globals` source,
+`InlineGlobals` preserves ordered comment name ranges, and `Globals` is the
+resolved map after inline settings override configuration. Rules consume this
+context data instead of scanning comments independently.
 
 ### Listener Registration
 

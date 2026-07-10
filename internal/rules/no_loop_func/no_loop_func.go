@@ -404,7 +404,7 @@ func (s *RunState) checkForLoopsCore(node *ast.Node) {
 var NoLoopFuncRule = rule.Rule{
 	Name:             "no-loop-func",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Defense-in-depth: RequiresTypeInfo: true filters this rule out for
 		// gap files / inferred-project files, but if a future caller bypasses
 		// the filter we still want to no-op rather than nil-deref.

@@ -71,7 +71,7 @@ type thisAlias struct {
 
 var NoUnusedPrivateClassMembersRule = rule.CreateRule(rule.Rule{
 	Name: "no-unused-private-class-members",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Root scope corresponds to upstream's IntermediateScope-for-Program:
 		// no `this` binding.
 		root := &thisScope{}

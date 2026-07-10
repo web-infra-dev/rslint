@@ -115,7 +115,7 @@ func matchedObjectName(call *ast.CallExpression, pattern *regexp.Regexp) string 
 // assignment — matching upstream exactly.
 var NoRenderReturnValueRule = rule.Rule{
 	Name: "react/no-render-return-value",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pattern := calleeObjectRe(ctx.Settings)
 
 		return rule.RuleListeners{

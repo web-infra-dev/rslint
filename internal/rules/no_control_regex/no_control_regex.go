@@ -12,7 +12,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-control-regex
 var NoControlRegexRule = rule.Rule{
 	Name: "no-control-regex",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		report := func(node *ast.Node, controlChars []string) {
 			ctx.ReportNode(node, rule.RuleMessage{
 				Id:          "unexpected",
