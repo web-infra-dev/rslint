@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 )
 
@@ -36,25 +35,25 @@ func TestCompileSchemaAndValidateOptions(t *testing.T) {
 	}
 
 	// No options at all: satisfies minItems: 0.
-	if _, err := schema.Validate([]any{}); err != nil {
+	if err := schema.Validate([]any{}); err != nil {
 		t.Errorf("expected empty options to be valid, got: %v", err)
 	}
 
 	// A well-formed options object.
 	valid := []any{map[string]any{"allow": []any{"warn", "error"}}}
-	if _, err := schema.Validate(valid); err != nil {
+	if err := schema.Validate(valid); err != nil {
 		t.Errorf("expected valid options, got: %v", err)
 	}
 
 	// `allow` must be an array of strings, not a bare string.
 	invalidType := []any{map[string]any{"allow": "warn"}}
-	if _, err := schema.Validate(invalidType); err == nil {
+	if err := schema.Validate(invalidType); err == nil {
 		t.Error("expected error for allow as non-array, got nil")
 	}
 
 	// Unknown property rejected by additionalProperties: false.
 	invalidProp := []any{map[string]any{"unknown": true}}
-	if _, err := schema.Validate(invalidProp); err == nil {
+	if err := schema.Validate(invalidProp); err == nil {
 		t.Error("expected error for unknown property, got nil")
 	}
 
@@ -63,7 +62,7 @@ func TestCompileSchemaAndValidateOptions(t *testing.T) {
 		map[string]any{"allow": []any{"warn"}},
 		map[string]any{"allow": []any{"error"}},
 	}
-	if _, err := schema.Validate(tooMany); err == nil {
+	if err := schema.Validate(tooMany); err == nil {
 		t.Error("expected error for too many options, got nil")
 	}
 }
@@ -79,10 +78,10 @@ func TestCompileSchemaNoOptions(t *testing.T) {
 		t.Fatalf("CompileSchema failed: %v", err)
 	}
 
-	if _, err := schema.Validate([]any{}); err != nil {
+	if err := schema.Validate([]any{}); err != nil {
 		t.Errorf("expected empty options to be valid, got: %v", err)
 	}
-	if _, err := schema.Validate([]any{"unexpected"}); err == nil {
+	if err := schema.Validate([]any{"unexpected"}); err == nil {
 		t.Error("expected error when options are passed to a no-options rule, got nil")
 	}
 }
@@ -116,490 +115,11 @@ func TestCompileSchemaIsolatesResourcesAcrossCalls(t *testing.T) {
 }
 
 func TestEmptyArraySchema(t *testing.T) {
-	if _, err := EmptyArraySchema.Validate([]any{}); err != nil {
+	if err := EmptyArraySchema.Validate([]any{}); err != nil {
 		t.Errorf("expected empty options to be valid, got: %v", err)
 	}
-	if _, err := EmptyArraySchema.Validate([]any{"unexpected"}); err == nil {
+	if err := EmptyArraySchema.Validate([]any{"unexpected"}); err == nil {
 		t.Error("expected error when options are passed to EmptyArraySchema, got nil")
-	}
-}
-
-func TestValidateFillsObjectPropertyDefaults(t *testing.T) {
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "object",
-				"properties": {
-					"allow": {
-						"type": "array",
-						"items": { "type": "string" },
-						"default": []
-					},
-					"strict": { "type": "boolean", "default": true }
-				},
-				"additionalProperties": false
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	// Missing properties get filled; a present property is left untouched.
-	got, err := schema.Validate([]any{map[string]any{"strict": false}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"allow": []any{}, "strict": false}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsTrailingTupleItemDefaults(t *testing.T) {
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{ "type": "string" },
-			{ "type": "number", "default": 42 }
-		],
-		"minItems": 0,
-		"maxItems": 2
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	// The second tuple item is missing, so it gets appended from its default.
-	got, err := schema.Validate([]any{"hello"})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{"hello", float64(42)}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsNestedDefaults(t *testing.T) {
-	// A default nested inside another default (object-in-object) must also be
-	// filled in, not just the top-level property.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "object",
-				"properties": {
-					"outer": {
-						"type": "object",
-						"properties": {
-							"inner": { "type": "string", "default": "fallback" }
-						},
-						"additionalProperties": false,
-						"default": {}
-					}
-				},
-				"additionalProperties": false
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{map[string]any{}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"outer": map[string]any{"inner": "fallback"}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsTrailingItemCreatesGapWhenEarlierItemHasNoDefault(t *testing.T) {
-	// Matches ajv's own useDefaults: every tuple position with a declared
-	// default is considered unconditionally, so a later item's default can
-	// still be inserted even while an earlier, default-less item is missing.
-	// That leaves a hole (nil) at the earlier position rather than refusing
-	// to fill the later one.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{ "type": "string" },
-			{ "type": "number", "default": 42 }
-		],
-		"minItems": 0,
-		"maxItems": 2
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{})
-	want := []any{nil, float64(42)}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-	// Still invalid overall: index 0 is missing and fails its own "type": "string" check.
-	if err == nil {
-		t.Error("expected an error since the first tuple item is still missing, got nil")
-	}
-}
-
-func TestValidateDefaultsShareStorageAcrossCalls(t *testing.T) {
-	// Deliberate trade-off: applyDefaults inserts the schema's compiled
-	// Default directly rather than deep-copying it, so a compound (map/slice)
-	// default is the *same* underlying value across every call to Validate on
-	// this schema. Mutating one call's result in place can affect another's.
-	// This documents that behavior so it isn't mistaken for a bug later.
-	//
-	// A map is used here (rather than a slice) because mutating it via key
-	// assignment always mutates the shared storage directly; a slice default
-	// would only demonstrate this if grown by index-assignment rather than
-	// append, since append past a zero-capacity empty-slice default happens
-	// to reallocate.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "object",
-				"properties": {
-					"config": { "type": "object", "default": {} }
-				},
-				"additionalProperties": false
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	first, err := schema.Validate([]any{map[string]any{}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	first.([]any)[0].(map[string]any)["config"].(map[string]any)["mutated"] = true
-
-	second, err := schema.Validate([]any{map[string]any{}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	secondConfig := second.([]any)[0].(map[string]any)["config"].(map[string]any)
-	if mutated, ok := secondConfig["mutated"]; !ok || mutated != true {
-		t.Errorf("expected second call's default to share storage with the first call's mutation, got %#v", secondConfig)
-	}
-}
-
-func TestValidateHandlesCyclicPureRefWithoutHanging(t *testing.T) {
-	// Two schemas that only $ref each other, with neither ever declaring its
-	// own Properties/Items: this is pathological enough that ajv itself
-	// can't even compile it (stack overflow trying to inline/resolve the
-	// cycle at compile time). applyDefaults's resolveRef must not hang or
-	// panic on it either, even though there's no real ajv output to match —
-	// it should just give up resolving and leave the value as-is.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"definitions": {
-			"a": { "$ref": "#/definitions/b" },
-			"b": { "$ref": "#/definitions/a" }
-		},
-		"items": [ { "$ref": "#/definitions/a" } ],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	// No assertion on validity: this schema never resolves to a concrete
-	// type, so either outcome is acceptable — the point is that it returns
-	// at all, and doesn't corrupt the input on the way.
-	got, _ := schema.Validate([]any{map[string]any{}})
-	want := []any{map[string]any{}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateHandlesCyclicAllOfWithoutHanging(t *testing.T) {
-	// Two definitions whose sole allOf branch $refs back to the other: like
-	// TestValidateHandlesCyclicPureRefWithoutHanging, this is pathological
-	// enough that the underlying jsonschema library itself rejects it (at
-	// Validate time, once it tries to actually check the instance against
-	// the cyclic schema) — but defaultSources's own cycle guard must still
-	// stop collectDefaultSources from recursing forever while walking it to
-	// fill in defaults beforehand.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"definitions": {
-			"a": { "allOf": [ { "$ref": "#/definitions/b" } ] },
-			"b": { "allOf": [ { "$ref": "#/definitions/a" } ] }
-		},
-		"items": [ { "$ref": "#/definitions/a" } ],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	// No assertion on validity: the point is that this returns at all, and
-	// doesn't corrupt the input on the way.
-	got, _ := schema.Validate([]any{map[string]any{}})
-	want := []any{map[string]any{}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsAllOfBranchDefaults(t *testing.T) {
-	// allOf is unambiguous — every branch must hold — unlike anyOf/oneOf, so
-	// a default declared on an allOf branch's property is filled in, exactly
-	// as if that branch's properties were merged into this level. Confirmed
-	// against ajv@6: see allOf_multiple_branches_each_contribute_defaults in
-	// testdata/ajv_fixtures.json.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "object",
-				"allOf": [
-					{ "properties": { "a": { "type": "string", "default": "a-default" } } },
-					{ "properties": { "b": { "type": "string", "default": "b-default" } } }
-				]
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{map[string]any{}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"a": "a-default", "b": "b-default"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsAdditionalPropertiesSchemaDefaultForExistingKey(t *testing.T) {
-	// additionalProperties as a schema never manufactures a brand-new key,
-	// but a key already present that's only matched by additionalProperties
-	// (not a named property) still gets its own nested defaults filled in.
-	// Confirmed against ajv@6.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "object",
-				"properties": { "known": { "type": "string" } },
-				"additionalProperties": {
-					"type": "object",
-					"properties": { "inner": { "type": "string", "default": "inner-default" } }
-				}
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	// "extra" isn't a declared property, only matched via additionalProperties.
-	got, err := schema.Validate([]any{map[string]any{"known": "x", "extra": map[string]any{}}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"known": "x", "extra": map[string]any{"inner": "inner-default"}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-
-	// additionalProperties never creates a brand-new key on its own account.
-	got, err = schema.Validate([]any{map[string]any{"known": "x"}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want = []any{map[string]any{"known": "x"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsPatternPropertiesDefaultForExistingKey(t *testing.T) {
-	// Same idea as additionalProperties, but matched via patternProperties.
-	// Confirmed against ajv@6.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "object",
-				"patternProperties": {
-					"^opt_": {
-						"type": "object",
-						"properties": { "inner": { "type": "string", "default": "pp-default" } }
-					}
-				}
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{map[string]any{"opt_x": map[string]any{}}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"opt_x": map[string]any{"inner": "pp-default"}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsRefSiblingDefault(t *testing.T) {
-	// A literal `default` written directly beside a bare $ref (a "$ref
-	// sibling") is honored using that literal value, not the ref target's
-	// own top-level default — confirmed against ajv@6, which (unlike the
-	// underlying jsonschema library, which discards every sibling keyword
-	// next to "$ref" for Draft 4) still applies it.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"definitions": {
-			"foo": { "type": "string", "default": "ref-target-default" }
-		},
-		"items": [
-			{
-				"type": "object",
-				"properties": {
-					"foo": { "$ref": "#/definitions/foo", "default": "sibling-default" }
-				},
-				"additionalProperties": false
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{map[string]any{}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"foo": "sibling-default"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateFillsListStyleItemsDefaultPerElement(t *testing.T) {
-	// A list-style (single-schema, non-tuple) `items` schema applies the same
-	// schema to every element, so each already-present element gets its own
-	// defaults filled in independently — this is the real-world case
-	// @graphql-eslint/eslint-plugin's relay-arguments schema hits (a rule's
-	// own top-level options schema declared as list-style rather than a
-	// tuple), confirmed against ajv@6.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "array",
-				"items": {
-					"type": "object",
-					"properties": { "foo": { "type": "string", "default": "d" } }
-				}
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{[]any{map[string]any{}, map[string]any{"foo": "x"}}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{[]any{map[string]any{"foo": "d"}, map[string]any{"foo": "x"}}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-}
-
-func TestValidateListStyleItemsDoesNotGrowArray(t *testing.T) {
-	// Unlike a tuple position with its own literal default, list-style
-	// `items` never determines the array's length, so it never pads a
-	// too-short array — confirmed against ajv@6.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"items": [
-			{
-				"type": "array",
-				"minItems": 2,
-				"items": { "type": "string", "default": "d" }
-			}
-		],
-		"minItems": 0,
-		"maxItems": 1
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{[]any{"a"}})
-	want := []any{[]any{"a"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
-	}
-	if err == nil {
-		t.Error("expected an error since the inner array is still short of minItems, got nil")
-	}
-}
-
-func TestValidateFillsTopLevelListStyleItemsDefault(t *testing.T) {
-	// The exact real-world shape: a rule's own top-level options schema is
-	// list-style (a single object schema, not a tuple) rather than the usual
-	// `{"type": "array", "items": [...]}` tuple convention. An empty `{}`
-	// option gets its declared default filled in, satisfying minProperties —
-	// confirmed against ajv@6.
-	schema, err := CompileSchema([]byte(`{
-		"type": "array",
-		"maxItems": 1,
-		"items": {
-			"type": "object",
-			"minProperties": 1,
-			"properties": { "includeBoth": { "type": "boolean", "default": true } }
-		}
-	}`))
-	if err != nil {
-		t.Fatalf("CompileSchema failed: %v", err)
-	}
-
-	got, err := schema.Validate([]any{map[string]any{}})
-	if err != nil {
-		t.Fatalf("expected valid options, got error: %v", err)
-	}
-	want := []any{map[string]any{"includeBoth": true}}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %#v, want %#v", got, want)
 	}
 }
 
@@ -621,10 +141,10 @@ func TestCompileSchemaAcceptsPatternWithJavaScriptOnlyRegexSyntax(t *testing.T) 
 		t.Fatalf("CompileSchema failed to compile a lookbehind pattern: %v", err)
 	}
 
-	if _, err := schema.Validate([]any{"ab"}); err != nil {
+	if err := schema.Validate([]any{"ab"}); err != nil {
 		t.Errorf("expected \"ab\" to satisfy (?<=a)b, got: %v", err)
 	}
-	if _, err := schema.Validate([]any{"cb"}); err == nil {
+	if err := schema.Validate([]any{"cb"}); err == nil {
 		t.Error("expected \"cb\" to fail (?<=a)b, got nil error")
 	}
 }
@@ -653,10 +173,10 @@ func TestValidateAcceptsJavaScriptOnlyRegexAsFormatRegexValue(t *testing.T) {
 		t.Fatalf("CompileSchema failed: %v", err)
 	}
 
-	if _, err := schema.Validate([]any{map[string]any{"pattern": "(?<=a)b"}}); err != nil {
+	if err := schema.Validate([]any{map[string]any{"pattern": "(?<=a)b"}}); err != nil {
 		t.Errorf("expected a lookbehind pattern value to satisfy format: regex, got: %v", err)
 	}
-	if _, err := schema.Validate([]any{map[string]any{"pattern": "a("}}); err == nil {
+	if err := schema.Validate([]any{map[string]any{"pattern": "a("}}); err == nil {
 		t.Error("expected an unbalanced paren to fail format: regex, got nil error")
 	}
 }
@@ -703,12 +223,9 @@ func TestValidateMatchesAjvFixtures(t *testing.T) {
 				t.Fatalf("CompileSchema failed: %v", err)
 			}
 
-			got, err := schema.Validate(c.Input)
+			err = schema.Validate(c.Input)
 			if gotValid := err == nil; gotValid != c.Valid {
 				t.Errorf("valid = %v, want %v (err: %v)", gotValid, c.Valid, err)
-			}
-			if want := any(c.Output); !reflect.DeepEqual(got, want) {
-				t.Errorf("got %#v, want %#v", got, want)
 			}
 		})
 	}
