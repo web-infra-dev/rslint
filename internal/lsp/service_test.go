@@ -164,13 +164,25 @@ func TestHandleDidChange_UnopenedDocument(t *testing.T) {
 
 // ======== handleDidSave tests ========
 
-func TestHandleDidSave(t *testing.T) {
+func TestHandleDidSave_DoesNotOverwriteNewerDidChange(t *testing.T) {
 	s := newTestServer()
 	ctx := context.Background()
 	uri := lsproto.DocumentUri("file:///project/test.ts")
-	s.documents[uri] = "old content"
 
-	savedText := "saved content"
+	if err := s.handleDidOpen(ctx, &lsproto.DidOpenTextDocumentParams{
+		TextDocument: &lsproto.TextDocumentItem{
+			Uri:     uri,
+			Version: 1,
+			Text:    "older saved content",
+		},
+	}); err != nil {
+		t.Fatalf("handleDidOpen failed: %v", err)
+	}
+	if err := s.handleDidChange(ctx, makeDidChangeParams(uri, 2, "newer unsaved content")); err != nil {
+		t.Fatalf("handleDidChange failed: %v", err)
+	}
+
+	savedText := "older saved content"
 	err := s.handleDidSave(ctx, &lsproto.DidSaveTextDocumentParams{
 		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
 		Text:         &savedText,
@@ -179,8 +191,74 @@ func TestHandleDidSave(t *testing.T) {
 		t.Fatalf("handleDidSave failed: %v", err)
 	}
 
-	if s.documents[uri] != "saved content" {
-		t.Errorf("document content = %q, want %q", s.documents[uri], "saved content")
+	if s.documents[uri] != "newer unsaved content" {
+		t.Errorf("document content = %q, want newer didChange content", s.documents[uri])
+	}
+}
+
+func TestHandleDidSave_DoesNotOpenUntrackedDocument(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+	uri := lsproto.DocumentUri("file:///project/untracked.ts")
+	savedText := "saved content"
+
+	if err := s.handleDidSave(ctx, &lsproto.DidSaveTextDocumentParams{
+		TextDocument: lsproto.TextDocumentIdentifier{Uri: uri},
+		Text:         &savedText,
+	}); err != nil {
+		t.Fatalf("handleDidSave failed: %v", err)
+	}
+
+	if _, open := s.documents[uri]; open {
+		t.Error("didSave must not add an untracked document to the open-document mirror")
+	}
+}
+
+func TestShouldForwardDidSave(t *testing.T) {
+	matchingText := "current content"
+	staleText := "older content"
+	tests := []struct {
+		name           string
+		currentContent string
+		open           bool
+		savedText      *string
+		want           bool
+	}{
+		{
+			name:           "matching open document",
+			currentContent: matchingText,
+			open:           true,
+			savedText:      &matchingText,
+			want:           true,
+		},
+		{
+			name:           "stale open document",
+			currentContent: matchingText,
+			open:           true,
+			savedText:      &staleText,
+			want:           false,
+		},
+		{
+			name:      "untracked document",
+			open:      false,
+			savedText: &staleText,
+			want:      true,
+		},
+		{
+			name:           "client omitted text",
+			currentContent: matchingText,
+			open:           true,
+			savedText:      nil,
+			want:           true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldForwardDidSave(tt.currentContent, tt.open, tt.savedText); got != tt.want {
+				t.Fatalf("shouldForwardDidSave() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
