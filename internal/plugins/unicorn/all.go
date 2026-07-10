@@ -9,6 +9,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/no_useless_switch_case"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_array_flat_map"
 	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/prefer_number_properties"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/rules/require_array_join_separator"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -22,5 +23,6 @@ func GetAllRules() []rule.Rule {
 		no_useless_switch_case.NoUselessSwitchCaseRule,
 		prefer_array_flat_map.PreferArrayFlatMapRule,
 		prefer_number_properties.PreferNumberPropertiesRule,
+		require_array_join_separator.RequireArrayJoinSeparatorRule,
 	}
 }

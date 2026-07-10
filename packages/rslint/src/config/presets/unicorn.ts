@@ -148,7 +148,7 @@ const recommended: RslintConfigEntry = {
     // 'unicorn/prefer-type-error': 'error', // not implemented
     // 'unicorn/prevent-abbreviations': 'error', // not implemented
     // 'unicorn/relative-url-style': 'error', // not implemented
-    // 'unicorn/require-array-join-separator': 'error', // not implemented
+    'unicorn/require-array-join-separator': 'error',
     // 'unicorn/require-module-attributes': 'error', // not implemented
     // 'unicorn/require-module-specifiers': 'error', // not implemented
     // 'unicorn/require-number-to-fixed-digits-argument': 'error', // not implemented
