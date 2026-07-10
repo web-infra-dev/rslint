@@ -392,16 +392,15 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Most `parseOptions` bodies predate this and expect the single bare value ESLint rules traditionally parse (a lone `map[string]interface{}`, `bool`, etc., not wrapped in a slice), so unwrap first with `rule.LegacyUnwrapOptions`, then extract the map with `utils.GetOptionsMap()` — it handles both array format (`[]interface{}` from JS tests / multi-element config) and direct object format (`map[string]interface{}` from the CLI / single-option config) in one helper:
+`Run` receives `options []any` — ESLint's `context.options` array (the configured options after the severity level; empty when none were configured). Write `parseOptions` to take that slice directly and extract the first element's map with `utils.GetOptionsMap()`:
 
 ```go
-Run: func(ctx rule.RuleContext, newOptions []any) rule.RuleListeners {
-    options := rule.LegacyUnwrapOptions(newOptions)
+Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
     opts := parseOptions(options)
     // ...
 }
 
-func parseOptions(options any) Options {
+func parseOptions(options []any) Options {
     opts := Options{/* defaults */}
     optsMap := utils.GetOptionsMap(options)
     if optsMap != nil {
@@ -411,19 +410,9 @@ func parseOptions(options any) Options {
 }
 ```
 
-**Why this matters — the shape the CLI sends is different from Go tests.** `parseArrayRuleConfig` in `internal/config/config.go` unwraps single-element option arrays: if the user writes `['warn', { foo: true }]`, the rule receives a bare `map[string]interface{}` — NOT wrapped in an array. A hand-rolled fallback that only handles `options.([]interface{})` will silently fall back to defaults on every real CLI invocation. `GetOptionsMap` is the only safe extractor; do not reimplement it.
+`GetOptionsMap` is the only safe extractor — do not reimplement it with a hand-rolled `options[0].(map[string]interface{})` type assertion.
 
-**Anti-pattern — do not write this:**
-
-```go
-// ❌ WRONG — only matches when len(remaining) > 1 in config.go;
-//    misses every single-option config and every CLI invocation.
-if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-    if optsJSON, err := json.Marshal(arr[0]); err == nil {
-        _ = json.Unmarshal(optsJSON, &opts)
-    }
-}
-```
+For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
 
 ### Alignment Audit
 
