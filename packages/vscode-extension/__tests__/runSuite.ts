@@ -27,7 +27,10 @@ async function activateAndRun(
     // while the language client and workspace configuration are still starting.
     await extension.activate();
 
-    const files = fastGlob.sync('**/*.test.js', { cwd: testPath });
+    const files = fastGlob.sync('**/*.test.js', { cwd: testPath }).sort();
+    if (files.length === 0) {
+      throw new Error(`No compiled test files found in ${testPath}`);
+    }
     const mocha = new Mocha({ ui: 'tdd' });
     files.forEach((file) => mocha.addFile(path.join(testPath, file)));
     mocha.run((failures) => callback(null, failures));

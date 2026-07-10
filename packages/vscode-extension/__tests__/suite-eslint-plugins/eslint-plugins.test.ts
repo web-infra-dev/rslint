@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import fs from 'node:fs';
 import path from 'node:path';
+import { waitForContentChange } from '../suite/fixall-helpers';
 
 // End-to-end VS Code coverage for the object-form `plugins` reverse-dispatch
 // path: the LSP server lints natively but dispatches rules mounted via a
@@ -53,32 +54,8 @@ suite('rslint object-form plugins integration', function () {
     return vscode.languages.getDiagnostics(doc.uri);
   }
 
-  test('mounted plugin rules report, merged with native rules', async () => {
-    const filePath = path.join(workspaceRoot(), 'src', 'index.ts');
-    const doc = await vscode.workspace.openTextDocument(filePath);
-    await vscode.window.showTextDocument(doc);
-
-    const diagnostics = await waitForDiagnostics(doc, (diags) =>
-      diags.some((d) => d.message.includes('local/no-null')),
-    );
-    const msgs = messages(diagnostics);
-
-    // Both plugin rules must come back from the worker...
-    assert.ok(
-      diagnostics.some((d) => d.message.includes('local/no-null')),
-      `Expected local/no-null. Got: ${msgs}`,
-    );
-    assert.ok(
-      diagnostics.some((d) => d.message.includes('local/prefer-array-some')),
-      `Expected local/prefer-array-some. Got: ${msgs}`,
-    );
-    // ...alongside the natively-linted rule, proving the merge.
-    assert.ok(
-      diagnostics.some((d) => d.message.includes('no-console')),
-      `Expected native no-console merged with plugin diagnostics. Got: ${msgs}`,
-    );
-  });
-
+  // Keep the original flaky scenario first: no preceding test may warm the
+  // diagnostics or code-action-on-save path in this fresh extension host.
   test('plugin auto-fix participates in source.fixAll on save', async () => {
     const tmpFile = path.join(
       workspaceRoot(),
@@ -120,11 +97,11 @@ suite('rslint object-form plugins integration', function () {
         await doc.save(),
         'Document should complete the plugin code-action-on-save pipeline',
       );
-
-      const start = Date.now();
-      while (doc.getText().includes('.filter(') && Date.now() - start < 20000) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('.filter('),
+        60000,
+      );
 
       assert.ok(
         !doc.getText().includes('.filter('),
@@ -147,5 +124,31 @@ suite('rslint object-form plugins integration', function () {
       }
       if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
     }
+  });
+
+  test('mounted plugin rules report, merged with native rules', async () => {
+    const filePath = path.join(workspaceRoot(), 'src', 'index.ts');
+    const doc = await vscode.workspace.openTextDocument(filePath);
+    await vscode.window.showTextDocument(doc);
+
+    const diagnostics = await waitForDiagnostics(doc, (diags) =>
+      diags.some((d) => d.message.includes('local/no-null')),
+    );
+    const msgs = messages(diagnostics);
+
+    // Both plugin rules must come back from the worker...
+    assert.ok(
+      diagnostics.some((d) => d.message.includes('local/no-null')),
+      `Expected local/no-null. Got: ${msgs}`,
+    );
+    assert.ok(
+      diagnostics.some((d) => d.message.includes('local/prefer-array-some')),
+      `Expected local/prefer-array-some. Got: ${msgs}`,
+    );
+    // ...alongside the natively-linted rule, proving the merge.
+    assert.ok(
+      diagnostics.some((d) => d.message.includes('no-console')),
+      `Expected native no-console merged with plugin diagnostics. Got: ${msgs}`,
+    );
   });
 });

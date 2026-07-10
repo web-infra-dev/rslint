@@ -26,12 +26,20 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       const wrapperDiags = initialDiags.filter((d) =>
         d.message.includes('no-wrapper-object-types'),
       );
-      if (wrapperDiags.length === 0) return;
+      assert.ok(
+        wrapperDiags.length > 0,
+        `Expected no-wrapper-object-types diagnostics. Got: ${initialDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
-      if (!fixAllAction?.edit) return;
+      assert.ok(fixAllAction?.edit, 'Cascade fixAll should provide an edit');
 
-      await vscode.workspace.applyEdit(fixAllAction.edit);
+      assert.ok(
+        await vscode.workspace.applyEdit(fixAllAction.edit),
+        'Cascade fixAll edit should apply',
+      );
 
       const fixedContent = doc.getText();
       assert.ok(
@@ -60,10 +68,14 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       await replaceAll(editor, cascadeContent);
 
       const diags = await waitForDiagnostics(doc);
-      if (!diags.some((d) => d.message.includes('no-wrapper-object-types')))
-        return;
+      assert.ok(
+        diags.some((d) => d.message.includes('no-wrapper-object-types')),
+        `Expected no-wrapper-object-types before on-save cascade. Got: ${diags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
-      await doc.save();
+      assert.ok(await doc.save(), 'Cascade document should save');
 
       // Event-driven wait: resolves the moment the on-save fixAll edit
       // lands on the document, instead of polling on a 500ms interval.

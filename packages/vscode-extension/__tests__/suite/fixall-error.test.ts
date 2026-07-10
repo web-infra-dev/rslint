@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import {
   waitForDiagnostics,
+  waitForContentChange,
   findFixAllAction,
   requestFixAll,
   withTmpFile,
@@ -54,25 +55,24 @@ suite('rslint fixAll - error flows', function () {
         "const pVal: string = 'x';\nconst pRes = (pVal as string).trim();\n",
       );
       const probeDiags = await waitForDiagnostics(doc);
-      if (
-        !probeDiags.some((d) =>
+      assert.ok(
+        probeDiags.some((d) =>
           d.message.includes('no-unnecessary-type-assertion'),
-        )
-      ) {
-        return;
-      }
-      await doc.save();
-      const probeStart = Date.now();
-      while (
-        doc.getText().includes('pVal as string') &&
-        Date.now() - probeStart < 20000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
+        ),
+        `Expected fixable diagnostic before syntax-error save. Got: ${probeDiags
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
+      assert.ok(await doc.save(), 'Syntax-error probe should save');
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('pVal as string'),
+        60000,
+      );
 
       const brokenContent = 'const x = \nfunction {\nexport {\n';
       await replaceAll(editor, brokenContent);
-      await doc.save();
+      assert.ok(await doc.save(), 'Broken document should save');
 
       await new Promise((r) => setTimeout(r, 3000));
 
