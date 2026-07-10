@@ -452,8 +452,8 @@ func parseOptions(rawOpts any) []normalizedSelector {
 	case []interface{}:
 		optsList = v
 	case map[string]interface{}:
-		// Single selector object (e.g., when CLI --rule passes one option element,
-		// parseArrayRuleConfig unwraps the single-element array).
+		// Single selector object (e.g., when the config has one option element,
+		// LegacyUnwrapOptions collapses the single-element options array).
 		optsList = []interface{}{v}
 	default:
 		return getDefaultConfig()
