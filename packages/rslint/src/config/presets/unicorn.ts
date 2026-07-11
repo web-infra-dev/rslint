@@ -1,13 +1,11 @@
-import globals from 'globals';
 import type { RslintConfigEntry } from '../define-config.js';
 
 // Aligned with official eslint-plugin-unicorn@64.x recommended.
 // Rules commented out with "not implemented" are in the official preset but not yet available.
+// The official preset also injects `languageOptions.globals` (Array, Promise, Map, …);
+// rslint's config entry doesn't expose a `globals` field, so that part is omitted.
 const recommended: RslintConfigEntry = {
   plugins: ['unicorn'],
-  languageOptions: {
-    globals: globals.builtin,
-  },
   rules: {
     // Core ESLint rules disabled by upstream once their unicorn equivalents take over.
     // Keep them enabled (i.e. don't override) until the unicorn replacements are implemented,
