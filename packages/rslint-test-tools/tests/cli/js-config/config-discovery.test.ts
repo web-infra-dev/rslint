@@ -716,4 +716,36 @@ describe('CLI config discovery (upward traversal)', () => {
       await cleanupTempDir(tempDir);
     }
   });
+
+  test.each(['cjs', 'cts'])(
+    '--config should load an explicitly selected .%s config',
+    async (extension) => {
+      const config =
+        extension === 'cts'
+          ? `const config: Array<Record<string, unknown>> = [{
+  files: ['**/*.ts'],
+  rules: { 'no-debugger': 'error' },
+}];
+module.exports = config;`
+          : `module.exports = [{
+  files: ['**/*.ts'],
+  rules: { 'no-debugger': 'error' },
+}];`;
+      const configName = `custom.config.${extension}`;
+      const tempDir = await createTempDir({
+        [configName]: config,
+        'test.ts': 'debugger;\n',
+      });
+      try {
+        const result = await runRslint(
+          ['--config', configName, '--format', 'jsonline', 'test.ts'],
+          tempDir,
+        );
+        expect(result.exitCode).toBe(1);
+        expect(result.stdout).toContain('no-debugger');
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    },
+  );
 });

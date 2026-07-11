@@ -908,10 +908,8 @@ describe('findJSConfig', () => {
     expect(JS_CONFIG_FILES).toEqual([
       'rslint.config.js',
       'rslint.config.mjs',
-      'rslint.config.cjs',
       'rslint.config.ts',
       'rslint.config.mts',
-      'rslint.config.cts',
     ]);
   });
 
@@ -936,10 +934,10 @@ describe('findJSConfig', () => {
     }
   });
 
-  test('uses ESLint config filename priority', () => {
+  test('uses the automatic config filename priority', () => {
     const tmp = createTempDir();
     try {
-      // Create every supported config variant.
+      // Create every automatically discoverable config variant.
       for (const name of JS_CONFIG_FILES) {
         fs.writeFileSync(path.join(tmp, name), 'export default []');
       }
@@ -960,20 +958,6 @@ describe('findJSConfig', () => {
       );
       const result = findJSConfig(tmp);
       expect(result).toBe(path.join(tmp, 'rslint.config.mjs'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
-
-  test('finds cjs when js and mjs do not exist', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(
-        path.join(tmp, 'rslint.config.cjs'),
-        'module.exports = []',
-      );
-      const result = findJSConfig(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.cjs'));
     } finally {
       cleanup(tmp);
     }
@@ -1004,19 +988,18 @@ describe('findJSConfig', () => {
     }
   });
 
-  test('finds .cts config when no other config exists', () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(
-        path.join(tmp, 'rslint.config.cts'),
-        'export default []',
-      );
-      const result = findJSConfig(tmp);
-      expect(result).toBe(path.join(tmp, 'rslint.config.cts'));
-    } finally {
-      cleanup(tmp);
-    }
-  });
+  test.each(['cjs', 'cts'])(
+    'does not auto-discover .%s configs',
+    (extension) => {
+      const tmp = createTempDir();
+      try {
+        fs.writeFileSync(path.join(tmp, `rslint.config.${extension}`), '');
+        expect(findJSConfig(tmp)).toBe(null);
+      } finally {
+        cleanup(tmp);
+      }
+    },
+  );
 
   test('returns null for non-existent directory', () => {
     const result = findJSConfig('/tmp/definitely-does-not-exist-99999');

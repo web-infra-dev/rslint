@@ -136,14 +136,14 @@ func isESMPackage(directory string) bool {
 }
 
 // InitDefaultConfig initializes a default config file in the directory.
-//   - JS/TS config already exists → error
+//   - Automatically discoverable JS/TS config exists → error
 //   - Only JSON/JSONC config exists → migrate to JS/TS config and delete JSON
-//   - Nothing exists → create default JS/TS config
+//   - Otherwise → create a default discoverable JS/TS config
 func InitDefaultConfig(directory string) error {
-	// Check if JS/TS config already exists
+	// Check if an automatically discoverable JS/TS config already exists.
 	existingConfigs := []string{
-		"rslint.config.js", "rslint.config.mjs", "rslint.config.cjs",
-		"rslint.config.ts", "rslint.config.mts", "rslint.config.cts",
+		"rslint.config.js", "rslint.config.mjs",
+		"rslint.config.ts", "rslint.config.mts",
 	}
 	for _, name := range existingConfigs {
 		p := filepath.Join(directory, name)

@@ -9,13 +9,12 @@ export {
   type ConfigEntry,
 } from './config-hierarchy.js';
 
+/** Config basenames eligible for automatic discovery. */
 export const JS_CONFIG_FILES = [
   'rslint.config.js',
   'rslint.config.mjs',
-  'rslint.config.cjs',
   'rslint.config.ts',
   'rslint.config.mts',
-  'rslint.config.cts',
 ] as const;
 
 let freshConfigLoadNonce = 0;
@@ -25,20 +24,12 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Load a JS/TS config file.
- * - .js/.mjs/.cjs: native import()
- * - .ts/.mts/.cts: native import() when Node.js has TypeScript support (>= 22.6),
- *             otherwise fall back to jiti
+ * Load a selected JS/TS config file.
+ * TypeScript modules use native import when Node.js supports type stripping
+ * and otherwise fall back to jiti. Other module formats use native import.
  */
 export async function loadConfigFile(configPath: string): Promise<unknown> {
   const ext = path.extname(configPath);
-
-  if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
-    const mod: Record<string, unknown> = await import(
-      pathToFileURL(configPath).href
-    );
-    return mod.default ?? mod;
-  }
 
   if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
     // Use feature detection to decide the loading strategy (same as rsbuild).
@@ -60,13 +51,16 @@ export async function loadConfigFile(configPath: string): Promise<unknown> {
 
     throw new Error(
       `Failed to load TypeScript config file: ${configPath}\n` +
-        `To load .ts config files, either:\n` +
+        `To load .ts/.mts/.cts config files, either:\n` +
         `  1. Use Node.js >= 22.6 (with native TypeScript support)\n` +
         `  2. Install jiti as a dependency: npm install -D jiti`,
     );
   }
 
-  throw new Error(`Unsupported config file extension: ${ext}`);
+  const mod: Record<string, unknown> = await import(
+    pathToFileURL(configPath).href
+  );
+  return mod.default ?? mod;
 }
 
 /**
@@ -90,25 +84,14 @@ export async function loadConfigFileFresh(
     }
   };
 
-  if (ext === '.cjs') {
-    evictCommonJSCache();
-    return requireFromConfig(configPath) as unknown;
-  }
-
-  if (ext === '.js' || ext === '.mjs') {
-    evictCommonJSCache();
-    return importConfigFresh(configPath);
-  }
-
-  if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
-    evictCommonJSCache();
-    if (process.features.typescript) {
-      return importConfigFresh(configPath);
-    }
+  evictCommonJSCache();
+  if (
+    (ext === '.ts' || ext === '.mts' || ext === '.cts') &&
+    !process.features.typescript
+  ) {
     return loadConfigFile(configPath);
   }
-
-  throw new Error(`Unsupported config file extension: ${ext}`);
+  return importConfigFresh(configPath);
 }
 
 async function importConfigFresh(configPath: string): Promise<unknown> {

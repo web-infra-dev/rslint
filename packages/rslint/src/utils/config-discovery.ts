@@ -95,13 +95,16 @@ function findJSConfigFromCanonicalTarget(
  */
 export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
   const resolved = path.resolve(startDir);
-  const matches = await glob(['**/rslint.config.{js,mjs,cjs,ts,mts,cts}'], {
-    cwd: resolved,
-    absolute: true,
-    dot: true,
-    followSymbolicLinks: false,
-    ignore: ['**/node_modules/**', '**/.git/**'],
-  });
+  const matches = await glob(
+    JS_CONFIG_FILES.map((name) => `**/${name}`),
+    {
+      cwd: resolved,
+      absolute: true,
+      dot: true,
+      followSymbolicLinks: false,
+      ignore: ['**/node_modules/**', '**/.git/**'],
+    },
+  );
 
   const candidateDirectories = new Set<string>();
   for (const match of matches) {

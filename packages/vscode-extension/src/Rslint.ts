@@ -43,8 +43,14 @@ const LOCKFILE_NAMES = [
   'yarn.lock',
 ] as const;
 
-export const JS_CONFIG_SEARCH_GLOB = '**/rslint.config.{js,mjs,cjs,ts,mts,cts}';
+export const JS_CONFIG_SEARCH_GLOB = `**/{${JS_CONFIG_FILES.join(',')}}`;
 export const JS_CONFIG_SEARCH_EXCLUDE_PATTERN = '**/{node_modules,.git}/**';
+const CONFIG_WATCH_GLOB = `**/{${[
+  ...JS_CONFIG_FILES,
+  'rslint.json',
+  'rslint.jsonc',
+  ...LOCKFILE_NAMES,
+].join(',')}}`;
 
 /** A loaded + normalized config file with its source path. */
 interface LoadedConfig {
@@ -209,9 +215,7 @@ export class Rslint implements Disposable {
         { scheme: 'file', language: 'javascriptreact' },
       ],
       synchronize: {
-        fileEvents: workspace.createFileSystemWatcher(
-          '**/{rslint.config.{js,mjs,cjs,ts,mts,cts},rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
-        ),
+        fileEvents: workspace.createFileSystemWatcher(CONFIG_WATCH_GLOB),
       },
       outputChannel: this.outputChannel,
     };

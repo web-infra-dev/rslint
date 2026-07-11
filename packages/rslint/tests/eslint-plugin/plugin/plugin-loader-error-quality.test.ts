@@ -210,18 +210,24 @@ export default [
     );
   });
 
-  test.each(['ts', 'mts', 'cts'])(
+  test.each(['cjs', 'ts', 'mts', 'cts'])(
     'loads object-form plugins from a .%s config through the worker loader',
     async (extension) => {
       const configSource =
-        extension === 'cts'
+        extension === 'cjs'
           ? `const plugin = require('./plugin.cjs');
+module.exports = [{
+  files: ['src/**/*.ts'],
+  plugins: { probe: plugin },
+}];`
+          : extension === 'cts'
+            ? `const plugin = require('./plugin.cjs');
 const config: Array<Record<string, unknown>> = [{
   files: ['src/**/*.ts'],
   plugins: { probe: plugin },
 }];
 module.exports = config;`
-          : `import plugin from './plugin.cjs';
+            : `import plugin from './plugin.cjs';
 export default [{
   files: ['src/**/*.ts'],
   plugins: { probe: plugin as unknown as Record<string, unknown> },

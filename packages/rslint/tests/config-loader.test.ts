@@ -96,18 +96,6 @@ describe('loadConfigFile', () => {
       cleanup(tmp);
     }
   });
-
-  test('throws for an unsupported extension', async () => {
-    const tmp = createTempDir();
-    try {
-      fs.writeFileSync(path.join(tmp, 'rslint.config.yaml'), 'rules: {}');
-      await expect(
-        loadConfigFile(path.join(tmp, 'rslint.config.yaml')),
-      ).rejects.toThrow('Unsupported config file extension');
-    } finally {
-      cleanup(tmp);
-    }
-  });
 });
 
 describe('loadConfigFileFresh', () => {

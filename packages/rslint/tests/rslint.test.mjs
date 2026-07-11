@@ -512,6 +512,44 @@ describe('Rslint class', () => {
     }
   });
 
+  test.each(['cjs', 'cts'])(
+    'overrideConfigFile loads an explicitly selected .%s config',
+    async (extension) => {
+      const tmp = await mkdtemp(path.join(os.tmpdir(), 'rslint-override-ext-'));
+      const configPath = path.join(tmp, `custom.config.${extension}`);
+      const config =
+        extension === 'cts'
+          ? `const config: Array<Record<string, unknown>> = [{
+  files: ['**/*.ts'],
+  rules: { 'no-debugger': 'error' },
+}];
+module.exports = config;`
+          : `module.exports = [{
+  files: ['**/*.ts'],
+  rules: { 'no-debugger': 'error' },
+}];`;
+      try {
+        await writeFile(configPath, config);
+        await writeFile(path.join(tmp, 'test.ts'), 'debugger;\n');
+        const rslint = new Rslint({
+          cwd: tmp,
+          overrideConfigFile: configPath,
+        });
+        try {
+          const results = await rslint.lintFiles('test.ts');
+          expect(results).toHaveLength(1);
+          expect(
+            results[0].messages.map((message) => message.ruleId),
+          ).toContain('no-debugger');
+        } finally {
+          await rslint.close();
+        }
+      } finally {
+        await rm(tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
   test('lintFiles returns one result per matched file, routed correctly', async () => {
     const { mkdtemp, writeFile, mkdir, rm } = await import('node:fs/promises');
     const os = await import('node:os');

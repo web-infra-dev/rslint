@@ -32,7 +32,7 @@ export type GlobalsConfig = Record<string, GlobalAccess>;
  * it as a Map key for per-file dispatch.
  */
 export interface ConfigDescriptor {
-  /** Absolute filesystem path of the rslint config file (`rslint.config.{js,mjs,cjs,ts,mts,cts}`). */
+  /** Absolute filesystem path of the selected JS/TS config file. */
   configPath: string;
   /** Absolute filesystem path of the directory holding the config file.
    *  Matches the `ConfigKey` Go emits per file during plugin-lint dispatch. */

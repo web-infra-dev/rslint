@@ -208,58 +208,6 @@ suite('rslint JS config support', function () {
     }
   });
 
-  test('CJS and CTS configs support create and hot reload', async () => {
-    const root = getWorkspaceRoot();
-    const jsConfigPath = path.join(root, 'rslint.config.js');
-    const originalJSConfig = fs.readFileSync(jsConfigPath, 'utf8');
-    const probePath = path.join(root, 'src', 'config-extension-probe.ts');
-    const configSource = (ruleName: string): string => `module.exports = [{
-  files: ['**/*.ts'],
-  rules: { ${JSON.stringify(ruleName)}: 'error' },
-}];
-`;
-
-    fs.writeFileSync(probePath, 'debugger;\nconsole.log("probe");\n', 'utf8');
-    const doc = await vscode.workspace.openTextDocument(probePath);
-    await vscode.window.showTextDocument(doc);
-    fs.unlinkSync(jsConfigPath);
-
-    try {
-      for (const extension of ['cjs', 'cts']) {
-        const configPath = path.join(root, `rslint.config.${extension}`);
-        const debuggerDiagnostics = waitForDiagnostics(doc, (diagnostics) =>
-          diagnostics.some((diagnostic) =>
-            diagnostic.message.includes("Unexpected 'debugger' statement"),
-          ),
-        );
-        fs.writeFileSync(configPath, configSource('no-debugger'), 'utf8');
-        await debuggerDiagnostics;
-
-        const consoleDiagnostics = waitForDiagnostics(
-          doc,
-          (diagnostics) =>
-            diagnostics.some((diagnostic) =>
-              diagnostic.message.includes('Unexpected console statement'),
-            ) &&
-            !diagnostics.some((diagnostic) =>
-              diagnostic.message.includes("Unexpected 'debugger' statement"),
-            ),
-        );
-        fs.writeFileSync(configPath, configSource('no-console'), 'utf8');
-        await consoleDiagnostics;
-        fs.unlinkSync(configPath);
-      }
-    } finally {
-      for (const extension of ['cjs', 'cts']) {
-        fs.rmSync(path.join(root, `rslint.config.${extension}`), {
-          force: true,
-        });
-      }
-      fs.writeFileSync(jsConfigPath, originalJSConfig, 'utf8');
-      fs.rmSync(probePath, { force: true });
-    }
-  });
-
   test('deleting JS config should clear diagnostics', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
@@ -569,14 +517,12 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
     }
   });
 
-  test('same-directory configs use .js > .mjs > .cjs > .ts > .mts > .cts priority', async () => {
+  test('same-directory configs use .js > .mjs > .ts > .mts priority', async () => {
     const root = getWorkspaceRoot();
     const jsPath = path.join(root, 'rslint.config.js');
     const mjsPath = path.join(root, 'rslint.config.mjs');
-    const cjsPath = path.join(root, 'rslint.config.cjs');
     const tsPath = path.join(root, 'rslint.config.ts');
     const mtsPath = path.join(root, 'rslint.config.mts');
-    const ctsPath = path.join(root, 'rslint.config.cts');
     const originalJS = fs.readFileSync(jsPath, 'utf8');
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
@@ -585,8 +531,7 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       enabledRule:
         | '@typescript-eslint/no-explicit-any'
         | '@typescript-eslint/no-unsafe-member-access',
-      commonJS = false,
-    ): string => `${commonJS ? 'module.exports =' : 'export default'} [
+    ): string => `export default [
   {
     files: ['**/*.ts'],
     languageOptions: {
@@ -628,27 +573,17 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       );
       fs.writeFileSync(
         tsPath,
-        configFor('@typescript-eslint/no-explicit-any'),
-        'utf8',
-      );
-      fs.writeFileSync(
-        mtsPath,
         configFor('@typescript-eslint/no-unsafe-member-access'),
         'utf8',
       );
       fs.writeFileSync(
-        cjsPath,
-        configFor('@typescript-eslint/no-unsafe-member-access', true),
-        'utf8',
-      );
-      fs.writeFileSync(
-        ctsPath,
-        configFor('@typescript-eslint/no-explicit-any', true),
+        mtsPath,
+        configFor('@typescript-eslint/no-explicit-any'),
         'utf8',
       );
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      let diagnostics = vscode.languages.getDiagnostics(doc.uri);
+      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
       assert.ok(
         diagnostics.some(
           (d) =>
@@ -664,20 +599,8 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       fs.unlinkSync(mjsPath);
       await expectWarning('no-unsafe-member-access');
 
-      fs.unlinkSync(cjsPath);
-      await expectWarning('no-explicit-any');
-
       fs.unlinkSync(tsPath);
-      await expectWarning('no-unsafe-member-access');
-
-      fs.unlinkSync(mtsPath);
       await expectWarning('no-explicit-any');
-
-      diagnostics = vscode.languages.getDiagnostics(doc.uri);
-      assert.ok(
-        !diagnostics.some((d) => d.message.includes('no-unsafe-member-access')),
-        '.cts should govern after all higher-priority variants are removed',
-      );
     } finally {
       const restored = waitForDiagnostics(doc, (diags) =>
         diags.some(
@@ -688,10 +611,8 @@ export default [{ files: ['**/*.ts'], rules: { 'no-console': 'error' } }];
       ).catch(() => undefined);
       fs.writeFileSync(jsPath, originalJS, 'utf8');
       fs.rmSync(mjsPath, { force: true });
-      fs.rmSync(cjsPath, { force: true });
       fs.rmSync(tsPath, { force: true });
       fs.rmSync(mtsPath, { force: true });
-      fs.rmSync(ctsPath, { force: true });
       await restored;
     }
   });

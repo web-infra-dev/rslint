@@ -45,7 +45,7 @@ describe('isJSConfigFile', () => {
     expect(isJSConfigFile('/project/rslint.config.ts')).toBe(true);
   });
 
-  test('returns true for .cjs and .cts', () => {
+  test('returns true for explicitly selectable .cjs and .cts configs', () => {
     expect(isJSConfigFile('rslint.config.cjs')).toBe(true);
     expect(isJSConfigFile('rslint.config.cts')).toBe(true);
   });

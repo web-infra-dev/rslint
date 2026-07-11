@@ -67,9 +67,6 @@ import {
  */
 async function importConfigFile(configFilePath: string): Promise<unknown> {
   const ext = path.extname(configFilePath);
-  if (ext === '.js' || ext === '.mjs' || ext === '.cjs') {
-    return import(pathToFileURL(configFilePath).href);
-  }
   if (ext === '.ts' || ext === '.mts' || ext === '.cts') {
     const useNative = Boolean(
       (process.features as { typescript?: boolean }).typescript,
@@ -105,7 +102,7 @@ async function importConfigFile(configFilePath: string): Promise<unknown> {
     // unwrap.
     return resolved;
   }
-  throw new Error(`Unsupported config file extension: ${ext}`);
+  return import(pathToFileURL(configFilePath).href);
 }
 
 /**
