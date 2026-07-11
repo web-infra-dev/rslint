@@ -1,14 +1,20 @@
 package no_console
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//go:embed no-console.schema.json
+var schemaJSON []byte
+
 // https://eslint.org/docs/latest/rules/no-console
 var NoConsoleRule = rule.Rule{
-	Name: "no-console",
+	Name:   "no-console",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)

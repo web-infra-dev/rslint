@@ -1,12 +1,17 @@
 package eqeqeq
 
 import (
+	_ "embed"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
+
+//go:embed eqeqeq.schema.json
+var schemaJSON []byte
 
 // strictEquivalent maps a loose operator to its strict counterpart.
 func strictEquivalent(kind ast.Kind) string {
@@ -154,7 +159,8 @@ func parseOptions(opts any) eqeqeqOptions {
 // EqeqeqRule requires use of === and !==.
 // https://eslint.org/docs/latest/rules/eqeqeq
 var EqeqeqRule = rule.Rule{
-	Name: "eqeqeq",
+	Name:   "eqeqeq",
+	Schema: rule.NewSchema(schemaJSON),
 	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
