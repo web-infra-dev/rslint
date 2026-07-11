@@ -40,6 +40,14 @@ func newTestServer() *Server {
 	}
 }
 
+func documentURIFromPath(filePath string) lsproto.DocumentUri {
+	uriPath := filepath.ToSlash(filePath)
+	if len(uriPath) >= 2 && uriPath[1] == ':' {
+		uriPath = "/" + uriPath
+	}
+	return lsproto.DocumentUri((&url.URL{Scheme: "file", Path: uriPath}).String())
+}
+
 // helper to build a didChange params for full-sync mode
 func makeDidChangeParams(uri lsproto.DocumentUri, version int32, text string) *lsproto.DidChangeTextDocumentParams {
 	return &lsproto.DidChangeTextDocumentParams{
@@ -1234,7 +1242,7 @@ func TestHandleConfigUpdate_InvalidTsConfigPreservesPreviousGeneration(t *testin
 	err := s.handleConfigUpdate(context.Background(), map[string]any{
 		"generation": "rejected-generation",
 		"configs": []any{map[string]any{
-			"configDirectory": lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(dir)}).String()),
+			"configDirectory": documentURIFromPath(dir),
 			"entries": []any{map[string]any{
 				"languageOptions": map[string]any{
 					"parserOptions": map[string]any{"project": []any{"./missing-tsconfig.json"}},
@@ -1676,6 +1684,17 @@ func TestGetConfigForURI_IsJSConfig(t *testing.T) {
 }
 
 // ======== uriToPath tests ========
+
+func TestDocumentURIFromPath_WindowsDriveRoundTrip(t *testing.T) {
+	const filePath = "C:/Users/Test User/project/index.ts"
+	uri := documentURIFromPath(filePath)
+	if uri != "file:///C:/Users/Test%20User/project/index.ts" {
+		t.Fatalf("documentURIFromPath(%q) = %q", filePath, uri)
+	}
+	if got := uriToPath(uri); got != filePath {
+		t.Fatalf("uriToPath(%q) = %q, want %q", uri, got, filePath)
+	}
+}
 
 func TestUriToPath(t *testing.T) {
 	tests := []struct {
@@ -2246,7 +2265,7 @@ func TestSelectLintProgram_UsesDeclaredProjectOrderAndGapFallback(t *testing.T) 
 	defer s.session.Close()
 
 	toURI := func(filePath string) lsproto.DocumentUri {
-		return lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+		return documentURIFromPath(filePath)
 	}
 	for _, file := range []string{sourcePath, gapPath} {
 		uri := toURI(file)
@@ -2333,7 +2352,7 @@ func TestRunConfiguredLintForContent_SyntaxErrorSkipsRules(t *testing.T) {
 	s := newTestServer()
 	s.cwd = dir
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	uri := documentURIFromPath(filePath)
 	s.documents[uri] = malformed
 
 	result, err := s.runConfiguredLintForContent(
@@ -2386,7 +2405,7 @@ func TestRunConfiguredLintForContent_ZeroRuleTargetsReportSyntaxErrors(t *testin
 	s := newTestServer()
 	s.cwd = dir
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	uri := documentURIFromPath(filePath)
 	s.documents[uri] = malformed
 
 	tests := []struct {
@@ -2471,15 +2490,15 @@ func TestRunConfiguredLintForContent_OverlaysLexicalAndRealpath(t *testing.T) {
 		realRoot:  realRoot,
 	}
 	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
-	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(aliasFile)}).String())
-	realURI := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(realFile)}).String())
+	uri := documentURIFromPath(aliasFile)
+	realURI := documentURIFromPath(realFile)
 	const openContent = "const editorValue = 2;\n"
 	s.documents[realURI] = "const competingAliasValue = 3;\n"
 	s.documents[uri] = openContent
 
 	editorOverlay := s.currentEditorOverlayFS(uri)
 	for _, filePath := range []string{aliasFile, realFile} {
-		if got, ok := editorOverlay.ReadFile(filePath); !ok || got != openContent {
+		if got, ok := editorOverlay.ReadFile(tspath.NormalizePath(filePath)); !ok || got != openContent {
 			t.Fatalf("editor overlay read %q = %q, %v; want open content", filePath, got, ok)
 		}
 	}
@@ -2529,7 +2548,7 @@ func TestRunConfiguredLintForContent_SymlinkedConfigRootKeepsRulePathSpace(t *te
 	s.cwd = aliasRoot
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	aliasFile := filepath.Join(aliasRoot, "src", "index.ts")
-	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(aliasFile)}).String())
+	uri := documentURIFromPath(aliasFile)
 	s.documents[uri] = source
 	result, err := s.runConfiguredLintForContent(
 		uri,
@@ -2571,8 +2590,8 @@ func TestConfigTransaction_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	s := newTestServer()
 	s.cwd = realRoot
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	configURI := (&url.URL{Scheme: "file", Path: filepath.ToSlash(aliasRoot)}).String()
-	fileURI := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(realFile)}).String())
+	configURI := string(documentURIFromPath(aliasRoot))
+	fileURI := documentURIFromPath(realFile)
 	if err := s.handleConfigUpdate(context.Background(), map[string]any{
 		"generation": "symlink-generation",
 		"configs": []any{map[string]any{
@@ -2587,7 +2606,7 @@ func TestConfigTransaction_SymlinkedOwnerMatchesPhysicalFile(t *testing.T) {
 	}
 
 	cfg, configCwd, isJSConfig := s.getConfigForURI(fileURI)
-	if !isJSConfig || configCwd != aliasRoot {
+	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(aliasRoot) {
 		t.Fatalf("physical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
 	}
 	result, err := s.runConfiguredLintForContent(
@@ -2624,7 +2643,7 @@ func TestConfigTransaction_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 	}
 
 	toURI := func(filePath string) string {
-		return (&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String()
+		return string(documentURIFromPath(filePath))
 	}
 	config.RegisterAllRules()
 	s := newTestServer()
@@ -2652,7 +2671,7 @@ func TestConfigTransaction_PrefersLexicalOwnerOverPhysicalConfig(t *testing.T) {
 
 	fileURI := lsproto.DocumentUri(toURI(filepath.Join(aliasDir, "index.ts")))
 	cfg, configCwd, isJSConfig := s.getConfigForURI(fileURI)
-	if !isJSConfig || configCwd != root {
+	if !isJSConfig || tspath.NormalizePath(configCwd) != tspath.NormalizePath(root) {
 		t.Fatalf("lexical file resolved to config cwd %q, JS=%v", configCwd, isJSConfig)
 	}
 	result, err := s.runConfiguredLintForContent(
@@ -2694,7 +2713,7 @@ func TestComputeFixAllContent_DefaultExcludedFileIsUnchanged(t *testing.T) {
 	s := newTestServer()
 	s.cwd = root
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	uri := documentURIFromPath(filePath)
 	s.documents[uri] = source
 	got := s.computeFixAllContent(
 		context.Background(),
@@ -2726,7 +2745,7 @@ func TestComputeFixAllContent_NoTsconfigKeepsNativeFixes(t *testing.T) {
 	s := newTestServer()
 	s.cwd = root
 	s.fs = bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	uri := lsproto.DocumentUri((&url.URL{Scheme: "file", Path: filepath.ToSlash(filePath)}).String())
+	uri := documentURIFromPath(filePath)
 	s.documents[uri] = source
 	cfg := config.RslintConfig{{
 		Files: []string{"**/*.ts"},

@@ -15,9 +15,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// programConfigOrders records which rslint configs declared one Program's
-// normalized tsconfig path and the declaration order within each config. A
-// shared path has one Program instance but may have multiple associations.
+// programConfigOrders maps normalized config-directory identities to the
+// declaration order of one Program's tsconfig in each config. A shared path
+// has one Program instance but may have multiple associations.
 type programConfigOrders map[string]int
 
 // lintProgramSet is the unique set of real tsconfig-backed Programs used by a
@@ -94,7 +94,9 @@ func createProgramSetForConfigs(
 	programByTsconfig := make(map[string]int)
 	for _, configDir := range configDirs {
 		entries := configMap[configDir]
-		tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, configDir, fsys)
+		normalizedConfigDir := tspath.NormalizePath(configDir)
+		configDirID := exactFilesystemPathID(normalizedConfigDir)
+		tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, normalizedConfigDir, fsys)
 		if err != nil {
 			return lintProgramSet{}, fmt.Errorf("resolve tsconfigs for %q: %w", configDir, err)
 		}
@@ -103,8 +105,8 @@ func createProgramSetForConfigs(
 			tsconfigPath = tspath.NormalizePath(tsconfigPath)
 			tsconfigID := exactFilesystemPathID(tsconfigPath)
 			if programIndex, ok := programByTsconfig[tsconfigID]; ok {
-				if _, alreadyAssociated := set.ConfigOrders[programIndex][configDir]; !alreadyAssociated {
-					set.ConfigOrders[programIndex][configDir] = order
+				if _, alreadyAssociated := set.ConfigOrders[programIndex][configDirID]; !alreadyAssociated {
+					set.ConfigOrders[programIndex][configDirID] = order
 				}
 				continue
 			}
@@ -121,7 +123,7 @@ func createProgramSetForConfigs(
 
 			programByTsconfig[tsconfigID] = len(set.Programs)
 			set.Programs = append(set.Programs, program)
-			set.ConfigOrders = append(set.ConfigOrders, programConfigOrders{configDir: order})
+			set.ConfigOrders = append(set.ConfigOrders, programConfigOrders{configDirID: order})
 		}
 	}
 
@@ -490,17 +492,18 @@ func groupFallbackTargets(
 }
 
 func orderedProgramIndexesForConfig(set lintProgramSet, configDir string) []int {
+	configDirID := exactFilesystemPathID(configDir)
 	indexes := make([]int, 0, len(set.Programs))
 	for i := range set.Programs {
 		if i < len(set.ConfigOrders) {
-			if _, ok := set.ConfigOrders[i][configDir]; ok {
+			if _, ok := set.ConfigOrders[i][configDirID]; ok {
 				indexes = append(indexes, i)
 			}
 		}
 	}
 	sort.SliceStable(indexes, func(i, j int) bool {
-		left := set.ConfigOrders[indexes[i]][configDir]
-		right := set.ConfigOrders[indexes[j]][configDir]
+		left := set.ConfigOrders[indexes[i]][configDirID]
+		right := set.ConfigOrders[indexes[j]][configDirID]
 		if left != right {
 			return left < right
 		}

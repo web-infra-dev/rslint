@@ -339,6 +339,9 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 	if len(programSet.Programs) != 1 {
 		t.Fatalf("expected one tsconfig-backed program, got %d", len(programSet.Programs))
 	}
+	if _, ok := programSet.ConfigOrders[0][exactFilesystemPathID(dir)]; !ok {
+		t.Fatalf("config order was not keyed by normalized directory identity: %v", programSet.ConfigOrders[0])
+	}
 
 	libPath := tspath.NormalizePath(filepath.Join(dir, "lib.ts"))
 	plan, binding := resolveAndBindTestTargets(
@@ -371,6 +374,22 @@ func TestBuildProgramsWithLintTargets_BindsImportedNonRootFile(t *testing.T) {
 	if len(targetsByProgram) != 1 || len(targetsByProgram[0]) != 1 ||
 		canonicalFilesystemPathID(targetsByProgram[0][0], fs) != canonicalFilesystemPathID(libPath, fs) {
 		t.Fatalf("expected lib.ts bound to the tsconfig Program, got %v", targetsByProgram)
+	}
+}
+
+func TestOrderedProgramIndexesForConfig_NormalizesDirectorySeparators(t *testing.T) {
+	set := lintProgramSet{
+		Programs: []*compiler.Program{nil},
+		ConfigOrders: []programConfigOrders{{
+			exactFilesystemPathID(`C:\Repo`): 0,
+		}},
+	}
+	indexes := orderedProgramIndexesForConfig(set, "C:/Repo")
+	if len(indexes) != 1 || indexes[0] != 0 {
+		t.Fatalf("normalized config directory did not find its Program: %v", indexes)
+	}
+	if indexes := orderedProgramIndexesForConfig(set, "c:/repo"); len(indexes) != 0 {
+		t.Fatalf("config directory identity unexpectedly folded case: %v", indexes)
 	}
 }
 
