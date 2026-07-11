@@ -121,6 +121,15 @@ func TestNoShadowRule(t *testing.T) {
 			// A declared global does not shadow when `builtinGlobals` is off.
 			{Code: `function foo() { var top = 0; }`, Globals: map[string]bool{"top": true}},
 
+			// ---- builtinGlobals + explicit `off` setting ----
+			// Config `Object: "off"` / `/* global Object: off */` un-declares
+			// the builtin from the global scope, so shadowing it no longer
+			// reports even under `builtinGlobals: true`.
+			{Code: `function foo() { var Object = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"Object": false}},
+			{Code: `/* global Object: off */ function foo() { var Object = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}},
+			// A final inline `off` also suppresses a config-declared global.
+			{Code: `/* global top: off */ function foo() { var top = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"top": true}},
+
 			// Script-mode merging (VALID under script sourceType). Our implementation
 			// always treats the file as a module, so `var Object = 0;` at top level
 			// under `builtinGlobals: true` reports. Skip to preserve upstream intent.
@@ -607,6 +616,9 @@ function bar() { }`},
 			// `/* global */` comment) makes builtinGlobals catch the shadow.
 			{Code: `function foo() { var top = 0; }`, Globals: map[string]bool{"top": true}, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'top' is already a global variable."}}},
 			{Code: `/* global top */ function foo() { var top = 0; }`, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'top' is already a global variable."}}},
+			// An inline `/* global */` comment re-declares a builtin the config
+			// turned off — the final setting wins.
+			{Code: `/* global Object */ function foo() { var Object = 0; }`, Globals: map[string]bool{"Object": false}, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal", Message: "'Object' is already a global variable."}}},
 			// SKIP: `function foo() { var top = 0; }` requires browser globals.
 			{Code: `var Object = 0;`, Options: map[string]interface{}{"builtinGlobals": true}, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noShadowGlobal"}}},
 			// SKIP: `var top = 0;` browser globals.

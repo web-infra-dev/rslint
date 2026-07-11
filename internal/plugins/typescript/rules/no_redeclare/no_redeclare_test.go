@@ -72,6 +72,19 @@ func TestNoRedeclareRule(t *testing.T) {
 			{Code: "import {} from './foo';\nvar Array = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ====================================================================
+			// ctx.Globals: an explicit `off` setting (config `Object: "off"` /
+			// `/* globals Object:off */`) un-declares the builtin, so the
+			// declaration no longer collides — even for globals resolved from
+			// the TypeScript default libraries (lib.dom etc.).
+			// ====================================================================
+			{Code: "var Object = 0;", Globals: map[string]bool{"Object": false}},
+			{Code: "/* globals Object:off */ var Object = 0;"},
+			{Code: "var document = 0;", Globals: map[string]bool{"document": false}},
+			{Code: "/* globals top:off */ var top = 0;"},
+			// A final inline `off` wins over a config-declared global.
+			{Code: "/* globals a:off */ var a = 0;", Globals: map[string]bool{"a": true}},
+
+			// ====================================================================
 			// TypeScript declaration merging (default ignoreDeclarationMerge: true).
 			// ====================================================================
 			{Code: "interface A {}\ninterface A {}"},
@@ -537,6 +550,23 @@ func TestNoRedeclareRule(t *testing.T) {
 					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 11},
 				},
 				Options: map[string]interface{}{"builtinGlobals": true},
+			},
+			// ctx.Globals: a config-declared global collides like a builtin.
+			{
+				Code:    "var app = 0;",
+				Globals: map[string]bool{"app": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Message: "'app' is already defined as a built-in global variable.", Line: 1, Column: 5},
+				},
+			},
+			// ctx.Globals: an inline comment re-declares a builtin the config
+			// turned off — the comment then collides with the declaration.
+			{
+				Code:    "/* globals Object */ var Object = 0;",
+				Globals: map[string]bool{"Object": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredBySyntax", Message: "'Object' is already defined by a variable declaration.", Line: 1, Column: 12},
+				},
 			},
 			// ====================================================================
 			// Documented divergence #1 (see no_redeclare.md):

@@ -14,12 +14,13 @@ import (
 //
 // Scope semantics are reconstructed by walking the AST and tracking scopes
 // directly (rslint has no eslint-scope-equivalent). This covers the common
-// cases exercised by the ESLint test suite. Framework-level concepts that
-// rslint deliberately does not expose (for example `/*global*/` directive
-// comments, `env`/`globals` in languageOptions, `parserOptions.globalReturn`)
-// are intentionally not modeled — the rule reports shadowing against
-// declarations visible within the file plus, when a type checker is
-// available, symbols from the default TypeScript libraries.
+// cases exercised by the ESLint test suite. The rule reports shadowing against
+// declarations visible within the file plus, when `builtinGlobals` is on, the
+// global scope: ECMAScript builtins, default-library symbols (when a type
+// checker is available), and globals declared via config
+// `languageOptions.globals` or `/* global */` comments (`ctx.Globals`), where
+// an explicit `off` setting un-declares the name. Concepts rslint does not
+// expose (for example `parserOptions.globalReturn`) remain unmodeled.
 
 type hoistMode int
 
@@ -1276,14 +1277,19 @@ func runWithDefaults(defaults options) func(rule.RuleContext, []any) rule.RuleLi
 		builtinGlobals := map[string]bool{}
 		if opts.builtinGlobals {
 			utils.AddECMAScriptGlobals(builtinGlobals)
+			utils.AddDefaultLibraryGlobals(builtinGlobals, ctx.Program, ctx.TypeChecker)
 			// Config `languageOptions.globals` and `/* global */` comments
-			// declare additional globals beyond the ECMAScript/lib set.
+			// declare additional globals beyond the ECMAScript/lib set. An
+			// explicit `off` setting un-declares the builtin from the global
+			// scope (ESLint removes the variable entirely), so shadowing it
+			// no longer reports.
 			for name, declared := range ctx.Globals {
 				if declared {
 					builtinGlobals[name] = true
+				} else {
+					delete(builtinGlobals, name)
 				}
 			}
-			utils.AddDefaultLibraryGlobals(builtinGlobals, ctx.Program, ctx.TypeChecker)
 		}
 		b.builtinGlobals = builtinGlobals
 

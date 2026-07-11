@@ -11,10 +11,11 @@ import (
 // (https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/tests/rules/no-shadow/no-shadow.test.ts),
 // kept in roughly the same order so a diff against that file is tractable.
 //
-// Cases that depend on `languageOptions.globals` (a framework concept rslint
-// does not model) are converted to use `builtinGlobals` against well-known
-// ECMAScript / TypeScript default-library names so the underlying semantics
-// are still exercised.
+// Cases that depend on upstream's env-based globals are converted to use
+// `builtinGlobals` against well-known ECMAScript / TypeScript default-library
+// names so the underlying semantics are still exercised. Config
+// `languageOptions.globals` and `/* global */` comments are modeled via
+// `ctx.Globals` (see the dedicated cases below).
 func TestNoShadowTSESLintRule(t *testing.T) {
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
@@ -59,6 +60,18 @@ function foo() {
   var Object = 0;
 }
 			`},
+
+			// ---- ctx.Globals: an explicit `off` setting (config
+			// `Array: "off"` / `/* global Array: off */`) un-declares the
+			// builtin, so shadowing it stays silent even under
+			// `builtinGlobals: true` ----
+			{Code: `
+function fn(Array: number) {}
+			`, Options: map[string]interface{}{"builtinGlobals": true}, Globals: map[string]bool{"Array": false}},
+			{Code: `
+/* global Array: off */
+declare const Array: (environment: 'dev' | 'prod' | 'test') => boolean;
+			`, Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ---- this params ----
 			{Code: `
@@ -1578,6 +1591,41 @@ declare const Array: (environment: 'dev' | 'prod' | 'test') => boolean;
 						Message:   "'Array' is already a global variable.",
 						Line:      2,
 						Column:    15,
+					},
+				},
+			},
+
+			// ---- ctx.Globals: a config-declared global is shadowable like a
+			// builtin, and an inline `/* global */` comment re-declares a
+			// builtin the config turned off ----
+			{
+				Code: `
+function foo(top: number) {}
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Globals: map[string]bool{"top": true},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'top' is already a global variable.",
+						Line:      2,
+						Column:    14,
+					},
+				},
+			},
+			{
+				Code: `
+/* global Array */
+function fn(Array: number) {}
+				`,
+				Options: map[string]interface{}{"builtinGlobals": true},
+				Globals: map[string]bool{"Array": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "noShadowGlobal",
+						Message:   "'Array' is already a global variable.",
+						Line:      3,
+						Column:    13,
 					},
 				},
 			},
