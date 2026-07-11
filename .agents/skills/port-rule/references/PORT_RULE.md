@@ -416,6 +416,28 @@ func parseOptions(options []any) Options {
 
 For a rule with multiple positional options (e.g. `["error", "both", {...}]`), index `options` directly (`options[0]`, `options[1]`, ...) instead of using `GetOptionsMap`.
 
+#### Options schema
+
+Every new rule declares a JSON Schema for its options on the `Schema` field. The linter validates each configured rule's options against it before linting starts (in the CLI, as a separate fail-fast step right after configuration is resolved), so a misconfigured rule fails with a clear error instead of being silently misread.
+
+- **No options**: set `Schema: rule.EmptyArraySchema`. Always reference the shared value — never author your own copy of the empty-array schema.
+- **With options**: copy ESLint's `meta.schema` into a `<rule-name>.schema.json` file beside the rule source and embed it. When upstream's `meta.schema` is a plain **array** of item schemas, wrap it the way ESLint itself does: `{"type": "array", "items": [<the array>], "minItems": 0, "maxItems": <len>}`. When it's already a full schema **object** (e.g. eqeqeq's top-level `anyOf`), copy it as-is.
+
+```go
+import _ "embed"
+
+//go:embed my-rule.schema.json
+var schemaJSON []byte
+
+var MyRule = rule.Rule{
+    Name:   "my-rule",
+    Schema: rule.NewSchema(schemaJSON),
+    Run:    /* ... */,
+}
+```
+
+Schemas are JSON Schema Draft 4 (the draft ESLint itself uses) and compile lazily on first use; the CI sweep `TestAllRules_DeclaredSchemasCompile` (internal/config) catches a schema that fails to compile. Validation only accepts or rejects a config — it never fills schema `default` values into the options (a deliberate divergence from ESLint's ajv setup), so `parseOptions` remains the single owner of option defaults.
+
 ### Alignment Audit
 
 Before moving on, walk through each check. Each one targets a class of AST-shape bug that is not caught by compilation and may slip past narrowly-written unit tests. Skip a row when it doesn't apply to your rule.
