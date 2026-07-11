@@ -26,6 +26,7 @@ import { describe, test, expect } from '@rstest/core';
 import { lintFile } from '../../../src/eslint-plugin/linter/ecma-language-plugin.js';
 import type { LoadedPlugins } from '../../../src/eslint-plugin/plugin/plugin-loader.js';
 import type { RuleContext } from '../../../src/eslint-plugin/linter/context.js';
+import type { GlobalAccess } from '../../../src/eslint-plugin/types.js';
 
 // ── Stub plugin that records the ctx fields it observes ───────────
 
@@ -348,12 +349,10 @@ describe('A15: listener throw is attributed to its rule in ruleErrors', () => {
 //
 // Pre-fix `ensureGlobal` short-circuited on existing entries without
 // updating mode, so user-supplied `'writable'` had no effect on
-// built-ins. Empirically confirmed against ESLint v9 (Linter.verify
+// built-ins. Confirmed against ESLint v10 (Linter.verify
 // returns writeable=true for the same setup).
 describe('A16: user globals override built-in mode flags', () => {
-  function readArrayMode(
-    globalsOpt: Record<string, 'readonly' | 'writable' | 'off'>,
-  ): {
+  function readArrayMode(globalsOpt: Record<string, GlobalAccess>): {
     writeable: boolean | undefined;
     eslintImplicitGlobalSetting: string | undefined;
   } {

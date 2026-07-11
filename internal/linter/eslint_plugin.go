@@ -39,6 +39,7 @@ type EslintPluginLintFile struct {
 }
 
 type EslintPluginLintRequest struct {
+	Generation      string                            `json:"generation,omitempty"`
 	Files           []EslintPluginLintFile            `json:"files"`
 	Rules           map[string]EslintPluginRuleConfig `json:"rules"`
 	Fix             bool                              `json:"fix"`
@@ -305,7 +306,7 @@ func groupEslintPluginFiles(files []EslintPluginFileInput) [][]EslintPluginFileI
 func eslintPluginBatchKey(f EslintPluginFileInput) string {
 	type sigRule struct {
 		Name    string `json:"name"`
-		Options any    `json:"options"`
+		Options []any  `json:"options"`
 	}
 	sig := make([]sigRule, 0, len(f.Rules))
 	for _, r := range f.Rules {
@@ -317,7 +318,7 @@ func eslintPluginBatchKey(f EslintPluginFileInput) string {
 		Rules     []sigRule `json:"rules"`
 	}{f.ConfigKey, sig})
 	if err != nil {
-		// A rule's Options is `any`; a value that can't be marshaled would break
+		// A non-serializable option value would break
 		// the batch key. Fall back to a per-file key so the file lints in its own
 		// batch rather than silently mis-grouping with others.
 		return f.Path
@@ -328,7 +329,7 @@ func eslintPluginBatchKey(f EslintPluginFileInput) string {
 func buildEslintPluginRequest(batch []EslintPluginFileInput, fix bool, suggestionsMode string) EslintPluginLintRequest {
 	rules := map[string]EslintPluginRuleConfig{}
 	for _, r := range batch[0].Rules {
-		rules[r.Name] = EslintPluginRuleConfig{Options: rule.NormalizeOptions(r.Options)}
+		rules[r.Name] = EslintPluginRuleConfig{Options: r.Options}
 	}
 	wireFiles := make([]EslintPluginLintFile, 0, len(batch))
 	for _, f := range batch {

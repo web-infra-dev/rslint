@@ -49,7 +49,7 @@ export interface LintResponse {
   fixableWarningCount: number;
   fileCount: number;
   ruleCount: number;
-  // Files actually linted (config `ignores` excluded), each a program-canonical
+  // Files actually linted (config `ignores` excluded), each a requested target
   // path relative to configDirectory — same path space as Diagnostic.filePath.
   // Present for lintFiles so the Rslint class seeds one result per linted file.
   lintedFiles?: string[];
@@ -59,6 +59,9 @@ export interface LintResponse {
 
 export interface LintOptions {
   files?: string[];
+  // Optional physical paths parallel to files. High-level Node APIs provide
+  // these after target planning so Go does not repeat realpath resolution.
+  canonicalFiles?: string[];
   // Final resolved config — normalized config entries (normalizeConfig output:
   // plain objects, plugins as string[], no live functions). The JS side
   // resolves overrideConfig / config-file / discovery / normalize into this;
@@ -68,8 +71,15 @@ export interface LintOptions {
   // explicitly under an entry's `rules` (or pulled in via a preset that does
   // so), matching ESLint flat-config semantics.
   config?: Record<string, unknown>[];
+  // Community ESLint-plugin rules available to this request. Go registers
+  // request-scoped placeholder rules from this metadata, then asks the Node
+  // peer to execute them through a reverse `pluginLint` request.
+  eslintPlugins?: Array<{ prefix: string; ruleNames: string[] }>;
   // Anchor dir for resolving the config's relative files/ignores/project.
   configDirectory?: string;
+  // Opaque routing key for community-plugin workers. High-level APIs set this
+  // when config path rebasing makes it differ from configDirectory.
+  pluginConfigDirectory?: string;
   workingDirectory?: string;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
@@ -96,9 +106,19 @@ export interface IpcMessage {
   data: any;
 }
 
+/** Handler for a positive-id request frame sent by the Go peer. */
+export type InboundRequestHandler = (message: IpcMessage) => unknown;
+
+/** Reverse-request handlers that are scoped to one outer lint request. */
+export interface LintInboundHandlers {
+  pluginLint?: (request: unknown) => unknown;
+}
+
 // Service interface that all implementations must follow
 export interface RslintServiceInterface {
   sendMessage(kind: string, data: any): Promise<any>;
+  /** Optional for one-way backends such as the current browser worker. */
+  setInboundHandler?(handler: InboundRequestHandler | null): void;
   terminate(): void;
 }
 

@@ -41,6 +41,22 @@ const LOCAL_PLUGIN = `export default {
         };
       },
     },
+    'replace-one-zero': {
+      meta: { type: 'suggestion', fixable: 'code', schema: [], messages: { replace: 'Replace one zero.' } },
+      create(context) {
+        return {
+          Program(node) {
+            const index = context.sourceCode.text.indexOf('0');
+            if (index === -1) return;
+            context.report({
+              node,
+              messageId: 'replace',
+              fix: (fixer) => fixer.replaceTextRange([index, index + 1], '1'),
+            });
+          },
+        };
+      },
+    },
   },
 };
 `;
@@ -125,6 +141,35 @@ describe('CLI community plugins (object-form) end-to-end', () => {
       const content = await fs.readFile(path.join(dir, 'b.ts'), 'utf8');
       expect(content).toContain('.some(');
       expect(content).not.toContain('.filter(');
+    } finally {
+      await cleanupTempDir(dir);
+    }
+  });
+
+  test('--fix performs a final verification after the tenth write pass', async () => {
+    const config = `import local from './local-plugin.mjs';
+export default [{
+  files: ['**/*.ts'],
+  plugins: { local },
+  rules: { 'local/replace-one-zero': 'error' },
+}];
+`;
+    const dir = await createTempDir({
+      'local-plugin.mjs': LOCAL_PLUGIN,
+      'rslint.config.mjs': config,
+      'tsconfig.json': TSCONFIG,
+      'ten.ts': "const value = '0000000000';\n",
+    });
+    try {
+      const result = await runRslint(
+        ['--format', 'jsonline', '--fix', 'ten.ts'],
+        dir,
+      );
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('local/replace-one-zero');
+      expect(await fs.readFile(path.join(dir, 'ten.ts'), 'utf8')).toBe(
+        "const value = '1111111111';\n",
+      );
     } finally {
       await cleanupTempDir(dir);
     }

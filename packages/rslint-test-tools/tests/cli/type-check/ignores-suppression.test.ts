@@ -108,8 +108,8 @@ describe('--type-check + config ignores', () => {
       );
 
       // LintedFileCount counts the lint-rule pass only — ignored files do
-      // not contribute. Only src/bad.ts is "linted".
-      expect(r.lintedFileCount).toBe(1);
+      // not contribute. The targets are src/bad.ts and rslint.config.mjs.
+      expect(r.lintedFileCount).toBe(2);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -155,8 +155,9 @@ describe('--type-check + config ignores', () => {
       expect(utilDiags.length).toBeGreaterThan(0);
       expect(utilDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(true);
 
-      // Lint-rule pass excludes the ignored file: count is 1 (caller.ts).
-      expect(r.lintedFileCount).toBe(1);
+      // Lint-rule pass excludes the ignored file. caller.ts and the default
+      // .mjs target rslint.config.mjs remain.
+      expect(r.lintedFileCount).toBe(2);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -208,8 +209,9 @@ describe('--type-check + config ignores', () => {
       expect(childDiags.length).toBeGreaterThan(0);
       expect(childDiags.some((d) => d.ruleName.includes('TS2322'))).toBe(true);
 
-      // Lint-rule pass excludes the ignored child file: count is 1 (src/ok.ts).
-      expect(r.lintedFileCount).toBe(1);
+      // Lint-rule pass excludes the ignored child file. src/ok.ts and the
+      // default .mjs target rslint.config.mjs remain.
+      expect(r.lintedFileCount).toBe(2);
     } finally {
       await cleanupTempDir(tempDir);
     }

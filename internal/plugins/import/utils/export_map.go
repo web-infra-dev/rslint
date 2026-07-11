@@ -122,7 +122,7 @@ type exportKey struct {
 }
 
 func hasExport(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier *ast.Node, exportName string, seen map[exportKey]bool) (bool, bool) {
-	_, sourceFile, ok := ResolveSourceFileFromSourceFile(ctx, origin, moduleSpecifier)
+	_, sourceFile, ok := ResolveModuleReferenceFromSourceFile(ctx, origin, moduleSpecifier)
 	if !ok {
 		return false, false
 	}
@@ -138,7 +138,7 @@ func getExportMap(ctx rule.RuleContext, origin *ast.SourceFile, moduleSpecifier 
 		return nil, false
 	}
 
-	_, sourceFile, ok := ResolveSourceFileFromSourceFile(ctx, origin, moduleSpecifier)
+	_, sourceFile, ok := ResolveModuleReferenceFromSourceFile(ctx, origin, moduleSpecifier)
 	if !ok {
 		return nil, false
 	}

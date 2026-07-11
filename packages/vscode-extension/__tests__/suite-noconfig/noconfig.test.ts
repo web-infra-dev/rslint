@@ -198,7 +198,31 @@ suite('rslint no config fallback', function () {
         'Step 4: no-unsafe-member-access should be gone (JS config deleted)',
       );
 
-      // ── Step 5: Delete JSON config → no diagnostics ──
+      // ── Step 5: Broken JS with no last-good → explicit no-lint state ──
+      const disabledByBrokenJS = waitForDiagnostics(
+        doc,
+        (ds) => ds.filter((d) => d.source === 'rslint').length === 0,
+      );
+      fs.writeFileSync(jsConfigPath, 'export default [BROKEN SYNTAX;', 'utf8');
+      diags = await disabledByBrokenJS;
+      assert.strictEqual(
+        diags.filter((d) => d.source === 'rslint').length,
+        0,
+        'Step 5: A broken discovered JS config must not fall back to JSON',
+      );
+
+      // ── Step 6: Delete broken JS → legitimate deletion restores JSON ──
+      const jsonRestored = waitForDiagnostics(doc, (ds) =>
+        ds.some((d) => d.message.includes('no-explicit-any')),
+      );
+      fs.unlinkSync(jsConfigPath);
+      diags = await jsonRestored;
+      assert.ok(
+        diags.some((d) => d.message.includes('no-explicit-any')),
+        'Step 6: Deleting all JS configs should restore the JSON fallback',
+      );
+
+      // ── Step 7: Delete JSON config → no diagnostics ──
       fs.unlinkSync(jsonConfigPath);
 
       await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -212,7 +236,7 @@ suite('rslint no config fallback', function () {
       assert.strictEqual(
         diags.filter((d) => d.source === 'rslint').length,
         0,
-        'Step 5: After deleting all configs, should have no rslint diagnostics',
+        'Step 7: After deleting all configs, should have no rslint diagnostics',
       );
     } finally {
       // Clean up — ensure no config files remain for other test runs

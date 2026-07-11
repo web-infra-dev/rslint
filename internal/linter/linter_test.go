@@ -108,6 +108,41 @@ func TestRunLinter_ExecutedRules(t *testing.T) {
 	}
 }
 
+func TestRunLinter_DoesNotExecutePluginPlaceholderInNativePass(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{
+		"a.ts": "const a = 1;",
+	})
+	pluginRunCalled := false
+
+	result, err := RunLinter(RunLinterOptions{
+		Programs:       []*compiler.Program{program},
+		SingleThreaded: true,
+		TargetFiles:    [][]string{{paths["a.ts"]}},
+		GetRulesForFile: func(*ast.SourceFile) []ConfiguredRule {
+			return []ConfiguredRule{{
+				Name:               "community/example",
+				IsEslintPluginRule: true,
+				Run: func(rule.RuleContext) rule.RuleListeners {
+					pluginRunCalled = true
+					return nil
+				},
+			}}
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunLinter error: %v", err)
+	}
+	if pluginRunCalled {
+		t.Fatal("Node-dispatched plugin placeholder executed in the native pass")
+	}
+	if _, ok := result.ExecutedRules["community/example"]; !ok {
+		t.Fatal("plugin rule should still contribute to the run's rule count")
+	}
+	if result.LintedFileCount != 1 {
+		t.Fatalf("plugin-only target should still count as linted, got %d", result.LintedFileCount)
+	}
+}
+
 func TestRunLinter_GlobalDeclarationMetadata(t *testing.T) {
 	source := "#!/usr/bin/env node\n" +
 		"/*global configOn:off, inlineOn, repeated:off */\n" +

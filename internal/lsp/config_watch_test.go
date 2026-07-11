@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -69,18 +70,28 @@ func TestIsTsConfigURI(t *testing.T) {
 
 // ======== reloadConfigAndRelint guard tests ========
 
-func TestReloadConfigAndRelint_SkipsWhenJSConfigsActive(t *testing.T) {
+func TestReloadConfigAndRelint_RefreshesJSONFallbackWhenJSConfigsActive(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "rslint.json")
+	if err := os.WriteFile(configPath, []byte(`[{"rules":{"no-debugger":"error"}}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
 	s := newTestServer()
-	s.fs = &mockFS{files: map[string]bool{"/project/rslint.json": true}}
-	s.cwd = "/project"
-	// Simulate JS configs being active
-	s.jsConfigs["file:///project"] = config.RslintConfig{{}}
+	s.fs = osvfs.FS()
+	s.cwd = dir
+	s.jsConfigs["file:///other"] = config.RslintConfig{{Rules: config.Rules{"no-console": "error"}}}
 
 	s.reloadConfigAndRelint()
 
-	// Should NOT load JSON config because JS configs take priority
-	if s.rslintConfigPath != "" {
-		t.Errorf("expected empty config path (skipped), got %q", s.rslintConfigPath)
+	if s.rslintConfigPath != configPath {
+		t.Fatalf("expected JSON fallback path %q, got %q", configPath, s.rslintConfigPath)
+	}
+	if len(s.jsonConfig) != 1 || s.jsonConfig[0].Rules["no-debugger"] != "error" {
+		t.Fatalf("expected refreshed JSON fallback, got %v", s.jsonConfig)
+	}
+	if len(s.jsConfigs) != 1 {
+		t.Fatalf("expected active JS configs to remain loaded, got %v", s.jsConfigs)
 	}
 }
 
@@ -596,6 +607,34 @@ func TestHandleInitialized_WatchDisabledWhenCapabilitiesNil(t *testing.T) {
 func TestIsBlockingMethod_ConfigUpdate(t *testing.T) {
 	if !isBlockingMethod(lsproto.Method("rslint/configUpdate")) {
 		t.Error("rslint/configUpdate must be a blocking method to avoid data races on jsConfigs")
+	}
+}
+
+func TestConfigUpdateRequestAcknowledgesAcceptedGeneration(t *testing.T) {
+	s, outgoing := newTestServerWithQueue()
+	id := jsonrpc.NewIDString("config-update-1")
+	req := &lsproto.RequestMessage{
+		ID:     id,
+		Method: lsproto.Method("rslint/configUpdate"),
+		Params: map[string]any{
+			"generation": "accepted",
+			"configs": []any{
+				map[string]any{"configDirectory": "file:///project", "entries": []any{}},
+			},
+		},
+	}
+
+	if err := handlers()[req.Method](s, context.Background(), req); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case message := <-outgoing:
+		response := message.AsResponse()
+		if response.ID == nil || response.ID.String() != id.String() || response.Error != nil {
+			t.Fatalf("unexpected config update response: %+v", response)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("config update request was not acknowledged")
 	}
 }
 

@@ -129,7 +129,8 @@ suite('rslint monorepo multi-config support', function () {
   });
 
   test('broken sub-package file should fall back to root config', async () => {
-    // broken/ has an invalid config, so its files should fall back to root config
+    // Partial config failures retain the established behavior: the failed
+    // config is skipped while the valid ancestor config remains active.
     const doc = await openFile('packages/broken/src/index.ts');
     await vscode.window.showTextDocument(doc);
 
@@ -139,7 +140,7 @@ suite('rslint monorepo multi-config support', function () {
 
     assert.ok(
       diagnostics.some((d) => d.message.includes('no-explicit-any')),
-      'Broken package file should fall back to root config (no-explicit-any: error)',
+      'Broken package file should fall back to the root config',
     );
   });
 

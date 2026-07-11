@@ -65,10 +65,10 @@ const (
 // is the wire contract — keep in sync with packages/rslint/src/engine.ts.
 type initPayload struct {
 	// Configs: array of `{configDirectory, entries}`-shaped JSON objects.
-	// Re-marshaled byte-for-byte into the synthesized stdin payload so
-	// parseConfigPayload (cmd.go) parses it identically to the legacy stdin
-	// path. Empty/nil means "no JS config — load JSON config from disk via
-	// LoadConfigurationWithFallback (ConfigStdin=false branch)".
+	// Re-marshaled byte-for-byte into the synthesized parseConfigPayload input
+	// so IPC init and the legacy stdin path share identical config semantics.
+	// Empty/nil means "no JS config — load JSON config from disk via
+	// the JSON configuration loader (ConfigStdin=false branch)".
 	Configs []json.RawMessage `json:"configs,omitempty"`
 
 	// Runtime: out-of-band switches without a 1:1 user flag.

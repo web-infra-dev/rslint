@@ -1,6 +1,9 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
+	"reflect"
 	"testing"
 )
 
@@ -179,17 +182,79 @@ func TestGetConfigForFile_RulesShallowMerge(t *testing.T) {
 	}
 }
 
-func TestGetConfigForFile_SettingsShallowMerge(t *testing.T) {
+func TestGetConfigForFile_SeverityOnlyRuleOverridePreservesOptions(t *testing.T) {
+	for _, override := range []any{"warn", 1, []interface{}{float64(1)}} {
+		t.Run(fmt.Sprintf("%T_%v", override, override), func(t *testing.T) {
+			config := RslintConfig{
+				{Rules: Rules{"example": []interface{}{"error", map[string]interface{}{"mode": "strict"}, "tail"}}},
+				{Rules: Rules{"example": override}},
+			}
+
+			merged := config.GetConfigForFile("src/app.ts", "")
+			if merged == nil || merged.Rules["example"] == nil {
+				t.Fatal("expected merged example rule")
+			}
+			ruleConfig := merged.Rules["example"]
+			if ruleConfig.Level != "warn" {
+				t.Fatalf("severity = %q, want warn", ruleConfig.Level)
+			}
+			if len(ruleConfig.Options) != 2 || ruleConfig.Options[1] != "tail" {
+				t.Fatalf("severity-only override lost prior options: %#v", ruleConfig.Options)
+			}
+		})
+	}
+}
+
+func TestGetConfigForFile_NumericRuleSeverities(t *testing.T) {
+	config := RslintConfig{{Rules: Rules{
+		"off":   0,
+		"warn":  float64(1),
+		"error": uint8(2),
+	}}}
+
+	merged := config.GetConfigForFile("src/app.ts", "")
+	if merged == nil {
+		t.Fatal("expected merged config")
+	}
+	for name, want := range map[string]string{"off": "off", "warn": "warn", "error": "error"} {
+		if got := merged.Rules[name]; got == nil || got.Level != want {
+			t.Errorf("rule %q = %#v, want level %q", name, got, want)
+		}
+	}
+}
+
+func TestGetConfigForFile_NumericRuleOverrideWithOptionsReplacesOptions(t *testing.T) {
+	config := RslintConfig{
+		{Rules: Rules{"example": []interface{}{"error", "old", map[string]any{"keep": false}}}},
+		{Rules: Rules{"example": []interface{}{1, "new", true}}},
+	}
+
+	merged := config.GetConfigForFile("src/app.ts", "")
+	ruleConfig := merged.Rules["example"]
+	if ruleConfig.Level != "warn" {
+		t.Fatalf("severity = %q, want warn", ruleConfig.Level)
+	}
+	if !reflect.DeepEqual(ruleConfig.Options, []interface{}{"new", true}) {
+		t.Fatalf("explicit positional options were not replaced: %#v", ruleConfig.Options)
+	}
+}
+
+func TestGetConfigForFile_SettingsDeepMerge(t *testing.T) {
 	config := RslintConfig{
 		{
 			Settings: Settings{
 				"importResolver": "node",
-				"react":          "17",
+				"react": map[string]any{
+					"version": "17",
+					"pragma":  "h",
+				},
+				"extensions": []any{".js"},
 			},
 		},
 		{
 			Settings: Settings{
-				"react": "18",
+				"react":      map[string]any{"version": "18"},
+				"extensions": []any{".ts"},
 			},
 		},
 	}
@@ -203,8 +268,13 @@ func TestGetConfigForFile_SettingsShallowMerge(t *testing.T) {
 	if merged.Settings["importResolver"] != "node" {
 		t.Errorf("Expected importResolver to be 'node', got %v", merged.Settings["importResolver"])
 	}
-	if merged.Settings["react"] != "18" {
-		t.Errorf("Expected react to be '18' (overridden), got %v", merged.Settings["react"])
+	react, ok := merged.Settings["react"].(map[string]any)
+	if !ok || react["version"] != "18" || react["pragma"] != "h" {
+		t.Fatalf("nested settings were not deeply merged: %#v", merged.Settings["react"])
+	}
+	extensions, ok := merged.Settings["extensions"].([]any)
+	if !ok || len(extensions) != 1 || extensions[0] != ".ts" {
+		t.Fatalf("settings arrays should be replaced, got %#v", merged.Settings["extensions"])
 	}
 }
 
@@ -272,6 +342,26 @@ func TestMergeLanguageOptions(t *testing.T) {
 			t.Error("Expected ProjectService to be preserved from base")
 		}
 	})
+
+	t.Run("raw parser options are recursively merged", func(t *testing.T) {
+		base := &LanguageOptions{Raw: map[string]any{
+			"parserOptions": map[string]any{
+				"alpha": map[string]any{"one": float64(1), "two": float64(2)},
+			},
+		}}
+		override := &LanguageOptions{Raw: map[string]any{
+			"parserOptions": map[string]any{
+				"alpha": map[string]any{"one": float64(9)},
+			},
+		}}
+
+		result := mergeLanguageOptions(base, override)
+		parserOptions := result.Raw["parserOptions"].(map[string]any)
+		alpha := parserOptions["alpha"].(map[string]any)
+		if alpha["one"] != float64(9) || alpha["two"] != float64(2) {
+			t.Fatalf("raw parserOptions were not deeply merged: %#v", parserOptions)
+		}
+	})
 }
 
 func TestIsGlobalIgnoreEntry(t *testing.T) {
@@ -286,8 +376,18 @@ func TestIsGlobalIgnoreEntry(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "ignores with name",
+			entry:    ConfigEntry{Name: "global ignores", Ignores: []string{"dist/**"}},
+			expected: true,
+		},
+		{
 			name:     "ignores with rules",
 			entry:    ConfigEntry{Ignores: []string{"dist/**"}, Rules: Rules{"no-debugger": "error"}},
+			expected: false,
+		},
+		{
+			name:     "ignores with empty rules",
+			entry:    ConfigEntry{Ignores: []string{"dist/**"}, Rules: Rules{}},
 			expected: false,
 		},
 		{
@@ -301,6 +401,11 @@ func TestIsGlobalIgnoreEntry(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "ignores with empty plugins",
+			entry:    ConfigEntry{Ignores: []string{"dist/**"}, Plugins: []string{}},
+			expected: false,
+		},
+		{
 			name:     "ignores with languageOptions",
 			entry:    ConfigEntry{Ignores: []string{"dist/**"}, LanguageOptions: &LanguageOptions{}},
 			expected: false,
@@ -308,6 +413,11 @@ func TestIsGlobalIgnoreEntry(t *testing.T) {
 		{
 			name:     "ignores with settings",
 			entry:    ConfigEntry{Ignores: []string{"dist/**"}, Settings: Settings{"key": "val"}},
+			expected: false,
+		},
+		{
+			name:     "ignores with empty settings",
+			entry:    ConfigEntry{Ignores: []string{"dist/**"}, Settings: Settings{}},
 			expected: false,
 		},
 		{
@@ -485,6 +595,46 @@ func TestGetConfigForFile_EmptyConfig(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged != nil {
 		t.Error("Expected nil for empty config (no entries)")
+	}
+}
+
+func TestConfigDecode_PreservesNonGlobalIgnoreObjectShape(t *testing.T) {
+	for _, raw := range []string{
+		`[{"ignores":["dist/**"],"rules":null}]`,
+		`[{"ignores":["dist/**"],"processor":"example"}]`,
+	} {
+		var cfg RslintConfig
+		if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+			t.Fatalf("decode %s: %v", raw, err)
+		}
+		if len(cfg) != 1 || isGlobalIgnoreEntry(cfg[0]) {
+			t.Fatalf("entry with another authored key must not become a global ignore: %#v", cfg)
+		}
+		if ignores := ExtractConfigIgnores(cfg); len(ignores) != 0 {
+			t.Fatalf("entry-level ignore leaked into global ignores: %#v", ignores)
+		}
+	}
+}
+
+func TestGetConfigForFile_UnscopedEntriesStayWithinConfigSelectorUnion(t *testing.T) {
+	config := RslintConfig{
+		{Rules: Rules{"base-rule": "error"}},
+		{Files: []string{"**/*.JS"}, Rules: Rules{"uppercase-rule": "error"}},
+	}
+
+	defaultFile := config.GetConfigForFile("src/app.ts", "")
+	if defaultFile == nil || defaultFile.Rules["base-rule"] == nil {
+		t.Fatalf("default baseline file should receive the unscoped entry: %+v", defaultFile)
+	}
+
+	explicitlySelected := config.GetConfigForFile("src/app.JS", "")
+	if explicitlySelected == nil || explicitlySelected.Rules["base-rule"] == nil || explicitlySelected.Rules["uppercase-rule"] == nil {
+		t.Fatalf("explicit selector should make unscoped entries cascade: %+v", explicitlySelected)
+	}
+
+	outsideSelector := RslintConfig{{Rules: Rules{"base-rule": "error"}}}.GetConfigForFile("src/app.JS", "")
+	if outsideSelector != nil {
+		t.Fatalf("unscoped entry must not configure a path outside the implicit selector: %+v", outsideSelector)
 	}
 }
 
@@ -820,5 +970,27 @@ func TestGetConfigForFile_WindowsPaths(t *testing.T) {
 				t.Errorf("expected no match for filePath=%q cwd=%q", tt.filePath, tt.cwd)
 			}
 		})
+	}
+}
+
+func TestGetConfigForFile_FilesAndGroupsUseOrOutsideAndInside(t *testing.T) {
+	cfg := RslintConfig{{
+		Files: []string{"special.ts"},
+		FilePatternGroups: [][]string{
+			{"src/**", "**/*.js", "!**/*.test.js"},
+		},
+		Rules: Rules{"no-console": "error"},
+	}}
+
+	for _, filePath := range []string{"/repo/special.ts", "/repo/src/app.js"} {
+		merged := cfg.GetConfigForFile(filePath, "/repo")
+		if merged == nil || merged.Rules["no-console"] == nil {
+			t.Fatalf("expected %q to match a files selector", filePath)
+		}
+	}
+	for _, filePath := range []string{"/repo/src/app.test.js", "/repo/other/app.js", "/repo/src/app.ts"} {
+		if merged := cfg.GetConfigForFile(filePath, "/repo"); merged != nil {
+			t.Fatalf("expected %q to fail the complete AND group, got %+v", filePath, merged)
+		}
 	}
 }

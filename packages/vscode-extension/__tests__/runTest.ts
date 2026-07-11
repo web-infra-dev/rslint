@@ -7,7 +7,7 @@ function resolveFixture(name: string): string {
 }
 
 async function main() {
-  const extensionDevelopmentPath = path.resolve(__dirname, '..');
+  const extensionDevelopmentPath = path.resolve(__dirname, '../..');
   let failed = false;
 
   // --- Existing tests (JSON config workspace) ---

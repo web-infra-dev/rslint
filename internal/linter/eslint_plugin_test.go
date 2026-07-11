@@ -15,7 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func pluginRule(name string, opts any, sev rule.DiagnosticSeverity) ConfiguredRule {
+func pluginRule(name string, opts []any, sev rule.DiagnosticSeverity) ConfiguredRule {
 	return ConfiguredRule{Name: name, Options: opts, Severity: sev, IsEslintPluginRule: true}
 }
 

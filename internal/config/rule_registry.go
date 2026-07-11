@@ -37,9 +37,12 @@ func (r *RuleRegistry) GetAllRules() map[string]rule.Rule {
 }
 
 // GetEnabledRules returns rules that are enabled in the configuration for a given file.
-// Returns nil if no config entry matches the file (file should not be linted).
+// It returns nil rules and a nil merged config when no config entry matches.
+// Target planning remains responsible for deciding whether an explicitly
+// requested file is still parsed without lint rules.
 // When enforcePlugins is true (JS/TS config), rules with a plugin prefix (e.g. "@typescript-eslint/")
-// are only included if the corresponding plugin is declared in the merged config's Plugins set.
+// are included only when the normalized native or third-party prefix is
+// declared in the merged config's Plugins set.
 // Core rules (no "/" prefix) are always included regardless of enforcePlugins.
 // cwd is the config directory used to resolve files/ignores patterns.
 func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd string, enforcePlugins bool) ([]linter.ConfiguredRule, *MergedConfig) {
@@ -48,8 +51,17 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 		return nil, nil // file is globally ignored
 	}
 
-	globals := ExtractGlobals(mergedConfig.LanguageOptions)
+	return r.GetEnabledRulesForMergedConfig(mergedConfig, enforcePlugins), mergedConfig
+}
 
+// GetEnabledRulesForMergedConfig converts an already-resolved config into
+// enabled rule handlers without re-running files/ignores matching.
+func (r *RuleRegistry) GetEnabledRulesForMergedConfig(mergedConfig *MergedConfig, enforcePlugins bool) []linter.ConfiguredRule {
+	if mergedConfig == nil {
+		return nil
+	}
+
+	globals := ExtractGlobals(mergedConfig.LanguageOptions)
 	var enabledRules []linter.ConfiguredRule
 	for ruleName, ruleConfig := range mergedConfig.Rules {
 		if ruleConfig.IsEnabled() {
@@ -66,6 +78,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				ruleConfigCopy := ruleConfig
+				options := rule.NormalizeOptions(ruleConfigCopy.Options)
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
 					Name:               ruleName,
 					Settings:           CloneSettings(mergedConfig.Settings),
@@ -73,9 +86,9 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 					Severity:           ruleConfig.GetSeverity(),
 					RequiresTypeInfo:   ruleImpl.RequiresTypeInfo,
 					IsEslintPluginRule: ruleImpl.IsEslintPluginRule,
-					Options:            ruleConfigCopy.Options,
+					Options:            options,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleImpl.Run(ctx, rule.NormalizeOptions(ruleConfigCopy.Options))
+						return ruleImpl.Run(ctx, options)
 					},
 				})
 			}
@@ -90,7 +103,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	return enabledRules, mergedConfig
+	return enabledRules
 }
 
 // GetActiveRulesForFile returns the lint rules that should run on a file.

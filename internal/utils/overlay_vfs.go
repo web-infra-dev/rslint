@@ -26,14 +26,14 @@ func (vfs *OverlayVFS) UseCaseSensitiveFileNames() bool {
 }
 
 func (vfs *OverlayVFS) FileExists(path string) bool {
-	if _, ok := vfs.VirtualFiles[path]; ok {
-		return ok
+	if _, ok := vfs.virtualFile(path); ok {
+		return true
 	}
 	return vfs.fs.FileExists(path)
 }
 
 func (vfs *OverlayVFS) ReadFile(path string) (contents string, ok bool) {
-	if src, ok := vfs.VirtualFiles[path]; ok {
+	if src, ok := vfs.virtualFile(path); ok {
 		return src, ok
 	}
 	return vfs.fs.ReadFile(path)
@@ -121,7 +121,7 @@ func (fi *overlayVFSFileInfo) Type() fs.FileMode {
 }
 
 func (vfs *OverlayVFS) Stat(path string) vfs.FileInfo {
-	if src, ok := vfs.VirtualFiles[path]; ok {
+	if src, ok := vfs.virtualFile(path); ok {
 		return &overlayVFSFileInfo{
 			name: path,
 			size: int64(len(src)),
@@ -137,30 +137,45 @@ func (vfs *OverlayVFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error {
 
 func (vfs *OverlayVFS) Realpath(path string) string {
 	if _, ok := vfs.VirtualFiles[path]; ok {
+		if realPath := vfs.fs.Realpath(path); realPath != "" {
+			return realPath
+		}
 		return path
 	}
 	return vfs.fs.Realpath(path)
 }
 
 func (vfs *OverlayVFS) WriteFile(path string, data string) error {
-	if _, ok := vfs.VirtualFiles[path]; ok {
+	if _, ok := vfs.virtualFile(path); ok {
 		panic("not implemented: cannot write to overlay file system")
 	}
 	return vfs.fs.WriteFile(path, data)
 }
 
 func (vfs *OverlayVFS) AppendFile(path string, data string) error {
-	if _, ok := vfs.VirtualFiles[path]; ok {
+	if _, ok := vfs.virtualFile(path); ok {
 		panic("not implemented: cannot append to overlay file system")
 	}
 	return vfs.fs.AppendFile(path, data)
 }
 
 func (vfs *OverlayVFS) Remove(path string) error {
-	if _, ok := vfs.VirtualFiles[path]; ok {
+	if _, ok := vfs.virtualFile(path); ok {
 		panic("not implemented: cannot remove from overlay file system")
 	}
 	return vfs.fs.Remove(path)
+}
+
+func (vfs *OverlayVFS) virtualFile(path string) (string, bool) {
+	if src, ok := vfs.VirtualFiles[path]; ok {
+		return src, true
+	}
+	realPath := vfs.fs.Realpath(path)
+	if realPath == "" || realPath == path {
+		return "", false
+	}
+	src, ok := vfs.VirtualFiles[realPath]
+	return src, ok
 }
 
 func NewOverlayVFS(baseFS vfs.FS, virtualFiles map[string]string) vfs.FS {

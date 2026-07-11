@@ -1,6 +1,5 @@
 export default [
   {
-    files: [],
     languageOptions: {
       parserOptions: {
         projectService: false,

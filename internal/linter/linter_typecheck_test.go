@@ -1,12 +1,21 @@
 package linter
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/diagnostics"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -563,6 +572,117 @@ const x: Foo = { a: 'hello' };
 			}
 		}
 		t.Error("Expected multi-line message (message chain) for object type mismatch")
+	}
+}
+
+func TestTypeCheckDedupeKeyIncludesMessageChainAndRelatedInformation(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
+	sourceFile := program.GetSourceFile(paths["a.ts"])
+	if sourceFile == nil {
+		t.Fatal("expected a.ts source file")
+	}
+	newBase := func() *ast.Diagnostic {
+		return ast.NewDiagnostic(
+			sourceFile,
+			core.NewTextRange(0, 5),
+			diagnostics.Type_0_is_not_assignable_to_type_1,
+			"Source",
+			"Target",
+		)
+	}
+	withChainA := newBase().AddMessageChain(ast.NewCompilerDiagnostic(
+		diagnostics.Property_0_is_missing_in_type_1_but_required_in_type_2,
+		"first",
+		"Source",
+		"Target",
+	))
+	withChainB := newBase().AddMessageChain(ast.NewCompilerDiagnostic(
+		diagnostics.Property_0_is_missing_in_type_1_but_required_in_type_2,
+		"second",
+		"Source",
+		"Target",
+	))
+	if typeCheckDedupeKeyForDiagnostic(program, withChainA) == typeCheckDedupeKeyForDiagnostic(program, withChainB) {
+		t.Fatal("message-chain differences must remain distinct in the dedupe key")
+	}
+
+	withRelatedA := newBase().AddRelatedInfo(ast.NewDiagnostic(
+		sourceFile,
+		core.NewTextRange(7, 12),
+		diagnostics.The_expected_type_comes_from_property_0_which_is_declared_here_on_type_1,
+		"first",
+		"Target",
+	))
+	withRelatedB := newBase().AddRelatedInfo(ast.NewDiagnostic(
+		sourceFile,
+		core.NewTextRange(7, 12),
+		diagnostics.The_expected_type_comes_from_property_0_which_is_declared_here_on_type_1,
+		"second",
+		"Target",
+	))
+	if typeCheckDedupeKeyForDiagnostic(program, withRelatedA) == typeCheckDedupeKeyForDiagnostic(program, withRelatedB) {
+		t.Fatal("related-information differences must remain distinct in the dedupe key")
+	}
+}
+
+func TestTypeCheckDedupeSurvivorUsesProgramOrder(t *testing.T) {
+	key := typeCheckDedupeKey{path: "/repo/shared.ts", code: 2322, pos: 1, end: 2, message: "same"}
+	collected := [][]collectedTypeCheckDiagnostic{
+		{{key: key, ruleDiagnostic: rule.RuleDiagnostic{FilePath: "/first/shared.ts"}}},
+		{{key: key, ruleDiagnostic: rule.RuleDiagnostic{FilePath: "/second/shared.ts"}}},
+	}
+	var got []rule.RuleDiagnostic
+	emitDeduplicatedTypeCheckDiagnostics(collected, func(d rule.RuleDiagnostic) {
+		got = append(got, d)
+	})
+	if len(got) != 1 || got[0].FilePath != "/first/shared.ts" {
+		t.Fatalf("expected stable first-Program survivor, got %+v", got)
+	}
+}
+
+func TestTypeCheckFilesystemPathIDIsStableAcrossSymlinkAliases(t *testing.T) {
+	program, paths := createTestProgramWithFiles(t, map[string]string{"a.ts": "export const value = 1;"})
+	realPath := paths["a.ts"]
+	aliasPath := filepath.Join(filepath.Dir(realPath), "alias.ts")
+	if err := os.Symlink(realPath, aliasPath); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if typeCheckFilesystemPathID(program, realPath) != typeCheckFilesystemPathID(program, aliasPath) {
+		t.Fatalf("expected real and alias paths to share a typecheck identity: real=%q alias=%q", realPath, aliasPath)
+	}
+}
+
+type caseInsensitiveTypeCheckFS struct {
+	vfs.FS
+	realPaths map[string]string
+}
+
+func (fs *caseInsensitiveTypeCheckFS) UseCaseSensitiveFileNames() bool { return false }
+func (fs *caseInsensitiveTypeCheckFS) Realpath(filePath string) string {
+	if realPath := fs.realPaths[tspath.NormalizePath(filePath)]; realPath != "" {
+		return realPath
+	}
+	return fs.FS.Realpath(filePath)
+}
+
+func TestTypeCheckFilesystemPathIDPreservesDistinctCanonicalCase(t *testing.T) {
+	dir := tspath.NormalizePath(t.TempDir())
+	upper := tspath.ResolvePath(dir, "Source.ts")
+	lower := tspath.ResolvePath(dir, "source.ts")
+	fsys := &caseInsensitiveTypeCheckFS{
+		FS: bundled.WrapFS(cachedvfs.From(osvfs.FS())),
+		realPaths: map[string]string{
+			upper: upper,
+			lower: lower,
+		},
+	}
+	host := utils.CreateCompilerHost(dir, fsys)
+	program, err := utils.CreateProgramFromOptionsLenient(true, &core.CompilerOptions{}, nil, host)
+	if err != nil {
+		t.Fatalf("CreateProgramFromOptionsLenient: %v", err)
+	}
+	if typeCheckFilesystemPathID(program, upper) == typeCheckFilesystemPathID(program, lower) {
+		t.Fatalf("distinct canonical paths must retain exact identity: upper=%q lower=%q", upper, lower)
 	}
 }
 

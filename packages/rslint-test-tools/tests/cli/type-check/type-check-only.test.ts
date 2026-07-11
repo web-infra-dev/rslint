@@ -8,7 +8,7 @@ import { runRslint, createTempDir, cleanupTempDir, TS_CONFIG } from './helpers';
 //   1. Type-check-only skips the lint phase entirely (no rule diagnostics,
 //      no lint-file count) while still running Phase 2 type-check.
 //   2. `--fix` and `--rule` are rejected because the lint phase is gone.
-//   3. Lint-phase per-file warnings ("X was not found in the project" and
+//   3. Lint-phase per-file warnings ("X was not found" and
 //      "X is ignored because of a matching ignore pattern") are suppressed
 //      in --type-check-only — they describe a phase that didn't run, and
 //      Phase 2 itself ignores rslint's `ignores`/scope.
@@ -165,10 +165,10 @@ describe('--type-check-only flag compatibility', () => {
 });
 
 describe('--type-check-only suppresses lint-phase warnings', () => {
-  test('"was not found in the project" warning is suppressed', async () => {
-    // A CLI-specified file outside every program is a lint-phase concept
-    // (it would mean "Phase 1 has nothing to do"). Phase 2 is program-wide
-    // and unaffected, so the warning is noise in --type-check-only.
+  test('"was not found" warning is suppressed', async () => {
+    // A missing CLI-specified file is a lint-phase warning. Phase 2 is
+    // program-wide and unaffected, so the warning is noise in
+    // --type-check-only.
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': makeConfigPlain(),
@@ -179,7 +179,7 @@ describe('--type-check-only suppresses lint-phase warnings', () => {
         ['--type-check-only', 'nonexistent.ts'],
         tempDir,
       );
-      expect(r.stderr).not.toContain('not found in the project');
+      expect(r.stderr).not.toContain('was not found');
       expect(r.stderr).not.toContain('nonexistent.ts');
     } finally {
       await cleanupTempDir(tempDir);
@@ -253,7 +253,7 @@ describe('--type-check (non-only) does not short-circuit on Phase 2 diagnostics'
       // And the lint-side "not found" warning still fires in --type-check
       // (non-only) mode — only --type-check-only suppresses it.
       expect(r.stderr).toContain('nonexistent.ts');
-      expect(r.stderr).toContain('not found in the project');
+      expect(r.stderr).toContain('was not found');
     } finally {
       await cleanupTempDir(tempDir);
     }
