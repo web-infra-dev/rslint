@@ -59,14 +59,38 @@ func TestInitDefaultConfig_JSProject_CJSPackage(t *testing.T) {
 }
 
 func TestInitDefaultConfig_AlreadyExists(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "rslint.config.ts"), "")
+	for _, name := range []string{
+		"rslint.config.js",
+		"rslint.config.mjs",
+		"rslint.config.ts",
+		"rslint.config.mts",
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, name), "")
 
-	err := InitDefaultConfig(dir)
-	if err == nil {
-		t.Error("Expected error when JS/TS config already exists")
+			err := InitDefaultConfig(dir)
+			if err == nil {
+				t.Fatal("expected error when a JS/TS config already exists")
+			}
+			assertContains(t, err.Error(), "config file already exists")
+		})
 	}
-	assertContains(t, err.Error(), "config file already exists")
+}
+
+func TestInitDefaultConfig_NonDiscoverableJSConfigDoesNotBlock(t *testing.T) {
+	for _, name := range []string{"rslint.config.cjs", "rslint.config.cts"} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeFile(t, filepath.Join(dir, name), "")
+
+			if err := InitDefaultConfig(dir); err != nil {
+				t.Fatalf("non-discoverable config should not block initialization: %v", err)
+			}
+			assertFileExists(t, filepath.Join(dir, "rslint.config.mjs"))
+			assertFileExists(t, filepath.Join(dir, name))
+		})
+	}
 }
 
 // --- Migration branch tests ---
@@ -1265,6 +1289,17 @@ func TestMigrate_RulesOrderDeterministic(t *testing.T) {
 	}
 }
 
+func TestBuildOverrideFieldsPreservesFilesAndGroups(t *testing.T) {
+	entry := ConfigEntry{
+		Files:             []string{"special.ts"},
+		FilePatternGroups: [][]string{{"**/*.js", "!**/*.test.js"}},
+	}
+	got := buildOverrideFields(entry, nil, false)
+	if !strings.Contains(got, "files: ['special.ts', ['**/*.js', '!**/*.test.js']]") {
+		t.Fatalf("expected mixed files selectors in generated override, got:\n%s", got)
+	}
+}
+
 func TestMigrate_EmptyIgnoresArray_Dropped(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "rslint.json"), `[{
@@ -1496,7 +1531,7 @@ func TestDeduplicateRules_AllMatch(t *testing.T) {
 
 func TestDeduplicateRules_NoneMatch(t *testing.T) {
 	user := Rules{
-		"no-console":                            "warn",
+		"no-console": "warn",
 		"@typescript-eslint/no-floating-promises": "warn",
 	}
 	result := deduplicateRules(user, tsRecommendedRules)
@@ -1507,9 +1542,9 @@ func TestDeduplicateRules_NoneMatch(t *testing.T) {
 
 func TestDeduplicateRules_Mixed(t *testing.T) {
 	user := Rules{
-		"@typescript-eslint/no-namespace":     "error", // match → strip
-		"@typescript-eslint/no-explicit-any":  "warn",  // differs → keep
-		"no-console":                          "warn",  // not in preset → keep
+		"@typescript-eslint/no-namespace":    "error", // match → strip
+		"@typescript-eslint/no-explicit-any": "warn",  // differs → keep
+		"no-console":                         "warn",  // not in preset → keep
 	}
 	result := deduplicateRules(user, tsRecommendedRules)
 	if len(result) != 2 {

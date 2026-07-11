@@ -37,8 +37,8 @@ type queuedModule struct {
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/no-cycle.js
 var NoCycleRule = rule.Rule{
 	Name: "import/no-cycle",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts := parseOptions(options)
+	Run: func(ctx rule.RuleContext, newOptions []any) rule.RuleListeners {
+		opts := parseOptions(rule.LegacyUnwrapOptions(newOptions))
 		checkSourceFile(ctx, opts)
 		return rule.RuleListeners{}
 	},

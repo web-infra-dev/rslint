@@ -23,7 +23,7 @@ const errorMessage = "No access key attribute allowed. Inconsistencies between k
 
 var NoAccessKeyRule = rule.Rule{
 	Name: "jsx-a11y/no-access-key",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		check := func(node *ast.Node) {
 			attrs := reactutil.GetJsxElementAttributes(node)
 			accessKeyAttr := jsxa11yutil.FindAttributeByName(attrs, "accesskey")

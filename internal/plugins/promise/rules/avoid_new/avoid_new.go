@@ -14,7 +14,7 @@ const skipTransparent = ast.OEKParentheses
 
 var AvoidNewRule = rule.Rule{
 	Name: "promise/avoid-new",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				callee := ast.SkipOuterExpressions(node.AsNewExpression().Expression, skipTransparent)

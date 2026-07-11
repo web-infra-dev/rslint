@@ -190,7 +190,7 @@ func isRedundantSuperCall(statements []*ast.Node, params []*ast.Node) bool {
 
 var NoUselessConstructorRule = rule.CreateRule(rule.Rule{
 	Name: "no-useless-constructor",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {
 				constructor := node.AsConstructorDeclaration()

@@ -69,7 +69,7 @@ func isNegativeZero(node *ast.Node) bool {
 // NoCompareNegZeroRule disallows comparisons to negative zero
 var NoCompareNegZeroRule = rule.Rule{
 	Name: "no-compare-neg-zero",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Define the operators we want to check
 		operatorsToCheck := map[ast.Kind]bool{
 			ast.KindGreaterThanToken:             true, // >

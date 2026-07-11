@@ -91,6 +91,14 @@ ruleTester.run('no-undef', {
     '/*global a, b*/ a = 1; b = 2;',
     '/*global myVar:writable*/ myVar = 1;',
 
+    // === languageOptions.globals ===
+    {
+      code: 'configuredReadonly; configuredFalse;',
+      languageOptions: {
+        globals: { configuredReadonly: 'readonly', configuredFalse: false },
+      },
+    },
+
     // === Namespace ===
     'namespace MyNS { export var x = 1; } MyNS.x;',
 

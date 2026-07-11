@@ -91,7 +91,7 @@ func hasTrailingComma(sourceText string, lastArgEnd, callEnd int) bool {
 // https://eslint.org/docs/latest/rules/radix
 var RadixRule = rule.Rule{
 	Name: "radix",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

@@ -168,7 +168,7 @@ func TestVfsAdapter_SymlinksSkippedByDefault(t *testing.T) {
 	assert.Assert(t, hasReal, "regular files must still be returned")
 }
 
-// Opt-in vfsAdapter (followSymlinks=true) follows symlinks but dedupes cycles.
+// Opt-in vfsAdapter (followSymlinks=true) follows symlinks but skips cycles.
 // This is what loader.expandProjectGlob uses (single-threaded).
 func TestVfsAdapter_SymlinkCycleFilteredWhenFollowing(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -179,7 +179,8 @@ func TestVfsAdapter_SymlinkCycleFilteredWhenFollowing(t *testing.T) {
 
 	adapter := &vfsAdapter{vfs: osvfs.FS(), root: tmpDir, followSymlinks: true}
 
-	// Open "a" and read its entries — first encounter of the symlink is kept.
+	// The target is already an ancestor of "a", so entering the symlink would
+	// create a cycle immediately.
 	f, err := adapter.Open("a")
 	assert.NilError(t, err)
 	defer f.Close()
@@ -193,36 +194,155 @@ func TestVfsAdapter_SymlinkCycleFilteredWhenFollowing(t *testing.T) {
 			hasLoop = true
 		}
 	}
-	assert.Assert(t, hasLoop, "first encounter of symlink should be included")
+	assert.Assert(t, !hasLoop, "symlink target already in the ancestor chain must be skipped")
+}
 
-	// Open "a/loop" (resolves to tmpDir) and read its entries.
-	f2, err := adapter.Open("a/loop")
-	assert.NilError(t, err)
-	defer f2.Close()
+type vfsAdapterMockFS struct {
+	vfs.FS
+	entries         map[string]vfs.Entries
+	resolvedPaths   map[string]string
+	realpathCalls   []string
+	caseSensitiveFS bool
+}
 
-	entries2, err := f2.(fs.ReadDirFile).ReadDir(-1)
-	assert.NilError(t, err)
+func (m *vfsAdapterMockFS) GetAccessibleEntries(path string) vfs.Entries {
+	return m.entries[path]
+}
 
-	hasA := false
-	for _, e := range entries2 {
-		if e.Name() == "a" {
-			hasA = true
-		}
+func (m *vfsAdapterMockFS) Realpath(path string) string {
+	m.realpathCalls = append(m.realpathCalls, path)
+	if realpath, ok := m.resolvedPaths[path]; ok {
+		return realpath
 	}
-	assert.Assert(t, hasA, "should see 'a' directory inside the symlink target")
+	return path
+}
 
-	// Open a/loop/a — second encounter of the cycle target → deduped.
-	f3, err := adapter.Open("a/loop/a")
+func (m *vfsAdapterMockFS) UseCaseSensitiveFileNames() bool {
+	return m.caseSensitiveFS
+}
+
+func TestVfsAdapter_UsesSymlinkMetadataBeforeRealpath(t *testing.T) {
+	for _, followSymlinks := range []bool{false, true} {
+		t.Run(map[bool]string{false: "skip", true: "follow"}[followSymlinks], func(t *testing.T) {
+			mock := &vfsAdapterMockFS{
+				FS: osvfs.FS(),
+				entries: map[string]vfs.Entries{
+					"/repo": {
+						Directories: []string{"link", "regular"},
+						Symlinks:    map[string]struct{}{"link": {}},
+					},
+				},
+				resolvedPaths: map[string]string{"/repo/link": "/target"},
+			}
+			adapter := &vfsAdapter{vfs: mock, root: "/repo", followSymlinks: followSymlinks}
+
+			file, err := adapter.Open(".")
+			assert.NilError(t, err)
+			entries, err := file.(fs.ReadDirFile).ReadDir(-1)
+			assert.NilError(t, err)
+
+			names := make([]string, 0, len(entries))
+			for _, entry := range entries {
+				names = append(names, entry.Name())
+			}
+			if followSymlinks {
+				assert.DeepEqual(t, names, []string{"link", "regular"})
+				assert.DeepEqual(t, mock.realpathCalls, []string{"/repo/link", "/repo"})
+			} else {
+				assert.DeepEqual(t, names, []string{"regular"})
+				assert.Equal(t, len(mock.realpathCalls), 0)
+			}
+		})
+	}
+}
+
+func TestVfsAdapter_FollowSymlinksKeepsDistinctAliasesToSameTarget(t *testing.T) {
+	mock := &vfsAdapterMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			"/repo": {
+				Directories: []string{"alias-a", "alias-b"},
+				Symlinks: map[string]struct{}{
+					"alias-a": {},
+					"alias-b": {},
+				},
+			},
+		},
+		resolvedPaths: map[string]string{
+			"/repo":         "/repo",
+			"/repo/alias-a": "/shared",
+			"/repo/alias-b": "/shared",
+		},
+	}
+	adapter := &vfsAdapter{vfs: mock, root: "/repo", followSymlinks: true}
+
+	file, err := adapter.Open(".")
 	assert.NilError(t, err)
-	defer f3.Close()
+	entries, err := file.(fs.ReadDirFile).ReadDir(-1)
+	assert.NilError(t, err)
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	assert.DeepEqual(t, names, []string{"alias-a", "alias-b"})
+}
 
-	entries3, err := f3.(fs.ReadDirFile).ReadDir(-1)
+func TestVfsAdapter_RealpathFallbackIsCached(t *testing.T) {
+	mock := &vfsAdapterMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			"/repo":       {Directories: []string{"child"}},
+			"/repo/child": {Directories: []string{"grandchild"}},
+		},
+	}
+	adapter := &vfsAdapter{vfs: mock, root: "/repo"}
+
+	root, err := adapter.Open(".")
+	assert.NilError(t, err)
+	_, err = root.(fs.ReadDirFile).ReadDir(-1)
 	assert.NilError(t, err)
 
-	for _, e := range entries3 {
-		if e.Name() == "loop" {
-			t.Fatal("symlink cycle should have been deduped on second encounter")
-		}
+	child, err := adapter.Open("child")
+	assert.NilError(t, err)
+	_, err = child.(fs.ReadDirFile).ReadDir(-1)
+	assert.NilError(t, err)
+
+	assert.DeepEqual(t, mock.realpathCalls, []string{
+		"/repo",
+		"/repo/child",
+		"/repo/child/grandchild",
+	})
+}
+
+func TestVfsAdapter_RealpathFallbackJoinsFilesystemRoots(t *testing.T) {
+	tests := []struct {
+		name      string
+		root      string
+		childPath string
+	}{
+		{name: "posix", root: "/", childPath: "/child"},
+		{name: "drive", root: "C:/", childPath: "C:/child"},
+		{name: "unc", root: "//server/share/", childPath: "//server/share/child"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := &vfsAdapterMockFS{
+				FS: osvfs.FS(),
+				entries: map[string]vfs.Entries{
+					test.root: {Directories: []string{"child"}},
+				},
+			}
+			adapter := &vfsAdapter{vfs: mock, root: test.root}
+
+			file, err := adapter.Open(".")
+			assert.NilError(t, err)
+			entries, err := file.(fs.ReadDirFile).ReadDir(-1)
+			assert.NilError(t, err)
+			assert.Equal(t, len(entries), 1)
+			assert.Equal(t, entries[0].Name(), "child")
+			assert.DeepEqual(t, mock.realpathCalls, []string{test.root, test.childPath})
+		})
 	}
 }
 
@@ -240,6 +360,10 @@ func TestVfsDirEntry_TypeAndInfo(t *testing.T) {
 	fileEntry := &vfsDirEntry{name: "file.txt", isDir: false}
 	assert.Assert(t, !fileEntry.IsDir())
 	assert.Equal(t, fileEntry.Type(), fs.FileMode(0))
+
+	symlinkEntry := &vfsDirEntry{name: "link.ts", isSymlink: true}
+	assert.Assert(t, !symlinkEntry.IsDir())
+	assert.Equal(t, symlinkEntry.Type(), fs.ModeSymlink)
 }
 
 // spyVFS wraps a real VFS and counts DirectoryExists calls.

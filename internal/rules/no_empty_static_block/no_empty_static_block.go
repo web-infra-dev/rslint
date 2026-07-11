@@ -9,7 +9,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-empty-static-block
 var NoEmptyStaticBlockRule = rule.Rule{
 	Name: "no-empty-static-block",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindClassStaticBlockDeclaration: func(node *ast.Node) {
 				staticBlock := node.AsClassStaticBlockDeclaration()

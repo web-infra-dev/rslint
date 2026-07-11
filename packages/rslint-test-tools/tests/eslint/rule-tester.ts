@@ -1,9 +1,12 @@
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
+import type { RslintConfigEntry } from '@rslint/core';
 import { lint, type LintResponse } from '@rslint/core/internal';
 import assert from 'node:assert';
 
 import { buildConfigForSettings } from '../src/util/load-test-config';
+
+type TestLanguageOptions = NonNullable<RslintConfigEntry['languageOptions']>;
 
 interface TsDiagnostic {
   line?: number;
@@ -58,6 +61,7 @@ export type ValidTestCase =
   | {
       code: string;
       options?: Record<string, unknown>;
+      languageOptions?: TestLanguageOptions;
       only?: boolean;
       skip?: boolean;
     };
@@ -66,6 +70,7 @@ export interface InvalidTestCase {
   code: string;
   errors: TsDiagnostic[];
   options?: Record<string, unknown>;
+  languageOptions?: TestLanguageOptions;
   only?: boolean;
   skip?: boolean;
 }
@@ -116,6 +121,10 @@ export class RuleTester {
             typeof validCase === 'string' ? validCase : validCase.code;
           const options =
             typeof validCase === 'object' ? validCase.options : undefined;
+          const languageOptions =
+            typeof validCase === 'object'
+              ? validCase.languageOptions
+              : undefined;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
           const { config: resolvedConfig, configDirectory } =
@@ -129,6 +138,7 @@ export class RuleTester {
             config: [
               ...resolvedConfig,
               {
+                ...(languageOptions ? { languageOptions } : {}),
                 rules: {
                   [ruleName]:
                     ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',
@@ -152,7 +162,7 @@ export class RuleTester {
           if (item.skip) continue;
           if (hasOnly && !item.only) continue;
 
-          const { code, errors, options } = item;
+          const { code, errors, options, languageOptions } = item;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
           const { config: resolvedConfig, configDirectory } =
@@ -166,6 +176,7 @@ export class RuleTester {
             config: [
               ...resolvedConfig,
               {
+                ...(languageOptions ? { languageOptions } : {}),
                 rules: {
                   [ruleName]:
                     ruleArgs.length > 0 ? ['error', ...ruleArgs] : 'error',

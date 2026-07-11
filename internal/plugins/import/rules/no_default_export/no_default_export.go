@@ -30,7 +30,7 @@ func noAliasDefaultMessage(local string) rule.RuleMessage {
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/src/rules/no-default-export.js
 var NoDefaultExportRule = rule.Rule{
 	Name: "import/no-default-export",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
 		reportDefaultExport := func(node *ast.Node) {
 			ctx.ReportRange(defaultKeywordRange(ctx.SourceFile, node), preferNamedMessage())
 		}

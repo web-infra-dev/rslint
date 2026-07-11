@@ -320,6 +320,16 @@ function runRslintChunk(
       const d = JSON.parse(t) as RslintDiag;
       const idx = fileToIndex.get(d.filePath);
       if (idx === undefined) continue;
+      // Compare only the community-plugin rule under test for this fixture.
+      // Native rslint infrastructure diagnostics indicate a bad harness setup;
+      // unrelated rule diagnostics from the same file are ignored for this case.
+      if (d.ruleName.startsWith('rslint/')) {
+        throw new Error(
+          `rslint infrastructure diagnostic for ${d.filePath}: ${d.ruleName}: ${d.message}`,
+        );
+      }
+      const c = cases[idx];
+      if (d.ruleName !== `${aliasFor(c.pkg)}/${c.rule}`) continue;
       byIndex.get(idx)!.push(normRslint(d));
     }
   } finally {

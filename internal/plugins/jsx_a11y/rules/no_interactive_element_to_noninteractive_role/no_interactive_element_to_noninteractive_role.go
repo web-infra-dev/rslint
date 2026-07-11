@@ -91,7 +91,8 @@ func parseOptions(raw any) options {
 
 var NoInteractiveElementToNoninteractiveRoleRule = rule.Rule{
 	Name: "jsx-a11y/no-interactive-element-to-noninteractive-role",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		return rule.RuleListeners{

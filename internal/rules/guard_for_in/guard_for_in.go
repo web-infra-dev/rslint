@@ -8,7 +8,7 @@ import (
 // https://eslint.org/docs/latest/rules/guard-for-in
 var GuardForInRule = rule.Rule{
 	Name: "guard-for-in",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindForInStatement: func(node *ast.Node) {
 				if isGuarded(node.AsForInOrOfStatement().Statement) {

@@ -43,6 +43,21 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 	return createProgramFromConfig(singleThreaded, configParseResult, host)
 }
 
+// CreateProgramLenient creates a tsconfig-backed Program but tolerates
+// syntactic errors. CLI/API plain lint uses this so the final lint target set
+// decides which syntax diagnostics are user-visible; type-check modes still
+// report diagnostics from the tsconfig-backed Program boundary.
+func CreateProgramLenient(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
+	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
+	if !fs.FileExists(resolvedConfigPath) {
+		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
+	}
+
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
+
+	return createProgramFromConfigLenient(singleThreaded, configParseResult, host)
+}
+
 // CreateProgramFromOptions creates a program from in-memory compiler options and root file names,
 // without requiring a tsconfig file on disk.
 func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
@@ -63,8 +78,12 @@ func CreateProgramFromOptionsLenient(singleThreaded bool, compilerOptions *core.
 		CurrentDirectory:          host.GetCurrentDirectory(),
 	})
 
+	return createProgramFromConfigLenient(singleThreaded, configParseResult, host)
+}
+
+func createProgramFromConfigLenient(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
 	opts := compiler.ProgramOptions{
-		Config:         configParseResult,
+		Config:         config,
 		SingleThreaded: core.TSTrue,
 		Host:           host,
 	}

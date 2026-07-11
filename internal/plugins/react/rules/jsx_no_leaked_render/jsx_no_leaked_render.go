@@ -74,7 +74,8 @@ func hasStrategy(list []string, s string) bool {
 
 var JsxNoLeakedRenderRule = rule.Rule{
 	Name: "react/jsx-no-leaked-render",
-	Run: func(ctx rule.RuleContext, raw any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _raw []any) rule.RuleListeners {
+		raw := rule.LegacyUnwrapOptions(_raw)
 		opts := parseOptions(raw)
 		var fixStrategy string
 		if len(opts.validStrategies) > 0 {
@@ -561,4 +562,3 @@ func isLiteralLike(n *ast.Node) bool {
 	}
 	return false
 }
-

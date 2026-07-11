@@ -13,7 +13,7 @@ import (
 // https://eslint.org/docs/latest/rules/prefer-template
 var PreferTemplateRule = rule.Rule{
 	Name: "prefer-template",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Tracks concat chains already reported, keyed by the top binary
 		// expression's position, so nested literals don't double-report.
 		reported := map[int]bool{}

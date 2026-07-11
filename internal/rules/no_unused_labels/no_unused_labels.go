@@ -90,7 +90,7 @@ func isFixable(ctx rule.RuleContext, node *ast.Node) bool {
 // https://eslint.org/docs/latest/rules/no-unused-labels
 var NoUnusedLabelsRule = rule.Rule{
 	Name: "no-unused-labels",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		var scopeInfo *labelScope
 
 		enterLabeledScope := func(node *ast.Node) {

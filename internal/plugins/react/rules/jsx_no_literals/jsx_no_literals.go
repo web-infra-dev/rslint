@@ -27,15 +27,15 @@ const (
 )
 
 const (
-	msgInvalidPropValue                  = "invalidPropValue"
-	msgInvalidPropValueInElement         = "invalidPropValueInElement"
-	msgNoStringsInAttributes             = "noStringsInAttributes"
-	msgNoStringsInAttributesInElement    = "noStringsInAttributesInElement"
-	msgNoStringsInJSX                    = "noStringsInJSX"
-	msgNoStringsInJSXInElement           = "noStringsInJSXInElement"
-	msgLiteralNotInJSXExpression         = "literalNotInJSXExpression"
+	msgInvalidPropValue                   = "invalidPropValue"
+	msgInvalidPropValueInElement          = "invalidPropValueInElement"
+	msgNoStringsInAttributes              = "noStringsInAttributes"
+	msgNoStringsInAttributesInElement     = "noStringsInAttributesInElement"
+	msgNoStringsInJSX                     = "noStringsInJSX"
+	msgNoStringsInJSXInElement            = "noStringsInJSXInElement"
+	msgLiteralNotInJSXExpression          = "literalNotInJSXExpression"
 	msgLiteralNotInJSXExpressionInElement = "literalNotInJSXExpressionInElement"
-	msgRestrictedAttributeString         = "restrictedAttributeString"
+	msgRestrictedAttributeString          = "restrictedAttributeString"
 	msgRestrictedAttributeStringInElement = "restrictedAttributeStringInElement"
 )
 
@@ -700,7 +700,8 @@ func handleTemplate(ctx rule.RuleContext, node *ast.Node, cfg *ruleConfig, renam
 
 var JsxNoLiteralsRule = rule.Rule{
 	Name: "react/jsx-no-literals",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		cfg := parseConfig(options)
 		var renamedImports map[string]string
 		if cfg.hasElementOverrides() {

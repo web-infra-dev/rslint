@@ -432,8 +432,9 @@ func BuildRule(name string) rule.Rule {
 	}
 }
 
-func makeRun() func(rule.RuleContext, any) rule.RuleListeners {
-	return func(ctx rule.RuleContext, raw any) rule.RuleListeners {
+func makeRun() func(rule.RuleContext, []any) rule.RuleListeners {
+	return func(ctx rule.RuleContext, _raw []any) rule.RuleListeners {
+		raw := rule.LegacyUnwrapOptions(_raw)
 		opts := parseOptions(raw)
 		text := ctx.SourceFile.Text()
 

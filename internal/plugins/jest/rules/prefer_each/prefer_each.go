@@ -27,7 +27,7 @@ func recommendFn(jestFnCalls []jestUtils.JestFnType) string {
 
 var PreferEachRule = rule.Rule{
 	Name: "jest/prefer-each",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		jestFnCalls := make([]jestUtils.JestFnType, 0, 4)
 		inTestCaseCall := false
 

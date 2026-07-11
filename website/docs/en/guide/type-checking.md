@@ -28,7 +28,7 @@ rslint --type-check .         # lint + type-check
 rslint --type-check-only .    # type-check only
 ```
 
-Without `parserOptions.project` no TypeScript program is built and type-check produces no diagnostics.
+When `parserOptions.project` is omitted, rslint uses `tsconfig.json` in the governing config directory when present. If neither configured projects nor that fallback tsconfig exist, no real TypeScript Program is built and type-check produces no diagnostics for that config.
 
 ## What gets type-checked
 
@@ -44,9 +44,9 @@ parserOptions: {
 }
 ```
 
-Each entry produces one TypeScript program. Type-check runs over every program independently.
+Each normalized declared tsconfig path in the effective loaded config catalog produces one TypeScript Program, even when multiple rslint configs reference that path. Parent global ignores can prevent a nested config from entering that catalog during directory discovery. File-symlink declarations remain distinct because TypeScript resolves relative paths from the declared location. Rslint retains every config association and project declaration order for lint-rule binding. Type-check runs over every real Program independently.
 
-**The type-check scope is each tsconfig's `include` / `files` minus `exclude` — nothing in your rslint config or on the CLI changes it.** Specifically, the following are **lint-phase concepts** that do **not** affect type-check scope:
+**After the effective config catalog is established, each Program's type-check scope is its tsconfig `include` / `files` minus `exclude`.** The following lint-phase concepts do not filter that Program scope:
 
 - rslint config's `files` patterns
 - rslint config's `ignores` patterns (root-level or per-entry)
@@ -57,7 +57,7 @@ If a file is included by tsconfig but matched by rslint `ignores`, lint rules do
 
 ### Gap files
 
-Files that match your rslint config's `files` pattern but are **not** in any tsconfig (root-level scripts, ad-hoc config files, etc.) are called _gap files_. Syntactic lint rules still run on them, but type-check skips them — semantic type information requires tsconfig coverage. To enable type-check for a gap file, add it to an existing tsconfig's `include` or create a dedicated tsconfig that covers it.
+Selected files that are **not** present in any tsconfig Program declared by their governing config (root-level scripts, ad-hoc config files, etc.) are called _gap files_. They receive a non-project-backed fallback Program, so rules that do not require type information still run while type-aware rules do not. The program-wide type-check phase also skips the fallback. To enable type information, add the file to one of the governing config's tsconfigs or declare a dedicated project there.
 
 ## Output
 
@@ -159,7 +159,7 @@ rslint --type-check-only .
 | `--type-check`      |     ✓      |        ✓         |                      no                      |
 | `--type-check-only` |     ✗      |        ✓         |                     yes                      |
 
-<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found in the project, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, when in fact Phase 2 is independent of CLI scope and rslint ignores (see [What gets type-checked](#what-gets-type-checked)).
+<sup>\*</sup> The lint phase emits per-file stderr warnings like `<file> was not found, skipping` and `<file> is ignored because of a matching ignore pattern`. In `--type-check-only` the lint phase doesn't run, so these are suppressed — they would otherwise mislead users into thinking the file wasn't type-checked, when in fact Phase 2 is independent of CLI scope and rslint ignores (see [What gets type-checked](#what-gets-type-checked)).
 
 ## Flag matrix
 

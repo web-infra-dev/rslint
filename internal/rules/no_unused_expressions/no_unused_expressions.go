@@ -16,7 +16,8 @@ func messageUnusedExpression() rule.RuleMessage {
 // https://eslint.org/docs/latest/rules/no-unused-expressions
 var NoUnusedExpressionsRule = rule.Rule{
 	Name: "no-unused-expressions",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := utils.ParseNoUnusedExpressionOptions(rawOptions)
 
 		return rule.RuleListeners{

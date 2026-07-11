@@ -39,7 +39,8 @@ func parseOptions(options any) ruleOptions {
 // See: https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-duplicates.md
 var NoDuplicatesRule = rule.Rule{
 	Name: "import/no-duplicates",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		sourceFile := ctx.SourceFile

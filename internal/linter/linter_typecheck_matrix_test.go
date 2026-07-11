@@ -305,8 +305,8 @@ export type T = typeof M;
 
 // Inverse control: BOTH programs skipLibCheck:true → ZERO TS2307 reported.
 // Together with the previous test this proves:
-//   1. the d.ts genuinely has the error (program A in the previous test reported it),
-//   2. when ALL programs containing it have skipLibCheck:true, none reports.
+//  1. the d.ts genuinely has the error (program A in the previous test reported it),
+//  2. when ALL programs containing it have skipLibCheck:true, none reports.
 func TestMatrix_MultiProgram_BothSkipLibCheck_NoDtsErrors(t *testing.T) {
 	root := t.TempDir()
 	writeFiles(t, root, map[string]string{
@@ -438,11 +438,8 @@ export type T = typeof M;
 	assertExactDiagCount(t, diags, 1)
 }
 
-// === TypeInfoFiles gate as backstop ===
-//
-// Baseline + with-gate: same source, same program. Without the gate, TS2322
-// appears. With TypeInfoFiles excluding the file, the diagnostic is dropped.
-func TestMatrix_TypeInfoFiles_GateActsAsBackstopForGapFiles(t *testing.T) {
+// === TypeInfoFiles is lint-phase only ===
+func TestMatrix_TypeInfoFilesDoesNotRestrictTypeCheck(t *testing.T) {
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
 		"a.ts":          "const x: number = 'oops';\n",
@@ -475,9 +472,10 @@ func TestMatrix_TypeInfoFiles_GateActsAsBackstopForGapFiles(t *testing.T) {
 	assertOneDiag(t, baseline, "TS2322", "a.ts", 1, 7)
 	assertExactDiagCount(t, baseline, 1)
 
-	// Gate that excludes a.ts → 0.
+	// Excluding a.ts from lint type-info does not narrow program-wide type-check.
 	gated := collect(map[string]struct{}{"/some/other/file.ts": {}})
-	assertExactDiagCount(t, gated, 0)
+	assertOneDiag(t, gated, "TS2322", "a.ts", 1, 7)
+	assertExactDiagCount(t, gated, 1)
 
 	// Gate that includes a.ts → still 1 (the gate is a positive set).
 	included := collect(map[string]struct{}{program.GetSourceFile(filepath.Join(dir, "a.ts")).FileName(): {}})
@@ -490,6 +488,7 @@ func TestMatrix_TypeInfoFiles_GateActsAsBackstopForGapFiles(t *testing.T) {
 // Same source loaded by two programs with different strictness:
 //   - strict program reports TS7006 (param `x` implicitly any) at col 21
 //   - loose program reports nothing
+//
 // Across both, exactly 1 TS7006 should reach the consumer. Asserts the
 // dedup keeps strict's report and that the loose program's silence does
 // not override it.

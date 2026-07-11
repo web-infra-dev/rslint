@@ -52,7 +52,7 @@ func staticJestTitleValue(arg *ast.Node) (string, bool) {
 
 var NoIdenticalTitleRule = rule.Rule{
 	Name: "jest/no-identical-title",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		contexts := []*titleLayer{newTitleLayer()}
 
 		return rule.RuleListeners{

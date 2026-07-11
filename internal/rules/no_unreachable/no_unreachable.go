@@ -90,7 +90,7 @@ func isVarWithoutInitializer(node *ast.Node) bool {
 // NoUnreachableRule disallows unreachable code after return, throw, break, and continue statements.
 var NoUnreachableRule = rule.Rule{
 	Name: "no-unreachable",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "unreachableCode",
 			Description: "Unreachable code.",

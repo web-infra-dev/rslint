@@ -47,7 +47,9 @@ func ParseCLIRuleFlag(input string) (string, interface{}, error) {
 }
 
 // BuildCLIRuleEntry converts a list of --rule flag values into a synthetic
-// ConfigEntry with no Files field (matches all files). Returns nil if flags is empty.
+// ConfigEntry with no Files field. It overlays the already-selected lint
+// targets; target discovery remains owned by CLI/API target + files matching.
+// Returns nil if flags is empty.
 func BuildCLIRuleEntry(flags []string) (*ConfigEntry, error) {
 	if len(flags) == 0 {
 		return nil, nil //nolint:nilnil // no flags means no entry, not an error

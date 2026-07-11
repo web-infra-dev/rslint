@@ -112,7 +112,8 @@ func skipParensUp(node *ast.Node) *ast.Node {
 // https://eslint.org/docs/latest/rules/no-extend-native
 var NoExtendNativeRule = rule.Rule{
 	Name: "no-extend-native",
-	Run: func(ctx rule.RuleContext, opts any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _opts []any) rule.RuleListeners {
+		opts := rule.LegacyUnwrapOptions(_opts)
 		o := parseOptions(opts)
 
 		return rule.RuleListeners{

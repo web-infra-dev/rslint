@@ -284,7 +284,7 @@ func isDefinitionFile(fileName string) bool {
 
 var NoUselessEmptyExportRule = rule.CreateRule(rule.Rule{
 	Name: "no-useless-empty-export",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// In a definition file, export {} is necessary to make the module properly
 		// encapsulated, even when there are other exports
 		if isDefinitionFile(ctx.SourceFile.FileName()) {

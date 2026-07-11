@@ -2,7 +2,7 @@
 /**
  * Severity level for a rule.
  */
-export type RuleSeverity = 'off' | 'warn' | 'error';
+export type RuleSeverity = 'off' | 'warn' | 'error' | 0 | 1 | 2;
 
 /**
  * Source of truth for the rule prefixes owned by rslint's built-in
@@ -63,18 +63,15 @@ export const NATIVE_PLUGIN_RESERVED_NAMES: ReadonlySet<string> = new Set([
 export type RuleOptions = Record<string, any>;
 
 /**
- * Configuration value accepted for a single rule.
+ * Configuration value accepted for a single rule. Aligned with ESLint —
+ * rslint's own `{ level, options }` object form has been removed.
  *
  * - `RuleSeverity` — just toggle the rule.
  * - `[RuleSeverity, ...args]` — ESLint-style array form. Most rules take a
  *   single options object (`[severity, { ... }]`); some accept positional
  *   string/object args (`[severity, "always", { ... }]`).
- * - `{ level, options }` — object form supported by the loader.
  */
-export type RuleEntry =
-  | RuleSeverity
-  | readonly [RuleSeverity, ...any[]]
-  | { level: RuleSeverity; options?: RuleOptions };
+export type RuleEntry = RuleSeverity | readonly [RuleSeverity, ...any[]];
 
 /**
  * Map of rule name → rule configuration. Rule names are `string` (no
@@ -108,7 +105,16 @@ export interface ParserOptions {
 /**
  * Access level for a declared global variable.
  */
-export type GlobalAccess = boolean | 'readonly' | 'writable' | 'off';
+export type GlobalAccess =
+  | boolean
+  | null
+  | 'true'
+  | 'false'
+  | 'readonly'
+  | 'readable'
+  | 'writable'
+  | 'writeable'
+  | 'off';
 
 /**
  * Map of global variable name to its access level.
@@ -125,10 +131,9 @@ export interface LanguageOptions {
   parserOptions?: ParserOptions;
   /**
    * Global variables available in this file's scope, e.g. from a browser
-   * or Node.js runtime. `'readonly'`/`true` allows reading; `'writable'`
-   * allows reassignment. Only the string `'off'` un-declares a global
-   * (undoes one a base config added) — `false` still declares it (as
-   * read-only), matching ESLint's own `normalizeConfigGlobal`.
+   * or Node.js runtime. `'readonly'`, `false`, and `null` allow reading;
+   * `'writable'` and `true` allow reassignment. Only the string `'off'`
+   * un-declares a global inherited from an earlier entry.
    *
    * @example
    * globals: { myGlobal: 'readonly' }
@@ -154,13 +159,17 @@ export interface ESLintPlugin {
  * different file globs and are merged at lint time.
  */
 export interface RslintConfigEntry {
+  /** Optional human-readable name for this config entry. */
+  name?: string;
   /**
-   * Glob patterns for files this entry applies to.
+   * Glob selectors for files this entry applies to. Top-level selectors are
+   * ORed; strings inside one nested array are ANDed, matching ESLint flat
+   * config semantics.
    *
    * @example
    * files: ['src/**', 'tests/**']
    */
-  files?: string[];
+  files?: Array<string | string[]>;
   /**
    * Glob patterns excluded from this entry.
    *

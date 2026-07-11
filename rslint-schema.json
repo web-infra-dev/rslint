@@ -4,7 +4,6 @@
   "title": "Rslint Configuration",
   "description": "Configuration file for Rslint - a high-performance TypeScript/JavaScript linter",
   "type": "array",
-  "minItems": 1,
   "items": {
     "$ref": "#/definitions/ConfigEntry"
   },
@@ -13,20 +12,29 @@
       "type": "object",
       "description": "A single configuration entry in the rslint.json array",
       "properties": {
-        "language": {
+        "name": {
           "type": "string",
-          "description": "Programming language for this configuration entry",
-          "enum": ["javascript"],
-          "default": "javascript"
+          "description": "Optional human-readable name for this configuration entry"
         },
         "files": {
           "type": "array",
-          "description": "Additional files to include beyond those specified in tsconfig.json",
+          "description": "Non-empty file selector list. Top-level selectors are ORed; patterns inside a nested array are ANDed. Rslint unions these selectors with its default JavaScript and TypeScript extension baseline.",
+          "minItems": 1,
           "items": {
-            "type": "string",
-            "description": "File pattern (glob) to include"
-          },
-          "default": []
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "File pattern (glob) to include"
+              },
+              {
+                "type": "array",
+                "description": "File patterns that must all match",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
         },
         "ignores": {
           "type": "array",
@@ -51,13 +59,25 @@
           "description": "List of plugin names to enable",
           "items": {
             "type": "string",
-            "enum": ["@typescript-eslint"]
+            "enum": [
+              "@typescript-eslint",
+              "import",
+              "jest",
+              "jsx-a11y",
+              "promise",
+              "react",
+              "react-hooks",
+              "unicorn"
+            ]
           },
           "uniqueItems": true,
           "examples": [["@typescript-eslint"]]
+        },
+        "settings": {
+          "type": "object",
+          "description": "Shared settings exposed to enabled rules"
         }
       },
-      "required": ["language"],
       "additionalProperties": false
     },
     "LanguageOptions": {
@@ -67,6 +87,28 @@
         "parserOptions": {
           "$ref": "#/definitions/ParserOptions",
           "description": "Parser-specific configuration options"
+        },
+        "globals": {
+          "type": "object",
+          "description": "Global variables available to rules for matching files. Null is readonly; \"off\" disables a global; all other accepted values declare it as readonly or writable.",
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "boolean" },
+              { "type": "null" },
+              {
+                "type": "string",
+                "enum": [
+                  "true",
+                  "writable",
+                  "writeable",
+                  "false",
+                  "readonly",
+                  "readable",
+                  "off"
+                ]
+              }
+            ]
+          }
         }
       },
       "additionalProperties": false
@@ -81,12 +123,20 @@
           "default": false
         },
         "project": {
-          "type": "array",
           "description": "TypeScript project configuration files to use for typed linting",
-          "items": {
-            "type": "string",
-            "description": "Path to tsconfig.json file"
-          },
+          "oneOf": [
+            {
+              "type": "string",
+              "description": "Path or glob for a tsconfig file"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "description": "Path or glob for a tsconfig file"
+              }
+            }
+          ],
           "examples": [
             ["./tsconfig.json"],
             ["./packages/*/tsconfig.json", "./tsconfig.base.json"]
@@ -260,44 +310,31 @@
       "description": "Rule configuration value",
       "oneOf": [
         {
-          "type": "string",
-          "enum": ["off", "warn", "error"],
-          "description": "Simple rule severity level"
+          "$ref": "#/definitions/RuleSeverity"
         },
         {
           "type": "array",
-          "description": "Array format rule configuration [severity, options]",
+          "description": "Array rule configuration [severity, ...positionalOptions]",
           "minItems": 1,
-          "maxItems": 2,
           "items": [
             {
-              "type": "string",
-              "enum": ["off", "warn", "error"],
-              "description": "Rule severity level"
-            },
-            {
-              "type": "object",
-              "description": "Rule-specific options",
-              "additionalProperties": true
+              "$ref": "#/definitions/RuleSeverity"
             }
-          ]
+          ],
+          "additionalItems": true
+        }
+      ]
+    },
+    "RuleSeverity": {
+      "description": "Rule severity: 0/off, 1/warn, or 2/error",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["off", "warn", "error"]
         },
         {
-          "type": "object",
-          "description": "Object format rule configuration",
-          "properties": {
-            "level": {
-              "type": "string",
-              "enum": ["off", "warn", "error"],
-              "description": "Rule severity level"
-            },
-            "options": {
-              "type": "object",
-              "description": "Rule-specific options",
-              "additionalProperties": true
-            }
-          },
-          "additionalProperties": false
+          "type": "integer",
+          "enum": [0, 1, 2]
         }
       ]
     }
@@ -305,8 +342,6 @@
   "examples": [
     [
       {
-        "language": "javascript",
-        "files": [],
         "ignores": ["node_modules/**", "dist/**", "*.test.ts"],
         "languageOptions": {
           "parserOptions": {

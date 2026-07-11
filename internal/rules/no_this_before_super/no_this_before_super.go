@@ -42,7 +42,6 @@ func isScopeBoundary(node *ast.Node) bool {
 	return node != nil && (ast.IsFunctionLikeDeclaration(node) || ast.IsClassLike(node))
 }
 
-
 // containsSuperCall checks if a node contains a super() call anywhere,
 // not crossing scope boundaries.
 func containsSuperCall(node *ast.Node) bool {
@@ -103,7 +102,7 @@ func bodyAlwaysExits(node *ast.Node) bool {
 // https://eslint.org/docs/latest/rules/no-this-before-super
 var NoThisBeforeSuperRule = rule.Rule{
 	Name: "no-this-before-super",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindConstructor: func(node *ast.Node) {
 				classNode := ast.GetContainingClass(node)

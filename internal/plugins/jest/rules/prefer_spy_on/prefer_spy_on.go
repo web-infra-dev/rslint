@@ -149,7 +149,7 @@ func buildSpyOnFixes(ctx rule.RuleContext, left *ast.Node, jestFnCall *ast.Node)
 
 var PreferSpyOnRule = rule.Rule{
 	Name: "jest/prefer-spy-on",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				if !ast.IsAssignmentExpression(node, false) {

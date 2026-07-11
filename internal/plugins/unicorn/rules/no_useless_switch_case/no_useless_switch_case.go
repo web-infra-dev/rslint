@@ -15,7 +15,7 @@ const (
 
 var NoUselessSwitchCaseRule = rule.Rule{
 	Name: "unicorn/no-useless-switch-case",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
 				switchStmt := node.AsSwitchStatement()

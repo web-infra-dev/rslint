@@ -67,7 +67,8 @@ func isBooleanType(t *checker.Type) bool {
 var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-boolean-literal-compare",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(NoUnnecessaryBooleanLiteralCompareOptions)
 		if !ok {
 			opts = NoUnnecessaryBooleanLiteralCompareOptions{}

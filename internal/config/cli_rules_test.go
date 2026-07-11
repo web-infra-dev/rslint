@@ -54,10 +54,10 @@ func TestParseCLIRuleFlag_WhitespaceVariations(t *testing.T) {
 		wantName string
 		wantVal  interface{}
 	}{
-		{"no-console:error", "no-console", "error"},           // no space after colon
-		{"no-console:  error", "no-console", "error"},         // multiple spaces after colon
-		{"  no-console  :  error  ", "no-console", "error"},   // leading/trailing spaces
-		{"no-console:\terror", "no-console", "error"},         // tab after colon
+		{"no-console:error", "no-console", "error"},                                                 // no space after colon
+		{"no-console:  error", "no-console", "error"},                                               // multiple spaces after colon
+		{"  no-console  :  error  ", "no-console", "error"},                                         // leading/trailing spaces
+		{"no-console:\terror", "no-console", "error"},                                               // tab after colon
 		{"@typescript-eslint/no-explicit-any:  warn", "@typescript-eslint/no-explicit-any", "warn"}, // plugin rule with extra space
 	}
 	for _, tt := range tests {
@@ -249,7 +249,7 @@ func TestBuildCLIRuleEntry_SingleRule(t *testing.T) {
 	entry, err := BuildCLIRuleEntry([]string{"no-console: error"})
 	assert.NilError(t, err)
 	assert.Assert(t, entry != nil)
-	assert.Assert(t, len(entry.Files) == 0, "should have no files (matches all)")
+	assert.Assert(t, entry.Files == nil, "should omit files and only overlay selected targets")
 	assert.Assert(t, len(entry.Ignores) == 0, "should have no ignores")
 	assert.Assert(t, len(entry.Plugins) == 0, "should have no plugins")
 	assert.Assert(t, entry.LanguageOptions == nil, "should have no language options")
@@ -405,7 +405,9 @@ func TestIntegration_CLIArrayOverridesConfigString(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	assert.Assert(t, merged != nil)
 	assert.Equal(t, merged.Rules["no-console"].Level, "warn")
-	opts, ok := merged.Rules["no-console"].Options.(map[string]interface{})
+	options := merged.Rules["no-console"].Options
+	assert.Equal(t, len(options), 1)
+	opts, ok := options[0].(map[string]interface{})
 	assert.Assert(t, ok)
 	allow, ok := opts["allow"].([]interface{})
 	assert.Assert(t, ok)
@@ -413,8 +415,9 @@ func TestIntegration_CLIArrayOverridesConfigString(t *testing.T) {
 	assert.Equal(t, allow[0], "warn")
 }
 
-func TestIntegration_CLIStringOverridesConfigArray(t *testing.T) {
-	// Config has array with options, CLI overrides with plain "off"
+func TestIntegration_CLISeverityOverrideRetainsConfigOptions(t *testing.T) {
+	// A severity-only override retains the earlier options, matching flat config
+	// cascading in ESLint.
 	config := RslintConfig{
 		{
 			Rules: Rules{"no-console": []interface{}{"error", map[string]interface{}{"allow": []interface{}{"warn"}}}},
@@ -428,7 +431,7 @@ func TestIntegration_CLIStringOverridesConfigArray(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	assert.Assert(t, merged != nil)
 	assert.Equal(t, merged.Rules["no-console"].Level, "off")
-	assert.Assert(t, merged.Rules["no-console"].Options == nil)
+	assert.Equal(t, len(merged.Rules["no-console"].Options), 1)
 }
 
 func TestIntegration_CLIDoesNotAffectGloballyIgnoredFiles(t *testing.T) {
@@ -495,14 +498,14 @@ func TestIntegration_CLIWithMultipleConfigEntries(t *testing.T) {
 	// .ts file: base + ts-specific + CLI
 	merged = config.GetConfigForFile("src/app.ts", "")
 	assert.Assert(t, merged != nil)
-	assert.Equal(t, merged.Rules["no-console"].Level, "error")  // CLI overrides ts-specific "warn"
-	assert.Equal(t, merged.Rules["no-debugger"].Level, "warn")  // CLI overrides base "error"
+	assert.Equal(t, merged.Rules["no-console"].Level, "error") // CLI overrides ts-specific "warn"
+	assert.Equal(t, merged.Rules["no-debugger"].Level, "warn") // CLI overrides base "error"
 
 	// .test.ts file: base + ts-specific + test-specific + CLI
 	merged = config.GetConfigForFile("src/app.test.ts", "")
 	assert.Assert(t, merged != nil)
-	assert.Equal(t, merged.Rules["no-console"].Level, "error")  // CLI overrides test-specific "off"
-	assert.Equal(t, merged.Rules["no-debugger"].Level, "warn")  // CLI overrides test-specific "off"
+	assert.Equal(t, merged.Rules["no-console"].Level, "error") // CLI overrides test-specific "off"
+	assert.Equal(t, merged.Rules["no-debugger"].Level, "warn") // CLI overrides test-specific "off"
 }
 
 func TestIntegration_CLIOnlyMatchesFilesMatchedByConfig(t *testing.T) {

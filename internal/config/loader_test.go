@@ -31,6 +31,57 @@ func TestContainsGlobPattern(t *testing.T) {
 	}
 }
 
+func TestRelativeGlobPatternPreservesFilesystemRoots(t *testing.T) {
+	tests := []struct {
+		root     string
+		pattern  string
+		expected string
+	}{
+		{root: "/", pattern: "/*/tsconfig.json", expected: "*/tsconfig.json"},
+		{root: "/repo", pattern: "/repo/packages/*/tsconfig.json", expected: "packages/*/tsconfig.json"},
+		{root: "C:/", pattern: "C:/*/tsconfig.json", expected: "*/tsconfig.json"},
+		{root: "//server/share/", pattern: "//server/share/*/tsconfig.json", expected: "*/tsconfig.json"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, relativeGlobPattern(tt.root, tt.pattern), tt.expected)
+	}
+}
+
+func TestLoadRslintConfig_RejectsEmptyFilesArray(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "rslint.jsonc")
+	if err := os.WriteFile(configPath, []byte(`[
+		{
+			"files": [],
+			"rules": { "no-console": "error" }
+		}
+	]`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	_, _, err := loader.LoadRslintConfig("rslint.jsonc")
+	assert.ErrorContains(t, err, `key "files": expected value to be a non-empty array`)
+}
+
+func TestLoadRslintConfig_AllowsMissingFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "rslint.jsonc")
+	if err := os.WriteFile(configPath, []byte(`[
+		{
+			"rules": { "no-console": "error" }
+		}
+	]`), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	cfg, _, err := loader.LoadRslintConfig("rslint.jsonc")
+	assert.NilError(t, err)
+	assert.Equal(t, len(cfg), 1)
+	assert.Assert(t, cfg[0].Files == nil)
+}
+
 func TestLoadTsConfigsFromRslintConfig_GlobExpansion(t *testing.T) {
 	tmpDir := t.TempDir()
 	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))

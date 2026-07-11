@@ -1,20 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import picomatch from 'picomatch';
 import { glob } from 'tinyglobby';
-import { type RslintConfigEntry } from '../config/define-config.ts';
+import { JS_CONFIG_FILES } from '../config/config-loader.ts';
 
-export const JS_CONFIG_FILES = [
-  'rslint.config.js',
-  'rslint.config.mjs',
-  'rslint.config.ts',
-  'rslint.config.mts',
-];
+export {
+  filterConfigsByParentIgnores,
+  type ConfigEntry,
+} from '../config/config-hierarchy.ts';
+
+export { JS_CONFIG_FILES };
 
 export function findJSConfig(cwd: string): string | null {
   for (const name of JS_CONFIG_FILES) {
     const p = path.join(cwd, name);
-    if (fs.existsSync(p)) return p;
+    try {
+      if (fs.statSync(p).isFile()) return p;
+    } catch {
+      // Continue through the configured filename priority.
+    }
   }
   return null;
 }
@@ -35,25 +38,85 @@ export function findJSConfigUp(startDir: string): string | null {
 }
 
 /**
- * Recursively scan a directory for all rslint JS/TS config files.
+ * Find the governing config for one target without discarding lexical path
+ * ownership. Physical ancestry is only a fallback when the lexical ancestry
+ * contains no config.
+ */
+export function findJSConfigForTarget(
+  targetPath: string,
+  isDirectory: boolean,
+): string | null {
+  const lexicalPath = path.resolve(targetPath);
+  const lexicalDirectory = isDirectory
+    ? lexicalPath
+    : path.dirname(lexicalPath);
+  const lexicalConfig = findJSConfigUp(lexicalDirectory);
+  if (lexicalConfig) return lexicalConfig;
+
+  return findJSConfigFromCanonicalTarget(
+    lexicalPath,
+    lexicalDirectory,
+    isDirectory,
+  );
+}
+
+function findJSConfigFromCanonicalTarget(
+  lexicalPath: string,
+  lexicalDirectory: string,
+  isDirectory: boolean,
+  configByCanonicalDirectory?: Map<string, string | null>,
+): string | null {
+  try {
+    const canonicalPath = fs.realpathSync(lexicalPath);
+    const canonicalDirectory = isDirectory
+      ? canonicalPath
+      : path.dirname(canonicalPath);
+    if (
+      path.normalize(canonicalDirectory) !== path.normalize(lexicalDirectory)
+    ) {
+      const normalizedDirectory = path.normalize(canonicalDirectory);
+      const cached = configByCanonicalDirectory?.get(normalizedDirectory);
+      if (cached !== undefined) return cached;
+      const configPath = findJSConfigUp(normalizedDirectory);
+      configByCanonicalDirectory?.set(normalizedDirectory, configPath);
+      return configPath;
+    }
+  } catch {
+    // Missing or inaccessible targets have no physical fallback.
+  }
+  return null;
+}
+
+/**
+ * Recursively scan a directory for effective rslint JS/TS config files.
  * Skips node_modules and .git directories (aligned with ESLint defaults).
- * Uses tinyglobby's async glob; the directory walk is I/O-bound, so an async
- * crawl parallelizes it across the libuv thread pool.
- *
- * tinyglobby returns POSIX-style paths even on Windows, so the result is
- * normalized through path.normalize to match the native separator that
- * findJSConfigUp / path.join produce. Without this, Map<configPath, ...>
- * dedupe against findJSConfigUp results fails on Windows.
+ * Uses tinyglobby's async crawl for filesystem traversal performance and edge
+ * cases, then applies rslint config semantics to the small candidate set.
  */
 export async function findJSConfigsInDir(startDir: string): Promise<string[]> {
   const resolved = path.resolve(startDir);
-  const matches = await glob(['**/rslint.config.{js,mjs,ts,mts}'], {
-    cwd: resolved,
-    absolute: true,
-    dot: true,
-    ignore: ['**/node_modules/**', '**/.git/**'],
-  });
-  return matches.map((p) => path.normalize(p));
+  const matches = await glob(
+    JS_CONFIG_FILES.map((name) => `**/${name}`),
+    {
+      cwd: resolved,
+      absolute: true,
+      dot: true,
+      followSymbolicLinks: false,
+      ignore: ['**/node_modules/**', '**/.git/**'],
+    },
+  );
+
+  const candidateDirectories = new Set<string>();
+  for (const match of matches) {
+    candidateDirectories.add(path.dirname(path.normalize(match)));
+  }
+
+  const effectiveConfigs: string[] = [];
+  for (const configDirectory of candidateDirectories) {
+    const configPath = findJSConfig(configDirectory);
+    if (configPath) effectiveConfigs.push(path.normalize(configPath));
+  }
+  return effectiveConfigs;
 }
 
 /**
@@ -72,6 +135,8 @@ export async function discoverConfigs(
   dirs: string[],
   cwd: string,
   explicitConfig: string | null,
+  fileConfigs?: ReadonlyMap<string, string | null>,
+  directoryConfigs?: ReadonlyMap<string, string | null>,
 ): Promise<Map<string, string>> {
   // Map: configPath -> configDirectory
   const configs = new Map<string, string>();
@@ -93,32 +158,27 @@ export async function discoverConfigs(
     return configs;
   }
 
-  // Collect unique start directories for upward config search
-  const startDirs = new Set<string>();
   // Collect directories to scan for nested configs
   const scanDirs: string[] = [];
 
   if (files.length === 0 && dirs.length === 0) {
-    startDirs.add(cwd);
+    const configPath = findJSConfigForTarget(cwd, true);
+    if (configPath) addConfig(configPath);
     scanDirs.push(cwd);
   }
 
-  // Deduplicate file directories before searching
+  const resolvedFileConfigs = fileConfigs ?? findJSConfigsForFiles(files);
   for (const file of files) {
-    startDirs.add(path.dirname(file));
+    const configPath = resolvedFileConfigs.get(path.normalize(file));
+    if (configPath) addConfig(configPath);
   }
 
   for (const dir of dirs) {
-    startDirs.add(dir);
+    const configPath =
+      directoryConfigs?.get(path.normalize(dir)) ??
+      findJSConfigForTarget(dir, true);
+    if (configPath) addConfig(configPath);
     scanDirs.push(dir);
-  }
-
-  // Upward traversal: find nearest config for each start directory
-  for (const startDir of startDirs) {
-    const configPath = findJSConfigUp(startDir);
-    if (configPath) {
-      addConfig(configPath);
-    }
   }
 
   // Scan for nested configs within the target scope (no-args and dir-args).
@@ -136,178 +196,199 @@ export async function discoverConfigs(
   return configs;
 }
 
-/**
- * Check if a config entry is a "global ignore" entry — an entry with only
- * `ignores` and no other meaningful fields. Aligns with ESLint flat config
- * semantics where such entries prevent directory traversal.
- */
-function isGlobalIgnoreEntry(
-  entry: RslintConfigEntry,
-): entry is Required<Pick<RslintConfigEntry, 'ignores'>> {
-  const ignores = entry.ignores;
-  if (!Array.isArray(ignores) || ignores.length === 0) return false;
-
-  return (
-    entry.files == null &&
-    entry.rules == null &&
-    // No meaningful plugins: absent, an empty array-form whitelist, or an empty
-    // object-form map. `plugins` is a union (string[] native names XOR a live
-    // community-plugin object), so branch on the shape before measuring length.
-    (entry.plugins == null ||
-      (Array.isArray(entry.plugins)
-        ? entry.plugins.length === 0
-        : Object.keys(entry.plugins).length === 0)) &&
-    entry.languageOptions == null &&
-    entry.settings == null
-  );
-}
-
-/**
- * Extract global ignore patterns from a config's entries.
- */
-function getGlobalIgnores(entries: RslintConfigEntry[]): string[] {
-  const patterns: string[] = [];
-  for (const entry of entries) {
-    if (isGlobalIgnoreEntry(entry)) {
-      for (const pattern of entry.ignores) {
-        patterns.push(pattern);
-      }
+/** Resolve each explicit file's config once while preserving lexical ownership. */
+export function findJSConfigsForFiles(
+  files: readonly string[],
+): Map<string, string | null> {
+  const result = new Map<string, string | null>();
+  const lexicalConfigByDirectory = new Map<string, string | null>();
+  const canonicalConfigByDirectory = new Map<string, string | null>();
+  for (const rawFile of files) {
+    const file = path.normalize(rawFile);
+    const fileDirectory = path.dirname(file);
+    let configPath = lexicalConfigByDirectory.get(fileDirectory);
+    if (configPath === undefined) {
+      configPath = findJSConfigUp(fileDirectory);
+      lexicalConfigByDirectory.set(fileDirectory, configPath);
     }
+    if (!configPath) {
+      configPath = findJSConfigFromCanonicalTarget(
+        path.resolve(file),
+        fileDirectory,
+        false,
+        canonicalConfigByDirectory,
+      );
+    }
+    result.set(file, configPath);
   }
-  return patterns;
+  return result;
 }
 
-/**
- * Check if a directory path is matched by any of the given ignore patterns.
- * Patterns are resolved relative to the parent config's directory.
- * Uses picomatch for full glob support (**, *, {}, etc.).
- *
- * A directory is considered ignored if the pattern matches the directory
- * itself or any of its ancestor paths. For example, pattern `__tests__/**`
- * matches both `__tests__/` and `__tests__/fixtures/`.
- */
-function isDirIgnoredByPatterns(
-  dirPath: string,
-  patterns: string[],
-  parentConfigDir: string,
-): boolean {
-  const relDir = path.relative(parentConfigDir, dirPath);
-  if (!relDir || relDir.startsWith('..')) return false;
-
-  const normalizedRelDir = relDir.split(path.sep).join('/');
-
-  for (const pattern of patterns) {
-    // Skip empty or negation patterns.
-    if (!pattern || pattern.startsWith('!')) continue;
-
-    // Skip file-level patterns (ending with /**/* or /*). These only ignore
-    // files inside a directory, NOT the directory itself. ESLint v10's
-    // isDirectoryIgnored does not block traversal for file-level patterns,
-    // allowing `!` re-include to work for files inside.
-    // Only directory-level patterns (ending with /** or /) block traversal.
-    if (
-      pattern.endsWith('/**/*') ||
-      (pattern.endsWith('/*') && !pattern.endsWith('/**'))
-    )
-      continue;
-
-    const isMatch = picomatch(pattern, { dot: true });
-
-    // Check if the pattern matches the directory itself or a file inside it.
-    // We test: the dir path, dir path + trailing slash, and a synthetic
-    // child path to handle patterns like `dir/**`.
-    if (
-      isMatch(normalizedRelDir) ||
-      isMatch(normalizedRelDir + '/') ||
-      isMatch(normalizedRelDir + '/x')
-    ) {
-      return true;
+/** Resolve each explicit directory's config once while preserving its alias. */
+export function findJSConfigsForDirectories(
+  directories: readonly string[],
+): Map<string, string | null> {
+  const result = new Map<string, string | null>();
+  const lexicalConfigByDirectory = new Map<string, string | null>();
+  const canonicalConfigByDirectory = new Map<string, string | null>();
+  for (const rawDirectory of directories) {
+    const directory = path.normalize(rawDirectory);
+    let configPath = lexicalConfigByDirectory.get(directory);
+    if (configPath === undefined) {
+      configPath = findJSConfigUp(directory);
+      lexicalConfigByDirectory.set(directory, configPath);
     }
+    if (!configPath) {
+      configPath = findJSConfigFromCanonicalTarget(
+        path.resolve(directory),
+        directory,
+        true,
+        canonicalConfigByDirectory,
+      );
+    }
+    result.set(directory, configPath);
+  }
+  return result;
+}
 
-    // For nested dirs, also check if any parent segment matches.
-    // e.g., pattern `__tests__/**` should match `__tests__/fixtures/deep`.
-    const segments = normalizedRelDir.split('/');
-    for (let i = 1; i < segments.length; i++) {
-      const partial = segments.slice(0, i).join('/');
-      if (
-        isMatch(partial) ||
-        isMatch(partial + '/') ||
-        isMatch(partial + '/x')
-      ) {
+function caseDifferenceTraversesSymlink(
+  leftDirectory: string,
+  rightDirectory: string,
+): boolean {
+  const leftRoot = path.parse(leftDirectory).root;
+  const rightRoot = path.parse(rightDirectory).root;
+  const leftSegments = leftDirectory.slice(leftRoot.length).split(path.sep);
+  const rightSegments = rightDirectory.slice(rightRoot.length).split(path.sep);
+  let leftCurrent = leftRoot;
+  let rightCurrent = rightRoot;
+  for (let index = 0; index < leftSegments.length; index++) {
+    const leftSegment = leftSegments[index];
+    const rightSegment = rightSegments[index];
+    if (!leftSegment || !rightSegment) continue;
+    leftCurrent = path.join(leftCurrent, leftSegment);
+    rightCurrent = path.join(rightCurrent, rightSegment);
+    if (leftSegment === rightSegment) continue;
+    try {
+      const leftInfo = fs.lstatSync(leftCurrent);
+      const rightInfo = fs.lstatSync(rightCurrent);
+      const leftIsSymlink = leftInfo.isSymbolicLink();
+      const rightIsSymlink = rightInfo.isSymbolicLink();
+      if (leftIsSymlink || rightIsSymlink) {
+        // Alternate casing of one symlink/junction is one native path. Distinct
+        // symlink entries that happen to share a target remain separate owners.
+        if (
+          leftIsSymlink &&
+          rightIsSymlink &&
+          (leftInfo.dev !== 0 || leftInfo.ino !== 0) &&
+          leftInfo.dev === rightInfo.dev &&
+          leftInfo.ino === rightInfo.ino
+        ) {
+          continue;
+        }
         return true;
       }
+    } catch {
+      return true;
     }
   }
-
   return false;
 }
 
-export interface ConfigEntry {
-  configDirectory: string;
-  entries: RslintConfigEntry[];
+function isNativeCaseAlias(
+  leftPath: string,
+  leftDirectory: string,
+  rightPath: string,
+  rightDirectory: string,
+): boolean {
+  if (
+    leftPath === rightPath ||
+    leftPath.toLowerCase() !== rightPath.toLowerCase()
+  ) {
+    return false;
+  }
+  try {
+    if (
+      path.normalize(fs.realpathSync.native(leftDirectory)) !==
+        path.normalize(fs.realpathSync.native(rightDirectory)) ||
+      path.normalize(fs.realpathSync.native(leftPath)) !==
+        path.normalize(fs.realpathSync.native(rightPath))
+    ) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  return !caseDifferenceTraversesSymlink(leftDirectory, rightDirectory);
 }
 
-/**
- * Filter out nested configs whose directory is covered by an ancestor config's
- * global ignores. Aligns with ESLint v10 behavior: when traversing directories,
- * global ignores in a parent config prevent entering ignored directories, so
- * nested configs in those directories are never discovered.
- *
- * Example: root config has `{ ignores: ['__tests__/**'] }`.
- * A nested config at `__tests__/fixtures/rslint.config.js` is filtered out
- * because `__tests__/fixtures/` is within the root config's global ignores.
- */
-export function filterConfigsByParentIgnores(
-  configEntries: ConfigEntry[],
-): ConfigEntry[] {
-  if (configEntries.length <= 1) return configEntries;
-
-  // Resolve symlinks and normalize trailing slashes for reliable ancestor checks.
-  const resolvedDirs = new Map<ConfigEntry, string>();
-  for (const entry of configEntries) {
-    let dir = entry.configDirectory.replace(/[/\\]+$/, '');
-    try {
-      dir = fs.realpathSync(dir);
-    } catch {
-      // Keep the original (stripped) path if realpath fails
-    }
-    resolvedDirs.set(entry, dir);
-  }
-
-  // Sort by directory depth (shallowest first) so parents are processed first
-  const sorted = [...configEntries].sort(
-    (a, b) =>
-      (resolvedDirs.get(a)?.length ?? 0) - (resolvedDirs.get(b)?.length ?? 0),
-  );
-
-  const result: ConfigEntry[] = [];
-
-  for (const config of sorted) {
-    let ignored = false;
-    const configDir = resolvedDirs.get(config)!;
-
-    for (const parent of result) {
-      const parentDir = resolvedDirs.get(parent)!;
-      if (
-        !configDir.startsWith(parentDir + path.sep) &&
-        configDir !== parentDir
-      ) {
-        continue;
-      }
-
-      const globalIgnores = getGlobalIgnores(parent.entries);
-      if (globalIgnores.length === 0) continue;
-
-      if (isDirIgnoredByPatterns(configDir, globalIgnores, parentDir)) {
-        ignored = true;
-        break;
-      }
-    }
-
-    if (!ignored) {
-      result.push(config);
+/** Find an already-known spelling of the same native case-aliased config. */
+export function findNativeCaseAliasConfigPath(
+  configPath: string,
+  configDirectory: string,
+  configs: ReadonlyMap<string, string>,
+): string | null {
+  const normalizedPath = path.normalize(configPath);
+  const normalizedDirectory = path.normalize(configDirectory);
+  const foldedPath = normalizedPath.toLowerCase();
+  for (const [candidatePath, candidateDirectory] of configs) {
+    if (path.normalize(candidatePath).toLowerCase() !== foldedPath) continue;
+    if (
+      isNativeCaseAlias(
+        normalizedPath,
+        normalizedDirectory,
+        path.normalize(candidatePath),
+        path.normalize(candidateDirectory),
+      )
+    ) {
+      return candidatePath;
     }
   }
+  return null;
+}
 
-  return result;
+/** Coalesce native case aliases without collapsing explicit symlink roots. */
+export function coalesceCaseAliasedConfigs(
+  configs: Map<string, string>,
+  explicitTargets: Map<string, string[]> = new Map(),
+  explicitDirectories: Map<string, string[]> = new Map(),
+): {
+  configs: Map<string, string>;
+  explicitFileTargetsByConfigPath: Map<string, string[]>;
+  explicitDirectoryTargetsByConfigPath: Map<string, string[]>;
+} {
+  const coalescedConfigs = new Map<string, string>();
+  const coalescedTargets = new Map<string, string[]>();
+  const coalescedDirectories = new Map<string, string[]>();
+
+  for (const [rawConfigPath, rawConfigDirectory] of configs) {
+    const configPath = path.normalize(rawConfigPath);
+    const configDirectory = path.normalize(rawConfigDirectory);
+    const representative = findNativeCaseAliasConfigPath(
+      configPath,
+      configDirectory,
+      coalescedConfigs,
+    );
+    const selectedPath = representative ?? configPath;
+    if (!representative) {
+      coalescedConfigs.set(configPath, configDirectory);
+    }
+
+    const mergeTargets = (
+      source: Map<string, string[]>,
+      destination: Map<string, string[]>,
+    ): void => {
+      const targets = source.get(rawConfigPath) ?? source.get(configPath);
+      if (!targets || targets.length === 0) return;
+      const existing = destination.get(selectedPath) ?? [];
+      destination.set(selectedPath, [...new Set([...existing, ...targets])]);
+    };
+    mergeTargets(explicitTargets, coalescedTargets);
+    mergeTargets(explicitDirectories, coalescedDirectories);
+  }
+
+  return {
+    configs: coalescedConfigs,
+    explicitFileTargetsByConfigPath: coalescedTargets,
+    explicitDirectoryTargetsByConfigPath: coalescedDirectories,
+  };
 }

@@ -33,6 +33,8 @@ import type { LintFileResult } from '../linter/ecma-language-plugin.js';
  * doesn't need to re-validate Go's serialization.
  */
 export interface EslintPluginLintRequest {
+  /** LSP config/worker generation. Omitted by the CLI's single-host path. */
+  generation?: string;
   files: ReadonlyArray<{
     path: string;
     /**

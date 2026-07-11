@@ -267,6 +267,7 @@ libsyncrpc
 lifecycles
 Lingui
 lingui
+lintable
 lintedfile
 listitem
 llms
@@ -327,6 +328,7 @@ nilerr
 nilnesserr
 nilnil
 Nkoo
+nocase
 noconfig
 nodesep
 noembed
@@ -554,6 +556,7 @@ undefinded
 undefinedish
 undefinedundefined
 undereferenced
+unicornutil
 uninit
 uninitialised
 unional
