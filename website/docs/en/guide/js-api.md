@@ -21,7 +21,7 @@ for (const result of results) {
 
 ## Linting files
 
-`lintFiles` takes one or more glob patterns (resolved against `cwd`) and lints every matching file. By default the nearest config is auto-discovered from `cwd`.
+`lintFiles` takes one or more glob patterns resolved against `cwd`. It keeps supported source-file extensions that are not excluded by global config ignores or `.gitignore`. With automatic discovery, each selected file is routed to its nearest loadable config, so files in different monorepo packages can use different configs.
 
 ```ts
 const results = await rslint.lintFiles(['src/**/*.ts', 'test/**/*.ts']);
@@ -43,19 +43,19 @@ const [result] = await rslint.lintText('const x = 1', {
 
 `lintText` always returns exactly one result — for the linted buffer. If you omit `filePath`, the result's `filePath` is the `"<text>"` sentinel (matching ESLint).
 
-## Fully in-memory linting
+## In-memory linting
 
-By default `lintText` still reads the config and tsconfig from disk. To lint with **no disk access at all** — source, config, and tsconfig all in memory — combine `overrideConfigFile: true` (use only the inline config), an inline `overrideConfig`, and a `virtualFiles` overlay:
+By default `lintText` still reads the config and tsconfig from disk. To provide the source, config, tsconfig, and project files from memory, combine `overrideConfigFile: true` (use only the inline config), an inline `overrideConfig`, and a `virtualFiles` overlay:
 
 ```ts
 const rslint = new Rslint({
-  cwd: '/', // virtual root: doesn't touch the host cwd or disk
+  cwd: '/', // stable root for the virtual paths below
   overrideConfigFile: true, // use only overrideConfig — skip config discovery
   overrideConfig: [
     {
       files: ['**/*.ts'],
       // The tsconfig + parserOptions.project below are needed ONLY for
-      // type-aware rules (like no-for-in-array). Syntax-only rules need neither.
+      // type-aware rules (like no-for-in-array). Other rules need neither.
       languageOptions: { parserOptions: { project: ['./tsconfig.json'] } },
       plugins: ['@typescript-eslint'],
       rules: { '@typescript-eslint/no-for-in-array': 'error' },
@@ -75,11 +75,11 @@ const [result] = await rslint.lintText(
 );
 ```
 
-`virtualFiles` is an in-memory file overlay (path → content) — an rslint extension; ESLint has no in-memory file map. Type-aware rules run against it with no disk access: put the `tsconfig.json` that `parserOptions.project` names, plus any dependency files, in the overlay.
+`virtualFiles` is an in-memory file overlay (path → content) — an rslint extension; ESLint has no in-memory file map. Put the `tsconfig.json` that `parserOptions.project` names, plus any dependency files, in the overlay. The overlay does not disable filesystem fallback: rslint may still consult disk for `.gitignore` and TypeScript resolution, so this API is not a filesystem sandbox.
 
 **Declaring plugins.** A rule from a plugin (`@typescript-eslint/*`, `unicorn/*`, and so on) runs only when that plugin is listed in `plugins` — rslint enforces this exactly like ESLint. Core rules (no `/` prefix) need no declaration.
 
-**Type-aware vs syntax-only rules.** The `tsconfig.json` and `parserOptions.project` matter only for **type-aware** rules, which need a real TypeScript program (see [Type Checking](/guide/type-checking)). If your config has only syntax-only rules, you can drop both — no tsconfig, no `parserOptions.project`.
+**Type-aware vs non-type-aware rules.** The `tsconfig.json` and `parserOptions.project` matter only for **type-aware** rules, which need a real TypeScript program (see [Type Checking](/guide/type-checking)). If your config has only rules that do not require type information, you can drop both — no tsconfig, no `parserOptions.project`.
 
 **Use relative paths** in `virtualFiles` keys and inside the tsconfig:
 
@@ -175,4 +175,4 @@ Each `LintMessage`:
 | `overrideConfig`     | `RslintConfigEntry \| RslintConfigEntry[] \| null` | —           | Extra config appended after the resolved/discovered config (ESLint's `overrideConfig`)                                                 |
 | `overrideConfigFile` | `string \| true \| null`                           | `null`      | `string`: use this config file (no discovery); `true`: use only `overrideConfig` (no file, no discovery); `null`/absent: auto-discover |
 | `fix`                | `boolean`                                          | `false`     | Apply rule auto-fixes; results carry `output`                                                                                          |
-| `virtualFiles`       | `Record<string, string>`                           | —           | In-memory file overlay (path → content) for fully in-memory linting                                                                    |
+| `virtualFiles`       | `Record<string, string>`                           | —           | In-memory file overlay (path → content); unresolved reads may fall back to disk                                                        |

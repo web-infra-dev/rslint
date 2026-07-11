@@ -21,7 +21,8 @@ import (
 // https://eslint.org/docs/latest/rules/no-useless-escape
 var NoUselessEscapeRule = rule.Rule{
 	Name: "no-useless-escape",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		allowed := parseAllowRegexCharacters(options)
 
 		return rule.RuleListeners{
@@ -210,7 +211,7 @@ func isDirectiveBlockContainer(node *ast.Node) bool {
 
 // rawStartOf returns the source-text start offset of `node`, skipping any
 // leading trivia. For string/template/regex literals this points at the
-// opening delimiter (`'`, `"`, `` ` ``, `}`, or `/`).
+// opening delimiter (`'`, `"`, “ ` “, `}`, or `/`).
 func rawStartOf(sourceFile *ast.SourceFile, node *ast.Node) int {
 	return utils.TrimNodeTextRange(sourceFile, node).Pos()
 }
@@ -242,7 +243,7 @@ func checkStringLiteral(ctx rule.RuleContext, node *ast.Node) {
 
 // checkTemplateElement scans a template element (NoSubstitutionTemplateLiteral
 // or TemplateHead/Middle/Tail) for useless escapes. Template-specific cases:
-//   - `` \` `` is the quote escape and never reported.
+//   - “ \` “ is the quote escape and never reported.
 //   - `\$` is necessary iff followed by `{` (forms `\${` to suppress
 //     interpolation).
 //   - `\{` is necessary iff preceded by `$` (forms `$\{` to suppress

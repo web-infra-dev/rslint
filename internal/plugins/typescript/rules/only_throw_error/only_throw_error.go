@@ -134,7 +134,8 @@ func isRethrownError(ctx rule.RuleContext, expr *ast.Node) bool {
 var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 	Name:             "only-throw-error",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(OnlyThrowErrorOptions)
 		if !ok {
 			opts = OnlyThrowErrorOptions{}

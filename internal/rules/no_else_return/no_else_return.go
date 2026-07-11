@@ -31,7 +31,8 @@ var unexpectedMessage = rule.RuleMessage{
 // https://eslint.org/docs/latest/rules/no-else-return
 var NoElseReturnRule = rule.Rule{
 	Name: "no-else-return",
-	Run: func(ctx rule.RuleContext, ruleOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ruleOptions []any) rule.RuleListeners {
+		ruleOptions := rule.LegacyUnwrapOptions(_ruleOptions)
 		opts := parseOptions(ruleOptions)
 		check := checkIfWithoutElse
 		if !opts.allowElseIf {

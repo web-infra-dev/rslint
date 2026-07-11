@@ -49,7 +49,7 @@ func getIncludesCalleeName(callee *ast.Node) (receiver *ast.Node, ok bool) {
 
 var PreferToContainRule = rule.Rule{
 	Name: "jest/prefer-to-contain",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				jestFnCall := jestUtils.ParseJestFnCall(node, ctx)

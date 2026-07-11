@@ -40,7 +40,7 @@ func walkUpParensFromNode(node *ast.Node) *ast.Node {
 
 var NoExtraNonNullAssertionRule = rule.CreateRule(rule.Rule{
 	Name: "no-extra-non-null-assertion",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		msg := rule.RuleMessage{
 			Id:          "noExtraNonNullAssertion",
 			Description: "Forbidden extra non-null assertion.",

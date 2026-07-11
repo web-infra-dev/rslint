@@ -11,7 +11,7 @@ import (
 
 var JsxNoUndefRule = rule.Rule{
 	Name: "react/jsx-no-undef",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		allowGlobals := false
 		optsMap := utils.GetOptionsMap(options)
 		if optsMap != nil {

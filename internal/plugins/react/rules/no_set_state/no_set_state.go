@@ -26,7 +26,7 @@ import (
 //     component into "not a component", so there's no need to defer.
 var NoSetStateRule = rule.Rule{
 	Name: "react/no-set-state",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		pragma := reactutil.GetReactPragma(ctx.Settings)
 		createClass := reactutil.GetReactCreateClass(ctx.Settings)
 		wrappers := reactutil.GetComponentWrapperFunctions(ctx.Settings, pragma)

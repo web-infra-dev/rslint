@@ -41,7 +41,8 @@ type RestrictPlusOperandsOptions struct {
 var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name:             "restrict-plus-operands",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts, ok := options.(RestrictPlusOperandsOptions)
 		if !ok {
 			opts = RestrictPlusOperandsOptions{}

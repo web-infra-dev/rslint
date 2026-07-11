@@ -221,7 +221,7 @@ func isConstVariableDeclaration(node *ast.Node) bool {
 var PreferIncludesRule = rule.CreateRule(rule.Rule{
 	Name:             "prefer-includes",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		getNodeText := func(n *ast.Node) string {
 			if n == nil {
 				return ""

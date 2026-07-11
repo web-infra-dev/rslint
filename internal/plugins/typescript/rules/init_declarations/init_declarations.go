@@ -23,7 +23,8 @@ import (
 // Upstream base rule: eslint/lib/rules/init-declarations.js
 var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 	Name: "init-declarations",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{

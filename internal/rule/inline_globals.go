@@ -1,10 +1,12 @@
 package rule
 
 import (
-	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 )
 
 // inlineGlobalsKeywords lists the directive keywords that introduce a
@@ -12,71 +14,150 @@ import (
 // the longer prefix.
 var inlineGlobalsKeywords = [...]string{"globals", "global"}
 
+// InlineGlobal describes one name declared by `/* global */` comments.
+// Declared is the name's final inline state after all comments are applied.
+// NameRanges contains one exact name range per comment that mentions the name,
+// in source order. Repeating a name within one comment still contributes only
+// its first range, matching ESLint's comment metadata.
+type InlineGlobal struct {
+	Name       string
+	Declared   bool
+	NameRanges []core.TextRange
+}
+
+type inlineGlobalName struct {
+	name      string
+	setting   string
+	nameRange core.TextRange
+}
+
 // ParseInlineGlobals scans `/* global ... */` / `/* globals ... */` block
-// comments and returns the set of names they declare (name -> declared).
+// comments once and returns both the final name -> declared map and ordered
+// declaration metadata for rules that need to distinguish comment globals
+// from configured globals.
 //
-// This is the DisableManager-equivalent preprocessing step for globals: it
-// runs once per file, over the same real comment tokens DisableManager
-// consumes (not a regex over raw source text, so lookalike text inside a
-// string literal or another comment can't be mistaken for a directive), and
-// its result is merged with config globals before being handed to rules —
-// no rule should parse `/* global */` comments itself.
-//
-// Mirrors ESLint's inline-config handling: only the setting "off" un-declares
-// a name; a bare name or any other setting (e.g. "writable") declares it.
-func ParseInlineGlobals(sourceFile *ast.SourceFile, comments []*ast.CommentRange) map[string]bool {
-	if sourceFile.Text() == "" || len(comments) == 0 {
-		return nil
+// Only real block-comment ranges supplied by the TypeScript scanner are read,
+// so lookalike text in strings, templates, regexes, or line comments is ignored.
+// Within a comment, duplicate names use the last setting and retain the first
+// name range. Across comments, the last setting wins and every comment range is
+// preserved. As in the existing globals API, only "off" un-declares a name.
+func ParseInlineGlobals(sourceFile *ast.SourceFile, comments []*ast.CommentRange) (map[string]bool, []InlineGlobal) {
+	if sourceFile == nil || sourceFile.Text() == "" || len(comments) == 0 {
+		return nil, nil
 	}
 
 	text := sourceFile.Text()
-	var globals map[string]bool
+	var values map[string]bool
+	var globals []InlineGlobal
+	var globalIndexes map[string]int
 
 	for _, comment := range comments {
-		// `/* global */` is only recognized as a block comment, matching
-		// ESLint's convention (and rslint's prior behavior).
-		if comment.Kind != ast.KindMultiLineCommentTrivia {
-			continue
-		}
-		content := strings.TrimSpace(text[comment.Pos()+2 : comment.End()-2])
-
-		rest, ok := matchInlineGlobalsDirective(content)
-		if !ok {
+		entries := parseInlineGlobalComment(text, comment)
+		if len(entries) == 0 {
 			continue
 		}
 
-		if globals == nil {
-			globals = make(map[string]bool)
+		// ESLint's parseStringConfig returns an object, so a repeated name in
+		// one comment has one comment entry: its last setting and first range.
+		commentEntries := make([]inlineGlobalName, 0, len(entries))
+		commentIndexes := make(map[string]int, len(entries))
+		for _, entry := range entries {
+			if index, exists := commentIndexes[entry.name]; exists {
+				commentEntries[index].setting = entry.setting
+				continue
+			}
+			commentIndexes[entry.name] = len(commentEntries)
+			commentEntries = append(commentEntries, entry)
 		}
-		for name, setting := range parseGlobalNameList(rest) {
-			globals[name] = setting != "off"
+
+		if values == nil {
+			values = make(map[string]bool)
+			globalIndexes = make(map[string]int)
+		}
+		for _, entry := range commentEntries {
+			declared := entry.setting != "off"
+			values[entry.name] = declared
+
+			if index, exists := globalIndexes[entry.name]; exists {
+				globals[index].Declared = declared
+				globals[index].NameRanges = append(globals[index].NameRanges, entry.nameRange)
+				continue
+			}
+			globalIndexes[entry.name] = len(globals)
+			globals = append(globals, InlineGlobal{
+				Name:       entry.name,
+				Declared:   declared,
+				NameRanges: []core.TextRange{entry.nameRange},
+			})
 		}
 	}
 
-	return globals
+	return values, globals
 }
 
-// matchInlineGlobalsDirective reports whether comment content begins with
-// the "global"/"globals" directive keyword (followed by whitespace or
-// end-of-string, so e.g. "globalConfig setup" is not mistaken for one) and
-// returns the remainder to parse as a name list.
+func parseInlineGlobalComment(text string, comment *ast.CommentRange) []inlineGlobalName {
+	if comment == nil || comment.Kind != ast.KindMultiLineCommentTrivia {
+		return nil
+	}
+
+	start, end := comment.Pos(), comment.End()
+	if start < 0 || end > len(text) || end-start < len("/*") || text[start:start+2] != "/*" {
+		return nil
+	}
+
+	contentStart, contentEnd := start+2, end
+	if contentEnd-contentStart >= 2 && text[contentEnd-2:contentEnd] == "*/" {
+		contentEnd -= 2
+	}
+	contentStart, contentEnd = trimECMAScriptWhitespaceRange(text, contentStart, contentEnd)
+	if contentStart == contentEnd {
+		return nil
+	}
+
+	restStart, ok := matchInlineGlobalsDirectiveRange(text, contentStart, contentEnd)
+	if !ok {
+		return nil
+	}
+	if justificationStart := findDirectiveJustification(text, restStart, contentEnd); justificationStart >= 0 {
+		contentEnd = justificationStart
+	}
+	restStart, contentEnd = trimECMAScriptWhitespaceRange(text, restStart, contentEnd)
+	return parseGlobalNameListEntries(text, restStart, contentEnd)
+}
+
+// matchInlineGlobalsDirective reports whether comment content begins with the
+// exact lower-case "global"/"globals" directive label followed by ECMAScript
+// whitespace or end-of-string.
 func matchInlineGlobalsDirective(content string) (string, bool) {
-	for _, kw := range inlineGlobalsKeywords {
-		if !strings.HasPrefix(content, kw) {
+	start, end := trimECMAScriptWhitespaceRange(content, 0, len(content))
+	restStart, ok := matchInlineGlobalsDirectiveRange(content, start, end)
+	if !ok {
+		return "", false
+	}
+	restStart, end = trimECMAScriptWhitespaceRange(content, restStart, end)
+	return content[restStart:end], true
+}
+
+func matchInlineGlobalsDirectiveRange(text string, start int, end int) (int, bool) {
+	for _, keyword := range inlineGlobalsKeywords {
+		if !strings.HasPrefix(text[start:end], keyword) {
 			continue
 		}
-		rest := content[len(kw):]
-		if rest == "" || rest[0] == ' ' || rest[0] == '\t' || rest[0] == '\n' || rest[0] == '\r' {
-			return strings.TrimSpace(rest), true
+		restStart := start + len(keyword)
+		if restStart == end {
+			return restStart, true
+		}
+		r, _ := utf8.DecodeRuneInString(text[restStart:end])
+		if isECMAScriptWhitespace(r) {
+			return restStart, true
 		}
 	}
-	return "", false
+	return 0, false
 }
 
 // MergeGlobals combines config-declared globals with inline `/* global */`
-// comment globals into the single set exposed to rules as ctx.Globals —
-// mirroring ESLint's addDeclaredGlobals, which layers inline comments on top
-// of config (inline wins on conflict). Returns nil if both are empty.
+// comment globals into the single set exposed to rules as ctx.Globals. Inline
+// settings win on conflict. Returns nil if both inputs are empty.
 func MergeGlobals(configGlobals, inlineGlobals map[string]bool) map[string]bool {
 	if len(configGlobals) == 0 {
 		return inlineGlobals
@@ -94,27 +175,164 @@ func MergeGlobals(configGlobals, inlineGlobals map[string]bool) map[string]bool 
 	return merged
 }
 
-// globalSettingSeparatorPattern collapses whitespace around a `:` or `,`
-// separator (e.g. "foo : writable ,  bar" -> "foo:writable,bar") before
-// splitting — mirrors ESLint's own parseStringConfig, which does the same
-// normalization so spaces around a separator don't get mistaken for part of
-// the name/setting.
-var globalSettingSeparatorPattern = regexp.MustCompile(`\s*([:,])\s*`)
-
-// parseGlobalNameList parses a comma-and/or-whitespace separated
-// "name[:setting]" list, e.g. "foo, bar:writable baz:off", returning each
-// name mapped to its raw setting ("" when none was given).
+// parseGlobalNameList parses ESLint's comma-and/or-whitespace separated
+// "name[:setting]" syntax. It is kept as a map helper for focused parser tests.
 func parseGlobalNameList(s string) map[string]string {
-	collapsed := globalSettingSeparatorPattern.ReplaceAllString(strings.TrimSpace(s), "$1")
-
 	names := make(map[string]string)
-	for _, part := range strings.FieldsFunc(collapsed, func(r rune) bool {
-		return r == ',' || r == ' ' || r == '\t' || r == '\n' || r == '\r'
-	}) {
-		name, setting, _ := strings.Cut(part, ":")
-		if name != "" {
-			names[name] = setting
-		}
+	for _, entry := range parseGlobalNameListEntries(s, 0, len(s)) {
+		names[entry.name] = entry.setting
 	}
 	return names
+}
+
+type globalConfigRune struct {
+	value rune
+	start int
+	end   int
+}
+
+func parseGlobalNameListEntries(text string, start int, end int) []inlineGlobalName {
+	runes := normalizeGlobalConfigRunes(text, start, end)
+	var entries []inlineGlobalName
+
+	for index := 0; index < len(runes); {
+		for index < len(runes) && (runes[index].value == ',' || isECMAScriptWhitespace(runes[index].value)) {
+			index++
+		}
+		if index == len(runes) {
+			break
+		}
+
+		tokenStart := index
+		for index < len(runes) && runes[index].value != ',' && !isECMAScriptWhitespace(runes[index].value) {
+			index++
+		}
+		tokenEnd := index
+
+		nameEnd := tokenEnd
+		for i := tokenStart; i < tokenEnd; i++ {
+			if runes[i].value == ':' {
+				nameEnd = i
+				break
+			}
+		}
+		if nameEnd == tokenStart {
+			continue
+		}
+
+		setting := ""
+		if nameEnd < tokenEnd {
+			settingStart, settingEnd := nameEnd+1, tokenEnd
+			for i := settingStart; i < tokenEnd; i++ {
+				if runes[i].value == ':' {
+					settingEnd = i
+					break
+				}
+			}
+			if settingStart < settingEnd {
+				setting = text[runes[settingStart].start:runes[settingEnd-1].end]
+			}
+		}
+
+		nameStartPos := runes[tokenStart].start
+		nameEndPos := runes[nameEnd-1].end
+		entries = append(entries, inlineGlobalName{
+			name:      text[nameStartPos:nameEndPos],
+			setting:   setting,
+			nameRange: core.NewTextRange(nameStartPos, nameEndPos),
+		})
+	}
+
+	return entries
+}
+
+// normalizeGlobalConfigRunes mirrors @eslint/plugin-kit's parseStringConfig:
+// whitespace immediately around ':' and ',' is removed before tokens are
+// split. Source positions stay attached so declaration ranges remain exact.
+func normalizeGlobalConfigRunes(text string, start int, end int) []globalConfigRune {
+	raw := make([]globalConfigRune, 0, end-start)
+	for index := start; index < end; {
+		r, size := utf8.DecodeRuneInString(text[index:end])
+		raw = append(raw, globalConfigRune{value: r, start: index, end: index + size})
+		index += size
+	}
+
+	normalized := make([]globalConfigRune, 0, len(raw))
+	for index := 0; index < len(raw); {
+		if !isECMAScriptWhitespace(raw[index].value) {
+			normalized = append(normalized, raw[index])
+			index++
+			continue
+		}
+
+		whitespaceEnd := index + 1
+		for whitespaceEnd < len(raw) && isECMAScriptWhitespace(raw[whitespaceEnd].value) {
+			whitespaceEnd++
+		}
+		previousIsDelimiter := len(normalized) > 0 && (normalized[len(normalized)-1].value == ':' || normalized[len(normalized)-1].value == ',')
+		nextIsDelimiter := whitespaceEnd < len(raw) && (raw[whitespaceEnd].value == ':' || raw[whitespaceEnd].value == ',')
+		if !previousIsDelimiter && !nextIsDelimiter {
+			normalized = append(normalized, raw[index:whitespaceEnd]...)
+		}
+		index = whitespaceEnd
+	}
+	return normalized
+}
+
+func findDirectiveJustification(text string, start int, end int) int {
+	for index := start; index < end; {
+		r, size := utf8.DecodeRuneInString(text[index:end])
+		if !isECMAScriptWhitespace(r) {
+			index += size
+			continue
+		}
+
+		hyphenStart := index + size
+		afterHyphens := hyphenStart
+		for afterHyphens < end && text[afterHyphens] == '-' {
+			afterHyphens++
+		}
+		if afterHyphens-hyphenStart >= 2 && afterHyphens < end {
+			next, _ := utf8.DecodeRuneInString(text[afterHyphens:end])
+			if isECMAScriptWhitespace(next) {
+				return index
+			}
+		}
+		index += size
+	}
+	return -1
+}
+
+func trimECMAScriptWhitespaceRange(text string, start int, end int) (int, int) {
+	for start < end {
+		r, size := utf8.DecodeRuneInString(text[start:end])
+		if !isECMAScriptWhitespace(r) {
+			break
+		}
+		start += size
+	}
+	for end > start {
+		r, size := utf8.DecodeLastRuneInString(text[start:end])
+		if !isECMAScriptWhitespace(r) {
+			break
+		}
+		end -= size
+	}
+	return start, end
+}
+
+// ECMAScript's \s set is Unicode Zs plus ASCII spacing/line terminators,
+// U+2028/U+2029, and BOM. unicode.IsSpace is not exact: it includes U+0085 and
+// excludes BOM. TypeScript's internal stringutil helper also accepts U+0085
+// and U+200B, so it cannot model ESLint's JavaScript regexp semantics here.
+func isECMAScriptWhitespace(r rune) bool {
+	if unicode.Is(unicode.Zs, r) {
+		return true
+	}
+	switch r {
+	case '\t', '\v', '\f', '\n', '\r', '\u2028', '\u2029', '\uFEFF':
+		return true
+	default:
+		return false
+	}
 }

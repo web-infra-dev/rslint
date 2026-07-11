@@ -68,6 +68,7 @@ func TestNoRedeclareRule(t *testing.T) {
 			// In a module (any file with a top-level `export`), top-level
 			// declarations are module-scoped and do not merge with lib globals.
 			{Code: "export {};\nvar Object = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
+			{Code: "export {};\nvar top = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 			{Code: "import {} from './foo';\nvar Array = 0;", Options: map[string]interface{}{"builtinGlobals": true}},
 
 			// ====================================================================
@@ -246,8 +247,8 @@ func TestNoRedeclareRule(t *testing.T) {
 			// interfaces in different declaration spaces. ESLint, which does
 			// name-level matching, flags these. We intentionally don't.
 			// ====================================================================
-			{Code: "type NodeListOf = 1;"},                      // lib.dom
-			{Code: "type HTMLElement = 1;"},                     // lib.dom
+			{Code: "type NodeListOf = 1;"},  // lib.dom
+			{Code: "type HTMLElement = 1;"}, // lib.dom
 			{Code: "type Array = 1;", Options: map[string]interface{}{"builtinGlobals": true}}, // lib.es5 core interface
 			// Extending a lib interface with a same-named user interface is
 			// the idiomatic TS pattern (ImportMeta augmentation, etc.) — it
@@ -502,6 +503,13 @@ func TestNoRedeclareRule(t *testing.T) {
 				},
 				Options: map[string]interface{}{"builtinGlobals": true},
 			},
+			{
+				Code: "export {};\n/*globals top */ var top = 0;",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 11},
+				},
+				Options: map[string]interface{}{"builtinGlobals": true},
+			},
 			// Default options already enable builtinGlobals.
 			{
 				Code: "var Number = 0;",
@@ -515,6 +523,20 @@ func TestNoRedeclareRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 5},
 				},
+			},
+			{
+				Code: "/*globals Array */",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 1, Column: 11},
+				},
+				Options: map[string]interface{}{"builtinGlobals": true},
+			},
+			{
+				Code: "export {};\n/*globals Array */",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "redeclaredAsBuiltin", Line: 2, Column: 11},
+				},
+				Options: map[string]interface{}{"builtinGlobals": true},
 			},
 			// ====================================================================
 			// Documented divergence #1 (see no_redeclare.md):

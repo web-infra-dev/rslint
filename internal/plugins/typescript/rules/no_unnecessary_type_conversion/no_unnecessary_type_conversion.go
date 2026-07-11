@@ -96,12 +96,12 @@ func argumentSkippingParens(node *ast.Node) *ast.Node {
 	return ast.SkipParentheses(node)
 }
 
-// isEmptyStringLiteral mirrors upstream's `node.type === Literal && value === ''`.
-// In ESTree a TemplateLiteral is NOT a Literal — even `` `` ``. tsgo keeps
+// isEmptyStringLiteral mirrors upstream's `node.type === Literal && value === ”`.
+// In ESTree a TemplateLiteral is NOT a Literal — even “ “ “. tsgo keeps
 // NoSubstitutionTemplateLiteral as a literal-kind, but to stay aligned we
 // match the upstream contract and only treat StringLiteral as empty here.
 //
-// SkipParentheses lets `('')` and `((''))` qualify, matching upstream which
+// SkipParentheses lets `(”)` and `((”))` qualify, matching upstream which
 // never sees ParenthesizedExpression — ESTree treats parens transparently.
 func isEmptyStringLiteral(node *ast.Node) bool {
 	if node == nil {
@@ -333,7 +333,7 @@ func allUnionPartsAreIntegerNumberLiteral(t *checker.Type) bool {
 var NoUnnecessaryTypeConversionRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unnecessary-type-conversion",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 
 		// reportUnaryConversion reports unary-operator-style conversions (`+x`,

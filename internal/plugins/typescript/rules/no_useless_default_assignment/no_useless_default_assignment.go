@@ -71,7 +71,8 @@ func buildUselessUndefinedMessage(kind string) rule.RuleMessage {
 	}
 }
 
-func run(ctx rule.RuleContext, options any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+	options := rule.LegacyUnwrapOptions(_options)
 	if ctx.TypeChecker == nil {
 		return rule.RuleListeners{}
 	}

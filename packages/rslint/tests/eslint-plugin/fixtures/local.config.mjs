@@ -5,5 +5,8 @@ export default [
     plugins: {
       local: localPlugin,
     },
+    rules: {
+      'local/program-listener': 'error',
+    },
   },
 ];

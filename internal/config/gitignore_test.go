@@ -23,6 +23,40 @@ func (s *gitignoreSpyFS) GetAccessibleEntries(path string) vfs.Entries {
 	return s.FS.GetAccessibleEntries(path)
 }
 
+type gitignoreMockFS struct {
+	vfs.FS
+	entries         map[string]vfs.Entries
+	files           map[string]string
+	resolvedPaths   map[string]string
+	readFileCalls   []string
+	accessedDirs    []string
+	realpathCalls   []string
+	caseSensitiveFS bool
+}
+
+func (m *gitignoreMockFS) ReadFile(path string) (string, bool) {
+	m.readFileCalls = append(m.readFileCalls, path)
+	content, ok := m.files[path]
+	return content, ok
+}
+
+func (m *gitignoreMockFS) GetAccessibleEntries(path string) vfs.Entries {
+	m.accessedDirs = append(m.accessedDirs, path)
+	return m.entries[path]
+}
+
+func (m *gitignoreMockFS) Realpath(path string) string {
+	m.realpathCalls = append(m.realpathCalls, path)
+	if realpath, ok := m.resolvedPaths[path]; ok {
+		return realpath
+	}
+	return path
+}
+
+func (m *gitignoreMockFS) UseCaseSensitiveFileNames() bool {
+	return m.caseSensitiveFS
+}
+
 func setupGitignoreFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -235,6 +269,27 @@ func TestReadGitignoreAsGlobs_SkipsNodeModules(t *testing.T) {
 	assert.Equal(t, globs[0], "**/dist/**/*")
 }
 
+func TestReadGitignoreAsGlobs_SkipsDefaultDirsCaseInsensitively(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		entries: map[string]vfs.Entries{
+			"/repo": {
+				Directories: []string{"NODE_MODULES"},
+				Symlinks:    map[string]struct{}{},
+			},
+		},
+		files:           map[string]string{},
+		caseSensitiveFS: false,
+	}
+
+	ReadGitignoreAsGlobs("/repo", mock, nil)
+	for _, accessed := range mock.accessedDirs {
+		if strings.EqualFold(accessed, "/repo/node_modules") {
+			t.Fatalf("case-insensitive filesystem must not scan default excluded directory %q", accessed)
+		}
+	}
+}
+
 // --- Scope isolation tests ---
 
 func TestConvertGitignoreToGlobs_ScopeIsolation(t *testing.T) {
@@ -271,6 +326,64 @@ func TestReadGitignoreAsGlobs_ThreeLevelNested(t *testing.T) {
 	assert.Assert(t, hasRoot, "root dist")
 	assert.Assert(t, hasApp, "app tmp")
 	assert.Assert(t, hasSub, "sub cache")
+}
+
+func TestReadGitignoreAsGlobs_SkipsDescendantSymlinkCycle(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			"/repo/.gitignore":        "root-cache/\n",
+			"/repo/a/.gitignore":      "nested-cache/\n",
+			"/repo/a/loop/.gitignore": "cycle-cache/\n",
+		},
+		entries: map[string]vfs.Entries{
+			"/repo": {
+				Directories: []string{"a"},
+				Symlinks:    map[string]struct{}{},
+			},
+			"/repo/a": {
+				Directories: []string{"loop"},
+				Symlinks:    map[string]struct{}{"loop": {}},
+			},
+			"/repo/a/loop": {
+				Directories: []string{"a"},
+				Symlinks:    map[string]struct{}{},
+			},
+		},
+		resolvedPaths: map[string]string{"/repo/a/loop": "/repo"},
+	}
+
+	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
+
+	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
+	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
+	assert.Equal(t, len(mock.realpathCalls), 0, "symlink metadata should avoid Realpath fallback")
+}
+
+func TestReadGitignoreAsGlobs_LegacySymlinkCycleUsesCachedRealpaths(t *testing.T) {
+	mock := &gitignoreMockFS{
+		FS: osvfs.FS(),
+		files: map[string]string{
+			"/repo/.gitignore":        "root-cache/\n",
+			"/repo/a/.gitignore":      "nested-cache/\n",
+			"/repo/a/loop/.gitignore": "cycle-cache/\n",
+		},
+		entries: map[string]vfs.Entries{
+			"/repo":   {Directories: []string{"a"}},
+			"/repo/a": {Directories: []string{"loop"}},
+		},
+		resolvedPaths: map[string]string{
+			"/repo":        "/repo",
+			"/repo/a":      "/repo/a",
+			"/repo/a/loop": "/repo",
+		},
+	}
+
+	globs := ReadGitignoreAsGlobs("/repo", mock, nil)
+
+	assert.DeepEqual(t, globs, []string{"**/root-cache/**/*", "a/**/nested-cache/**/*"})
+	assert.DeepEqual(t, mock.accessedDirs, []string{"/repo", "/repo/a"})
+	assert.DeepEqual(t, mock.realpathCalls, []string{"/repo", "/repo/a", "/repo/a/loop"})
 }
 
 // --- Additional edge case tests ---
@@ -329,6 +442,150 @@ func TestConvertGitignoreToGlobs_DirOnlySuffixDedup(t *testing.T) {
 
 // --- Ancestor inheritance tests ---
 
+func TestParentDirStopsAtFilesystemRoot(t *testing.T) {
+	tests := []struct {
+		path   string
+		parent string
+	}{
+		{path: "/repo/pkg", parent: "/repo"},
+		{path: "/repo", parent: "/"},
+		{path: "/", parent: ""},
+		{path: "C:/repo", parent: "C:/"},
+		{path: "C:/", parent: ""},
+		{path: "//server/share/repo", parent: "//server/share/"},
+		{path: "//server/share/", parent: ""},
+		{path: "pkg/src", parent: "pkg"},
+		{path: "pkg", parent: ""},
+	}
+
+	for _, test := range tests {
+		assert.Equal(t, parentDir(test.path), test.parent, "parentDir(%q)", test.path)
+	}
+}
+
+func TestRelativeDirIsVolumeAndShareAware(t *testing.T) {
+	tests := []struct {
+		name string
+		root string
+		dir  string
+		rel  string
+		ok   bool
+	}{
+		{name: "posix", root: "/repo", dir: "/repo/pkg", rel: "pkg", ok: true},
+		{name: "posix sibling", root: "/repo", dir: "/repository/pkg", ok: false},
+		{name: "drive", root: "C:/repo", dir: "c:/repo/pkg", rel: "pkg", ok: true},
+		{name: "other drive", root: "C:/repo", dir: "D:/repo/pkg", ok: false},
+		{name: "unc", root: "//server/share/repo", dir: "//SERVER/SHARE/repo/pkg", rel: "pkg", ok: true},
+		{name: "other share", root: "//server/share/repo", dir: "//server/other/repo/pkg", ok: false},
+		{name: "share prefix", root: "//server/share/repo", dir: "//server/share-other/repo/pkg", ok: false},
+		{name: "other server", root: "//server/share/repo", dir: "//other/share/repo/pkg", ok: false},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			rel, ok := relativeDir(test.root, test.dir, true)
+			assert.Equal(t, ok, test.ok)
+			assert.Equal(t, rel, test.rel)
+		})
+	}
+
+	rel, ok := relativeDir("/Repo", "/repo/pkg", false)
+	assert.Assert(t, ok)
+	assert.Equal(t, rel, "pkg")
+}
+
+func TestSortByPathDepthTreatsUNCShareAsRoot(t *testing.T) {
+	paths := []string{
+		"//server/share/repo/pkg",
+		"//server/share/repo",
+		"//server/share/",
+	}
+
+	sortByPathDepth(paths)
+
+	assert.DeepEqual(t, paths, []string{
+		"//server/share/",
+		"//server/share/repo",
+		"//server/share/repo/pkg",
+	})
+}
+
+func TestReadGitignoreAsGlobs_JoinsFilesystemRoots(t *testing.T) {
+	tests := []struct {
+		name         string
+		configDir    string
+		rootIgnore   string
+		configIgnore string
+	}{
+		{name: "posix", configDir: "/repo", rootIgnore: "/.gitignore", configIgnore: "/repo/.gitignore"},
+		{name: "drive", configDir: "C:/repo", rootIgnore: "C:/.gitignore", configIgnore: "C:/repo/.gitignore"},
+		{name: "unc", configDir: "//server/share/repo", rootIgnore: "//server/share/.gitignore", configIgnore: "//server/share/repo/.gitignore"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mock := &gitignoreMockFS{
+				FS: osvfs.FS(),
+				files: map[string]string{
+					test.rootIgnore: "root-cache/\n",
+				},
+				entries: map[string]vfs.Entries{
+					test.configDir: {Symlinks: map[string]struct{}{}},
+				},
+			}
+
+			globs := ReadGitignoreAsGlobs(test.configDir, mock, nil)
+
+			assert.DeepEqual(t, globs, []string{"**/root-cache/**/*"})
+			assert.DeepEqual(t, mock.readFileCalls, []string{test.rootIgnore, test.configIgnore})
+		})
+	}
+}
+
+func TestConvertAncestorGitignoreToGlobs_IsVolumeAndShareAware(t *testing.T) {
+	tests := []struct {
+		name      string
+		ancestor  string
+		configDir string
+		content   string
+		expected  []string
+	}{
+		{
+			name:      "same drive preserves config base",
+			ancestor:  "C:/repo",
+			configDir: "C:/repo/packages/app",
+			content:   "/packages/app/dist/\n",
+			expected:  []string{"dist/**/*"},
+		},
+		{
+			name:      "same share preserves config base",
+			ancestor:  "//server/share/repo",
+			configDir: "//server/share/repo/packages/app",
+			content:   "/packages/app/dist/\n",
+			expected:  []string{"dist/**/*"},
+		},
+		{
+			name:      "other drive is not ancestor",
+			ancestor:  "D:/repo",
+			configDir: "C:/repo/packages/app",
+			content:   "dist/\n",
+		},
+		{
+			name:      "other share is not ancestor",
+			ancestor:  "//server/other/repo",
+			configDir: "//server/share/repo/packages/app",
+			content:   "dist/\n",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := convertAncestorGitignoreToGlobs(test.content, test.ancestor, test.configDir, true)
+			assert.DeepEqual(t, actual, test.expected)
+		})
+	}
+}
+
 func TestReadGitignoreAsGlobs_AncestorInheritance(t *testing.T) {
 	// Root has .gitignore with dist/. configDir is packages/app (child).
 	// ReadGitignoreAsGlobs should walk UP to find root .gitignore.
@@ -346,6 +603,224 @@ func TestReadGitignoreAsGlobs_AncestorInheritance(t *testing.T) {
 		}
 	}
 	assert.Assert(t, hasDistGlob, "child configDir should inherit root .gitignore dist/ pattern")
+}
+
+func TestReadGitignoreAsGlobs_AncestorAnchoredOutsideConfigDoesNotApply(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                 "/dist/\n",
+		"dist/root-build.js":         "x",
+		"packages/app/dist/app.js":   "x",
+		"packages/app/src/index.js":  "x",
+		"packages/app/rslint.jsonc":  "[]",
+		"packages/other/dist/app.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	for _, g := range globs {
+		if strings.Contains(g, "dist") {
+			t.Fatalf("root-anchored /dist/ must not become a config-relative dist ignore for nested configs, got %v", globs)
+		}
+	}
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	appDist := tspath.NormalizePath(filepath.Join(appDir, "dist/app.js"))
+	if cfg.GetConfigForFile(appDist, appDir) == nil {
+		t.Fatalf("ancestor /dist/ should not ignore nested config dist file; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_AncestorAnchoredInsideConfigApplies(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                "/packages/app/dist/\n",
+		"packages/app/dist/app.js":  "x",
+		"packages/app/src/index.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["dist/**/*"], "ancestor pattern anchored into config should become config-relative dist/**/*, got: %v", globs)
+
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	appDist := tspath.NormalizePath(filepath.Join(appDir, "dist/app.js"))
+	if cfg.GetConfigForFile(appDist, appDir) != nil {
+		t.Fatalf("ancestor /packages/app/dist/ should ignore app dist; globs=%v", globs)
+	}
+	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
+	if cfg.GetConfigForFile(srcFile, appDir) == nil {
+		t.Fatalf("ancestor /packages/app/dist/ must not ignore src; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_AncestorWildcardInsideConfigApplies(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                "/packages/*/dist/\n",
+		"packages/app/dist/app.js":  "x",
+		"packages/app/src/index.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["dist/**/*"], "ancestor wildcard path should be projected under configDir, got: %v", globs)
+}
+
+func TestReadGitignoreAsGlobs_AncestorAnchoredParentDirCoversConfig(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                "/packages/\n",
+		"packages/app/src/index.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["**/*"], "ancestor pattern covering configDir should project to **/*, got: %v", globs)
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
+	if cfg.GetConfigForFile(srcFile, appDir) != nil {
+		t.Fatalf("ancestor /packages/ should ignore all files under packages/app; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_AncestorUnrootedParentDirCoversConfig(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                "packages/\n",
+		"packages/app/src/index.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["**/*"], "ancestor unrooted packages/ should cover configDir, got: %v", globs)
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
+	if cfg.GetConfigForFile(srcFile, appDir) != nil {
+		t.Fatalf("ancestor packages/ should ignore all files under packages/app; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_AncestorIgnoredConfigRootSkipsOwnGitignore(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                "packages/\n",
+		"packages/app/.gitignore":   "!src/index.js\n",
+		"packages/app/src/index.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	for _, glob := range globs {
+		if strings.HasPrefix(glob, "!") {
+			t.Fatalf("config root ignored by ancestor must not read own negation .gitignore, got: %v", globs)
+		}
+	}
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
+	if cfg.GetConfigForFile(srcFile, appDir) != nil {
+		t.Fatalf("ancestor packages/ should not be re-included by packages/app/.gitignore; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_AncestorIgnoredIntermediateSkipsGitignore(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                "packages/\n",
+		"packages/.gitignore":       "!app/src/index.js\n",
+		"packages/app/src/index.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	for _, glob := range globs {
+		if strings.HasPrefix(glob, "!") {
+			t.Fatalf("ignored intermediate ancestor must not re-include from its .gitignore, got: %v", globs)
+		}
+	}
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	srcFile := tspath.NormalizePath(filepath.Join(appDir, "src/index.js"))
+	if cfg.GetConfigForFile(srcFile, appDir) != nil {
+		t.Fatalf("ancestor packages/ should not be re-included by packages/.gitignore; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_AncestorChildWildcardReadsIntermediateGitignore(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                                   "packages/*\n!packages/app/\n",
+		"packages/.gitignore":                          "app/src/generated/\n",
+		"packages/app/src/generated/file.js":           "x",
+		"packages/app/src/generated/nested/other.js":   "x",
+		"packages/app/src/not-generated/file.js":       "x",
+		"packages/app/src/not-generated/nested/app.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	globs := ReadGitignoreAsGlobs(appDir, osvfs.FS(), nil)
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["src/generated/**/*"], "packages/.gitignore should be collected, got: %v", globs)
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	generated := tspath.NormalizePath(filepath.Join(appDir, "src/generated/file.js"))
+	if cfg.GetConfigForFile(generated, appDir) != nil {
+		t.Fatalf("intermediate .gitignore should ignore generated file; globs=%v", globs)
+	}
+	normal := tspath.NormalizePath(filepath.Join(appDir, "src/not-generated/file.js"))
+	if cfg.GetConfigForFile(normal, appDir) == nil {
+		t.Fatalf("root negation should keep non-generated file lintable; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobsForFiles_ChildWildcardReadsIntermediateGitignore(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                         "packages/*\n!packages/app/\n",
+		"packages/.gitignore":                "app/src/generated/\n",
+		"packages/app/src/generated/file.js": "x",
+	})
+	appDir := tspath.NormalizePath(filepath.Join(dir, "packages/app"))
+	generated := tspath.NormalizePath(filepath.Join(appDir, "src/generated/file.js"))
+
+	globs := ReadGitignoreAsGlobsForFiles(appDir, osvfs.FS(), []string{generated})
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["src/generated/**/*"], "explicit-file gitignore chain should include packages/.gitignore, got: %v", globs)
+	cfg := RslintConfig{
+		{Ignores: globs},
+		{Rules: Rules{"no-debugger": "error"}},
+	}
+	if cfg.GetConfigForFile(generated, appDir) != nil {
+		t.Fatalf("intermediate .gitignore should ignore explicit generated file; globs=%v", globs)
+	}
+}
+
+func TestReadGitignoreAsGlobs_DescendantChildWildcardReadsIntermediateGitignore(t *testing.T) {
+	dir := setupGitignoreFixture(t, map[string]string{
+		".gitignore":                         "packages/*\n!packages/app/\n",
+		"packages/.gitignore":                "app/src/generated/\n",
+		"packages/app/src/generated/file.js": "x",
+		"packages/app/src/index.js":          "x",
+	})
+
+	globs := ReadGitignoreAsGlobs(dir, osvfs.FS(), nil)
+
+	gs := globSet(globs)
+	assert.Assert(t, gs["packages/app/src/generated/**/*"], "root scan should read packages/.gitignore, got: %v", globs)
 }
 
 func TestReadGitignoreAsGlobs_AncestorPlusOwn(t *testing.T) {
@@ -671,24 +1146,22 @@ func TestReadGitignoreAsGlobs_ExactPathConfigIgnore(t *testing.T) {
 
 // A10: ExtractConfigIgnores only extracts from global-ignore entries.
 // An entry is "global ignore" when it has ONLY ignores — no files, rules, plugins, etc.
-// Note: {Files: []string{}} (empty slice) still counts as len(Files)==0, so IS global.
 func TestExtractConfigIgnores_OnlyGlobalEntries(t *testing.T) {
 	config := RslintConfig{
 		{Ignores: []string{"**/tests/**"}},                            // global ignore ✓
 		{Files: []string{"**/*.ts"}, Rules: Rules{"r": "error"}},      // has files+rules → NOT global
 		{Ignores: []string{"scripts/**"}},                             // global ignore ✓
-		{Files: []string{}, Ignores: []string{"also-global"}},         // empty files + only ignores → IS global (len(Files)==0)
+		{Files: []string{}, Ignores: []string{"not-global-empty"}},    // explicit empty files → NOT global (invalid at ingress)
 		{Ignores: []string{"vendor/**"}, Rules: Rules{"r": "error"}},  // has rules → NOT global
 		{Files: []string{"**/*.js"}, Ignores: []string{"not-global"}}, // has non-empty files → NOT global
 	}
 
 	ignores := ExtractConfigIgnores(config)
 
-	// Entries 0, 2, 3 are global ignores. Entries 1, 4, 5 are not.
-	assert.Equal(t, len(ignores), 3, "should extract exactly 3 patterns, got: %v", ignores)
+	// Entries 0 and 2 are global ignores. Entries 1, 3, 4, 5 are not.
+	assert.Equal(t, len(ignores), 2, "should extract exactly 2 patterns, got: %v", ignores)
 	assert.Equal(t, ignores[0].Glob, "**/tests/**")
 	assert.Equal(t, ignores[1].Glob, "scripts/**")
-	assert.Equal(t, ignores[2].Glob, "also-global")
 }
 
 // A11: multiple global ignore entries — all patterns combined.

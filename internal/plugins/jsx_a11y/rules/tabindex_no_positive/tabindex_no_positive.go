@@ -50,7 +50,7 @@ const errorMessage = "Avoid positive integer values for tabIndex."
 
 var TabindexNoPositiveRule = rule.Rule{
 	Name: "jsx-a11y/tabindex-no-positive",
-	Run: func(ctx rule.RuleContext, _ any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _ []any) rule.RuleListeners {
 		// Source text is needed for raw-string extraction on template
 		// literals (NoSubstitutionTemplateLiteral has no RawText field in
 		// tsgo). Captured once per file so the per-attribute callback

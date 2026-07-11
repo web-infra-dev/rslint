@@ -144,7 +144,8 @@ func ancestorSome(node *ast.Node, pred func(*ast.Node) bool) bool {
 
 var NoCallbackInPromiseRule = rule.Rule{
 	Name: "promise/no-callback-in-promise",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		opts := parseOptions(options)
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {

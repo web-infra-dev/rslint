@@ -124,7 +124,7 @@ func checkForLoops(s *core.RunState, node *ast.Node) {
 var NoLoopFuncRule = rule.CreateRule(rule.Rule{
 	Name:             "no-loop-func",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}
 		}

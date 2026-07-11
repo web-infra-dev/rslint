@@ -25,10 +25,10 @@ func parseOptions(rawOpts any) options {
 	opts := options{
 		allowArgumentsExplicitlyTypedAsAny:        false,
 		allowDirectConstAssertionInArrowFunctions: true,
-		allowedNames:                              nil,
-		allowHigherOrderFunctions:                 true,
-		allowOverloadFunctions:                    false,
-		allowTypedFunctionExpressions:             true,
+		allowedNames:                  nil,
+		allowHigherOrderFunctions:     true,
+		allowOverloadFunctions:        false,
+		allowTypedFunctionExpressions: true,
 	}
 	optsMap := utils.GetOptionsMap(rawOpts)
 	if optsMap == nil {
@@ -71,7 +71,8 @@ var ExplicitModuleBoundaryTypesRule = rule.CreateRule(rule.Rule{
 	Run:              run,
 })
 
-func run(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+func run(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+	rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 	opts := parseOptions(rawOptions)
 
 	// Per-file state. rslint constructs a new RuleListeners for each file, so
@@ -668,7 +669,6 @@ func variableStatementDeclarators(node *ast.Node) []*ast.Node {
 	}
 	return list.Declarations.Nodes
 }
-
 
 // isValidFunctionReturnType mirrors upstream's `isValidFunctionReturnType`.
 func isValidFunctionReturnType(node *ast.Node, returns []*ast.Node, opts options) bool {

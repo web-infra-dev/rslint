@@ -8,7 +8,7 @@ import (
 // https://eslint.org/docs/latest/rules/default-case-last
 var DefaultCaseLastRule = rule.Rule{
 	Name: "default-case-last",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
 				switchStmt := node.AsSwitchStatement()

@@ -1,90 +1,58 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import fs from 'node:fs';
-import path from 'node:path';
 import {
   waitForDiagnostics,
   waitForDiagnosticsCount,
   waitForContentChange,
   withOnSaveFixAll,
-  prewarmOnSaveFixAll,
   replaceAll,
-  getFixturesDir,
 } from './fixall-helpers';
+
+function assertHasFixableDiagnostic(
+  diagnostics: vscode.Diagnostic[],
+  context: string,
+): void {
+  assert.ok(
+    diagnostics.some((d) =>
+      d.message.includes('no-unnecessary-type-assertion'),
+    ),
+    `${context}: expected no-unnecessary-type-assertion. Got: ${diagnostics
+      .map((d) => d.message)
+      .join(' | ')}`,
+  );
+}
 
 suite('rslint fixAll - on-save', function () {
   this.timeout(120000);
 
-  // Prime the on-save fixAll pipeline once before the first test that
-  // exercises it. The helper is process-wide idempotent — if another
-  // suite has already warmed it, this resolves immediately.
-  suiteSetup(async function () {
-    this.timeout(120000);
-    await prewarmOnSaveFixAll();
-  });
-
   test('generic source.fixAll triggers rslint via on-save', async () => {
-    const fixturesDir = getFixturesDir();
-    const tmpFile = path.join(
-      fixturesDir,
-      'src',
-      `_fixall_generic_${Date.now()}.ts`,
-    );
-    fs.writeFileSync(tmpFile, '// placeholder\n', 'utf-8');
-
-    try {
-      const config = vscode.workspace.getConfiguration('editor');
-      const previousValue = config.get('codeActionsOnSave');
-      await config.update(
-        'codeActionsOnSave',
-        { 'source.fixAll': 'explicit' },
-        vscode.ConfigurationTarget.Workspace,
-      );
-
-      try {
-        const doc = await vscode.workspace.openTextDocument(tmpFile);
-        const editor = await vscode.window.showTextDocument(doc);
-
+    await withOnSaveFixAll(
+      async (doc, editor) => {
         await replaceAll(
           editor,
           "const gfVal: string = 'x';\nconst gfRes = (gfVal as string).trim();\n",
         );
 
         const diags = await waitForDiagnostics(doc);
-        if (
-          !diags.some((d) =>
-            d.message.includes('no-unnecessary-type-assertion'),
-          )
-        ) {
-          return;
-        }
+        assertHasFixableDiagnostic(diags, 'generic source.fixAll setup');
 
-        await doc.save();
-
-        const startTime = Date.now();
-        while (
-          doc.getText().includes('gfVal as string') &&
-          Date.now() - startTime < 20000
-        ) {
-          await new Promise((r) => setTimeout(r, 500));
-        }
+        assert.ok(
+          await doc.save(),
+          'Document should complete the generic source.fixAll save pipeline',
+        );
+        await waitForContentChange(
+          doc,
+          (content) => !content.includes('gfVal as string'),
+          60000,
+        );
 
         assert.ok(
           !doc.getText().includes('gfVal as string'),
           `Generic source.fixAll should trigger rslint fixAll.\nContent: ${doc.getText()}`,
         );
-      } finally {
-        await config.update(
-          'codeActionsOnSave',
-          previousValue,
-          vscode.ConfigurationTarget.Workspace,
-        );
-      }
-    } finally {
-      if (fs.existsSync(tmpFile)) {
-        fs.unlinkSync(tmpFile);
-      }
-    }
+      },
+      { 'source.fixAll': 'explicit' },
+    );
   });
 
   test('fixable issues get auto-fixed', async () => {
@@ -97,20 +65,14 @@ suite('rslint fixAll - on-save', function () {
       await replaceAll(editor, fixableContent);
 
       const diags = await waitForDiagnostics(doc);
-      const hasFixable = diags.some((d) =>
-        d.message.includes('no-unnecessary-type-assertion'),
+      assertHasFixableDiagnostic(diags, 'fixable on-save setup');
+
+      assert.ok(await doc.save(), 'Fixable document should save');
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('saveVal as string'),
+        60000,
       );
-      if (!hasFixable) return;
-
-      await doc.save();
-
-      const startTime = Date.now();
-      while (
-        doc.getText().includes('saveVal as string') &&
-        Date.now() - startTime < 20000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
 
       assert.ok(
         !doc.getText().includes('saveVal as string'),
@@ -127,21 +89,13 @@ suite('rslint fixAll - on-save', function () {
         "const probeVal: string = 'x';\nconst probeRes = (probeVal as string).trim();\n",
       );
       const probeDiags = await waitForDiagnostics(doc);
-      if (
-        !probeDiags.some((d) =>
-          d.message.includes('no-unnecessary-type-assertion'),
-        )
-      ) {
-        return;
-      }
-      await doc.save();
-      const probeStart = Date.now();
-      while (
-        doc.getText().includes('probeVal as string') &&
-        Date.now() - probeStart < 10000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
+      assertHasFixableDiagnostic(probeDiags, 'clean-file probe setup');
+      assert.ok(await doc.save(), 'Clean-file probe should save');
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('probeVal as string'),
+        60000,
+      );
       assert.ok(
         !doc.getText().includes('probeVal as string'),
         'Probe: on-save fixAll should be active',
@@ -153,7 +107,7 @@ suite('rslint fixAll - on-save', function () {
       await replaceAll(editor, cleanContent);
       await new Promise((r) => setTimeout(r, 3000));
 
-      await doc.save();
+      assert.ok(await doc.save(), 'Clean document should save');
       await new Promise((r) => setTimeout(r, 2000));
 
       assert.strictEqual(
@@ -172,21 +126,13 @@ suite('rslint fixAll - on-save', function () {
         "const probeVal2: string = 'x';\nconst probeRes2 = (probeVal2 as string).trim();\n",
       );
       const probeDiags = await waitForDiagnostics(doc);
-      if (
-        !probeDiags.some((d) =>
-          d.message.includes('no-unnecessary-type-assertion'),
-        )
-      ) {
-        return;
-      }
-      await doc.save();
-      const probeStart = Date.now();
-      while (
-        doc.getText().includes('probeVal2 as string') &&
-        Date.now() - probeStart < 10000
-      ) {
-        await new Promise((r) => setTimeout(r, 500));
-      }
+      assertHasFixableDiagnostic(probeDiags, 'non-fixable probe setup');
+      assert.ok(await doc.save(), 'Non-fixable probe should save');
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('probeVal2 as string'),
+        60000,
+      );
       assert.ok(
         !doc.getText().includes('probeVal2 as string'),
         'Probe: on-save fixAll should be active',
@@ -199,7 +145,7 @@ suite('rslint fixAll - on-save', function () {
       const diags = await waitForDiagnostics(doc);
       assert.ok(diags.length > 0, 'Should have non-fixable diagnostics');
 
-      await doc.save();
+      assert.ok(await doc.save(), 'Non-fixable document should save');
       await new Promise((r) => setTimeout(r, 2000));
 
       assert.strictEqual(
@@ -219,28 +165,34 @@ suite('rslint fixAll - on-save', function () {
   test('edit then immediately save (debounce not fired)', async () => {
     await withOnSaveFixAll(async (doc, editor) => {
       await replaceAll(editor, '// clean start\nexport {};\n');
-      await doc.save();
-      await waitForDiagnosticsCount(doc, 0);
+      assert.ok(await doc.save(), 'Initial clean document should save');
+      const cleanDiagnostics = await waitForDiagnosticsCount(doc, 0);
+      assert.strictEqual(
+        cleanDiagnostics.length,
+        0,
+        `Initial clean document should have no diagnostics. Got: ${cleanDiagnostics
+          .map((d) => d.message)
+          .join(' | ')}`,
+      );
 
       await replaceAll(
         editor,
         "const quickVal: string = 'x';\nconst quickRes = (quickVal as string).trim();\n",
       );
 
-      await doc.save();
+      assert.ok(
+        await doc.save(),
+        'Edited document should complete the code-action-on-save pipeline',
+      );
 
       // Event-driven wait — Windows CI needs more headroom than the previous
       // 20 s polling loop, and `onDidChangeTextDocument` resolves the moment
       // the on-save fixAll edit lands (sub-ms vs. 500 ms poll cadence).
-      try {
-        await waitForContentChange(
-          doc,
-          (content) => !content.includes('quickVal as string'),
-          60000,
-        );
-      } catch {
-        // fall through to assertion for a clearer failure message
-      }
+      await waitForContentChange(
+        doc,
+        (content) => !content.includes('quickVal as string'),
+        60000,
+      );
 
       assert.ok(
         !doc.getText().includes('quickVal as string'),

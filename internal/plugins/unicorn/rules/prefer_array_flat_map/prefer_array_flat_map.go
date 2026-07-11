@@ -6,6 +6,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/web-infra-dev/rslint/internal/plugins/unicorn/unicornutil"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -17,55 +18,17 @@ var preferArrayFlatMapMessage = rule.RuleMessage{
 	Description: "Prefer `.flatMap(…)` over `.map(…).flat()`.",
 }
 
-type dotMethodCall struct {
-	call      *ast.Node
-	rawCallee *ast.Node
-	callee    *ast.Node
-	object    *ast.Node
-	property  *ast.Node
-}
+type dotMethodCall = unicornutil.DotMethodCall
 
 // matchDotMethodCall mirrors unicorn's isMethodCall with computed:false. The
 // wider utils.IsSpecificMemberAccess helper also matches static bracket access,
 // which would make foo["map"](...).flat() a false positive for this rule.
 func matchDotMethodCall(node *ast.Node, method string, optionalCallFalse bool, optionalMemberFalse bool) (dotMethodCall, bool) {
-	if node == nil || !ast.IsCallExpression(node) {
-		return dotMethodCall{}, false
-	}
-
-	call := node.AsCallExpression()
-	// Check the direct optional token, not ast.IsOptionalChain: in tsgo,
-	// foo?.map(...).flat() marks later links as optional-chain nodes too, but
-	// upstream still reports because only map's member access is optional.
-	if optionalCallFalse && call.QuestionDotToken != nil {
-		return dotMethodCall{}, false
-	}
-
-	rawCallee := call.Expression
-	callee := ast.SkipParentheses(rawCallee)
-	// Parentheses around an optional-chain callee are not transparent to
-	// upstream isMethodCall: (foo?.map)(cb) is not treated as foo?.map(cb).
-	if callee == nil || (rawCallee != callee && ast.IsOptionalChain(callee)) || !ast.IsPropertyAccessExpression(callee) {
-		return dotMethodCall{}, false
-	}
-
-	propAccess := callee.AsPropertyAccessExpression()
-	if optionalMemberFalse && propAccess.QuestionDotToken != nil {
-		return dotMethodCall{}, false
-	}
-
-	property := propAccess.Name()
-	if property == nil || !ast.IsIdentifier(property) || property.AsIdentifier().Text != method {
-		return dotMethodCall{}, false
-	}
-
-	return dotMethodCall{
-		call:      node,
-		rawCallee: rawCallee,
-		callee:    callee,
-		object:    propAccess.Expression,
-		property:  property,
-	}, true
+	return unicornutil.MatchDotMethodCall(node, unicornutil.DotMethodCallOptions{
+		Method:              method,
+		AllowOptionalCall:   !optionalCallFalse,
+		AllowOptionalMember: !optionalMemberFalse,
+	})
 }
 
 func hasNoDepthOrRawDepthOne(sf *ast.SourceFile, call *ast.Node) bool {
@@ -119,11 +82,11 @@ func nodeMatchesPathParts(node *ast.Node, parts []string) bool {
 }
 
 func buildFixes(sf *ast.SourceFile, flatCall dotMethodCall, mapCall dotMethodCall) []rule.RuleFix {
-	mapPropertyRange := utils.TrimNodeTextRange(sf, mapCall.property)
+	mapPropertyRange := utils.TrimNodeTextRange(sf, mapCall.Property)
 	// Remove the .flat member and the following call separately, preserving any
 	// parentheses around the callee: (foo.map(cb).flat)() -> (foo.flatMap(cb)).
-	removeFlatPropertyRange := core.NewTextRange(flatCall.object.End(), flatCall.callee.End())
-	removeFlatArgumentsRange := core.NewTextRange(flatCall.rawCallee.End(), flatCall.call.End())
+	removeFlatPropertyRange := core.NewTextRange(flatCall.Object.End(), flatCall.Callee.End())
+	removeFlatArgumentsRange := core.NewTextRange(flatCall.RawCallee.End(), flatCall.Call.End())
 	return []rule.RuleFix{
 		rule.RuleFixReplaceRange(mapPropertyRange, "flatMap"),
 		rule.RuleFixRemoveRange(removeFlatPropertyRange),
@@ -134,7 +97,7 @@ func buildFixes(sf *ast.SourceFile, flatCall dotMethodCall, mapCall dotMethodCal
 // https://github.com/sindresorhus/eslint-plugin-unicorn/blob/v64.0.0/docs/rules/prefer-array-flat-map.md
 var PreferArrayFlatMapRule = rule.Rule{
 	Name: "unicorn/prefer-array-flat-map",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				flatCall, ok := matchDotMethodCall(node, "flat", true, true)
@@ -142,13 +105,13 @@ var PreferArrayFlatMapRule = rule.Rule{
 					return
 				}
 
-				mapCallObject := ast.SkipParentheses(flatCall.object)
+				mapCallObject := ast.SkipParentheses(flatCall.Object)
 				mapCall, ok := matchDotMethodCall(mapCallObject, "map", true, false)
-				if !ok || isIgnoredMapObject(mapCall.object) {
+				if !ok || isIgnoredMapObject(mapCall.Object) {
 					return
 				}
 
-				reportRange := utils.TrimNodeTextRange(ctx.SourceFile, mapCall.property).WithEnd(node.End())
+				reportRange := utils.TrimNodeTextRange(ctx.SourceFile, mapCall.Property).WithEnd(node.End())
 				ctx.ReportRangeWithFixes(
 					reportRange,
 					preferArrayFlatMapMessage,

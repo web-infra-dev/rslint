@@ -98,7 +98,7 @@ func removeForwardRefSuggestion(ctx rule.RuleContext, call *ast.Node, fn *ast.No
 // https://github.com/jsx-eslint/eslint-plugin-react/blob/master/docs/rules/forward-ref-uses-ref.md
 var ForwardRefUsesRefRule = rule.Rule{
 	Name: "react/forward-ref-uses-ref",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkFunction := func(node *ast.Node) {
 			call := parentForwardRefCall(node)
 			if call == nil {

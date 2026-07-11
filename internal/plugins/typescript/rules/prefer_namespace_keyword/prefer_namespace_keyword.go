@@ -15,7 +15,7 @@ func buildUseNamespaceMessage() rule.RuleMessage {
 
 var PreferNamespaceKeywordRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-namespace-keyword",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindModuleDeclaration: func(node *ast.Node) {
 				moduleDecl := node.AsModuleDeclaration()

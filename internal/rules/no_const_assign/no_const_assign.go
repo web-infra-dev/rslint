@@ -261,7 +261,7 @@ func checkIdentifierWrite(node *ast.Node, ctx *rule.RuleContext, constSymbols ma
 var NoConstAssignRule = rule.Rule{
 	Name:             "no-const-assign",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		// Track const declarations by their symbol
 		constSymbols := make(map[*ast.Symbol]bool)
 

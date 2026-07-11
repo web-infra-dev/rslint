@@ -16,7 +16,8 @@ func unusedExpressionMessage() rule.RuleMessage {
 // https://typescript-eslint.io/rules/no-unused-expressions
 var NoUnusedExpressionsRule = rule.CreateRule(rule.Rule{
 	Name: "no-unused-expressions",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := utils.ParseNoUnusedExpressionOptions(rawOptions)
 
 		return rule.RuleListeners{

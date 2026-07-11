@@ -48,7 +48,7 @@ func RegisterEslintPluginRules(entries []EslintPluginEntry) {
 				Name:               fullName,
 				RequiresTypeInfo:   false,
 				IsEslintPluginRule: true,
-				Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+				Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 					// Never executed: plugin rules run in the Node worker.
 					return rule.RuleListeners{}
 				},

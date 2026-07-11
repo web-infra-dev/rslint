@@ -13,7 +13,7 @@ import (
 // rule is unnecessary. It exists only for configuration compatibility.
 var JsxUsesVarsRule = rule.Rule{
 	Name: "react/jsx-uses-vars",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{}
 	},
 }

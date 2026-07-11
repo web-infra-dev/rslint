@@ -32,6 +32,9 @@ import * as eslintScopePkg from 'eslint-scope';
 
 import { VISITOR_KEYS } from './visitor-keys.js';
 import { BUILTIN_GLOBAL_NAMES } from './builtin-globals.js';
+import type { GlobalAccess } from '../types.js';
+
+type NormalizedGlobalAccess = 'readonly' | 'writable' | 'off';
 
 /** Subset of options accepted by both analyzers. */
 export interface ScopeFactoryOptions {
@@ -41,11 +44,11 @@ export interface ScopeFactoryOptions {
   ecmaVersion?: number | 'latest';
   /**
    * `languageOptions.globals` from the user's flat-config — a map of
-   * `name → 'readonly' | 'writable' | 'off'`. Used to seed the
-   * scope-manager so user-declared globals don't false-positive
-   * `no-undef` and similar rules.
+   * global names to ESLint-compatible access values. Used to seed the
+   * scope-manager so user-declared globals don't false-positive `no-undef`
+   * and similar rules.
    */
-  globals?: Record<string, 'readonly' | 'writable' | 'off'>;
+  globals?: Record<string, GlobalAccess>;
   /**
    * `languageOptions.parserOptions.ecmaFeatures.impliedStrict`. ESLint
    * v10 default is `false`; setting it `true` treats the source as if
@@ -200,6 +203,8 @@ interface SyntheticGlobal {
   scope: unknown;
 }
 
+const syntheticGlobals = new WeakSet<object>();
+
 interface GlobalScopeLike {
   variables: SyntheticGlobal[];
   set?: Map<string, SyntheticGlobal>;
@@ -210,7 +215,8 @@ interface GlobalScopeLike {
  * Add or update a synthetic global Variable in `globalScope`. Returns
  * the (newly created or existing) Variable.
  *
- * Mode is ALWAYS synced to `mode` — even on existing entries. ESLint's
+ * Mode is synced to `mode` for existing synthetic entries. Source-declared
+ * Variables are left unchanged. ESLint's
  * apply-environments + apply-globals pipeline lets user globals
  * (`languageOptions.globals: { Array: 'writable' }`) override the
  * built-in mode flags layered earlier by `seedEcmaGlobals`. Pre-fix
@@ -229,6 +235,9 @@ function ensureGlobal(
 ): SyntheticGlobal {
   const existing = gs.set?.get(name);
   if (existing) {
+    // A source declaration can share a name with a configured/built-in global.
+    // Config globals must not rewrite that lexical Variable's semantics.
+    if (!syntheticGlobals.has(existing)) return existing;
     // Sync mode — see jsdoc. The Variable's identity stays; only the
     // mode flags shift. Downstream rules consult `writeable` (the
     // typo'd-as-eslint-compat field) and `eslintImplicitGlobalSetting`
@@ -246,6 +255,7 @@ function ensureGlobal(
     eslintImplicitGlobalSetting: mode,
     scope: gs,
   };
+  syntheticGlobals.add(v);
   gs.variables.push(v);
   gs.set?.set(name, v);
   return v;
@@ -325,7 +335,7 @@ export function seedEcmaGlobals(scopeManager: unknown): void {
  */
 export function seedGlobals(
   scopeManager: unknown,
-  globals: Record<string, 'readonly' | 'writable' | 'off'> | undefined,
+  globals: Record<string, GlobalAccess> | undefined,
 ): void {
   if (!scopeManager) return;
   const sm = scopeManager as { globalScope?: GlobalScopeLike };
@@ -339,11 +349,13 @@ export function seedGlobals(
     return;
   }
 
-  for (const [name, mode] of Object.entries(globals)) {
+  for (const [name, access] of Object.entries(globals)) {
+    const mode = normalizeGlobalAccess(access);
+    if (mode == null) continue;
     if (mode === 'off') {
       // 'off' explicitly removes the binding — drop any synthetic entry.
-      if (gs.set?.has(name)) {
-        const v = gs.set.get(name)!;
+      const v = gs.set?.get(name);
+      if (v && syntheticGlobals.has(v)) {
         // Restore any references that `seedEcmaGlobals` previously
         // moved from `gs.through` onto this Variable. Without this,
         // every ref is left dangling on a deleted Variable —
@@ -370,11 +382,36 @@ export function seedGlobals(
         }
         const idx = gs.variables.indexOf(v);
         if (idx >= 0) gs.variables.splice(idx, 1);
-        gs.set.delete(name);
+        gs.set?.delete(name);
       }
       continue;
     }
     ensureGlobal(gs, name, mode);
   }
   resolveThroughReferences(gs);
+}
+
+function normalizeGlobalAccess(
+  access: GlobalAccess,
+): NormalizedGlobalAccess | undefined {
+  switch (access) {
+    case true:
+    case 'true':
+    case 'writable':
+    case 'writeable':
+      return 'writable';
+    case false:
+    case null:
+    case 'false':
+    case 'readonly':
+    case 'readable':
+      return 'readonly';
+    case 'off':
+      return 'off';
+    default:
+      // Config validation rejects unknown values before plugin execution.
+      // Keep the scope boundary defensive so a runtime value that bypassed
+      // validation cannot become an invalid eslintImplicitGlobalSetting.
+      return undefined;
+  }
 }

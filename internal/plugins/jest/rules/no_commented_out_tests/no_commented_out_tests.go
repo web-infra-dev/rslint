@@ -45,7 +45,7 @@ func commentInnerText(sourceText string, comment *ast.CommentRange) string {
 
 var NoCommentedOutTestsRule = rule.Rule{
 	Name: "jest/no-commented-out-tests",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		text := ctx.SourceFile.Text()
 		utils.ForEachComment(ctx.SourceFile.AsNode(), func(comment *ast.CommentRange) {
 			if comment == nil {

@@ -221,7 +221,7 @@ func isImportBindingName(node *ast.Node) bool {
 // NoImportAssignRule disallows assigning to imported bindings.
 var NoImportAssignRule = rule.Rule{
 	Name: "no-import-assign",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				importDecl := node.AsImportDeclaration()

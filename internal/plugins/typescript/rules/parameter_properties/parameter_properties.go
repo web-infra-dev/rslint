@@ -87,7 +87,8 @@ type propertyNodes struct {
 
 var ParameterPropertiesRule = rule.CreateRule(rule.Rule{
 	Name: "parameter-properties",
-	Run: func(ctx rule.RuleContext, rawOptions any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _rawOptions []any) rule.RuleListeners {
+		rawOptions := rule.LegacyUnwrapOptions(_rawOptions)
 		opts := parseOptions(rawOptions)
 
 		if opts.prefer == "class-property" {

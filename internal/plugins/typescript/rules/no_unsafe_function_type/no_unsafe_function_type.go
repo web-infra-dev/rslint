@@ -16,7 +16,7 @@ func buildBannedFunctionTypeMessage() rule.RuleMessage {
 var NoUnsafeFunctionTypeRule = rule.CreateRule(rule.Rule{
 	Name:             "no-unsafe-function-type",
 	RequiresTypeInfo: true,
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		checkBannedType := func(ident *ast.Node) {
 			if ident == nil || ident.Kind != ast.KindIdentifier {
 				return

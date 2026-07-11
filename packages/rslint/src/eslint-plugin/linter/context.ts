@@ -42,6 +42,7 @@ import {
   type ReportDescriptor,
   type SuggestionsMode,
 } from './diagnostic-builder.js';
+import type { GlobalsConfig } from '../types.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Public types
@@ -73,7 +74,7 @@ export interface LanguageOptions {
   ecmaVersion?: number | 'latest';
   /** Module / script / commonjs — top-level in ESLint v10. Same rationale as `ecmaVersion`. */
   sourceType?: 'module' | 'script' | 'commonjs';
-  globals?: Record<string, 'readonly' | 'writable' | 'off'>;
+  globals?: GlobalsConfig;
   /**
    * Parser-specific extras. Only `ecmaFeatures` lives here in v10
    * (rules that gate on `jsx` / `globalReturn` / `impliedStrict` read

@@ -10,7 +10,7 @@ import (
 // https://eslint.org/docs/latest/rules/no-useless-concat
 var NoUselessConcatRule = rule.Rule{
 	Name: "no-useless-concat",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 		lineMap := sourceFile.ECMALineMap()
 

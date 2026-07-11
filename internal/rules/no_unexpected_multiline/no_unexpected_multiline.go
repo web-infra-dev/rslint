@@ -33,7 +33,7 @@ var messageDivision = rule.RuleMessage{
 // https://eslint.org/docs/latest/rules/no-unexpected-multiline
 var NoUnexpectedMultilineRule = rule.Rule{
 	Name: "no-unexpected-multiline",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options []any) rule.RuleListeners {
 		sf := ctx.SourceFile
 		text := sf.Text()
 		lineMap := sf.ECMALineMap()

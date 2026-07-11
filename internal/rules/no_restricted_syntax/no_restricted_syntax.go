@@ -18,7 +18,8 @@ import (
 // https://eslint.org/docs/latest/rules/no-restricted-syntax
 var NoRestrictedSyntaxRule = rule.Rule{
 	Name: "no-restricted-syntax",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, _options []any) rule.RuleListeners {
+		options := rule.LegacyUnwrapOptions(_options)
 		entries := parseRuleOptions(options)
 		if len(entries) == 0 {
 			return rule.RuleListeners{}
